@@ -549,6 +549,36 @@ describe("M4.2 document API integration", () => {
 
     expect(createdDocument.pageRangeId).not.toBeNull();
     expect(createdDocument.sourceDocumentId).toBe(sourceDocument.id);
+
+    const lessonDocumentsResponse = await request(httpServer)
+      .get(`/api/v1/admin/lessons/${createdLesson.id}/documents`)
+      .set("Authorization", `Bearer ${accessToken}`)
+      .expect(200);
+    expect(lessonDocumentsResponse.body.data).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: createdDocument.id })]),
+    );
+
+    const learningPathDocumentsResponse = await request(httpServer)
+      .get(`/api/v1/admin/learning-paths/${ids.learningPath}/lesson-documents`)
+      .set("Authorization", `Bearer ${accessToken}`)
+      .expect(200);
+    expect(learningPathDocumentsResponse.body.data).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: createdDocument.id })]),
+    );
+
+    await request(httpServer)
+      .put(`/api/v1/admin/source-documents/${sourceDocument.id}/lesson-page-ranges`)
+      .set("Authorization", `Bearer ${accessToken}`)
+      .send({
+        ranges: [
+          {
+            lessonId: createdLesson.id,
+            pageEnd: 3,
+            pageStart: 1,
+          },
+        ],
+      })
+      .expect(200);
   });
 
   it("supports multiple source documents and multiple non-overlapping extractions per lesson", async () => {

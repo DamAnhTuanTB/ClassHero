@@ -2148,6 +2148,8 @@ model ProviderUsageEvent {
   sourceDocument        SourceDocument?            @relation("ProviderUsageSourceDocument", fields: [sourceDocumentId], references: [id], onDelete: SetNull)
   feature               AiGenerationType?
   purpose               AiModelPurpose?
+  operation             String?
+  reasoningEffort       String?                    @map("reasoning_effort")
   attempt               Int                        @default(1)
   providerRequestId     String?                    @map("provider_request_id")
   status                ProviderUsageStatus        @default(RUNNING)

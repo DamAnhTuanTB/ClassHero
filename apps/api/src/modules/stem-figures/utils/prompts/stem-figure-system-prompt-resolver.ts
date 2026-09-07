@@ -5,7 +5,11 @@ import { buildChemistryStemFigureSystemPrompt } from "#api/modules/stem-figures/
 import { buildGeneralStemFigureSystemPrompt } from "#api/modules/stem-figures/utils/prompts/general-stem-figure-system-prompt";
 
 export type StemFigureSystemPromptMode =
-  "REGENERATE_FROM_SOURCE" | "EDIT_CURRENT_SOURCE" | "GENERATE_FROM_BLOCK" | "REPAIR";
+  | "REGENERATE_FROM_SOURCE"
+  | "EDIT_CURRENT_SOURCE"
+  | "GENERATE_FROM_BLOCK"
+  | "GENERATE_SOLUTION_FROM_BLOCK"
+  | "REPAIR";
 
 export function buildStemFigureSystemPrompt(
   subject: LessonSummarySubjectSnapshot,

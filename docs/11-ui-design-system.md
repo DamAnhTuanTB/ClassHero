@@ -177,8 +177,11 @@ Spacing/radius mặc định:
 - Action icon trong admin phải dùng màu theo ý nghĩa để dễ quét: sửa dùng xanh, xóa dùng đỏ, đóng/hủy dùng màu trung tính hoặc xanh nhẹ. Hành động xóa phải mở modal xác nhận rõ tên item trước khi thực thi.
 - Action câu trước/câu tiếp theo thay nội dung ngay trong cùng một card phải giữ
   nguyên tọa độ cuộn của trang. Không focus một control nằm ngoài viewport sau
-  click khiến trình duyệt tự cuộn; keyboard navigation trong tablist vẫn được
-  phép chuyển focus giữa các tab bằng cơ chế riêng.
+  click khiến trình duyệt tự cuộn. Keyboard navigation trong tablist vẫn được
+  phép chuyển focus giữa các tab bằng cơ chế riêng, ngoại trừ tab Quiz của màn
+  chi tiết buổi học: khi Quiz đang active, `ArrowLeft`/`ArrowRight` được dành cho
+  câu trước/câu tiếp theo và không đổi sang tab Kiến thức/Flashcard. Shortcut này
+  không bắt sự kiện trong input/editor/dialog hoặc composite control khác.
 - Editor chỉnh nhẹ ảnh raster dùng icon `WandSparkles` với tooltip/aria-label
   `Chỉnh sửa ảnh`; chỉ hiện khi asset hỗ trợ, không để một nút disabled khó hiểu
   trên ảnh TeX. Modal giữ ba vùng header/content/footer, lazy-load và chỉ có hai
@@ -239,11 +242,47 @@ Spacing/radius mặc định:
   chỉ đóng popover; nhóm điều chỉnh nhiều mức như cỡ chữ dùng segmented controls
   với nhãn đời thường, không bắt admin nhập lệnh hoặc số pt.
 - Khi `Chỉnh nhanh` liệt kê text lấy từ code, mỗi text slot phải có một row input
-  riêng và action xóa sở hữu đúng row. Giữ thứ tự source, phân biệt các giá trị
+  riêng, icon áp dụng commit đúng row và action xóa sở hữu đúng row. Giữ thứ tự source, phân biệt các giá trị
   trùng nhau bằng định danh cú pháp thay vì nội dung chuỗi, dùng vùng cuộn giới
   hạn và empty/unsupported state rõ ràng. Không compile theo từng phím; commit ở
   blur/Enter, Escape hoàn nguyên edit chưa commit và lỗi compile không được làm
   mất source/input hợp lệ gần nhất.
+- Footer `Biên dịch` chỉ refresh preview; khi popover `Chỉnh nhanh` hoặc vùng cài
+  đặt một row đang mở, thao tác này phải giữ nguyên trạng thái mở để admin chỉnh
+  liên tục. Icon áp dụng từng row dùng cùng compile guard và không phát sinh lượt
+  compile thứ hai do sự kiện blur.
+- Công cụ nhập hình học bằng tên điểm phải xác nhận lại cách hiểu trước submit:
+  hiển thị tên góc chuẩn hóa, điểm giữa là đỉnh, số marker và cạnh sẽ tự thêm.
+  Không ẩn hành vi nối cạnh phía sau CTA; dùng checkbox mặc định bật, lỗi inline
+  và giữ source cũ khi tên điểm, tọa độ hoặc miền góc chưa xác định an toàn.
+- Action destructive `Bỏ góc` đặt cạnh `Thêm góc`, dùng riêng tên góc đang nhập
+  và không phụ thuộc field số đo. Không render banner đỏ/cảnh báo destructive
+  trong lúc chỉ đang nhập tên; màu destructive ở CTA là đủ. Action phải xóa cả
+  nhãn số đo embedded hoặc node rời có ownership tường minh, nhưng không được xóa
+  named point hoặc topology của hình.
+- `Thêm góc` phải là upsert: nhập lại cùng geometry với số đo mới sẽ thay số đo
+  và trọn nhóm cung cũ. Góc bằng nhau dùng cùng kiểu cung; góc khác số đo hoặc
+  chưa chứng minh bằng nhau không được dùng chung kiểu vì sẽ tạo ngụ ý hình học sai.
+- Công cụ cạnh dùng một input hai điểm và hai action đối nghĩa `Nối`/`Bỏ nối`,
+  luôn hiện trạng thái cạnh hiện tại trước khi admin bấm. Cạnh mới phải kế thừa
+  độ dày chiếm ưu thế trong hình, không rơi về stroke mặc định mảnh hơn. Xóa một số đo góc do
+  angle marker sở hữu phải xóa cả visual marker tương ứng; không để lại cung vô
+  nghĩa sau khi nhãn biến mất và không xóa hai cạnh tạo góc.
+- Công cụ midpoint dùng hai input ngắn `Đoạn thẳng`/`Tên trung điểm`, không yêu
+  cầu admin tự viết TikZ. Cặp marker phải nằm ở hai nửa đoạn (`.25`/`.75` trên
+  path toàn phần), tránh chồng lên điểm giữa; nhóm đoạn độc lập dùng lần lượt
+  palette marker khác nhau, mỗi glyph tối đa hai nét gọn.
+  Tên midpoint được chuẩn hóa viết hoa; nhãn midpoint kế thừa font-size đang dùng
+  cho các nhãn điểm trong hình.
+  Submit tên mới cho đoạn đã có đúng một midpoint do tool quản lý phải thay thế
+  atomic midpoint cũ, giữ kiểu marker và cạnh; không nháy cảnh báo trùng tên do
+  source vừa được cập nhật trong lúc compile.
+  `Xóa trung điểm` là action destructive đối nghĩa và chỉ cần input đoạn thẳng;
+  hệ thống tự tìm quan hệ duy nhất do tool sở hữu, xóa point/label/marker nhưng giữ
+  nguyên đoạn gốc; ownership mơ hồ không được đoán.
+- Công cụ đặt tên tâm dùng checkbox progressive disclosure: input và CTA chỉ hiện
+  khi checkbox `Thêm tên tâm đường tròn` được bật. Tên tự viết hoa, nhãn kế thừa
+  font point label, đặt cạnh tâm nhưng không thêm chấm mới hay thay geometry.
 - Điều chỉnh thu/phóng figure đã lưu phải tác động lên toàn bộ visual card gồm
   ảnh, caption và badge, rồi căn giữa card. Ảnh bên trong lấp đúng content box
   của card; cấm giữ card full-width rồi chỉ thu nhỏ `<img>` vì tạo vùng trắng
@@ -519,6 +558,11 @@ Một màn hình UI chỉ xem là xong khi:
   cột nhãn thu gọn, nội dung/KaTeX tự xuống dòng hoặc cuộn ngang cục bộ nhưng các
   đường ngăn vẫn liên tục; màu đường và chữ phải đủ tương phản ở light/dark.
   Quiz không render bảng GT–KL và không nhận field này từ API.
+- Trong modal sửa khối Ví dụ/Bài tập môn Toán, hai editor `Giả thiết` và
+  `Kết luận` xếp dọc và chiếm toàn bộ chiều ngang, không chia hai cột. Nút xóa
+  GT/KL chỉ đổi bản nháp trong modal và phải xóa luôn nội dung hai editor; khi
+  bấm `Thêm GT/KL` lại, cả hai editor mở ở trạng thái rỗng. Hủy/đóng modal khôi
+  phục dữ liệu đã lưu; các control GT/KL không xuất hiện ở môn khác.
 - Công thức display dài trong nội dung học tập không được scale toàn bộ SVG/KaTeX
   để ép vừa viewport. Giữ cỡ chữ đọc được và cho chính khối công thức cuộn ngang
   cục bộ; nếu nội dung sinh được nhiều dòng theo ngữ nghĩa thì ưu tiên

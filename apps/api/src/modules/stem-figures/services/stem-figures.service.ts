@@ -21,8 +21,10 @@ import { PrismaService } from "#api/common/prisma/prisma.service";
 import type { EnvConfig } from "#api/config/env.validation";
 import type {
   CreateNewStemFigureAiDto,
+  CreateStemFigureForBlockAiDto,
   EnsureStemFigureForBlockDto,
   RetryStemFigureDto,
+  StemFigureAiCreateOptionsDto,
   StemFigureMutationGuardDto,
   UseStemFigureSourceCropDto,
 } from "#api/modules/stem-figures/dto/stem-figure-mutation-guard.dto";
@@ -74,6 +76,7 @@ import type {
   AiFeatureRoute,
   ProviderRouteCandidate,
 } from "#api/modules/provider-operations/types/provider-operations.types";
+import type { StemFigureGenerationBrief } from "#api/modules/stem-figures/types/stem-figure-generation.types";
 
 @Injectable()
 export class StemFiguresService {
@@ -153,10 +156,15 @@ export class StemFiguresService {
         "Khối nội dung không còn tồn tại. Hãy tải lại trang.",
       );
     }
+    const figureIndex = dto.figureIndex ?? 0;
 
     const active = await this.prisma.stemFigure.findFirst({
-      where: { lessonSummaryId: summary.id, blockPath: dto.blockPath, deletedAt: null },
-      orderBy: { figureIndex: "asc" },
+      where: {
+        lessonSummaryId: summary.id,
+        blockPath: dto.blockPath,
+        figureIndex,
+        deletedAt: null,
+      },
       select: stemFigureSelect,
     });
     if (active) {
@@ -167,13 +175,13 @@ export class StemFiguresService {
       where: {
         lessonSummaryId: summary.id,
         blockPath: dto.blockPath,
+        figureIndex,
         deletedAt: { not: null },
       },
-      orderBy: [{ figureIndex: "asc" }, { updatedAt: "desc" }],
+      orderBy: { updatedAt: "desc" },
       select: stemFigureSelect,
     });
     const plan = deleted ? stemFigureRenderPlanSchema.safeParse(deleted.planJson) : null;
-    const figureIndex = deleted?.figureIndex ?? 0;
     const localPlanId =
       deleted?.localPlanId ?? `F${String(figureIndex + 1).padStart(3, "0")}`;
     const draftPlan = plan?.success
@@ -415,6 +423,97 @@ export class StemFiguresService {
     return { jobId: job.id, status: job.status, estimatedMaxCostVnd: null };
   }
 
+  async createNewAiForBlock(
+    lessonId: string,
+    actorUserId: string,
+    dto: CreateStemFigureForBlockAiDto,
+  ) {
+    const prepared = await this.prepareCreateNewAiForBlock(lessonId, dto);
+    const routeSnapshot = await this.resolveCreateAiRoute(dto);
+    const sourceVersion = prepared.deletedFigure
+      ? await this.nextSourceVersion(prepared.deletedFigure.id)
+      : 1;
+    const figure = await this.prisma.$transaction(async (transaction) => {
+      const logicalFigure = prepared.deletedFigure
+        ? await transaction.stemFigure.update({
+            where: { id: prepared.deletedFigure.id },
+            data: {
+              deletedAt: null,
+              lessonSummaryId: prepared.summary.id,
+              aiGenerationId: prepared.summary.aiGenerationId,
+              blockPath: dto.blockPath,
+              figureIndex: prepared.figureIndex,
+              localPlanId: prepared.localPlanId,
+              planJson: prepared.plan,
+              subjectKey: prepared.subject.key,
+              subjectName: prepared.subject.name,
+              subjectSlug: prepared.subject.slug,
+              status: "QUEUED",
+              currentRevisionId: null,
+              pendingRevisionId: null,
+              lastErrorCategory: null,
+              lastErrorCode: null,
+              lastErrorMessage: null,
+            },
+            select: { id: true },
+          })
+        : await transaction.stemFigure.create({
+            data: {
+              lessonId,
+              lessonSummaryId: prepared.summary.id,
+              aiGenerationId: prepared.summary.aiGenerationId,
+              blockPath: dto.blockPath,
+              figureIndex: prepared.figureIndex,
+              localPlanId: prepared.localPlanId,
+              planJson: prepared.plan,
+              subjectKey: prepared.subject.key,
+              subjectName: prepared.subject.name,
+              subjectSlug: prepared.subject.slug,
+              status: "QUEUED",
+              createdById: actorUserId,
+            },
+            select: { id: true },
+          });
+      const revision = await transaction.stemFigureRevision.create({
+        data: {
+          stemFigureId: logicalFigure.id,
+          sourceKind: "AI_TEX",
+          origin: "ADMIN_REGENERATE",
+          status: "QUEUED",
+          sourceVersion,
+          altText: prepared.altText,
+          caption: prepared.caption,
+          referenceSnapshotJson: prepared.referenceSnapshot,
+          referenceSnapshotHash: hashFigureReferenceSnapshot(
+            prepared.referenceSnapshot,
+          ),
+          generationBriefHash: hashAiValue(prepared.generationBrief),
+          createdById: actorUserId,
+        },
+        select: { id: true },
+      });
+      await transaction.stemFigure.update({
+        where: { id: logicalFigure.id },
+        data: { pendingRevisionId: revision.id },
+      });
+      return { id: logicalFigure.id, revisionId: revision.id };
+    });
+    const job = await this.jobs.enqueue(figure.id, actorUserId, {
+      revisionId: figure.revisionId,
+      trigger: "ADMIN_REGENERATE",
+      generationBrief: prepared.generationBrief,
+      routeSnapshot,
+      systemPrompt: dto.systemPrompt,
+      userPrompt: dto.userPrompt,
+    });
+    return {
+      figureId: figure.id,
+      jobId: job.id,
+      status: job.status,
+      estimatedMaxCostVnd: null,
+    };
+  }
+
   async previewCreateNewAi(
     lessonId: string,
     figureId: string,
@@ -423,7 +522,40 @@ export class StemFiguresService {
     const figure = await this.requireFigure(lessonId, figureId);
     this.assertMutationHead(figure, dto);
     const { generationBrief } = await this.prepareCreateNewAi(figure, dto);
-    const routeSnapshot = await this.resolveCreateAiRoute(dto);
+    return this.buildCreateNewAiPreview({
+      subject: {
+        key: lessonSummarySubjectKeySchema.parse(figure.subjectKey),
+        name: figure.subjectName,
+        slug: figure.subjectSlug,
+      },
+      generationBrief,
+      dto,
+    });
+  }
+
+  async previewCreateNewAiForBlock(
+    lessonId: string,
+    dto: CreateStemFigureForBlockAiDto,
+  ) {
+    const prepared = await this.prepareCreateNewAiForBlock(lessonId, dto);
+    return this.buildCreateNewAiPreview({
+      subject: prepared.subject,
+      generationBrief: prepared.generationBrief,
+      dto,
+    });
+  }
+
+  private async buildCreateNewAiPreview(input: {
+    subject: {
+      key: "MATH" | "PHYSICS" | "CHEMISTRY" | "GENERAL";
+      name: string;
+      slug: string;
+    };
+    generationBrief: StemFigureGenerationBrief;
+    dto: CreateNewStemFigureAiDto | CreateStemFigureForBlockAiDto;
+  }) {
+    const { generationBrief } = input;
+    const routeSnapshot = await this.resolveCreateAiRoute(input.dto);
     const preparedReferences = await prepareStemFigureProviderReferenceImages({
       assets: resolveStemFigureProviderReferenceAssets(generationBrief),
       downloadObject: (objectKey) => this.storage.downloadObject(objectKey),
@@ -433,15 +565,11 @@ export class StemFiguresService {
       referenceAssets: preparedReferences.assets,
     };
     const providerPreview = await this.repair.previewCreateInput({
-      subject: {
-        key: lessonSummarySubjectKeySchema.parse(figure.subjectKey),
-        name: figure.subjectName,
-        slug: figure.subjectSlug,
-      },
+      subject: input.subject,
       brief: providerBrief,
       routeSnapshot,
-      systemPrompt: dto.systemPrompt,
-      userPrompt: dto.userPrompt,
+      systemPrompt: input.dto.systemPrompt,
+      userPrompt: input.dto.userPrompt,
     });
     return {
       referenceImageMode: generationBrief.referenceImageMode,
@@ -464,8 +592,134 @@ export class StemFiguresService {
     };
   }
 
+  private async prepareCreateNewAiForBlock(
+    lessonId: string,
+    dto: CreateStemFigureForBlockAiDto,
+  ) {
+    if (dto.referenceImageMode !== StemFigureReferenceImageMode.NONE) {
+      throwBadRequest(
+        "STEM_FIGURE_BLOCK_CREATE_REFERENCE_MODE_INVALID",
+        "Khối chưa có hình chỉ có thể tạo mới mà không dùng ảnh tham chiếu.",
+      );
+    }
+    const summary = await this.prisma.lessonSummary.findFirst({
+      where: { lessonId, deletedAt: null },
+      select: {
+        id: true,
+        aiGenerationId: true,
+        contentJson: true,
+        lesson: {
+          select: {
+            learningPath: {
+              select: {
+                domain: { select: { name: true, slug: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+    const envelope = asRecord(summary?.contentJson);
+    const output = stemFigureLessonContextSchema.safeParse(envelope.data);
+    if (!summary || !output.success) {
+      throwBadRequest(
+        "STEM_FIGURE_LOCAL_CONTEXT_MISSING",
+        "Không đọc được nội dung khối để tạo hình.",
+      );
+    }
+    const blockContext = readBlockContext(output.data, dto.blockPath);
+    if (!blockContext) {
+      throwBadRequest(
+        "STEM_FIGURE_BLOCK_NOT_FOUND",
+        "Khối nội dung không còn tồn tại. Hãy tải lại trang.",
+      );
+    }
+    assertStemFigureAiTargetBlock(blockContext.block, dto.targetMode);
+    const expectedTargetFigureIndex =
+      dto.targetMode === "SOLUTION" ? 1 : dto.targetMode === "QUESTION" ? 0 : null;
+    const figureIndex = dto.figureIndex ?? expectedTargetFigureIndex ?? 0;
+    if (
+      expectedTargetFigureIndex !== null &&
+      figureIndex !== expectedTargetFigureIndex
+    ) {
+      throwBadRequest(
+        "STEM_FIGURE_AI_TARGET_SLOT_INVALID",
+        dto.targetMode === "SOLUTION"
+          ? "Hình lời giải phải dùng đúng vị trí hình lời giải."
+          : "Hình đề bài phải dùng đúng vị trí hình đề bài.",
+      );
+    }
+    const activeFigure = await this.prisma.stemFigure.findFirst({
+      where: {
+        lessonSummaryId: summary.id,
+        blockPath: dto.blockPath,
+        figureIndex,
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+    if (activeFigure) {
+      throwBadRequest(
+        "STEM_FIGURE_BLOCK_SLOT_ALREADY_EXISTS",
+        "Khối đã có hình ở vị trí này. Hãy tải lại trước khi thao tác.",
+      );
+    }
+    const deletedFigure = await this.prisma.stemFigure.findFirst({
+      where: {
+        lessonSummaryId: summary.id,
+        blockPath: dto.blockPath,
+        figureIndex,
+        deletedAt: { not: null },
+      },
+      orderBy: { updatedAt: "desc" },
+      select: {
+        id: true,
+        localPlanId: true,
+        currentRevision: { select: { altText: true, caption: true } },
+        pendingRevision: { select: { altText: true, caption: true } },
+      },
+    });
+    const localPlanId =
+      deletedFigure?.localPlanId ?? `F${String(figureIndex + 1).padStart(3, "0")}`;
+    const plan = buildBlockFigurePlan(blockContext, localPlanId);
+    const referenceSnapshot = emptyFigureReferenceSnapshot(localPlanId);
+    const previousRevision =
+      deletedFigure?.currentRevision ?? deletedFigure?.pendingRevision ?? null;
+    const subject = resolveCourseSubject({
+      domainName: summary.lesson.learningPath.domain.name,
+      domainSlug: summary.lesson.learningPath.domain.slug,
+    });
+    const generationBrief = buildStemFigureGenerationBrief({
+      output: output.data,
+      blockPath: dto.blockPath,
+      plan,
+      targetGrade: output.data.targetGrade ?? null,
+      referenceAssets: [],
+      referenceImageMode: StemFigureReferenceImageMode.NONE,
+      targetMode: dto.targetMode,
+      adminInstructions: dto.adminInstructions,
+    });
+    return {
+      summary,
+      figureIndex,
+      deletedFigure,
+      localPlanId,
+      plan,
+      referenceSnapshot,
+      subject,
+      generationBrief,
+      altText:
+        previousRevision?.altText ??
+        buildLessonSummaryFigureAltText({
+          block: blockContext.block,
+          sectionHeading: blockContext.sectionHeading,
+        }),
+      caption: previousRevision?.caption ?? null,
+    };
+  }
+
   private async resolveCreateAiRoute(
-    dto: CreateNewStemFigureAiDto,
+    dto: StemFigureAiCreateOptionsDto,
   ): Promise<AiFeatureRoute> {
     const baseRoute = await this.modelRouting.resolve(
       AiGenerationType.SUMMARY,
@@ -546,6 +800,26 @@ export class StemFiguresService {
     figure: StemFigureRecord,
     dto: CreateNewStemFigureAiDto,
   ) {
+    if (
+      dto.targetMode &&
+      dto.referenceImageMode === StemFigureReferenceImageMode.SOURCE_CROP_ONLY
+    ) {
+      throwBadRequest(
+        "STEM_FIGURE_AI_TARGET_REFERENCE_MODE_INVALID",
+        "Tạo hình đề bài hoặc lời giải độc lập không dùng ảnh nguồn sách giáo khoa.",
+      );
+    }
+    if (
+      dto.targetMode &&
+      figure.figureIndex !== (dto.targetMode === "SOLUTION" ? 1 : 0)
+    ) {
+      throwBadRequest(
+        "STEM_FIGURE_AI_TARGET_SLOT_INVALID",
+        dto.targetMode === "SOLUTION"
+          ? "Hình lời giải phải dùng đúng vị trí hình lời giải."
+          : "Hình đề bài phải dùng đúng vị trí hình đề bài.",
+      );
+    }
     const metadataRevision = figure.currentRevision ?? figure.pendingRevision;
     if (!metadataRevision) {
       throwBadRequest(
@@ -564,11 +838,15 @@ export class StemFiguresService {
       dto.referenceImageMode === StemFigureReferenceImageMode.SOURCE_CROP_ONLY;
     const wantsCurrent =
       dto.referenceImageMode === StemFigureReferenceImageMode.CURRENT_ONLY;
-    const wantsTextbookReference = wantsSource || wantsCurrent;
     const storedReferenceSnapshot =
       readFigureReferenceSnapshot(metadataRevision.referenceSnapshotJson) ??
       emptyFigureReferenceSnapshot(plan.data.localId);
-    const referenceSnapshot = wantsTextbookReference
+    const shouldResolveTextbookReference =
+      wantsSource ||
+      (wantsCurrent &&
+        (storedReferenceSnapshot.assets.length > 0 ||
+          plan.data.sourceReferences.length > 0));
+    const referenceSnapshot = shouldResolveTextbookReference
       ? preserveHistoricalExactReferenceAssets({
           fresh: await this.resolveFreshReferenceSnapshot({
             figure,
@@ -578,7 +856,7 @@ export class StemFiguresService {
           plan: plan.data,
         })
       : storedReferenceSnapshot;
-    if (wantsTextbookReference && referenceSnapshot.assets.length === 0) {
+    if (wantsSource && referenceSnapshot.assets.length === 0) {
       throwBadRequest(
         "STEM_FIGURE_SOURCE_REFERENCE_MISSING",
         "Không có ảnh gốc sách giáo khoa phù hợp cho chế độ đã chọn.",
@@ -593,12 +871,14 @@ export class StemFiguresService {
         "Hình hiện tại không có code TikZ để AI sửa.",
       );
     }
-    const referenceAssets = wantsTextbookReference ? referenceSnapshot.assets : [];
+    const referenceAssets =
+      wantsSource || wantsCurrent ? referenceSnapshot.assets : [];
     const generationBrief = await this.buildGenerationBrief({
       figure,
       referenceSnapshot,
       referenceAssets,
       referenceImageMode: dto.referenceImageMode,
+      targetMode: dto.targetMode,
       currentLatexSource,
       adminInstructions: dto.adminInstructions,
       altText: metadataRevision.altText,
@@ -618,6 +898,9 @@ export class StemFiguresService {
     referenceImageMode?: Parameters<
       typeof buildStemFigureGenerationBrief
     >[0]["referenceImageMode"];
+    targetMode?: Parameters<
+      typeof buildStemFigureGenerationBrief
+    >[0]["targetMode"];
     currentLatexSource?: string | null;
     adminInstructions?: string | null;
   }) {
@@ -641,6 +924,14 @@ export class StemFiguresService {
         "Không đọc được block hoặc figure plan gốc để dựng lại hình.",
       );
     }
+    const blockContext = readBlockContext(output.data, figure.blockPath);
+    if (!blockContext) {
+      throwBadRequest(
+        "STEM_FIGURE_BLOCK_NOT_FOUND",
+        "Khối nội dung không còn tồn tại. Hãy tải lại trang.",
+      );
+    }
+    assertStemFigureAiTargetBlock(blockContext.block, input.targetMode);
     return buildStemFigureGenerationBrief({
       output: output.data,
       blockPath: figure.blockPath,
@@ -648,6 +939,7 @@ export class StemFiguresService {
       targetGrade: output.data.targetGrade ?? null,
       referenceAssets: input.referenceAssets ?? input.referenceSnapshot.assets,
       referenceImageMode: input.referenceImageMode,
+      targetMode: input.targetMode,
       currentLatexSource: input.currentLatexSource,
       adminInstructions: input.adminInstructions,
     });
@@ -1280,6 +1572,28 @@ function buildBlockFigurePlan(
     // sourceReferences. An admin-authored figure starts without visual evidence.
     sourceReferences: [],
   };
+}
+
+function assertStemFigureAiTargetBlock(
+  block: Record<string, unknown>,
+  targetMode: "QUESTION" | "SOLUTION" | null | undefined,
+) {
+  if (!targetMode) return;
+  if (block.type !== "example" && block.type !== "exercise") {
+    throwBadRequest(
+      "STEM_FIGURE_AI_TARGET_BLOCK_INVALID",
+      "Chỉ khối Ví dụ hoặc Bài tập mới có hình đề bài và hình lời giải riêng.",
+    );
+  }
+  if (
+    targetMode === "SOLUTION" &&
+    (typeof block.solution !== "string" || block.solution.trim().length === 0)
+  ) {
+    throwBadRequest(
+      "STEM_FIGURE_SOLUTION_TEXT_MISSING",
+      "Cần có lời giải bằng chữ trước khi tạo hình cho lời giải.",
+    );
+  }
 }
 
 function createStarterFigureSource() {

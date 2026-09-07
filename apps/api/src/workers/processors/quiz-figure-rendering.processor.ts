@@ -48,7 +48,10 @@ import {
   autoRepairQuizFigureLatexSource,
   sanitizeQuizFigureSvg,
 } from "#api/modules/quiz-figures/utils/quiz-figure-source-policy";
-import type { AiFeatureRoute } from "#api/modules/provider-operations/types/provider-operations.types";
+import type {
+  AiFeatureRoute,
+  ProviderUsageOperation,
+} from "#api/modules/provider-operations/types/provider-operations.types";
 import type { QuizSubjectSnapshot } from "#api/modules/quiz/types/quiz-generation.types";
 
 const durableJobSelect = {
@@ -180,22 +183,20 @@ export class QuizFigureRenderingProcessor {
             systemPrompt,
             userPrompt,
           });
-      const autoRepair = generatedSource
-        ? autoRepairQuizFigureLatexSource({
-            source: generatedSource,
-            subjectKey: subject.key,
-            authorityText: JSON.stringify({
-              plan,
-              ...(adminInstructions ? { adminInstructions } : {}),
-            }),
-          })
-        : null;
-      if (autoRepair?.changes.length) {
+      const autoRepair = autoRepairQuizFigureLatexSource({
+        source: persistedSource ?? generatedSource!,
+        subjectKey: subject.key,
+        authorityText: JSON.stringify({
+          plan,
+          ...(adminInstructions ? { adminInstructions } : {}),
+        }),
+      });
+      if (autoRepair.changes.length) {
         this.logger.warn(
           `Quiz figure ${figure.id} applied ${autoRepair.changes.length} deterministic source repair(s).`,
         );
       }
-      const source = persistedSource ?? autoRepair?.source ?? generatedSource!;
+      const source = autoRepair.source;
       assertQuizFigureLatexSource(source);
       const sourceHash = QuizFigureJobService.sourceHash(source);
       attemptId = (
@@ -415,6 +416,7 @@ export class QuizFigureRenderingProcessor {
       backgroundJobId: input.backgroundJobId,
       attempt: input.attempt,
       callSequence: 1,
+      operation: resolveQuizFigureUsageOperation(input),
       routeSnapshot: input.routeSnapshot,
       allowProviderFallback: false,
       onResolvedRequest: (request: ResolvedAiStructuredRequestTrace) =>
@@ -618,6 +620,27 @@ function readQuizFigureAiMode(value: unknown): "REGENERATE" | "EDIT_CURRENT" {
 
 function readQuizFigureOperation(value: unknown): "GENERATE" | "REFINE_CURRENT" {
   return value === "REFINE_CURRENT" ? "REFINE_CURRENT" : "GENERATE";
+}
+
+function resolveQuizFigureUsageOperation(input: {
+  figure: { role: QuizFigureRole };
+  aiMode: "REGENERATE" | "EDIT_CURRENT";
+  operation: "GENERATE" | "REFINE_CURRENT";
+}): ProviderUsageOperation {
+  const isQuestion = input.figure.role === QuizFigureRole.QUESTION;
+  if (input.operation === "REFINE_CURRENT") {
+    return isQuestion
+      ? "QUIZ_QUESTION_FIGURE_REFINEMENT"
+      : "QUIZ_SOLUTION_FIGURE_REFINEMENT";
+  }
+  if (input.aiMode === "EDIT_CURRENT") {
+    return isQuestion
+      ? "QUIZ_QUESTION_FIGURE_EDITING"
+      : "QUIZ_SOLUTION_FIGURE_EDITING";
+  }
+  return isQuestion
+    ? "QUIZ_QUESTION_FIGURE_GENERATION"
+    : "QUIZ_SOLUTION_FIGURE_GENERATION";
 }
 
 function firstErrorCode(message: string) {

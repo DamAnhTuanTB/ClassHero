@@ -172,6 +172,8 @@ Thứ tự này ưu tiên nền tảng trước tính năng sau. Nếu `.codex/p
 | 52.11  | `M9.23` | Bộ chỉnh nhanh TikZ Summary/Quiz: popover, font và scale card — Done 2026-08-26    |
 | 52.12  | `M9.24` | Admin tinh chỉnh lời giải Quiz bằng AI — Done 2026-08-27                          |
 | 52.13  | `M9.25` | Sửa trực tiếp từng nhãn và số đo trong bộ chỉnh nhanh TikZ — Done 2026-08-28     |
+| 52.14  | `M9.26` | Chỉnh nhanh góc, cạnh, trung điểm và marker TikZ — Done 2026-09-05              |
+| 52.15  | `M9.27` | Summary Ví dụ/Bài tập sinh hình lời giải độc lập ở Phase 2 — Done 2026-09-05   |
 | 53     | `M9.4`  | Student request-new reserve-first UI + API                                         |
 | 54     | `M9.5`  | AI explanation cache inline UI + API                                               |
 | 55     | `M9.6`  | Chat AI trong lesson bằng RAG                                                      |

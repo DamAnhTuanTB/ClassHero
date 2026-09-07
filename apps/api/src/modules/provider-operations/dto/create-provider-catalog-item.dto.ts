@@ -1,12 +1,18 @@
 import { Type } from "class-transformer";
 import {
+  ArrayUnique,
   IsArray,
   IsEnum,
+  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
   ValidateNested,
 } from "class-validator";
+import {
+  AI_REASONING_EFFORT_LEVELS,
+  type AiReasoningEffort,
+} from "@learning-path/shared";
 import { ProviderCatalogCategory } from "@prisma/client";
 import { CreatePriceVersionDto } from "#api/modules/provider-operations/dto/create-price-version.dto";
 
@@ -41,8 +47,9 @@ export class CreateProviderCatalogItemDto {
 
   @IsOptional()
   @IsArray()
-  @IsString({ each: true })
-  reasoningEffortLevels?: string[];
+  @ArrayUnique()
+  @IsIn(AI_REASONING_EFFORT_LEVELS, { each: true })
+  reasoningEffortLevels?: AiReasoningEffort[];
 
   @IsOptional()
   @ValidateNested()

@@ -728,6 +728,10 @@ Behavior:
   toàn bộ block vào section ngay trước rồi đánh lại section/block path. Lịch sử
   layout được lưu cùng snapshot để lần Lưu/tải lại sau không dựng lại block hoặc
   section đã xóa.
+- Với block `example`/`exercise`, admin môn Toán có thể thêm hoặc bỏ
+  `geometryStatement` (GT/KL) trong modal. API kiểm tra phần override này bằng
+  schema block đã lưu thay vì ép lại ràng buộc output của provider theo lớp;
+  provenance, hình và review issue hiện có của block vẫn được giữ nguyên.
 - `MOVE_SECTION` và `MOVE_BLOCK` lưu đúng thao tác kéo thả/nút lên-xuống. Chỉ số
   đích được tính trên mảng sau khi phần tử nguồn đã được lấy ra; backend dùng cùng
   thao tác để đánh lại raw block path và `stem_figures.block_path` trong một
@@ -763,9 +767,13 @@ Behavior:
 
 - Xóa cứng summary hiện tại của lesson.
 - Cascade xóa các bản ghi STEM figure, revision và render attempt thuộc summary;
-  file asset đã upload không bị API này tự xóa khỏi storage.
+  mọi delivery file không còn figure nào khác tham chiếu được xóa khỏi MinIO/R2
+  rồi hard-delete metadata `files`.
 - Ghi audit log `LESSON_SUMMARY_DELETED` với snapshot nội dung trước khi xóa.
-- Trả `{ "deleted": true }`; nếu lesson không có summary thì trả `{ "deleted": false }`.
+- Trả
+  `{ "deleted": true, "deletedFileCount": 6, "pendingFileCleanupCount": 0 }`;
+  nếu lesson không có summary thì `deleted=false` và hai count bằng `0`. Storage
+  tạm lỗi giữ metadata ở trạng thái `DELETED` và tăng `pendingFileCleanupCount`.
 
 ### `POST /admin/lessons/:lessonId/summary/generate-ai`
 
@@ -780,6 +788,8 @@ Body:
   "styleInstructions": "Dễ hiểu, gần gũi, sử dụng cách diễn đạt và mức độ chi tiết phù hợp lứa tuổi.",
   "length": "standard",
   "targetWordCount": 350,
+  "standardExerciseCount": 2,
+  "realWorldExerciseCount": 2,
   "extraInstructions": "Dùng câu ngắn",
   "systemInstructions": "System instructions đã được admin kiểm tra",
   "userPrompt": "User prompt đã được admin kiểm tra",
@@ -815,6 +825,10 @@ Rules:
 - Nếu cùng lesson đang có job summary `QUEUED`/`RUNNING`, API trả lại `jobId`
   đó thay vì enqueue provider call thứ hai.
 - Sau khi job terminal `SUCCEEDED`/`FAILED`, admin có thể yêu cầu regenerate.
+- Khi regenerate đã persist bản Summary mới thành công, backend cascade xóa toàn
+  bộ figure/revision/attempt của bản cũ và dọn các delivery object cùng metadata
+  file đã hết tham chiếu. Nếu lượt mới thất bại trước persistence, bản cũ và ảnh
+  cũ vẫn được giữ nguyên.
 - `style` nhận `student_friendly | concise | academic`; `length` nhận
   `short | standard | detailed`. Các field còn lại là cấu hình theo lần chạy;
   `model` chỉ được chọn trong route `SUMMARY` đang khả dụng.
@@ -832,8 +846,16 @@ Rules:
 - `targetWordCount` không bắt buộc, giới hạn `50..5000`, biểu thị số từ mục
   tiêu gần đúng và được kết hợp với `length` trong đúng một mục `Độ dài` khi
   dựng user prompt; không xuất thành hai dòng chỉ dẫn rời nhau.
+- `standardExerciseCount` và `realWorldExerciseCount` là số bài trong hai nhóm
+  vận dụng độc lập, đều giới hạn `1..10` và mặc định `2`. Hai giá trị thuộc
+  request draft/hash/job snapshot, xuất hiện trong user prompt mặc định và dựng
+  mục tiêu số lượng cho provider. JSON Schema chỉ kiểm tra đúng cấu trúc hai mảng,
+  không khóa cardinality; nếu provider trả thiếu hoặc thừa, worker vẫn map, lưu và
+  hiển thị toàn bộ bài hợp lệ nhận được thay vì làm hỏng cả Summary. Custom prompt
+  vẫn là full override.
 - `temperature` giới hạn `0..1`; `reasoningEffort` nhận một trong các mức chuẩn
-  `none | minimal | low | medium | high | xhigh | max`, nhưng danh sách option
+  `none | minimal | low | medium | high | xhigh | max` theo thứ tự tăng dần,
+  nhưng danh sách option
   thực tế và validation phải lấy từ `capabilities.reasoningEffortLevels` của đúng
   model do admin thiết lập tại màn Cài đặt AI; `maxOutputTokens` giới hạn
   `8000..32000`. Bỏ trống thì dùng Cài đặt AI hiện tại với sàn mặc định `8000`
@@ -863,9 +885,11 @@ Side effects:
 
 - Tạo `background_jobs` queue `AI_GENERATION` và `ai_generations` type
   `SUMMARY`.
-- Worker validate structured output năm block. Mỗi section gồm `UNIT` (theory +
-  example bắt buộc) hoặc `NOTE`; theory/note/example có provenance trang nguồn,
-  example có origin và solution bắt buộc. Provider không được sinh `procedure`.
+- Worker validate structured output sáu block. Mỗi section gồm `UNIT` (theory +
+  example bắt buộc) hoặc `NOTE`; bài trong hai mảng vận dụng dùng riêng
+  `type=exercise`. Theory/note/example/exercise có provenance trang nguồn;
+  example/exercise có origin và solution bắt buộc. Provider không được sinh
+  `procedure` và không có adapter cho dữ liệu bài tập `type=example` cũ.
 - Example Toán có `isGeometry`; schema theo lớp bắt buộc GT–KL cho Hình học lớp
   7–9 và bắt buộc `geometryStatement=null` cho lớp 10–12/các nội dung không phải
   Hình học.
@@ -873,7 +897,7 @@ Side effects:
   không dựa title/keyword và không có semantic coverage gate backend. Provider
   trả semantic brief; backend cấp ID deterministic và resolve ảnh tham chiếu.
 - Sau khi validate/map, worker upsert Summary
-  `source=AI/reviewStatus=NEEDS_REVIEW` với content contract version 3.
+  `source=AI/reviewStatus=NEEDS_REVIEW` với content contract version 4.
 - Khi sinh lại, worker xóa cứng toàn bộ STEM figure, revision và render attempt
   thuộc bản Summary trước rồi mới tạo figure của bản mới; bản content cũ bị thay
   thế trong cùng transaction, vì vậy chỉ còn bản sinh mới nhất.
@@ -926,6 +950,10 @@ Behavior:
 
 - Dùng cùng packet builder, schema và prompt builder với worker để trả đúng
   `systemPrompt`, `userPrompt`, PDF packet, manifest và cấu hình model.
+- JSON Schema trong preview giữ hai mảng `standardExercises[]` và
+  `realWorldExercises[]` nhưng không mã hóa số lượng mục tiêu thành
+  `minItems/maxItems`; hai count chỉ nằm trong user prompt/request snapshot để sai
+  lệch số lượng của provider không chặn hiển thị nội dung còn lại.
 - `useTextbookSourceImages` không đổi provider input Phase 1. Preview vẫn phải
   snapshot field này và trả breakdown cho biết Phase 2 dự kiến bằng `0` khi bật;
   request OpenAI Phase 1 hiển thị phải giống hệt khi field này tắt nếu các cấu
@@ -1013,10 +1041,30 @@ ADMIN_EDIT | ADMIN_REGENERATE | ADMIN_UPLOAD | MANUAL_REPAIR | null` từ
   `displayScale` đã parse/clamp để UI admin và student co/phóng cả card figure.
   Source cũ không có marker trả `null`; student không nhận `latexSource`.
 - `GET /admin/lessons/:lessonId/stem-figures/:figureId`: chi tiết một figure.
-- `POST /admin/lessons/:lessonId/stem-figures/blocks/ensure`: nhận `blockPath`,
-  trả logical figure đang hoạt động hoặc phục hồi/tạo một draft figure chưa gắn
-  vào Summary. Endpoint dùng chung cho menu ảnh cấp block; draft chỉ được gắn
-  vào block sau khi upload/apply/render thành công nên không tạo placeholder chờ.
+- `POST /admin/lessons/:lessonId/stem-figures/blocks/ensure`: nhận `blockPath` và
+  optional `figureIndex` trong khoảng `0..2` (mặc định `0`), trả logical figure
+  đúng slot đang hoạt động hoặc phục hồi/tạo một draft figure chưa gắn vào
+  Summary. Modal sửa khối dùng slot `0` cho hình đề/hình minh họa chung và slot
+  `1` cho hình lời giải của khối Ví dụ/Bài tập. Endpoint chỉ phục vụ thao tác cần
+  logical figure trước khi submit như tạo bằng mã code hoặc tải ảnh lên. Mở modal
+  `Tạo mới bằng AI` cho block chưa có hình không được gọi endpoint này.
+- `POST /admin/lessons/:lessonId/stem-figures/blocks/create-new-ai/preview`: nhận
+  `blockPath`, optional `figureIndex`, `referenceImageMode=NONE`, optional
+  `targetMode=QUESTION|SOLUTION` và các override AI giống route figure-level; đọc
+  trực tiếp Summary để dựng request preview,
+  không tạo logical figure/revision, không enqueue và không gọi provider.
+- `POST /admin/lessons/:lessonId/stem-figures/blocks/create-new-ai`: nhận cùng
+  payload block-level. Chỉ khi admin bấm `Tạo mới`, API mới tạo hoặc phục hồi
+  logical figure, tạo thẳng revision `ADMIN_REGENERATE/QUEUED` và enqueue job;
+  không tạo revision nháp `ADMIN_EDIT/DRAFT_READY` trung gian. Với block
+  `example|exercise`, target `QUESTION` bắt buộc slot `0` và chỉ chiếu `problem`;
+  target `SOLUTION` bắt buộc slot `1`, yêu cầu lời giải chữ và chiếu
+  `solution > problem`; cả hai loại `answer` và không nhận ảnh nguồn.
+- Route figure-level `.../stem-figures/:figureId/create-new-ai[/preview]` cho
+  target `QUESTION|SOLUTION` nhận `referenceImageMode=NONE` để tạo mới lại hoặc
+  `CURRENT_ONLY` để sửa source TikZ hiện hành của đúng slot. `SOURCE_CROP_ONLY`
+  vẫn bị từ chối; `CURRENT_ONLY` không bắt buộc reference SGK nhưng bắt buộc
+  current revision có `latexSource`.
 - `POST /admin/lessons/:lessonId/stem-figures/:figureId/drafts/compile`: nhận
   `baseRevisionId`, `sourceVersion`, `latexSource`, `altText`, optional `caption`;
   compile local không gọi AI và trả revision `DRAFT_READY` kèm `previewSvg` đã
@@ -1060,9 +1108,12 @@ ADMIN_EDIT | ADMIN_REGENERATE | ADMIN_UPLOAD | MANUAL_REPAIR | null` từ
   serializer phải bỏ key và system/user prompt mặc định không được nhắc tới yêu
   cầu sửa đổi/bổ sung. Preview không được mô tả field như preference phụ.
   JSON chuyên vẽ chỉ giữ grade và projection của đúng block sở hữu hình; không
-  ghép theory đứng trước. Với example,
-  projection chỉ giữ `problem`, `isGeometry` và hypotheses GT–KL khi có; không
-  gửi `solution`, `answer` hoặc conclusions. Không gửi lesson title hoặc section
+  ghép theory đứng trước. Với `example`/`exercise` ở mode `NONE`, projection giữ
+  `problem`, `solution`, optional `isGeometry` và hypotheses GT–KL để dựng hình
+  lời giải độc lập với authority `solution > problem`; luôn loại `answer`. Khi
+  vẽ lại từ ảnh sách hoặc sửa source hiện tại, projection của cùng loại block vẫn
+  chỉ giữ `problem`, optional `isGeometry` và hypotheses để ảnh/source tiếp tục
+  là baseline. Không gửi lesson title hoặc section
   heading. Chỉ khi thực sự có
   ảnh mới gửi `reference: { mode, images }`; khi không ảnh, gửi
   `reference: { mode: "NONE" }` và bỏ `images` thay vì gửi mảng rỗng. Không có
@@ -1106,7 +1157,7 @@ ADMIN_EDIT | ADMIN_REGENERATE | ADMIN_UPLOAD | MANUAL_REPAIR | null` từ
   Full-page fallback chỉ hợp lệ khi figure có `sourceReferences` từ Stage 1.
   Resolver chỉ dùng `sourceReferences.figureLabel` và `sourceTarget.locator` để
   rank crop hoặc định vị hình con.
-  `blocks/ensure` cho figure do admin thêm vào block chưa từng có hình phải tạo
+  Route block-level `create-new-ai` cho block chưa từng có hình phải tạo plan với
   `sourceReferences=[]`, không suy reference từ trang nội dung của block/section.
 - `POST /admin/lessons/:lessonId/stem-figures/:figureId/use-source-crop`: nhận
   mutation guard, `sourceSnapshotHash`, `sourceObjectKey` và boolean `enhance`; chỉ
@@ -1310,6 +1361,21 @@ Behavior:
 - Nếu `printedPage.warning` là `missing` hoặc `ambiguous`, UI M4.5 nên cho admin thấy trạng thái cần kiểm tra/xác nhận thay vì âm thầm coi `pageNumber` là số trang in.
 - `textSource` production mặc định là `paid_ocr` khi OCR paid đã bật; `text_layer`/`free_ocr` chỉ dùng cho fallback local hoặc vận hành có kiểm soát.
 
+### `GET /admin/source-documents/:sourceDocumentId/ocr-preview-content`
+
+Role: `ADMIN`.
+
+Behavior:
+
+- Trả `format = mathpix_markdown` và toàn bộ MMD gốc của active OCR artifact để
+  chế độ xem “Toàn bộ” giữ cấu trúc bảng, danh sách, công thức và ảnh gần output
+  provider nhất, không ghép lại từ plain text đã normalize theo trang.
+- Backend chỉ thay đường dẫn ảnh trong MMD bằng signed URL của object nội bộ thuộc
+  đúng source document. HTML/SVG conversion kích thước lớn không được nhúng base64
+  vào JSON response.
+- Dữ liệu này chỉ phục vụ preview; tìm kiếm, số trang in và RAG vẫn dùng page/chunk
+  normalized.
+
 ### `PUT /admin/source-documents/:sourceDocumentId/lesson-page-ranges`
 
 Role: `ADMIN`.
@@ -1427,11 +1493,16 @@ Behavior:
   in chưa có thì từng đầu mút fallback về số trang PDF. Document upload trực tiếp
   trả `pageRange = null`.
   UI vẫn hiển thị tài liệu chưa sẵn sàng nhưng không cho chọn để tạo Summary.
-- `lesson.targetGrade` trả khối lớp ưu tiên của learning path (hoặc `null`) để UI
-  dựng mặc định cách trình bày theo đúng đối tượng khóa học.
+- `lesson.subjectKey` trả profile môn học chuẩn hóa
+  (`MATH | PHYSICS | CHEMISTRY | GENERAL`) và `lesson.targetGrade` trả khối lớp
+  ưu tiên của learning path (hoặc `null`) để UI dựng đúng công cụ biên tập và
+  cách trình bày theo đối tượng khóa học.
 - `summaryConfiguration` trả cấu hình mặc định và danh sách model Summary hỗ trợ
   PDF `detail=high` độc lập với endpoint prompt-preview. Vì vậy lỗi dựng packet
   hoặc preview không được làm dropdown model biến mất.
+- `summaryFigureConfiguration` trả cấu hình model riêng của route
+  `SUMMARY/IMAGE`; mọi modal tạo/sửa hình Summary phải dùng field này, không dùng
+  `summaryConfiguration` của route `SUMMARY/TEXT`.
 - `canUseForSummary` dùng cùng điều kiện packet với endpoint prompt-preview:
   tài liệu trích xuất phải có đủ source document và page range; PDF nền tảng tải
   trực tiếp không có hai liên kết này vẫn hợp lệ và dùng toàn bộ các trang.

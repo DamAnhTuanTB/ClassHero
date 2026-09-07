@@ -286,6 +286,54 @@ describe("OpenAiProvider", () => {
       );
     });
 
+    it("sends a strict request schema while parsing with a tolerant backend schema", async () => {
+      const requestSchema = z.object({
+        items: z.array(z.string()).length(2),
+      });
+      const validationSchema = z.object({
+        items: z.array(z.string()),
+      });
+      mockResponsesParse.mockResolvedValueOnce({
+        id: "resp-structured-tolerant-1",
+        model: "gpt-4.1-mini",
+        output_parsed: { items: ["one"] },
+        usage: null,
+      });
+
+      const result = await provider.generateStructured(
+        {
+          systemPrompt: "Return exactly two items.",
+          userPrompt: "Generate items.",
+          outputName: "strict_request_tolerant_parse",
+          promptVersion: "v1",
+          schemaVersion: "v1",
+        },
+        requestSchema,
+        validationSchema,
+      );
+      const providerRequest = mockResponsesParse.mock.calls[0]?.[0] as {
+        text: {
+          format: {
+            schema: {
+              properties: {
+                items: { minItems: number; maxItems: number };
+              };
+            };
+            $parseRaw: (content: string) => unknown;
+          };
+        };
+      };
+
+      expect(providerRequest.text.format.schema.properties.items).toMatchObject({
+        minItems: 2,
+        maxItems: 2,
+      });
+      expect(providerRequest.text.format.$parseRaw('{"items":["one"]}')).toEqual({
+        items: ["one"],
+      });
+      expect(result.data).toEqual({ items: ["one"] });
+    });
+
     it("sends optional reference images in the same structured user request", async () => {
       mockResponsesParse.mockResolvedValueOnce({
         id: "resp-structured-image-1",

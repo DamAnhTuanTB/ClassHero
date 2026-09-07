@@ -6,6 +6,7 @@ import {
   buildQuizQuestionPreviewFromGenerationJson,
   isProtectedQuizGenerationJsonEdit,
 } from "@/features/admin/quiz/utils/quiz-generation-json";
+import { resolveQuizExplanationEditorContent } from "@/features/admin/quiz/utils/quiz-explanation-editor";
 import { createTextTiptapDocument } from "@/lib/tiptap-rich-content";
 import {
   normalizeLatexCommandBackslashes,
@@ -140,7 +141,107 @@ test.describe("Quiz mutable generation JSON preview", () => {
 
     expect(preview.correctAnswerJson).toEqual(["2.1"]);
     expect(preview.sourceMetadataJson?.quizExplanationBlock).not.toHaveProperty("answer");
-    expect(JSON.stringify(preview.explanation?.contentJson)).toContain("Đáp án: 2.1");
+    expect(JSON.stringify(preview.explanation?.contentJson)).not.toContain("Đáp án:");
+    expect(JSON.stringify(preview.explanation?.contentJson)).toContain(
+      "Thể tích tính được là",
+    );
+  });
+
+  test("projects multi-statement labels as Tiptap bold marks without literal stars", () => {
+    const preview = buildQuizQuestionPreviewFromGenerationJson(currentQuestion, {
+      questionType: "MULTI_STATEMENT_TRUE_FALSE",
+      difficulty: "MEDIUM",
+      hint: "Xét riêng từng mệnh đề.",
+      statements: [
+        { id: "a", text: "Số 2 là số chẵn.", value: true },
+        { id: "b", text: "Số 3 là số chẵn.", value: false },
+      ],
+      explanation: {
+        problem: "Xét hai mệnh đề.",
+        statementSolutions: [
+          { statementId: "a", solution: "Số 2 chia hết cho 2." },
+          { statementId: "b", solution: "Số 3 không chia hết cho 2." },
+        ],
+      },
+    });
+
+    const serializedExplanation = JSON.stringify(preview.explanation?.contentJson);
+    expect(serializedExplanation).not.toContain("**a)**");
+    expect(serializedExplanation).not.toContain("**b)**");
+    expect(serializedExplanation).not.toContain("Đáp án:");
+    expect(serializedExplanation).toContain(
+      JSON.stringify({ type: "text", text: "b)", marks: [{ type: "bold" }] }),
+    );
+  });
+
+  test("normalizes three-point angle notation across Quiz fields before Tiptap edit", () => {
+    const preview = buildQuizQuestionPreviewFromGenerationJson(currentQuestion, {
+      questionType: "MULTIPLE_CHOICE",
+      difficulty: "MEDIUM",
+      hint: String.raw`Dùng $\angle DAB$.`,
+      options: [
+        { id: "A", text: String.raw`$\angle DAB=70^\circ$` },
+        { id: "B", text: String.raw`$\angle DAB=110^\circ$` },
+      ],
+      correctOptionId: "A",
+      explanation: {
+        problem: String.raw`Cho $\angle DAB=70^\circ$.`,
+        solution: String.raw`Vậy $\angle DAB=70^\circ$.`,
+      },
+    });
+
+    expect(JSON.stringify(preview.questionJson)).toContain("widehat{DAB}");
+    expect(JSON.stringify(preview.optionsJson)).toContain("widehat{DAB}");
+    expect(JSON.stringify(preview.hintJson)).toContain("widehat{DAB}");
+    expect(JSON.stringify(preview.explanation?.contentJson)).toContain("widehat{DAB}");
+    expect(JSON.stringify(preview)).not.toContain('"latex":"\\\\angle DAB');
+  });
+
+  test("loads only the structured solution into Edit for previously stored Quiz data", () => {
+    const editorContent = resolveQuizExplanationEditorContent({
+      ...currentQuestion,
+      explanation: {
+        id: "explanation-1",
+        contentJson: createTextTiptapDocument(
+          "**b)** Lập luận của mệnh đề b.\nĐáp án: a) Đúng; b) Sai.",
+        ),
+        reviewStatus: "NEEDS_REVIEW",
+        staleAt: null,
+      },
+      sourceMetadataJson: {
+        aiGenerationId: "generation-1",
+        generationQuestionIndex: 0,
+        quizExplanationBlock: {
+          type: "quizExplanation",
+          problem: "Xét hai mệnh đề.",
+          solution: "**b)** Lập luận của mệnh đề b.",
+        },
+      },
+    });
+
+    const serializedEditorContent = JSON.stringify(editorContent);
+    expect(serializedEditorContent).not.toContain("Đáp án:");
+    expect(serializedEditorContent).not.toContain("**b)**");
+    expect(serializedEditorContent).toContain(
+      JSON.stringify({ type: "text", text: "b)", marks: [{ type: "bold" }] }),
+    );
+  });
+
+  test("normalizes three-point angles from stored Quiz explanation metadata", () => {
+    const editorContent = resolveQuizExplanationEditorContent({
+      ...currentQuestion,
+      sourceMetadataJson: {
+        quizExplanationBlock: {
+          type: "quizExplanation",
+          problem: String.raw`Cho $\angle DAB=70^\circ$.`,
+          solution: String.raw`Suy ra $\angle DAB+\angle BCD=180^\circ$.`,
+        },
+      },
+    });
+
+    expect(JSON.stringify(editorContent)).toContain("widehat{DAB}");
+    expect(JSON.stringify(editorContent)).toContain("widehat{BCD}");
+    expect(JSON.stringify(editorContent)).not.toContain('"latex":"\\\\angle ');
   });
 
   test("protects the figure subtree from direct JSON editing", () => {
@@ -187,7 +288,6 @@ Vậy chọn phương án A.`,
       "paragraph",
       "blockMath",
       "paragraph",
-      "paragraph",
     ]);
     expect(explanationNodes[1]?.attrs?.latex).toContain("\\begin{aligned}");
     expect(
@@ -225,7 +325,6 @@ Suy ra $\widehat{C}=112^\circ\$.`,
     expect(explanationNodes.map((node) => node.type)).toEqual([
       "paragraph",
       "blockMath",
-      "paragraph",
       "paragraph",
     ]);
     expect(explanationNodes[1]?.attrs?.latex).toBe(

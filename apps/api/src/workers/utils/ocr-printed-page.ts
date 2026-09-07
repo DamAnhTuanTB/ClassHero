@@ -202,7 +202,7 @@ function readPrintedPageCandidates(line: InferPrintedPageLine): PrintedPageCandi
     );
   }
 
-  if (isRomanPageLabel(normalized)) {
+  if (isPageInfoLine(line) && isRomanPageLabel(normalized)) {
     candidates.push({
       printedPageNumber: null,
       printedPageLabel: normalized.toLowerCase(),
@@ -245,7 +245,7 @@ function shouldIgnorePageMarkerLine(line: InferPrintedPageLine): boolean {
 }
 
 function scoreLine(line: InferPrintedPageLine, baseScore: number): number {
-  return line.type?.toLowerCase() === "page_info"
+  return isPageInfoLine(line)
     ? Math.min(baseScore + 0.12, 0.99)
     : baseScore;
 }
@@ -253,8 +253,12 @@ function scoreLine(line: InferPrintedPageLine, baseScore: number): number {
 function normalizePageMarkerText(value: string): string {
   return value
     .replace(/\s+/g, " ")
-    .replace(/^[([{\s]+|[)\]}\s]+$/g, "")
+    .replace(/^[\p{Ps}\p{Pi}"'`\s]+|[\p{Pe}\p{Pf}"'`\s]+$/gu, "")
     .trim();
+}
+
+function isPageInfoLine(line: InferPrintedPageLine): boolean {
+  return line.type?.toLowerCase().includes("page_info") ?? false;
 }
 
 function isRomanPageLabel(value: string): boolean {

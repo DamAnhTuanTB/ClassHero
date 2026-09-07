@@ -568,6 +568,7 @@ export class StemFigureRenderingProcessor {
         latexSource: source,
         diagnosticBatch: batch,
         subject: subjectSnapshot(input.figure),
+        routeSnapshot: input.metadata.routeSnapshot,
         onRequestPrepared: (snapshot) =>
           this.appendProviderRequestSnapshot(input.revision.id, snapshot),
       });
@@ -659,6 +660,7 @@ export class StemFigureRenderingProcessor {
       latexSource: requireSource(revision),
       diagnosticBatch,
       subject: subjectSnapshot(input.figure),
+      routeSnapshot: readJobMetadata(input.durableJob.inputMeta).routeSnapshot,
       onRequestPrepared: (snapshot) =>
         this.appendProviderRequestSnapshot(revision.id, snapshot),
     });

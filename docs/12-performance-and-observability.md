@@ -219,7 +219,7 @@ Performance và cost rules:
 - Compiler failure phải ghi structured issue trước, kèm phần đuôi raw log có giới
   hạn; không chỉ giữ phần đầu log. Nhờ vậy `lastErrorMessage`/attempt log còn chứa
   lỗi gốc và dòng source sau khi bị clamp cho UI hoặc database.
-- Mỗi figure mặc định tối đa 2 lượt repair. Lỗi transport tạm thời của
+- Mỗi figure mặc định tối đa 1 lượt AI repair. Lỗi transport tạm thời của
   provider/renderer/network dùng BullMQ retry riêng, tối đa 3 attempt với
   exponential backoff và không gọi AI repair; mỗi provider attempt có usage/
   reservation idempotency riêng để không gộp sai chi phí. Lỗi source, validator,
@@ -353,8 +353,17 @@ AI là phần dễ tạo độ trễ và chi phí cao, nên Codex phải:
 - Validate JSON Schema/Zod kỹ thuật trước khi lưu. Summary hợp lệ được lưu để
   admin sửa trực tiếp; không hiển thị warning kỹ thuật và không gọi provider
   repair lần hai.
+- Với Phase 1 Summary/Quiz, chỉ giao model các vòng kiểm chứng không thể làm
+  deterministic như tính đúng chuyên môn, điều kiện áp dụng, mạch suy luận, độ
+  khớp nguồn và tính mới. Shape/required/enum và exact count Quiz thuộc schema;
+  count Summary chỉ nêu một lần trong generation contract. JSON transport, ký tự
+  điều khiển, delimiter/môi trường LaTeX và chuẩn hóa đoạn kết luận an toàn
+  thuộc normalizer/backend. Không lặp các vòng rà cơ học này trong system prompt
+  hoặc schema description vì chúng tăng input/reasoning mà không tăng coverage.
 - Có fallback/error state thân thiện khi provider chậm/lỗi.
-- Ghi log usage/duration khi module AI log đã có.
+- Ghi log usage/duration khi module AI log đã có; mỗi provider attempt snapshot
+  cả Reasoning Effort đã resolve và mã tác vụ theo mục đích nghiệp vụ để so sánh
+  latency/chi phí giữa các workflow mà không suy ngược từ model.
 - Structured response incomplete/refusal phải log mã lỗi ổn định, `status`,
   `incomplete_details.reason`, request ID, model, latency và usage; chỉ log độ dài
   partial output, không log raw prompt/chunk/output. Response đã có usage phải được
@@ -396,6 +405,13 @@ AI là phần dễ tạo độ trễ và chi phí cao, nên Codex phải:
   một panel riêng. Nhãn mơ hồ chỉ chọn một crop. Ảnh nguyên trang
   PDF chỉ giữ làm fallback khi block không có nhãn hình cụ thể hoặc không resolve
   được crop đáng tin cậy. Không lặp provenance trang/object key/hash trong prompt.
+- Route Phase 2 phải truyền nguyên `reasoningEffort` và `maxOutputTokens` đã resolve
+  từ cấu hình `IMAGE`; service/worker không được có cap hoặc floor ẩn. Preview và
+  runtime phải phản ánh cùng effective request. Prompt tạo/refinement chỉ giữ một
+  cổng kiểm chứng chuyên môn cuối; các vòng rà schema, source policy, compiler và
+  validator đã deterministic không được lặp trong prompt. Technical repair chỉ
+  sửa diagnostics kỹ thuật đã thu gọn, mặc định tối đa một lượt AI sau auto-repair
+  local, nhằm giảm tail latency và paid call lặp.
 - Compiler diagnostic đầy đủ tiếp tục lưu trên render attempt. Payload repair
   chỉ gửi toàn bộ issue đã chuẩn hóa và tối đa `12.000` ký tự phần đuôi raw log
   cho category `COMPILER`; category khác không gửi raw log lặp lại issue.
@@ -408,6 +424,19 @@ AI là phần dễ tạo độ trễ và chi phí cao, nên Codex phải:
   `subjectKey`; figure Phase 2 phân vùng thêm theo mode/role. Prompt version dùng
   cho Toán, Lý và Hóa phải khác nhau để cache hit hoặc retry không thể tái sử dụng
   system prompt chuyên môn của môn khác.
+- Summary Ví dụ/Bài tập không ảnh nguồn dùng prefix/version riêng cho
+  `GENERATE_SOLUTION_FROM_BLOCK` theo từng môn; Quiz dùng prefix/version riêng
+  cho `SOLUTION` create/edit và refinement. Khi làm rõ quan hệ authority giữa
+  `solution` với `problem`, các nhánh này là `NEW_STABLE_PREFIX_WARMUP`: không
+  invalidate cache của Summary `GENERATE_FROM_BLOCK`, source-regenerate,
+  current-edit hoặc Quiz `QUESTION`; nội dung động `problem`/`solution` tiếp tục
+  nằm sau stable system prompt breakpoint.
+- Với Sinh kiến thức, cặp `standardExerciseCount`/`realWorldExerciseCount` vừa nằm
+  trong user prompt vừa tạo `minItems=maxItems` trong provider schema. Cache key
+  phải khác nhau giữa các cặp số lượng để không tái sử dụng nhầm schema; cùng
+  subject/model/prompt/schema strategy và cùng cặp số lượng vẫn dùng chung key dù
+  lesson/PDF khác nhau. Đây là `CACHE_ARCHITECTURE_CHANGE`; mỗi tổ hợp số lượng
+  cần warm-up stable prefix riêng.
 - Preview request tạo lại STEM figure chỉ chạy theo thao tác `Xem dữ liệu` hoặc
   `Cập nhật dữ liệu`; đổi nguồn ảnh phải invalidate preview phía client thay vì
   âm thầm giữ request cũ. Preview chỉ resolve route/schema và ước tính token/chi

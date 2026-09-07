@@ -205,6 +205,9 @@ Behavior: hard delete, không soft delete và không thể khôi phục.
 - Thực hiện trong một transaction: xóa toàn bộ `quiz_attempts`/answer phụ thuộc,
   xóa `quiz_sets` để cascade câu hỏi/hình/revision/render attempt, rồi xóa các
   `ai_explanations` của những câu vừa bị xóa.
+- Mọi delivery file của figure không còn được figure nào khác tham chiếu được
+  đánh dấu xóa trong transaction, sau đó xóa object khỏi MinIO/R2 và hard-delete
+  metadata `files`. File còn được figure khác dùng không bị xóa.
 - Giữ `ai_generations`, provider usage và `audit_logs` để bảo toàn lịch sử chi
   phí/vận hành; audit action là `QUIZ_SET_PERMANENT_DELETED`.
 - Response:
@@ -214,9 +217,14 @@ Behavior: hard delete, không soft delete và không thể khôi phục.
   "success": true,
   "deletedQuestionCount": 10,
   "deletedAttemptCount": 3,
-  "deletedExplanationCount": 10
+  "deletedExplanationCount": 10,
+  "deletedFileCount": 6,
+  "pendingFileCleanupCount": 0
 }
 ```
+
+Nếu storage tạm lỗi, metadata file giữ tombstone `DELETED` để không được tái sử
+dụng và `pendingFileCleanupCount` phản ánh số object chưa dọn xong.
 
 #### `POST /admin/quiz-sets/:quizSetId/review`
 
@@ -437,7 +445,11 @@ Body:
   xác trước (`0.5`, `0,5`, `1/2`, `2/4`, `\\frac{1}{2}` tương đương), rồi
   fallback về chuỗi đã chuẩn hóa Unicode/khoảng trắng và không phân biệt hoa
   thường khi hai phía không cùng là số hợp lệ.
-- `hintJson` và `explanationJson` nhận Tiptap JSON hoặc `null`. Lời giải chi tiết thủ công được lưu trong `ai_explanations` với `source=ADMIN` và trả về qua relation `explanation`.
+- `hintJson` và `explanationJson` nhận Tiptap JSON hoặc `null`. `explanationJson`
+  chỉ chứa phần lời giải, không chứa dòng `Đáp án:` vì dữ liệu chấm ở
+  `correctAnswerJson` là nguồn đáp án duy nhất. Lời giải chi tiết thủ công được
+  lưu trong `ai_explanations` với `source=ADMIN` và trả về qua relation
+  `explanation`.
 - `questionJson`, `optionsJson[*].richText`, `hintJson` và
   `explanationJson` cùng nhận cây Tiptap rich content. Contract cho phép
   `heading`, `paragraph`, `bulletList`, `orderedList`, `listItem`; marks
@@ -544,6 +556,10 @@ Role: `ADMIN`.
 - Response admin của figure đang chạy trả thêm `pendingAiTargetMode` lấy từ
   immutable job `planSnapshot`. UI dùng field này để gắn trạng thái “đang xử lý”
   cho đúng role `QUESTION` hoặc `SOLUTION`.
+- Response danh sách câu Quiz phải hydrate URL truy cập của current delivery
+  asset. Nếu storage local/R2 chưa có `FILE_PUBLIC_BASE_URL`, API trả signed URL
+  ngắn hạn trong `currentRevision.deliveryFile.publicUrl`; trạng thái
+  `SUCCEEDED` không được hiển thị thành lỗi chỉ vì cột `File.publicUrl` là null.
 - Hai endpoint question-level này nhận đủ bốn loại câu Quiz, gồm `TRUE_FALSE` một
   mệnh đề. Quy tắc không tự sinh hình cho `TRUE_FALSE` chỉ thuộc Phase 1/Phase 2
   của lượt sinh Quiz tự động, không chặn thao tác tạo hình chủ động của admin.

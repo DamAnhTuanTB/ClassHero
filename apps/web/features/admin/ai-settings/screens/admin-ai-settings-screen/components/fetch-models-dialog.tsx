@@ -1,5 +1,9 @@
 "use client";
 
+import {
+  AI_REASONING_EFFORT_LEVELS,
+  normalizeAiReasoningEffortLevels,
+} from "@learning-path/shared";
 import { CloudDownload, Loader2, Trash2, Copy, Check, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
@@ -324,7 +328,7 @@ export function FetchModelsDialog({
                                 Các mức Reasoning Effort hỗ trợ
                               </label>
                               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                                {["none", "minimal", "low", "medium", "high", "xhigh", "max"].map((level) => {
+                                {AI_REASONING_EFFORT_LEVELS.map((level) => {
                                   const reasoningEffortLevels = form.watch(`models.${index}.reasoningEffortLevels`) || [];
                                   return (
                                     <label key={level} className="flex items-center gap-2 text-sm font-medium">
@@ -333,9 +337,9 @@ export function FetchModelsDialog({
                                         value={level}
                                         checked={reasoningEffortLevels.includes(level)}
                                         onChange={(e) => {
-                                          const newLevels = e.target.checked
+                                          const newLevels = normalizeAiReasoningEffortLevels(e.target.checked
                                             ? [...reasoningEffortLevels, level]
-                                            : reasoningEffortLevels.filter((l) => l !== level);
+                                            : reasoningEffortLevels.filter((l) => l !== level));
                                           form.setValue(`models.${index}.reasoningEffortLevels`, newLevels, { shouldDirty: true });
                                         }}
                                         className="h-4 w-4 text-[var(--theme-primary)] rounded border-[var(--theme-border)] focus:ring-[var(--theme-primary)]"

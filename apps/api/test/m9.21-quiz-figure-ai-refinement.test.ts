@@ -71,7 +71,7 @@ describe("M9.21 Quiz figure AI refinement", () => {
     expect(JSON.parse(input.userPrompt)).not.toHaveProperty("adminInstructions");
   });
 
-  it("keeps solution authority ordered as solution then problem", () => {
+  it("keeps solution as the higher-priority authority without implying sequential inputs", () => {
     const input = buildQuizFigureRefinementInput({
       subject: { key: "MATH", name: "Toán", slug: "toan" },
       plan: {
@@ -84,7 +84,11 @@ describe("M9.21 Quiz figure AI refinement", () => {
       currentImageDataUrl: "data:image/png;base64,aW1hZ2U=",
     });
     expect(input.systemPrompt).toContain("solution là nguồn ưu tiên cao nhất");
-    expect(input.systemPrompt).toContain("sau đó mới đến problem");
+    expect(input.systemPrompt).toContain("dùng cả solution và problem");
+    expect(input.systemPrompt).not.toContain("sau đó mới đến problem");
+    expect(input.promptVersion).toBe(
+      "quiz-figure-math-solution-refinement-comprehensive-v39-single-semantic-check",
+    );
   });
 
   it("uses the same full-source refinement schema in the worker", async () => {

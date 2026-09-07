@@ -155,7 +155,24 @@ model`. `maxInputTokens` cùng `maxOutputTokens` thuộc cấu hình từng feat
   phủ lớp 3–12 và 45 compile local; live OpenAI 4 call tốn ước tính 240 VNĐ.
 - `M9.25` đã triển khai ngày 2026-08-28: danh sách input sửa/xóa từng text slot
   an toàn trong `Chỉnh nhanh` dùng deterministic parser/transformer và compile
-  endpoint hiện có; không đổi API/database/worker và không gọi AI.
+  endpoint hiện có; icon áp dụng từng row, slider cho algebraic single-owner pic
+  có `pic text options` và footer compile giữ popover mở; không đổi API/database/worker và không gọi AI.
+- `M9.26` đã triển khai ngày 2026-09-05: form nhập góc nhanh dùng named point,
+  tự nối cạnh thiếu, tạo nhóm cung phân biệt và card nối/bỏ nối đoạn độc lập trong
+  shared `Chỉnh nhanh`; `Bỏ góc` theo tên và xóa số đo angle đều xóa trọn nhóm
+  cung owner cùng nhãn embedded/node rời neo tường minh nhưng giữ hai cạnh; không
+  hiện banner cảnh báo đỏ khi chỉ nhập tên. Dùng compile/history hiện có, không
+  đổi API/database/worker và không gọi AI. Cùng task có form thêm midpoint theo
+  named segment, tạo cặp marker `.25`/`.75`, chọn palette khác giữa các đoạn và
+  nhận tọa độ cực số, kế thừa độ dày cạnh cùng font-size point label, đồng thời
+  ghi đè atomic midpoint cũ khi nhập tên mới trên cùng đoạn; xóa midpoint chỉ bằng
+  tên đoạn trong khi vẫn giữ cạnh gốc. `Thêm góc` đã đổi thành upsert và phân bổ
+  kiểu cung theo lớp số đo bằng nhau; checkbox đặt tên tâm chỉ hiện input khi bật,
+  tự viết hoa và thêm nhãn cạnh tâm đường tròn đơn mà không đổi geometry.
+- `M9.27` đã triển khai ngày 2026-09-05: Summary Phase 2 của Ví dụ/Bài tập
+  `GENERATED_FROM_BRIEF` dùng `solution > problem` để dựng hình lời giải hoàn
+  chỉnh, độc lập; prompt/runtime Summary vẫn tách khỏi Quiz. Modal tạo hình AI
+  mode `NONE` dùng cùng contract; ảnh sách, current edit và block thường giữ nguyên.
 
 ## 1. Phạm vi bước này
 
@@ -344,6 +361,8 @@ chung`/`Bài tập cuối chương`. Output hợp lệ kỹ thuật luôn đư�
     43.7. `M9.22` - Admin tạo hình đề/lời giải AI từ header card Quiz. Done 2026-08-26.
     43.8. `M9.23` - Bộ chỉnh nhanh TikZ dùng chung cho Summary/Quiz. Done 2026-08-26.
     43.9. `M9.25` - Sửa trực tiếp từng nhãn và số đo trong bộ chỉnh nhanh TikZ. Done 2026-08-28.
+    43.10. `M9.26` - Nhập góc nhanh, tự nối cạnh và tạo nhóm cung TikZ. Done 2026-09-05.
+    43.11. `M9.27` - Summary Ví dụ/Bài tập sinh hình lời giải độc lập. Done 2026-09-05.
 44. `M9.4` - Student request-new reserve-first UI + API.
 45. `M9.5` - AI explanation cache inline UI + API.
 46. `M9.6` - Chat AI trong lesson bằng RAG.

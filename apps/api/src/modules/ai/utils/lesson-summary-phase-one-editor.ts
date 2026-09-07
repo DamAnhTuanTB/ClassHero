@@ -139,13 +139,18 @@ export function applyLessonSummaryPhaseOneBlockEdits(input: {
     const providerBlock = providerPath
       ? getValueAtPath(providerOutput, providerPath)
       : undefined;
-    if (isCrossFamilyConvertibleTypeChange(providerBlock, rawBlock)) {
+    if (
+      isCrossFamilyConvertibleTypeChange(providerBlock, rawBlock) ||
+      isProblemBlockManualOverride(providerBlock, rawBlock)
+    ) {
       const targetType = rawBlock.type;
-      const overrideSchema =
-        targetType === "note"
-          ? lessonSummaryProviderNoteTransportSchema
-          : lessonSummaryTheoryBlockTransportSchema;
-      const parsedOverride = overrideSchema.safeParse(rawBlock);
+      const isProblemOverride = targetType === "example" || targetType === "exercise";
+      const parsedOverride = isProblemOverride
+        ? parseManualProblemBlock(rawBlock)
+        : (targetType === "note"
+            ? lessonSummaryProviderNoteTransportSchema
+            : lessonSummaryTheoryBlockTransportSchema
+          ).safeParse(rawBlock);
       if (!parsedOverride.success) {
         return {
           success: false as const,
@@ -266,7 +271,21 @@ function applyManualBlockTypeOverrides(
       reviewIssues: currentBlock.reviewIssues,
     };
     const candidate =
-      rawBlock.type === "note"
+      rawBlock.type === "example" || rawBlock.type === "exercise"
+        ? compactRecord({
+            type: rawBlock.type,
+            problem: rawBlock.problem,
+            solution: rawBlock.solution,
+            answer: rawBlock.answer,
+            isGeometry: rawBlock.isGeometry,
+            geometryStatement: rawBlock.geometryStatement ?? undefined,
+            origin:
+              rawBlock.origin ??
+              ("origin" in currentBlock ? currentBlock.origin : undefined),
+            sourcePageNumbers: rawBlock.sourcePageNumbers,
+            ...preserved,
+          })
+        : rawBlock.type === "note"
         ? compactRecord({
             type: rawBlock.type,
             content:
@@ -289,6 +308,36 @@ function applyManualBlockTypeOverrides(
       parsed.data;
   }
   return copy;
+}
+
+function isProblemBlockManualOverride(
+  providerBlock: unknown,
+  rawBlock: unknown,
+): rawBlock is Record<string, unknown> & { type: "example" | "exercise" } {
+  if (!isRecord(providerBlock) || !isRecord(rawBlock)) return false;
+  return (
+    (rawBlock.type === "example" || rawBlock.type === "exercise") &&
+    rawBlock.type === providerBlock.type &&
+    (JSON.stringify(rawBlock.isGeometry) !==
+      JSON.stringify(providerBlock.isGeometry) ||
+      JSON.stringify(rawBlock.geometryStatement) !==
+        JSON.stringify(providerBlock.geometryStatement))
+  );
+}
+
+function parseManualProblemBlock(rawBlock: Record<string, unknown>) {
+  return lessonSummaryMvpBlockSchema.safeParse(
+    compactRecord({
+      type: rawBlock.type,
+      problem: rawBlock.problem,
+      solution: rawBlock.solution,
+      answer: rawBlock.answer,
+      isGeometry: rawBlock.isGeometry,
+      geometryStatement: rawBlock.geometryStatement ?? undefined,
+      sourcePageNumbers: rawBlock.sourcePageNumbers,
+      figures: [],
+    }),
+  );
 }
 
 function applyLayoutOperationsToMappedOutput(

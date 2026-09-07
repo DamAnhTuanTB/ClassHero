@@ -48,6 +48,15 @@ test.describe("M9.8 admin AI generation panel", () => {
     const summaryDialog = page.getByRole("dialog", { name: "Tạo Kiến thức bằng AI" });
     await expect(summaryDialog.locator("select")).toHaveCount(0);
     await expect(summaryDialog.getByLabel("Cách trình bày")).toBeVisible();
+    await expect(summaryDialog.getByLabel("Số bài tập bình thường")).toHaveValue("2");
+    await expect(summaryDialog.getByLabel("Số bài tập ứng dụng thực tế")).toHaveValue(
+      "2",
+    );
+    await summaryDialog.getByLabel("Số bài tập bình thường").fill("0");
+    await expect(
+      summaryDialog.getByText("Số bài tập bình thường phải từ 1 đến 10"),
+    ).toBeVisible();
+    await summaryDialog.getByLabel("Số bài tập bình thường").fill("2");
     await expect(summaryDialog.getByTestId("ai-prompt-markdown-preview")).toHaveCSS(
       "overflow-y",
       "auto",
@@ -756,11 +765,11 @@ test.describe("M9.8 admin AI generation panel", () => {
     );
     await expect
       .poll(() =>
-        figure.evaluate((element) => {
-          const container = element.parentElement;
-          return container
+        figureFrame.evaluate((element) => {
+          const scaleHost = element.parentElement;
+          return scaleHost
             ? element.getBoundingClientRect().width /
-                container.getBoundingClientRect().width
+                scaleHost.getBoundingClientRect().width
             : 0;
         }),
       )
@@ -779,6 +788,29 @@ test.describe("M9.8 admin AI generation panel", () => {
         }),
       )
       .toBeGreaterThan(0.98);
+    await expect
+      .poll(async () => {
+        const frameBox = await figure.boundingBox();
+        const actionButtons = figureFrame.getByRole("button");
+        const buttonCount = await actionButtons.count();
+        if (!frameBox || buttonCount === 0) return false;
+
+        for (let index = 0; index < buttonCount; index += 1) {
+          const buttonBox = await actionButtons.nth(index).boundingBox();
+          if (
+            !buttonBox ||
+            buttonBox.x < frameBox.x ||
+            buttonBox.x + buttonBox.width > frameBox.x + frameBox.width ||
+            buttonBox.y < frameBox.y ||
+            buttonBox.y + buttonBox.height > frameBox.y + frameBox.height
+          ) {
+            return false;
+          }
+        }
+
+        return true;
+      })
+      .toBe(true);
     await page.screenshot({
       path: `../../.codex/artifacts/m9-23-quick-tools/admin-quiz-applied-scale-${testInfo.project.name}.png`,
       fullPage: true,
@@ -937,7 +969,20 @@ test.describe("M9.8 admin AI generation panel", () => {
     });
 
     await page.goto(`/admin/lessons/${lessonId}`);
-    await page.getByRole("tab", { name: "Quiz", exact: true }).click();
+    const quizContentTab = page.getByRole("tab", { name: "Quiz", exact: true });
+    const flashcardContentTab = page.getByRole("tab", {
+      name: "Flashcard",
+      exact: true,
+    });
+    await quizContentTab.click();
+    await expect(page.locator(`#quiz-question-${firstQuestionId}`)).toBeVisible();
+
+    await page.keyboard.press("ArrowRight");
+    await expect(quizContentTab).toHaveAttribute("aria-selected", "true");
+    await expect(flashcardContentTab).toHaveAttribute("aria-selected", "false");
+    await expect(page.locator(`#quiz-question-${secondQuestionId}`)).toBeVisible();
+
+    await page.keyboard.press("ArrowLeft");
     await expect(page.locator(`#quiz-question-${firstQuestionId}`)).toBeVisible();
 
     const nextQuestionButton = page.getByRole("button", { name: "Câu tiếp theo" });
@@ -1219,6 +1264,8 @@ test.describe("M9.8 admin AI generation panel", () => {
     await dialog.getByRole("option", { name: "Chi tiết" }).click();
     await expect(dialog.getByLabel("Số lượng từ")).toHaveValue("");
     await dialog.getByLabel("Số lượng từ").fill("350");
+    await dialog.getByLabel("Số bài tập bình thường").fill("3");
+    await dialog.getByLabel("Số bài tập ứng dụng thực tế").fill("4");
 
     await expect(dialog.getByLabel("Yêu cầu bổ sung")).toHaveAttribute(
       "placeholder",
@@ -1310,6 +1357,8 @@ test.describe("M9.8 admin AI generation panel", () => {
           "Học thuật, chặt chẽ, có cấu trúc rõ ràng và dùng thuật ngữ chính xác.",
         length: "detailed",
         targetWordCount: 350,
+        standardExerciseCount: 3,
+        realWorldExerciseCount: 4,
         extraInstructions: "Dùng tiêu đề ngắn",
         systemInstructions: resolvedSystemPrompt,
         userPrompt: "USER CUSTOM",
@@ -1332,7 +1381,7 @@ test.describe("M9.8 admin AI generation panel", () => {
       .getByRole("button", { name: "Tạo mới", exact: true })
       .click();
     const dialog = page.getByRole("dialog", { name: "Tạo Kiến thức bằng AI" });
-    const sourceImageCheckbox = dialog.getByLabel("Dùng ảnh gốc sách giáo khoa");
+    const sourceImageCheckbox = dialog.getByLabel("Dùng ảnh gốc của tài liệu");
     const autoEnhanceCheckbox = dialog.getByLabel("Tự động làm nét ảnh");
     await expect(sourceImageCheckbox).not.toBeChecked();
     await expect(autoEnhanceCheckbox).toHaveCount(0);
@@ -1431,6 +1480,8 @@ test.describe("M9.8 admin AI generation panel", () => {
         styleInstructions:
           "Dễ hiểu, gần gũi, sử dụng cách diễn đạt và mức độ chi tiết phù hợp lứa tuổi.",
         length: "standard",
+        standardExerciseCount: 2,
+        realWorldExerciseCount: 2,
         systemInstructions: mockSystemPrompt,
         userPrompt: expect.stringContaining("USER PROMPT"),
         model: "gpt-5.6-luna",
@@ -1470,6 +1521,8 @@ test.describe("M9.8 admin AI generation panel", () => {
         styleInstructions:
           "Dễ hiểu, gần gũi, sử dụng cách diễn đạt và mức độ chi tiết phù hợp lứa tuổi.",
         length: "standard",
+        standardExerciseCount: 2,
+        realWorldExerciseCount: 2,
         extraInstructions: "Chỉ dùng cho lần tạo này",
         systemInstructions: mockSystemPrompt,
         userPrompt: expect.stringContaining("USER PROMPT"),
@@ -1489,6 +1542,12 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect(
       page.getByText("Số hữu tỉ là số viết được dưới dạng phân số."),
     ).toBeVisible();
+    await expect(page.getByText("Bài tập 1", { exact: true })).toBeVisible();
+    await expect(page.getByText("Bài tập 2", { exact: true })).toBeVisible();
+    const exerciseCards = page.locator('[data-lesson-summary-block-type="exercise"]');
+    await expect(exerciseCards).toHaveCount(2);
+    await expect(exerciseCards.first()).toHaveClass(/border-cyan-200/u);
+    await expect(exerciseCards.first().locator("svg.lucide-notebook-pen")).toBeVisible();
     const totalCostButton = page.getByRole("button", {
       name: "Tổng 9 lượt gọi: 1.096 VNĐ",
     });
@@ -1603,7 +1662,7 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect(
       dialog.getByLabel("Tài liệu dùng để tạo", { exact: true }),
     ).toContainText("Giáo trình Toán 7 (trang 5–9), Tài liệu tham khảo");
-    await expect(dialog.getByLabel("Dùng ảnh gốc sách giáo khoa")).toBeChecked();
+    await expect(dialog.getByLabel("Dùng ảnh gốc của tài liệu")).toBeChecked();
     await expect(dialog.getByLabel("Tự động làm nét ảnh")).toBeChecked();
     await expect(dialog.getByLabel("Cách trình bày")).toHaveValue(
       "Trình bày theo từng bước ngắn gọn.",
@@ -1630,7 +1689,7 @@ test.describe("M9.8 admin AI generation panel", () => {
     await generationCard(page, "Kiến thức")
       .getByRole("button", { name: "Tạo mới", exact: true })
       .click();
-    await expect(dialog.getByLabel("Dùng ảnh gốc sách giáo khoa")).not.toBeChecked();
+    await expect(dialog.getByLabel("Dùng ảnh gốc của tài liệu")).not.toBeChecked();
     await expect(dialog.getByLabel("Yêu cầu bổ sung")).toHaveValue("");
   });
 
@@ -1992,6 +2051,7 @@ test.describe("M9.8 admin AI generation panel", () => {
 \node at (0,0) {$A$};
 \node at (2,0) {$A$};
 \node at (1,1) {$65^\circ$};
+\pic[draw, pic text options={font=\small}, "$(3x-20)^\circ$"] {angle=A--B--C};
 \end{tikzpicture}`,
     });
     const mock = await setupAiGenerationMock(page, {
@@ -2007,11 +2067,14 @@ test.describe("M9.8 admin AI generation panel", () => {
     const editor = page.getByRole("dialog", { name: /Chỉnh sửa hình/ });
     await editor.getByRole("button", { name: "Chỉnh nhanh" }).click();
 
-    await expect(editor.getByText("Nhãn và số đo (3)")).toBeVisible();
-    const firstLabel = editor.getByRole("textbox", { name: "Nhãn 1" });
+    await expect(editor.getByText("Nhãn và số đo (4)")).toBeVisible();
+    const firstLabel = editor.getByRole("textbox", { name: "Điểm 1" });
+    const applyFirstLabel = editor.getByRole("button", { name: "Áp dụng điểm 1" });
     await expect(firstLabel).toHaveValue("A");
+    await expect(applyFirstLabel).toBeDisabled();
     await firstLabel.fill("B");
-    await firstLabel.press("Enter");
+    await expect(applyFirstLabel).toBeEnabled();
+    await applyFirstLabel.click();
 
     await expect.poll(() => mock.figureActions.compilePayloads).toHaveLength(1);
     await page.waitForTimeout(150);
@@ -2021,7 +2084,7 @@ test.describe("M9.8 admin AI generation panel", () => {
       String(mock.figureActions.compilePayloads[0]?.latexSource).match(/\{\$A\$\}/gu),
     ).toHaveLength(1);
 
-    await editor.getByRole("button", { name: "Cài đặt nhãn 1" }).click();
+    await editor.getByRole("button", { name: "Cài đặt điểm 1" }).click();
     const horizontalSlider = editor.getByRole("slider", { name: "Ngang (x)" });
     const verticalSlider = editor.getByRole("slider", { name: "Dọc (y)" });
     await expect(horizontalSlider).toHaveValue("0");
@@ -2031,9 +2094,8 @@ test.describe("M9.8 admin AI generation panel", () => {
     await editor.getByRole("button", { name: "Biên dịch" }).click();
     await expect.poll(() => mock.figureActions.compilePayloads).toHaveLength(2);
     expect(mock.figureActions.compilePayloads[1]?.latexSource).toContain("xshift=+12pt");
+    await expect(editor.getByTestId("stem-figure-quick-actions-popover")).toBeVisible();
 
-    await editor.getByRole("button", { name: "Chỉnh nhanh" }).click();
-    await editor.getByRole("button", { name: "Cài đặt nhãn 1" }).click();
     await expect(editor.getByRole("slider", { name: "Ngang (x)" })).toHaveValue("12");
     const fontSizeSlider = editor.getByRole("slider", { name: "Cỡ chữ" });
     await fontSizeSlider.fill("150");
@@ -2043,22 +2105,278 @@ test.describe("M9.8 admin AI generation panel", () => {
       String.raw`font=\fontsize{15pt}{18pt}\selectfont`,
     );
 
-    const secondLabel = editor.getByRole("textbox", { name: "Nhãn 2" });
+    const secondLabel = editor.getByRole("textbox", { name: "Điểm 2" });
     await secondLabel.fill("C");
     await editor.getByRole("button", { name: "Biên dịch" }).click();
     await expect.poll(() => mock.figureActions.compilePayloads).toHaveLength(4);
     expect(mock.figureActions.compilePayloads[3]?.latexSource).toContain("{$C$}");
     expect(mock.figureActions.compilePayloads[3]?.latexSource).not.toContain("{$A$}");
+    await expect(editor.getByTestId("stem-figure-quick-actions-popover")).toBeVisible();
 
-    await editor.getByRole("button", { name: "Chỉnh nhanh" }).click();
-    await editor.getByRole("button", { name: "Xóa số đo 3" }).click();
+    await editor.getByRole("button", { name: "Cài đặt góc 2" }).click();
+    await expect(editor.getByRole("slider", { name: "Ngang (x)" })).toHaveValue("0");
+    await expect(editor.getByRole("slider", { name: "Dọc (y)" })).toHaveValue("0");
+    const picFontSizeSlider = editor.getByRole("slider", { name: "Cỡ chữ" });
+    await expect(picFontSizeSlider).toHaveValue("100");
+    await expect(
+      editor.getByRole("slider", { name: "Khoảng cách cung tới đỉnh" }),
+    ).toHaveValue("14");
+    await picFontSizeSlider.fill("125");
+    await picFontSizeSlider.press("Enter");
     await expect.poll(() => mock.figureActions.compilePayloads).toHaveLength(5);
-    expect(mock.figureActions.compilePayloads[4]?.latexSource).not.toContain(
-      String.raw`65^\circ`,
+    expect(mock.figureActions.compilePayloads[4]?.latexSource).toContain(
+      String.raw`"$(3x-20)^\circ$"{classhero text slot adjustment/.style={font=\fontsize{11.25pt}{13.5pt}\selectfont}, classhero text slot adjustment}`,
     );
     expect(mock.figureActions.compilePayloads[4]?.latexSource).toContain(
+      String.raw`{angle=A--B--C}`,
+    );
+    expect(mock.figureActions.compilePayloads[4]?.latexSource).toContain(
+      String.raw`pic text options={font=\small}`,
+    );
+
+    const secondaryLabelSlider = editor.getByRole("slider", {
+      name: "Nhãn phụ (%)",
+    });
+    await secondaryLabelSlider.fill("71");
+    await secondaryLabelSlider.press("Enter");
+    await expect.poll(() => mock.figureActions.compilePayloads).toHaveLength(6);
+    expect(mock.figureActions.compilePayloads[5]?.latexSource).toContain(
+      String.raw`classhero text slot group scale/.style={font=\fontsize{6.39pt}{7.67pt}\selectfont}`,
+    );
+    expect(mock.figureActions.compilePayloads[5]?.latexSource).toContain(
+      String.raw`{angle=A--B--C}`,
+    );
+
+    await editor.getByRole("button", { name: "Xóa góc 1" }).click();
+    await expect.poll(() => mock.figureActions.compilePayloads).toHaveLength(7);
+    expect(mock.figureActions.compilePayloads[6]?.latexSource).not.toContain(
+      String.raw`65^\circ`,
+    );
+    expect(mock.figureActions.compilePayloads[6]?.latexSource).toContain(
       String.raw`\draw (0,0)--(2,0);`,
     );
+  });
+
+  test("adds a named angle, connects a missing side and keeps one undo step", async ({
+    page,
+  }) => {
+    const source = String.raw`\begin{tikzpicture}
+\coordinate (A) at (4,0);
+\coordinate (B) at (0,2);
+\coordinate (C) at (0,-1);
+\coordinate (D) at (1,-2);
+\draw (0,0) circle (4cm);
+\draw (B) -- (A) -- (C) -- (D);
+\pic[draw, angle radius=0.50cm, "$74^\circ$"] {angle=C--B--A};
+\pic[draw, angle radius=0.50cm] {angle=B--A--C};
+\pic[draw, angle radius=0.55cm, "$32^\circ$"] {angle=B--A--C};
+\pic[draw, angle radius=0.50cm] {angle=D--C--A};
+\pic[draw, angle radius=0.55cm] {angle=D--C--A};
+\pic[draw, angle radius=0.60cm, "$41^\circ$"] {angle=D--C--A};
+\end{tikzpicture}`;
+    const figure = stemFigureFixture({
+      id: "figure-quick-angle",
+      blockPath: "sections.0.blocks.0",
+      latexSource: source,
+    });
+    const mock = await setupAiGenerationMock(page, {
+      initialSummaryContent: summaryContent([String(figure.id)]),
+      stemFigures: [figure],
+    });
+    await page.goto(`/admin/lessons/${lessonId}`);
+    await page.getByRole("tab", { name: "Kiến thức" }).click();
+
+    const card = page.locator(`[data-admin-stem-figure="${String(figure.id)}"]`);
+    await card.getByRole("button", { name: "Mở menu thao tác hình" }).click();
+    await page.getByRole("menuitem", { name: "Chỉnh sửa bằng mã code" }).click();
+    const editor = page.getByRole("dialog", { name: /Chỉnh sửa hình/ });
+    await editor.getByRole("button", { name: "Chỉnh nhanh" }).click();
+    await editor.getByRole("textbox", { name: "Tên góc nhanh" }).fill("abd");
+    await editor.getByRole("textbox", { name: "Số đo góc nhanh" }).fill("50");
+
+    await expect(editor.getByText(/∠ABD = 50°/u)).toHaveCount(0);
+    await editor.getByRole("button", { name: "Thêm góc" }).click();
+
+    await expect.poll(() => mock.figureActions.compilePayloads).toHaveLength(1);
+    const transformedSource = String(mock.figureActions.compilePayloads[0]?.latexSource);
+    expect(transformedSource).toContain(String.raw`\draw (B) -- (D);`);
+    expect(transformedSource.match(/angle=D--B--A/gu)).toHaveLength(4);
+    expect(transformedSource.match(/\$50\^\\circ\$/gu)).toHaveLength(1);
+    await expect(editor.getByRole("textbox", { name: "Tên góc nhanh" })).toHaveValue("");
+    await expect(editor.getByRole("button", { name: "Hoàn tác" })).toBeEnabled();
+
+    await editor.getByRole("textbox", { name: "Tên góc nhanh" }).fill("ABD");
+    await editor.getByRole("textbox", { name: "Số đo góc nhanh" }).fill("60");
+    await editor.getByRole("button", { name: "Thêm góc" }).click();
+    await expect.poll(() => mock.figureActions.compilePayloads).toHaveLength(2);
+    const updatedAngleSource = String(mock.figureActions.compilePayloads[1]?.latexSource);
+    expect(updatedAngleSource).not.toContain(String.raw`$50^\circ$`);
+    expect(updatedAngleSource.match(/\$60\^\\circ\$/gu)).toHaveLength(1);
+    expect(updatedAngleSource.match(/angle=D--B--A/gu)).toHaveLength(4);
+    await expect(editor.getByText(/đã có dấu góc/u)).toHaveCount(0);
+
+    await editor.getByRole("button", { name: "Hoàn tác" }).click();
+    await expect.poll(() => mock.figureActions.compilePayloads).toHaveLength(3);
+    expect(mock.figureActions.compilePayloads[2]?.latexSource).toBe(transformedSource);
+    await editor.getByRole("button", { name: "Hoàn tác" }).click();
+    await expect.poll(() => mock.figureActions.compilePayloads).toHaveLength(4);
+    expect(mock.figureActions.compilePayloads[3]?.latexSource).toBe(source);
+
+    const centerToggle = editor.getByRole("checkbox", {
+      name: "Thêm tên tâm đường tròn",
+    });
+    await expect(editor.getByRole("textbox", { name: "Tên tâm đường tròn" })).toHaveCount(
+      0,
+    );
+    await centerToggle.check();
+    const centerNameInput = editor.getByRole("textbox", {
+      name: "Tên tâm đường tròn",
+    });
+    await centerNameInput.fill("o");
+    await expect(centerNameInput).toHaveValue("O");
+    await editor.getByRole("button", { name: "Thêm tên tâm" }).click();
+    await expect.poll(() => mock.figureActions.compilePayloads).toHaveLength(5);
+    const centerSource = String(mock.figureActions.compilePayloads[4]?.latexSource);
+    expect(centerSource).toContain(String.raw`\coordinate (O) at (0,0);`);
+    expect(centerSource).toContain(String.raw`at (O) {$O$};`);
+    await expect(centerNameInput).toHaveValue("");
+  });
+
+  test("deletes an angle marker group and connects or disconnects a named segment", async ({
+    page,
+  }) => {
+    const source = String.raw`\begin{tikzpicture}
+\coordinate (A) at (4,0);
+\coordinate (B) at (0,2);
+\coordinate (C) at (0,-1);
+\coordinate (D) at (1,-2);
+\draw (B) -- (A) -- (C) -- (D);
+\pic[draw, angle radius=0.50cm, "$74^\circ$"] {angle=C--B--A};
+\pic[draw, angle radius=0.50cm] {angle=B--A--C};
+\pic[draw, angle radius=0.55cm] {angle=B--A--C};
+\node[font=\small] at ($(A)+(195:0.82)$) {$32^\circ$};
+\pic[draw, angle radius=0.50cm] {angle=D--C--A};
+\pic[draw, angle radius=0.55cm] {angle=D--C--A};
+\pic[draw, angle radius=0.60cm, "$41^\circ$"] {angle=D--C--A};
+\end{tikzpicture}`;
+    const figure = stemFigureFixture({
+      id: "figure-angle-segment-delete",
+      blockPath: "sections.0.blocks.0",
+      latexSource: source,
+    });
+    const mock = await setupAiGenerationMock(page, {
+      initialSummaryContent: summaryContent([String(figure.id)]),
+      stemFigures: [figure],
+    });
+    await page.goto(`/admin/lessons/${lessonId}`);
+    await page.getByRole("tab", { name: "Kiến thức" }).click();
+
+    const card = page.locator(`[data-admin-stem-figure="${String(figure.id)}"]`);
+    await card.getByRole("button", { name: "Mở menu thao tác hình" }).click();
+    await page.getByRole("menuitem", { name: "Chỉnh sửa bằng mã code" }).click();
+    const editor = page.getByRole("dialog", { name: /Chỉnh sửa hình/ });
+    await editor.getByRole("button", { name: "Chỉnh nhanh" }).click();
+
+    const angleInput = editor.getByRole("textbox", { name: "Tên góc nhanh" });
+    await angleInput.fill("cab");
+    await expect(editor.getByText(/sẽ xóa số đo/u)).toHaveCount(0);
+    await editor.getByRole("button", { name: "Bỏ góc" }).click();
+    await expect.poll(() => mock.figureActions.compilePayloads).toHaveLength(1);
+    const afterAngleDelete = String(mock.figureActions.compilePayloads[0]?.latexSource);
+    expect(afterAngleDelete).not.toContain("angle=B--A--C");
+    expect(afterAngleDelete).not.toContain(String.raw`32^\circ`);
+    expect(afterAngleDelete).toContain("angle=C--B--A");
+    expect(afterAngleDelete).toContain("angle=D--C--A");
+    expect(afterAngleDelete).toContain(String.raw`\draw (B) -- (A) -- (C) -- (D);`);
+    await expect(angleInput).toHaveValue("");
+
+    const segmentInput = editor.getByRole("textbox", {
+      name: "Tên đoạn thẳng nhanh",
+    });
+    await segmentInput.fill("BD");
+    await expect(editor.getByText("Đoạn BD chưa được nối.")).toBeVisible();
+    await editor.getByRole("button", { exact: true, name: "Nối" }).click();
+    await expect.poll(() => mock.figureActions.compilePayloads).toHaveLength(2);
+    expect(mock.figureActions.compilePayloads[1]?.latexSource).toContain(
+      String.raw`\draw (B) -- (D);`,
+    );
+
+    await segmentInput.fill("DB");
+    await expect(editor.getByText("Đoạn DB đang được nối.")).toBeVisible();
+    await editor.getByRole("button", { exact: true, name: "Bỏ nối" }).click();
+    await expect.poll(() => mock.figureActions.compilePayloads).toHaveLength(3);
+    expect(mock.figureActions.compilePayloads[2]?.latexSource).not.toContain(
+      String.raw`\draw (B) -- (D);`,
+    );
+  });
+
+  test("adds a named midpoint with markers, auto-connects its segment and deletes it by segment only", async ({
+    page,
+  }) => {
+    const source = String.raw`\begin{tikzpicture}
+\coordinate (A) at (0,0);
+\coordinate (B) at (4,0);
+\coordinate (C) at (0,3);
+\coordinate (D) at (4,3);
+\end{tikzpicture}`;
+    const figure = stemFigureFixture({
+      id: "figure-quick-midpoint",
+      blockPath: "sections.0.blocks.0",
+      latexSource: source,
+    });
+    const mock = await setupAiGenerationMock(page, {
+      initialSummaryContent: summaryContent([String(figure.id)]),
+      stemFigures: [figure],
+    });
+    await page.goto(`/admin/lessons/${lessonId}`);
+    await page.getByRole("tab", { name: "Kiến thức" }).click();
+
+    const card = page.locator(`[data-admin-stem-figure="${String(figure.id)}"]`);
+    await card.getByRole("button", { name: "Mở menu thao tác hình" }).click();
+    await page.getByRole("menuitem", { name: "Chỉnh sửa bằng mã code" }).click();
+    const editor = page.getByRole("dialog", { name: /Chỉnh sửa hình/ });
+    await editor.getByRole("button", { name: "Chỉnh nhanh" }).click();
+
+    const segmentInput = editor.getByRole("textbox", {
+      name: "Đoạn thẳng thêm trung điểm",
+    });
+    const midpointInput = editor.getByRole("textbox", {
+      name: "Tên trung điểm nhanh",
+    });
+    await segmentInput.fill("ab");
+    await midpointInput.fill("m");
+    await expect(midpointInput).toHaveValue("M");
+    await editor.getByRole("button", { name: "Thêm trung điểm" }).click();
+    await expect(editor.getByText("Tên điểm M đã tồn tại trong hình.")).toHaveCount(0);
+
+    await expect.poll(() => mock.figureActions.compilePayloads).toHaveLength(1);
+    const addedSource = String(mock.figureActions.compilePayloads[0]?.latexSource);
+    expect(addedSource).toContain(String.raw`\draw[solid] (A) -- (B);`);
+    expect(addedSource).toContain(String.raw`\coordinate (M) at ($(A)!0.5!(B)$);`);
+    expect(addedSource).toContain("mark=at position .25");
+    expect(addedSource).toContain("mark=at position .75");
+    await expect(midpointInput).toHaveValue("");
+
+    await segmentInput.fill("AB");
+    await midpointInput.fill("n");
+    await expect(midpointInput).toHaveValue("N");
+    await editor.getByRole("button", { name: "Thêm trung điểm" }).click();
+    await expect.poll(() => mock.figureActions.compilePayloads).toHaveLength(2);
+    const replacedSource = String(mock.figureActions.compilePayloads[1]?.latexSource);
+    expect(replacedSource).not.toContain(String.raw`\coordinate (M)`);
+    expect(replacedSource).toContain(String.raw`\coordinate (N) at ($(A)!0.5!(B)$);`);
+    expect(replacedSource.match(/classhero-quick-midpoint:start/gu)).toHaveLength(1);
+    expect(replacedSource.match(/mark=at position \.25/gu)).toHaveLength(1);
+
+    await segmentInput.fill("BA");
+    await editor.getByRole("button", { name: "Xóa trung điểm" }).click();
+    await expect.poll(() => mock.figureActions.compilePayloads).toHaveLength(3);
+    const removedSource = String(mock.figureActions.compilePayloads[2]?.latexSource);
+    expect(removedSource).not.toContain("classhero-quick-midpoint");
+    expect(removedSource).not.toContain(String.raw`\coordinate (N)`);
+    expect(removedSource).not.toContain("mark=at position .25");
+    expect(removedSource).toContain(String.raw`\draw[solid] (A) -- (B);`);
+    await expect(editor.getByRole("button", { name: "Hoàn tác" })).toBeEnabled();
   });
 
   test("changes or clears a figure caption without compiling the current figure", async ({
@@ -2569,6 +2887,28 @@ test.describe("M9.8 admin AI generation panel", () => {
       page.getByRole("menuitem", { name: "Xem ảnh sách giáo khoa" }),
     ).toHaveCount(0);
     await page.getByRole("menuitem", { name: "Tạo mới bằng AI" }).click();
+    const canceledAiDialog = page.getByRole("dialog", {
+      name: "Tạo mới hình bằng AI",
+    });
+    await canceledAiDialog.getByRole("button", { name: "Đóng" }).click();
+    await expect(canceledAiDialog).toHaveCount(0);
+    expect(mock.figureActions.ensureBlockPaths).toHaveLength(0);
+    expect(mock.figureActions.deleted).not.toContain("ensured-sections-0-blocks-1");
+
+    await blockImageButton.click();
+    await page.getByRole("menuitem", { name: "Tạo mới bằng mã code" }).click();
+    const canceledCodeDialog = page.getByRole("dialog", { name: "Chỉnh sửa hình" });
+    await canceledCodeDialog.getByRole("button", { name: "Hủy" }).click();
+    await expect(canceledCodeDialog).toHaveCount(0);
+    await expect
+      .poll(() => mock.figureActions.ensureBlockPaths)
+      .toEqual(["sections.0.blocks.1"]);
+    await expect
+      .poll(() => mock.figureActions.deleted)
+      .toContain("ensured-sections-0-blocks-1");
+
+    await blockImageButton.click();
+    await page.getByRole("menuitem", { name: "Tạo mới bằng AI" }).click();
     const emptyReferenceDialog = page.getByRole("dialog", {
       name: "Tạo mới hình bằng AI",
     });
@@ -2578,6 +2918,29 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect(
       emptyReferenceDialog.getByText("Khối này chưa có ảnh tham chiếu"),
     ).toBeVisible();
+    await expect(emptyReferenceDialog).toContainText(
+      "Với Ví dụ/Bài tập, AI ưu tiên lời giải và dựng một hình hoàn chỉnh, độc lập.",
+    );
+    await expect(emptyReferenceDialog).toContainText(
+      "AI sẽ dựng hình độc lập dựa trên lời giải và dùng đề bài làm bối cảnh.",
+    );
+    await emptyReferenceDialog
+      .getByRole("button", { name: "Model", exact: true })
+      .click();
+    await expect(
+      emptyReferenceDialog.getByRole("option", {
+        name: "Tự động theo Cài đặt AI",
+      }),
+    ).toBeVisible();
+    await expect(
+      emptyReferenceDialog.getByRole("option", {
+        name: "OpenAI · gpt-5.6-luna",
+      }),
+    ).toBeVisible();
+    await emptyReferenceDialog
+      .getByRole("option", { name: "Tự động theo Cài đặt AI" })
+      .click();
+    expect(mock.figureActions.ensureBlockPaths).toEqual(["sections.0.blocks.1"]);
     await expect(page.getByText("Hình đang được xử lý")).toHaveCount(
       processingCountBeforeEnsure,
     );
@@ -2595,8 +2958,208 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect
       .poll(() => mock.figureActions.createPayloads.at(-1))
       .toMatchObject({
+        blockPath: "sections.0.blocks.1",
         referenceImageMode: "NONE",
         adminInstructions: null,
+      });
+  });
+
+  test("offers independent question and solution figure actions for Summary problem blocks", async ({
+    page,
+  }) => {
+    const textbookFigureId = "figure-summary-textbook-question";
+    const textbookFigure = stemFigureFixture({
+      id: textbookFigureId,
+      blockPath: "sections.0.blocks.1",
+      figureIndex: 0,
+      figureOrigin: "TEXTBOOK_SOURCE",
+      sourceReferenceImages: [sourceReferenceFixture()],
+    });
+    const mock = await setupAiGenerationMock(page, {
+      initialSummaryContent: problemBlocksSummaryContent(textbookFigureId),
+      stemFigures: [textbookFigure],
+    });
+    await page.goto(`/admin/lessons/${lessonId}`);
+    await page.getByRole("tab", { name: "Kiến thức" }).click();
+
+    const emptyExample = page.locator("#block-0-0");
+    await emptyExample
+      .getByRole("button", { name: "Thao tác với hình của khối" })
+      .click();
+    await expect(
+      page.getByRole("menuitem", { name: "Tạo hình cho đề bài" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("menuitem", { name: "Tạo hình cho lời giải" }),
+    ).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "Tạo mới bằng AI" })).toHaveCount(0);
+
+    await page.getByRole("menuitem", { name: "Tạo hình cho đề bài" }).click();
+    const questionDialog = page.getByRole("dialog", {
+      name: "Tạo hình cho đề bài",
+    });
+    await expect(questionDialog.getByLabel("Tạo mới lại")).toBeVisible();
+    await expect(questionDialog.getByLabel("Chỉnh sửa hình hiện tại")).toHaveCount(0);
+    await expect(questionDialog).toContainText(
+      "AI sẽ tạo hình đề bài chỉ từ nội dung đề hiện tại",
+    );
+    await questionDialog.getByRole("button", { name: "Xem dữ liệu" }).click();
+    await expect
+      .poll(() => mock.figureActions.previewPayloads.at(-1))
+      .toMatchObject({
+        blockPath: "sections.0.blocks.0",
+        figureIndex: 0,
+        referenceImageMode: "NONE",
+        targetMode: "QUESTION",
+      });
+    await questionDialog.getByRole("button", { name: "Đóng" }).click();
+
+    await emptyExample
+      .getByRole("button", { name: "Thao tác với hình của khối" })
+      .click();
+    await page.getByRole("menuitem", { name: "Tạo hình cho lời giải" }).click();
+    const emptySolutionDialog = page.getByRole("dialog", {
+      name: "Tạo hình cho lời giải",
+    });
+    await expect(emptySolutionDialog.getByLabel("Tạo mới lại")).toBeVisible();
+    await expect(emptySolutionDialog.getByLabel("Chỉnh sửa hình hiện tại")).toHaveCount(
+      0,
+    );
+    await expect(emptySolutionDialog).toContainText(
+      "AI sẽ tạo một hình lời giải hoàn chỉnh và độc lập",
+    );
+    await emptySolutionDialog.getByRole("button", { name: "Xem dữ liệu" }).click();
+    await expect
+      .poll(() => mock.figureActions.previewPayloads.at(-1))
+      .toMatchObject({
+        blockPath: "sections.0.blocks.0",
+        figureIndex: 1,
+        referenceImageMode: "NONE",
+        targetMode: "SOLUTION",
+      });
+    await emptySolutionDialog.getByRole("button", { name: "Đóng" }).click();
+
+    const textbookExercise = page.locator("#block-0-1");
+    await textbookExercise
+      .getByRole("button", { name: "Thao tác với hình của khối" })
+      .click();
+    await expect(page.getByRole("menuitem", { name: "Tạo mới bằng AI" })).toBeVisible();
+    await page.getByRole("menuitem", { name: "Tạo hình cho lời giải" }).click();
+    const textbookSolutionDialog = page.getByRole("dialog", {
+      name: "Tạo hình cho lời giải",
+    });
+    await textbookSolutionDialog.getByRole("button", { name: "Xem dữ liệu" }).click();
+    await expect
+      .poll(() => mock.figureActions.previewPayloads.at(-1))
+      .toMatchObject({
+        blockPath: "sections.0.blocks.1",
+        figureIndex: 1,
+        referenceImageMode: "NONE",
+        targetMode: "SOLUTION",
+      });
+    expect(mock.figureActions.ensureBlockPaths).toHaveLength(0);
+  });
+
+  test("edits only the existing Summary figure in each problem target modal", async ({
+    page,
+  }) => {
+    const questionFigureId = "figure-summary-generated-question";
+    const solutionFigureId = "figure-summary-generated-solution";
+    const questionFigure = stemFigureFixture({
+      id: questionFigureId,
+      blockPath: "sections.0.blocks.0",
+      figureIndex: 0,
+    });
+    const solutionFigure = stemFigureFixture({
+      id: solutionFigureId,
+      blockPath: "sections.0.blocks.0",
+      figureIndex: 1,
+    });
+    const mock = await setupAiGenerationMock(page, {
+      initialSummaryContent: problemBlocksSummaryContent("unused-textbook", {
+        questionFigureId,
+        solutionFigureId,
+      }),
+      stemFigures: [questionFigure, solutionFigure],
+    });
+    await page.goto(`/admin/lessons/${lessonId}`);
+    await page.getByRole("tab", { name: "Kiến thức" }).click();
+
+    const example = page.locator("#block-0-0");
+    await expect
+      .poll(() =>
+        example
+          .locator("[data-summary-figure-placement], [data-summary-solution-heading]")
+          .evaluateAll((elements) =>
+            elements.map((element) =>
+              element.hasAttribute("data-summary-solution-heading")
+                ? "solution-heading"
+                : element.getAttribute("data-summary-figure-placement"),
+            ),
+          ),
+      )
+      .toEqual(["question", "solution-heading", "solution"]);
+
+    const figureStatusSummary = page.getByRole("group", {
+      name: "Theo dõi xử lý hình STEM",
+    });
+    await figureStatusSummary.getByRole("button", { name: "Tổng 2 ảnh" }).click();
+    const figureOverviewDialog = page.getByRole("dialog", {
+      name: "Toàn bộ hình minh họa",
+    });
+    await expect(
+      figureOverviewDialog.getByText("Ảnh 1 · Hình đề bài", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      figureOverviewDialog.getByText("Ảnh 2 · Hình lời giải", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      figureOverviewDialog.getByRole("button", {
+        name: "Xem chi tiết khối chứa Ảnh 2 · Hình lời giải",
+      }),
+    ).toBeVisible();
+    await figureOverviewDialog
+      .locator("footer")
+      .getByRole("button", { name: "Đóng" })
+      .click();
+
+    await example.getByRole("button", { name: "Thao tác với hình của khối" }).click();
+    await expect(
+      page.getByRole("menuitem", { name: "Tạo hình cho đề bài" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("menuitem", { name: "Tạo hình cho lời giải" }),
+    ).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "Tạo mới bằng AI" })).toHaveCount(0);
+
+    await page.getByRole("menuitem", { name: "Tạo hình cho đề bài" }).click();
+    const questionDialog = page.getByRole("dialog", { name: "Tạo hình cho đề bài" });
+    await expect(questionDialog.getByLabel("Tạo mới lại")).toBeChecked();
+    await expect(questionDialog.getByLabel("Chỉnh sửa hình hiện tại")).toBeVisible();
+    await questionDialog.getByLabel("Chỉnh sửa hình hiện tại").check();
+    await questionDialog.getByRole("button", { name: "Xem dữ liệu" }).click();
+    await expect
+      .poll(() => mock.figureActions.previewPayloads.at(-1))
+      .toMatchObject({
+        referenceImageMode: "CURRENT_ONLY",
+        targetMode: "QUESTION",
+      });
+    await questionDialog.getByRole("button", { name: "Đóng" }).click();
+
+    await example.getByRole("button", { name: "Thao tác với hình của khối" }).click();
+    await page.getByRole("menuitem", { name: "Tạo hình cho lời giải" }).click();
+    const solutionDialog = page.getByRole("dialog", { name: "Tạo hình cho lời giải" });
+    await expect(solutionDialog.getByLabel("Tạo mới lại")).toBeChecked();
+    await expect(solutionDialog.getByLabel("Chỉnh sửa hình hiện tại")).toBeVisible();
+    await solutionDialog.getByLabel("Chỉnh sửa hình hiện tại").check();
+    await solutionDialog.getByRole("button", { name: "Xem dữ liệu" }).click();
+    await expect
+      .poll(() => mock.figureActions.previewPayloads.at(-1))
+      .toMatchObject({
+        referenceImageMode: "CURRENT_ONLY",
+        targetMode: "SOLUTION",
       });
   });
 
@@ -3154,6 +3717,7 @@ async function setupAiGenerationMock(
     compilePayloads: [] as Array<Record<string, unknown>>,
     createPayloads: [] as Array<Record<string, unknown>>,
     deleted: [] as string[],
+    ensureBlockPaths: [] as string[],
     previewModes: [] as string[],
     previewPayloads: [] as Array<Record<string, unknown>>,
     refinementPayloads: [] as Array<Record<string, unknown>>,
@@ -3321,6 +3885,7 @@ async function setupAiGenerationMock(
       pathname === `/admin/lessons/${lessonId}/stem-figures/blocks/ensure`
     ) {
       const body = request.postDataJSON() as { blockPath: string };
+      figureActions.ensureBlockPaths.push(body.blockPath);
       const existing = state.figures.find((item) => item.blockPath === body.blockPath);
       if (existing) return fulfillJson(route, 201, { data: existing });
       const ensured = stemFigureFixture({
@@ -3336,6 +3901,101 @@ async function setupAiGenerationMock(
       });
       state.figures.push(ensured);
       return fulfillJson(route, 201, { data: ensured });
+    }
+    if (
+      method === "POST" &&
+      pathname === `/admin/lessons/${lessonId}/stem-figures/blocks/create-new-ai/preview`
+    ) {
+      const body = request.postDataJSON() as Record<string, unknown> & {
+        adminInstructions?: string | null;
+        blockPath: string;
+        referenceImageMode: "NONE";
+        targetMode?: "QUESTION" | "SOLUTION" | null;
+      };
+      figureActions.previewModes.push(body.referenceImageMode);
+      figureActions.previewPayloads.push(body);
+      const blockContent =
+        body.targetMode === "QUESTION"
+          ? {
+              type: "example",
+              problem: "Nêu tên ba đỉnh.",
+            }
+          : {
+              type: "example",
+              problem: "Nêu tên ba đỉnh.",
+              solution: "Ba đỉnh là A, B, C.",
+            };
+      const userPrompt = JSON.stringify({
+        blockContent,
+        reference: { mode: "NONE" },
+      });
+      return fulfillJson(route, 201, {
+        data: {
+          referenceImageMode: "NONE",
+          adminInstructions: body.adminInstructions ?? null,
+          generationBrief: {
+            blockPath: body.blockPath,
+            blockContent,
+            referenceAssets: [],
+            referenceImageMode: "NONE",
+            targetMode: body.targetMode ?? null,
+          },
+          providerInput: {
+            model: "gpt-5.6-luna",
+            input: [
+              {
+                role: "user",
+                content: [{ type: "input_text", text: userPrompt }],
+              },
+            ],
+          },
+          systemPrompt:
+            body.targetMode === "QUESTION"
+              ? "Quy tắc tạo hình đề bài độc lập."
+              : "Quy tắc tạo hình lời giải độc lập.",
+          userPrompt,
+          configuration: {
+            resolvedProvider: "OPENAI",
+            resolvedModel: "gpt-5.6-luna",
+            temperature: null,
+            reasoningEffort: "xhigh",
+            maxOutputTokens: 20_000,
+          },
+          context: {
+            textInputTokens: 120,
+            imageInputTokens: 0,
+            estimatedTokens: 120,
+          },
+          estimatedCost: {
+            available: true,
+            inputUpperBoundUsd: 0.001,
+            inputUpperBoundVnd: 25,
+            outputUpperBoundUsd: 0.003,
+            outputUpperBoundVnd: 75,
+            upperBoundUsd: 0.004,
+            upperBoundVnd: 100,
+            fxRateVndPerUsd: 25_000,
+          },
+          referenceImages: [],
+        },
+      });
+    }
+    if (
+      method === "POST" &&
+      pathname === `/admin/lessons/${lessonId}/stem-figures/blocks/create-new-ai`
+    ) {
+      const body = request.postDataJSON() as Record<string, unknown> & {
+        blockPath: string;
+      };
+      figureActions.createPayloads.push(body);
+      return fulfillJson(route, 202, {
+        data: {
+          figureId: `created-${body.blockPath.replaceAll(".", "-")}`,
+          jobId: `create-${body.blockPath.replaceAll(".", "-")}`,
+          status: "QUEUED",
+          estimatedMaxCostVnd: 100,
+        },
+      });
     }
     const figureMatch = pathname.match(
       /^\/admin\/lessons\/lesson-ai-m9-8\/stem-figures\/([^/]+)(.*)$/u,
@@ -4300,7 +4960,7 @@ function materialize(
       lessonId,
       contentJson: {
         type: "lesson_summary_blocks",
-        version: 3,
+        version: 4,
         data: {
           lessonId,
           title: "Số hữu tỉ",
@@ -4333,13 +4993,13 @@ function materialize(
               sourceChunkIds: [documentId],
               blocks: [
                 {
-                  type: "example",
+                  type: "exercise",
                   problem: "Viết 0,25 dưới dạng phân số.",
                   solution: "$0,25 = 1/4$.",
                   answer: "$1/4$.",
                 },
                 {
-                  type: "example",
+                  type: "exercise",
                   problem: "Một món đồ 100 000 đồng giảm 20%. Tính giá mới.",
                   solution: "$100\\,000 \\times 80\\% = 80\\,000$ đồng.",
                   answer: "$80\\,000$ đồng.",
@@ -4369,7 +5029,7 @@ function materialize(
           figures: [],
         },
         "sections.1.blocks.0": {
-          type: "example",
+          type: "exercise",
           problem: "Viết 0,25 dưới dạng phân số.",
           solution: "$0,25 = 1/4$.",
           answer: "$1/4$.",
@@ -4377,7 +5037,7 @@ function materialize(
           figures: [],
         },
         "sections.1.blocks.1": {
-          type: "example",
+          type: "exercise",
           problem: "Một món đồ 100 000 đồng giảm 20%. Tính giá mới.",
           solution: "$100\\,000 \\times 80\\% = 80\\,000$ đồng.",
           answer: "$80\\,000$ đồng.",
@@ -4755,6 +5415,83 @@ function summaryContent(figureIds: string[] = [], includeEmptyBlock = false) {
                   },
                 ]
               : []),
+          ],
+        },
+      ],
+    },
+  };
+}
+
+function problemBlocksSummaryContent(
+  textbookFigureId: string,
+  generatedFigures: {
+    questionFigureId?: string;
+    solutionFigureId?: string;
+  } = {},
+) {
+  return {
+    type: "lesson_summary_blocks",
+    version: 4,
+    data: {
+      lessonId,
+      title: "Ví dụ và bài tập có hình",
+      objectives: ["Phân biệt hình đề và hình lời giải"],
+      sections: [
+        {
+          order: 1,
+          displayHeading: "Luyện tập",
+          sourceChunkIds: [documentId],
+          blocks: [
+            {
+              type: "example",
+              problem: "Cho tam giác ABC vuông tại A.",
+              solution: "Dựng đường cao AH và áp dụng hệ thức lượng.",
+              answer: "Tính được độ dài cần tìm.",
+              sourcePageNumbers: [1],
+              figures: [
+                ...(generatedFigures.questionFigureId
+                  ? [
+                      {
+                        kind: "TEX_FIGURE",
+                        figureId: generatedFigures.questionFigureId,
+                        altText: "Hình đề bài được tạo bằng AI",
+                        caption: null,
+                        status: "SUCCEEDED",
+                        figureOrigin: "GENERATED_FROM_BRIEF",
+                      },
+                    ]
+                  : []),
+                ...(generatedFigures.solutionFigureId
+                  ? [
+                      {
+                        kind: "TEX_FIGURE",
+                        figureId: generatedFigures.solutionFigureId,
+                        altText: "Hình lời giải được tạo bằng AI",
+                        caption: null,
+                        status: "SUCCEEDED",
+                        figureOrigin: "GENERATED_FROM_BRIEF",
+                      },
+                    ]
+                  : []),
+              ],
+            },
+            {
+              type: "exercise",
+              problem: "Tính diện tích hình chữ nhật trong đường tròn.",
+              solution: "Dùng định lý Pythagore rồi tính diện tích.",
+              answer: "Diện tích bằng 10 cm².",
+              sourcePageNumbers: [1],
+              figures: [
+                {
+                  kind: "TEX_FIGURE",
+                  figureId: textbookFigureId,
+                  altText: "Hình đề bài từ sách giáo khoa",
+                  caption: null,
+                  status: "SUCCEEDED",
+                  figureOrigin: "TEXTBOOK_SOURCE",
+                },
+              ],
+            },
           ],
         },
       ],

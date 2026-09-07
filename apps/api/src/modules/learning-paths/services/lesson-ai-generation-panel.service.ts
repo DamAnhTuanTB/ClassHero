@@ -13,6 +13,7 @@ import { throwLessonNotFound } from "#api/modules/learning-paths/utils/lesson.he
 import { AiModelRoutingService } from "#api/modules/provider-operations/services/ai-model-routing.service";
 import { supportsHighDetailPdfInput } from "#api/modules/provider-operations/utils/ai-model-capabilities";
 import { readJobErrorDetails } from "#api/jobs/job-error";
+import { resolveLessonSummarySubject } from "#api/modules/ai/utils/lesson-summary-subject";
 
 const PANEL_GENERATION_TYPES = [
   AiGenerationType.SUMMARY,
@@ -89,6 +90,7 @@ export class LessonAiGenerationPanelService {
           title: true,
           learningPath: {
             select: {
+              domain: { select: { name: true, slug: true } },
               targetAudiences: {
                 select: { targetAudience: { select: { grade: true, name: true } } },
               },
@@ -204,6 +206,10 @@ export class LessonAiGenerationPanelService {
       summaryReady && readyDocuments.every((document) => document.embeddingReady);
     const quizDocuments = documents.filter((document) => document.canUseForQuiz);
     const quizReady = quizDocuments.length > 0;
+    const lessonSubject = resolveLessonSummarySubject({
+      domainName: lesson.learningPath.domain.name,
+      domainSlug: lesson.learningPath.domain.slug,
+    });
     const latestByType = new Map<AiGenerationType, PanelGenerationRecord>();
     for (const generation of generations) {
       if (generation) latestByType.set(generation.type, generation);
@@ -234,6 +240,7 @@ export class LessonAiGenerationPanelService {
       lesson: {
         id: lesson.id,
         title: lesson.title,
+        subjectKey: lessonSubject.key,
         targetGrade:
           lesson.learningPath.targetAudiences
             .map(({ targetAudience }) => targetAudience.grade)

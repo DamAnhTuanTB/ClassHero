@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Check,
   ChevronDown,
   Compass,
   Eraser,
@@ -24,6 +25,19 @@ import {
 } from "react";
 
 import { StemFigureTextAdjustmentControls } from "@/components/admin/stem-figures/stem-figure-text-adjustment-controls";
+import { StemFigureQuickAngleForm } from "@/components/admin/stem-figures/stem-figure-quick-angle-form";
+import { StemFigureQuickCircleCenterForm } from "@/components/admin/stem-figures/stem-figure-quick-circle-center-form";
+import { StemFigureQuickMidpointForm } from "@/components/admin/stem-figures/stem-figure-quick-midpoint-form";
+import { StemFigureQuickSegmentForm } from "@/components/admin/stem-figures/stem-figure-quick-segment-form";
+import type {
+  StemFigureMidpointAction,
+  StemFigureQuickAngleInput,
+  StemFigureQuickAngleRemovalInput,
+  StemFigureQuickCircleCenterInput,
+  StemFigureQuickMidpointInput,
+  StemFigureQuickSegmentInput,
+  StemFigureSegmentAction,
+} from "@/lib/stem-figure-geometry-actions";
 import {
   extractStemFigureTextSlots,
   readStemFigureScalePercentage,
@@ -33,8 +47,8 @@ import {
   type StemFigureQuickAction,
   type StemFigureScaleTarget,
   type StemFigureTextAdjustmentTarget,
+  type StemFigureTextSlotDisplayKind,
   type StemFigureTextSlot,
-  type StemFigureTextSlotKind,
 } from "@/lib/stem-figure-source-actions";
 
 type QuickTool = {
@@ -107,6 +121,17 @@ type StemFigureSourceActionsProps = {
   canUndo: boolean;
   disabled: boolean;
   onAction: (action: StemFigureQuickAction) => void;
+  onQuickAngleAdd: (input: StemFigureQuickAngleInput) => Promise<boolean>;
+  onQuickAngleRemove: (input: StemFigureQuickAngleRemovalInput) => Promise<boolean>;
+  onQuickCircleCenterAdd: (input: StemFigureQuickCircleCenterInput) => Promise<boolean>;
+  onQuickMidpointUpdate: (
+    action: StemFigureMidpointAction,
+    input: StemFigureQuickMidpointInput,
+  ) => Promise<boolean>;
+  onQuickSegmentUpdate: (
+    action: StemFigureSegmentAction,
+    input: StemFigureQuickSegmentInput,
+  ) => Promise<boolean>;
   onScaleChange: (target: StemFigureScaleTarget, percentage: number) => Promise<void>;
   onTextSlotAdjustmentChange: (
     slotId: string,
@@ -126,6 +151,11 @@ export const StemFigureSourceActions = forwardRef<
     canUndo,
     disabled,
     onAction,
+    onQuickAngleAdd,
+    onQuickAngleRemove,
+    onQuickCircleCenterAdd,
+    onQuickMidpointUpdate,
+    onQuickSegmentUpdate,
     onScaleChange,
     onTextSlotAdjustmentChange,
     onTextSlotChange,
@@ -136,6 +166,7 @@ export const StemFigureSourceActions = forwardRef<
 ) {
   const [expandedSlotIndex, setExpandedSlotIndex] = useState<number | null>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const [pendingApplySlotId, setPendingApplySlotId] = useState<string | null>(null);
   const [pendingSlotId, setPendingSlotId] = useState<string | null>(null);
   const [textDrafts, setTextDrafts] = useState<Record<string, string>>({});
   const activeSlotIdRef = useRef<string | null>(null);
@@ -147,6 +178,7 @@ export const StemFigureSourceActions = forwardRef<
   } | null>(null);
   const scaleCommitPromiseRef = useRef<Promise<boolean> | null>(null);
   const adjustmentCommitPromiseRef = useRef<Promise<boolean> | null>(null);
+  const deferBlurCommitForFlushRef = useRef(false);
   const pendingAdjustmentDraftRef = useRef<{
     slotId: string;
     target: StemFigureTextAdjustmentTarget;
@@ -155,6 +187,10 @@ export const StemFigureSourceActions = forwardRef<
   const skipCommitSlotRef = useRef<string | null>(null);
   const textDraftsRef = useRef<Record<string, string>>({});
   const textExtraction = useMemo(() => extractStemFigureTextSlots(source), [source]);
+  const textSlotDisplayNames = useMemo(
+    () => createTextSlotDisplayNames(textExtraction.slots),
+    [textExtraction.slots],
+  );
 
   useEffect(() => {
     const nextDrafts = Object.fromEntries(
@@ -172,13 +208,22 @@ export const StemFigureSourceActions = forwardRef<
   useEffect(() => {
     if (!isOpen) return;
     function handlePointerDown(event: PointerEvent) {
-      if (!containerRef.current?.contains(event.target as Node)) setIsOpen(false);
+      const target = event.target;
+      if (
+        target instanceof Element &&
+        target.closest("[data-stem-figure-quick-actions-keep-open]")
+      ) {
+        deferBlurCommitForFlushRef.current = true;
+        return;
+      }
+      if (!containerRef.current?.contains(target as Node)) setIsOpen(false);
     }
     document.addEventListener("pointerdown", handlePointerDown);
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, [isOpen]);
 
   function commitTextSlot(slot: StemFigureTextSlot): Promise<boolean> {
+    if (deferBlurCommitForFlushRef.current) return Promise.resolve(false);
     if (commitPromiseRef.current) return commitPromiseRef.current;
     if (skipCommitSlotRef.current === slot.id) {
       skipCommitSlotRef.current = null;
@@ -188,11 +233,13 @@ export const StemFigureSourceActions = forwardRef<
     if (nextValue.trim() === slot.value) return Promise.resolve(false);
 
     const promise = (async () => {
+      setPendingApplySlotId(slot.id);
       setPendingSlotId(slot.id);
       try {
         await onTextSlotChange(slot.id, nextValue);
         return true;
       } finally {
+        setPendingApplySlotId(null);
         setPendingSlotId(null);
       }
     })();
@@ -207,6 +254,7 @@ export const StemFigureSourceActions = forwardRef<
     target: StemFigureScaleTarget,
     percentage: number,
   ): Promise<boolean> {
+    if (deferBlurCommitForFlushRef.current) return Promise.resolve(false);
     if (scaleCommitPromiseRef.current) return scaleCommitPromiseRef.current;
     pendingScaleDraftRef.current = null;
     const promise = onScaleChange(target, percentage).then(() => true);
@@ -224,6 +272,7 @@ export const StemFigureSourceActions = forwardRef<
     target: StemFigureTextAdjustmentTarget,
     value: number,
   ): Promise<boolean> {
+    if (deferBlurCommitForFlushRef.current) return Promise.resolve(false);
     if (adjustmentCommitPromiseRef.current) {
       return adjustmentCommitPromiseRef.current;
     }
@@ -248,6 +297,7 @@ export const StemFigureSourceActions = forwardRef<
 
   useImperativeHandle(ref, () => ({
     flushPendingChange() {
+      deferBlurCommitForFlushRef.current = false;
       if (commitPromiseRef.current) return commitPromiseRef.current;
       if (scaleCommitPromiseRef.current) return scaleCommitPromiseRef.current;
       if (adjustmentCommitPromiseRef.current) {
@@ -333,6 +383,25 @@ export const StemFigureSourceActions = forwardRef<
             Chọn một thao tác, hệ thống sẽ tự biên dịch để bạn xem kết quả. Chỉ lưu hình
             khi bạn bấm <strong>Áp dụng</strong>.
           </p>
+          <StemFigureQuickAngleForm
+            disabled={disabled || pendingSlotId !== null}
+            onAdd={onQuickAngleAdd}
+            onRemove={onQuickAngleRemove}
+            source={source}
+          />
+          <StemFigureQuickSegmentForm
+            disabled={disabled || pendingSlotId !== null}
+            onUpdate={onQuickSegmentUpdate}
+            source={source}
+          />
+          <StemFigureQuickMidpointForm
+            disabled={disabled || pendingSlotId !== null}
+            onUpdate={onQuickMidpointUpdate}
+          />
+          <StemFigureQuickCircleCenterForm
+            disabled={disabled || pendingSlotId !== null}
+            onAdd={onQuickCircleCenterAdd}
+          />
           <section>
             <h4 className="mb-1.5 text-[11px] font-extrabold uppercase tracking-wide text-[var(--theme-text-muted)]">
               Nhãn và số đo ({textExtraction.slots.length})
@@ -341,6 +410,12 @@ export const StemFigureSourceActions = forwardRef<
               <div className="grid max-h-[26rem] grid-cols-1 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
                 {textExtraction.slots.map((slot, index) => {
                   const slotPending = pendingSlotId === slot.id;
+                  const slotApplying = pendingApplySlotId === slot.id;
+                  const slotDraftValue = textDrafts[slot.id] ?? slot.value;
+                  const slotDirty = slotDraftValue.trim() !== slot.value;
+                  const displayName =
+                    textSlotDisplayNames[index] ??
+                    `${TEXT_SLOT_LABELS[slot.displayKind]} ${index + 1}`;
                   return (
                     <div
                       className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-2.5"
@@ -352,12 +427,37 @@ export const StemFigureSourceActions = forwardRef<
                           className="text-[11px] font-extrabold text-[var(--theme-text-muted)]"
                           htmlFor={`stem-figure-text-slot-${index}`}
                         >
-                          {TEXT_SLOT_LABELS[slot.kind]} {index + 1}
+                          {displayName}
                         </label>
                         <div className="flex items-center gap-1.5">
                           <button
+                            aria-label={`Áp dụng ${displayName.toLocaleLowerCase("vi")}`}
+                            className="theme-button-primary inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md disabled:cursor-not-allowed disabled:opacity-40"
+                            disabled={disabled || pendingSlotId !== null || !slotDirty}
+                            onClick={() => void commitTextSlot(slot)}
+                            onPointerDown={() => {
+                              if (
+                                document.activeElement?.id ===
+                                `stem-figure-text-slot-${index}`
+                              ) {
+                                skipCommitSlotRef.current = slot.id;
+                              }
+                            }}
+                            title={`Áp dụng ${displayName.toLocaleLowerCase("vi")} và biên dịch`}
+                            type="button"
+                          >
+                            {slotApplying ? (
+                              <LoaderCircle
+                                className="h-3.5 w-3.5 animate-spin"
+                                aria-hidden
+                              />
+                            ) : (
+                              <Check className="h-3.5 w-3.5" aria-hidden />
+                            )}
+                          </button>
+                          <button
                             aria-expanded={expandedSlotIndex === index}
-                            aria-label={`Cài đặt ${TEXT_SLOT_LABELS[slot.kind].toLocaleLowerCase("vi")} ${index + 1}`}
+                            aria-label={`Cài đặt ${displayName.toLocaleLowerCase("vi")}`}
                             className="theme-button-neutral inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md disabled:cursor-not-allowed disabled:opacity-50"
                             disabled={disabled || pendingSlotId !== null}
                             onClick={() =>
@@ -371,7 +471,7 @@ export const StemFigureSourceActions = forwardRef<
                             <Settings2 className="h-3.5 w-3.5" aria-hidden />
                           </button>
                           <button
-                            aria-label={`Xóa ${TEXT_SLOT_LABELS[slot.kind].toLocaleLowerCase("vi")} ${index + 1}`}
+                            aria-label={`Xóa ${displayName.toLocaleLowerCase("vi")}`}
                             className="theme-button-danger inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md disabled:cursor-not-allowed disabled:opacity-60"
                             disabled={disabled || pendingSlotId !== null}
                             onClick={() => {
@@ -386,10 +486,10 @@ export const StemFigureSourceActions = forwardRef<
                                 skipCommitSlotRef.current = slot.id;
                               }
                             }}
-                            title={`Xóa ${TEXT_SLOT_LABELS[slot.kind].toLocaleLowerCase("vi")} này`}
+                            title={`Xóa ${TEXT_SLOT_LABELS[slot.displayKind].toLocaleLowerCase("vi")} này`}
                             type="button"
                           >
-                            {slotPending ? (
+                            {slotPending && !slotApplying ? (
                               <LoaderCircle
                                 className="h-3.5 w-3.5 animate-spin"
                                 aria-hidden
@@ -401,7 +501,7 @@ export const StemFigureSourceActions = forwardRef<
                         </div>
                       </div>
                       <input
-                        aria-label={`${TEXT_SLOT_LABELS[slot.kind]} ${index + 1}`}
+                        aria-label={displayName}
                         autoComplete="off"
                         className="min-h-10 w-full rounded-lg border border-[var(--theme-input-border)] bg-[var(--theme-input-bg)] px-3 text-base font-semibold text-[var(--theme-text-strong)] outline-none transition hover:border-[var(--theme-input-hover-border)] focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 disabled:cursor-not-allowed disabled:bg-[var(--theme-input-bg-disabled)] lg:text-sm"
                         disabled={disabled || pendingSlotId !== null}
@@ -569,12 +669,24 @@ export const StemFigureSourceActions = forwardRef<
   );
 });
 
-const TEXT_SLOT_LABELS: Record<StemFigureTextSlotKind, string> = {
+const TEXT_SLOT_LABELS: Record<StemFigureTextSlotDisplayKind, string> = {
+  ANGLE: "Góc",
   ANNOTATION: "Chú thích",
-  COMPONENT_LABEL: "Nhãn linh kiện",
+  COMPONENT_LABEL: "Linh kiện",
   LABEL: "Nhãn",
-  MEASUREMENT: "Số đo",
+  LENGTH: "Độ dài",
+  POINT: "Điểm",
+  VALUE: "Giá trị",
 };
+
+function createTextSlotDisplayNames(slots: StemFigureTextSlot[]) {
+  const counts = new Map<StemFigureTextSlotDisplayKind, number>();
+  return slots.map((slot) => {
+    const count = (counts.get(slot.displayKind) ?? 0) + 1;
+    counts.set(slot.displayKind, count);
+    return `${TEXT_SLOT_LABELS[slot.displayKind]} ${count}`;
+  });
+}
 
 function LabelSizeControl({
   description,

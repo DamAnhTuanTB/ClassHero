@@ -23,10 +23,21 @@ async function main() {
 
   const lessonId = requiredEnv("M9_2_LIVE_LESSON_ID");
   const model = process.env.M9_2_LIVE_MODEL?.trim() || "gpt-5.6-terra";
+  const reasoningEffort =
+    process.env.M9_2_LIVE_REASONING_EFFORT === "high" ? "high" : "medium";
+  const maxBudgetVnd = readPositiveNumberEnv("M9_2_LIVE_MAX_BUDGET_VND", 5_000);
+  const standardExerciseCount = readPositiveIntegerEnv(
+    "M9_2_LIVE_STANDARD_EXERCISE_COUNT",
+    2,
+  );
+  const realWorldExerciseCount = readPositiveIntegerEnv(
+    "M9_2_LIVE_REAL_WORLD_EXERCISE_COUNT",
+    2,
+  );
   const outputPath = resolve(
     process.cwd(),
     process.env.M9_2_LIVE_OUTPUT ??
-      `../../.codex/artifacts/m9.2-five-block-live-b15/b15-${LESSON_SUMMARY_PROMPT_VERSIONS.MATH}-${model}.json`,
+      `../../.codex/artifacts/m9.2-five-block-live-b15/b15-${LESSON_SUMMARY_PROMPT_VERSIONS.MATH}-${LESSON_SUMMARY_SCHEMA_VERSION}-${model}.json`,
   );
   if (process.env.M9_2_LIVE_FORCE !== "1") {
     const cached = await readFile(outputPath, "utf8").catch(() => null);
@@ -85,31 +96,52 @@ async function main() {
         styleInstructions: "",
         length: "detailed",
         targetWordCount: null,
+        standardExerciseCount,
+        realWorldExerciseCount,
         extraInstructions: "",
-        schemaReferenceStrategy: "inline",
+        schemaReferenceStrategy: "ref_v2",
       },
     });
     const providerSchema = getLessonSummaryProviderTransportOutputSchema(
       subject.key,
       "CONTEXTUAL",
       12,
+      { standardExerciseCount, realWorldExerciseCount },
+    );
+    const routeSnapshot = {
+      feature: AiGenerationType.SUMMARY,
+      version: 1,
+      model,
+      temperature: 0.1,
+      reasoningEffort,
+      maxOutputTokens: structuredInput.maxTokens,
+      candidates: [candidate],
+      hasConfiguration: true,
+    } as const;
+    const preview = await providerCalls.previewStructuredRequest(
+      {
+        feature: AiGenerationType.SUMMARY,
+        routeSnapshot,
+      },
+      structuredInput,
+      providerSchema,
+    );
+    const upperBoundVnd = preview.estimatedCost.upperBoundVnd;
+    if (upperBoundVnd === null || upperBoundVnd > maxBudgetVnd) {
+      throw new Error(
+        `Phase 1 estimated upper bound ${String(upperBoundVnd)} VND exceeds live budget ${maxBudgetVnd} VND.`,
+      );
+    }
+    process.stdout.write(
+      `LIVE_PHASE_ONE_BUDGET estimated_upper_bound_vnd=${upperBoundVnd} budget_vnd=${maxBudgetVnd}\n`,
     );
     const result = await providerCalls.generateStructured(
       {
         feature: AiGenerationType.SUMMARY,
         attempt: 1,
         callSequence: 1,
-        idempotencyKey: `m9.2-live-stage-one:${lessonId}:${LESSON_SUMMARY_PROMPT_VERSIONS.MATH}:${model}`,
-        routeSnapshot: {
-          feature: AiGenerationType.SUMMARY,
-          version: 1,
-          model,
-          temperature: 0.1,
-          reasoningEffort: "medium",
-          maxOutputTokens: 16_000,
-          candidates: [candidate],
-          hasConfiguration: true,
-        },
+        idempotencyKey: `m9.2-live-stage-one:${lessonId}:${standardExerciseCount}:${realWorldExerciseCount}:${LESSON_SUMMARY_PROMPT_VERSIONS.MATH}:${LESSON_SUMMARY_SCHEMA_VERSION}:${model}`,
+        routeSnapshot,
       },
       structuredInput,
       providerSchema,
@@ -130,11 +162,18 @@ async function main() {
           lessonId,
           lessonTitle: lesson.title,
           model,
+          reasoningEffort,
           promptVersion: LESSON_SUMMARY_PROMPT_VERSIONS.MATH,
           schemaVersion: LESSON_SUMMARY_SCHEMA_VERSION,
           usage: result.usage ?? null,
           providerRequestId: result.providerRequestId ?? null,
           latencyMs: result.latencyMs,
+          estimatedUpperBoundVnd: upperBoundVnd,
+          budgetVnd: maxBudgetVnd,
+          requestedExerciseCounts: {
+            standard: standardExerciseCount,
+            realWorld: realWorldExerciseCount,
+          },
           packetManifest: packet.modelManifest,
           providerOutput: result.data,
           mappedContent: mapped.content,
@@ -157,6 +196,24 @@ async function main() {
 function requiredEnv(name: string) {
   const value = process.env[name]?.trim();
   if (!value) throw new Error(`${name} is required.`);
+  return value;
+}
+
+function readPositiveNumberEnv(name: string, fallback: number) {
+  const raw = process.env[name]?.trim();
+  if (!raw) return fallback;
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`${name} must be a positive number.`);
+  }
+  return value;
+}
+
+function readPositiveIntegerEnv(name: string, fallback: number) {
+  const value = readPositiveNumberEnv(name, fallback);
+  if (!Number.isInteger(value)) {
+    throw new Error(`${name} must be a positive integer.`);
+  }
   return value;
 }
 

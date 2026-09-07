@@ -1,5 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { normalizeAiReasoningEffortLevels } from "@learning-path/shared";
 import {
   AiGenerationType,
   AiModelPurpose,
@@ -154,7 +155,9 @@ export class ProviderOperationsAdminService {
         dto.aiConfiguration === AiConfigurationFeature.REASONING_EFFORT &&
         dto.reasoningEffortLevels?.length
       ) {
-        capabilitiesJson.reasoningEffortLevels = dto.reasoningEffortLevels;
+        capabilitiesJson.reasoningEffortLevels = normalizeAiReasoningEffortLevels(
+          dto.reasoningEffortLevels,
+        );
       }
     }
 
@@ -223,7 +226,9 @@ export class ProviderOperationsAdminService {
         dto.aiConfiguration === AiConfigurationFeature.REASONING_EFFORT &&
         dto.reasoningEffortLevels
       ) {
-        capabilitiesJson.reasoningEffortLevels = dto.reasoningEffortLevels;
+        capabilitiesJson.reasoningEffortLevels = normalizeAiReasoningEffortLevels(
+          dto.reasoningEffortLevels,
+        );
       } else {
         delete capabilitiesJson.reasoningEffortLevels;
       }
@@ -238,7 +243,9 @@ export class ProviderOperationsAdminService {
       if (dto.reasoningEffortLevels === null) {
         delete capabilitiesJson.reasoningEffortLevels;
       } else {
-        capabilitiesJson.reasoningEffortLevels = dto.reasoningEffortLevels;
+        capabilitiesJson.reasoningEffortLevels = normalizeAiReasoningEffortLevels(
+          dto.reasoningEffortLevels,
+        );
       }
     }
 

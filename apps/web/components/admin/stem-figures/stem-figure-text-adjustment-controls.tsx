@@ -1,6 +1,6 @@
 "use client";
 
-import { CaseSensitive, MoveHorizontal, MoveVertical } from "lucide-react";
+import { CaseSensitive, MoveHorizontal, MoveVertical, Radius } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
 import {
@@ -10,6 +10,9 @@ import {
   STEM_FIGURE_TEXT_OFFSET_DEFAULT,
   STEM_FIGURE_TEXT_OFFSET_MAX,
   STEM_FIGURE_TEXT_OFFSET_MIN,
+  STEM_FIGURE_ANGLE_RADIUS_PT_DEFAULT,
+  STEM_FIGURE_ANGLE_RADIUS_PT_MAX,
+  STEM_FIGURE_ANGLE_RADIUS_PT_MIN,
   type StemFigureTextAdjustment,
   type StemFigureTextAdjustmentTarget,
 } from "@/lib/stem-figure-source-actions";
@@ -74,6 +77,22 @@ export function StemFigureTextAdjustmentControls({
         suffix="%"
         value={adjustment.fontSizePercentage}
       />
+      {adjustment.angleRadiusPt !== undefined ? (
+        <CompactSlider
+          defaultValue={STEM_FIGURE_ANGLE_RADIUS_PT_DEFAULT}
+          disabled={disabled}
+          icon={Radius}
+          label="Khoảng cách cung tới đỉnh"
+          max={STEM_FIGURE_ANGLE_RADIUS_PT_MAX}
+          min={STEM_FIGURE_ANGLE_RADIUS_PT_MIN}
+          onCommit={(value) => onCommit("ANGLE_RADIUS", value)}
+          onDraftChange={(value) =>
+            onDraftChange(value === null ? null : { target: "ANGLE_RADIUS", value })
+          }
+          suffix="pt"
+          value={adjustment.angleRadiusPt}
+        />
+      ) : null}
     </div>
   );
 }

@@ -82,6 +82,8 @@ type FormulaKind = "inline" | "block";
 type ImageAlignment = "center" | "left" | "right";
 
 type FormulaDraft = {
+  insertionPosition?: number;
+  isNew?: boolean;
   kind: FormulaKind;
   latex: string;
   position?: number;
@@ -95,6 +97,16 @@ type TableDraft = {
 
 const maxIndentLevel = 8;
 const initialImageBaseWidthPercent = 60;
+const mathLivePlaceholderPattern = /\\placeholder(?:\[[^\]]*\])?\{[^{}]*\}/gu;
+
+function toTiptapPreviewLatex(latex: string) {
+  return latex.replace(mathLivePlaceholderPattern, "").trim();
+}
+
+function hasUnfilledMathLivePlaceholder(latex: string) {
+  mathLivePlaceholderPattern.lastIndex = 0;
+  return mathLivePlaceholderPattern.test(latex);
+}
 
 const QuizIndent = Extension.create({
   name: "quizIndent",
@@ -254,6 +266,7 @@ export function QuizRichContentEditor({
         inlineOptions: {
           onClick: (node, position) =>
             setFormulaDraft({
+              isNew: false,
               kind: "inline",
               latex: typeof node.attrs.latex === "string" ? node.attrs.latex : "",
               position,
@@ -262,6 +275,7 @@ export function QuizRichContentEditor({
         blockOptions: {
           onClick: (node, position) =>
             setFormulaDraft({
+              isNew: false,
               kind: "block",
               latex: typeof node.attrs.latex === "string" ? node.attrs.latex : "",
               position,
@@ -403,6 +417,8 @@ export function QuizRichContentEditor({
             setTableDraft(null);
             const { from, to } = editor.state.selection;
             setFormulaDraft({
+              insertionPosition: from,
+              isNew: true,
               kind: "inline",
               latex: from === to ? "" : editor.state.doc.textBetween(from, to, " "),
             });
@@ -1597,22 +1613,205 @@ function FormulaComposer({
   onChange: (draft: FormulaDraft) => void;
   onClose: () => void;
 }) {
-  const saveFormula = () => {
-    const latex = draft.latex.trim();
-    if (!editor || !latex) {
+  const liveFormulaPositionRef = useRef(draft.position);
+
+  useEffect(() => {
+    liveFormulaPositionRef.current = draft.position;
+  }, [draft.position]);
+
+  const updateFormulaAtPosition = (position: number, latex: string) => {
+    if (!editor || !latex.trim()) {
+      return false;
+    }
+
+    const formulaNode = editor.state.doc.nodeAt(position);
+    if (formulaNode?.type.name === "blockMath") {
+      return editor.commands.updateBlockMath({ latex, pos: position });
+    } else if (formulaNode?.type.name === "inlineMath") {
+      return editor.commands.updateInlineMath({ latex, pos: position });
+    }
+    return false;
+  };
+
+  const ensureFormulaKindAtPosition = (
+    position: number,
+    kind: FormulaKind,
+    latex: string,
+  ) => {
+    if (!editor || !latex.trim()) {
+      return undefined;
+    }
+
+    const expectedNodeName = kind === "block" ? "blockMath" : "inlineMath";
+    const formulaNode = editor.state.doc.nodeAt(position);
+    if (formulaNode?.type.name === expectedNodeName) {
+      return updateFormulaAtPosition(position, latex) ? position : undefined;
+    }
+    if (
+      formulaNode?.type.name !== "blockMath" &&
+      formulaNode?.type.name !== "inlineMath"
+    ) {
+      return undefined;
+    }
+
+    const expectedNodeType = editor.schema.nodes[expectedNodeName];
+    if (!expectedNodeType) {
+      return undefined;
+    }
+
+    const replaced = editor.commands.command(({ tr }) => {
+      const currentNode = tr.doc.nodeAt(position);
+      if (
+        currentNode?.type.name !== "blockMath" &&
+        currentNode?.type.name !== "inlineMath"
+      ) {
+        return false;
+      }
+
+      tr.replaceRangeWith(
+        position,
+        position + currentNode.nodeSize,
+        expectedNodeType.create({ latex }),
+      );
+      return true;
+    });
+    if (!replaced) {
+      return undefined;
+    }
+
+    const directNode = editor.state.doc.nodeAt(position);
+    if (directNode?.type.name === expectedNodeName) {
+      return position;
+    }
+
+    let nearestPosition: number | undefined;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    editor.state.doc.descendants((node, nodePosition) => {
+      if (node.type.name !== expectedNodeName || node.attrs.latex !== latex) {
+        return;
+      }
+      const distance = Math.abs(nodePosition - position);
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestPosition = nodePosition;
+      }
+    });
+    return nearestPosition;
+  };
+
+  const deleteFormulaAtPosition = (position: number) => {
+    if (!editor) {
+      return false;
+    }
+
+    const formulaNode = editor.state.doc.nodeAt(position);
+    if (formulaNode?.type.name === "blockMath") {
+      return editor.commands.deleteBlockMath({ pos: position });
+    } else if (formulaNode?.type.name === "inlineMath") {
+      return editor.commands.deleteInlineMath({ pos: position });
+    }
+    return false;
+  };
+
+  const insertFormulaAtCapturedCursor = (latex: string) => {
+    if (!editor || draft.insertionPosition === undefined || !latex.trim()) {
+      return undefined;
+    }
+
+    const insertionPosition = draft.insertionPosition;
+    const inserted =
+      draft.kind === "block"
+        ? editor.commands.insertBlockMath({ latex, pos: insertionPosition })
+        : editor.commands.insertInlineMath({ latex, pos: insertionPosition });
+    if (!inserted) {
+      return undefined;
+    }
+
+    const expectedNodeName = draft.kind === "block" ? "blockMath" : "inlineMath";
+    const directNode = editor.state.doc.nodeAt(insertionPosition);
+    if (directNode?.type.name === expectedNodeName) {
+      return insertionPosition;
+    }
+
+    let nearestPosition: number | undefined;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    editor.state.doc.descendants((node, position) => {
+      if (node.type.name !== expectedNodeName || node.attrs.latex !== latex) {
+        return;
+      }
+      const distance = Math.abs(position - insertionPosition);
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestPosition = position;
+      }
+    });
+    return nearestPosition;
+  };
+
+  const handleFormulaChange = (latex: string) => {
+    let position = liveFormulaPositionRef.current;
+    const previewLatex = toTiptapPreviewLatex(latex);
+    let insertionPosition = draft.insertionPosition;
+    if (!previewLatex && position !== undefined) {
+      if (deleteFormulaAtPosition(position)) {
+        insertionPosition ??= position;
+        position = undefined;
+        liveFormulaPositionRef.current = undefined;
+      }
+    } else if (previewLatex) {
+      if (position !== undefined) {
+        updateFormulaAtPosition(position, previewLatex);
+      } else {
+        position = insertFormulaAtCapturedCursor(previewLatex);
+        liveFormulaPositionRef.current = position;
+      }
+    }
+
+    onChange({ ...draft, insertionPosition, latex, position });
+  };
+
+  const handleFormulaKindChange = (kind: FormulaKind) => {
+    if (kind === draft.kind) {
       return;
     }
 
-    if (draft.position !== undefined) {
-      if (draft.kind === "block") {
-        editor.chain().focus().updateBlockMath({ latex, pos: draft.position }).run();
-      } else {
-        editor.chain().focus().updateInlineMath({ latex, pos: draft.position }).run();
+    const latex = toTiptapPreviewLatex(draft.latex);
+    const livePosition = liveFormulaPositionRef.current;
+    if (livePosition === undefined || !latex) {
+      onChange({ ...draft, kind });
+      return;
+    }
+
+    const nextPosition = ensureFormulaKindAtPosition(livePosition, kind, latex);
+    if (nextPosition === undefined) {
+      return;
+    }
+
+    liveFormulaPositionRef.current = nextPosition;
+    onChange({ ...draft, kind, position: nextPosition });
+  };
+
+  const saveFormula = () => {
+    const latex = toTiptapPreviewLatex(draft.latex);
+    if (!editor || !latex || hasUnfilledMathLivePlaceholder(draft.latex)) {
+      return;
+    }
+
+    const livePosition = liveFormulaPositionRef.current;
+    if (livePosition !== undefined) {
+      const nextPosition = ensureFormulaKindAtPosition(
+        livePosition,
+        draft.kind,
+        latex,
+      );
+      if (nextPosition === undefined) {
+        return;
       }
+      liveFormulaPositionRef.current = nextPosition;
     } else if (draft.kind === "block") {
-      editor.chain().focus().insertBlockMath({ latex }).run();
+      editor.commands.insertBlockMath({ latex, pos: draft.insertionPosition });
     } else {
-      editor.chain().focus().insertInlineMath({ latex }).insertContent(" ").run();
+      editor.commands.insertInlineMath({ latex, pos: draft.insertionPosition });
     }
     onClose();
   };
@@ -1622,27 +1821,41 @@ function FormulaComposer({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-sm font-extrabold text-[var(--theme-text-strong)]">
-            {draft.position === undefined ? "Chèn công thức" : "Sửa công thức"}
+            {draft.isNew ? "Chèn công thức" : "Sửa công thức"}
           </p>
           <p className="text-xs font-medium text-[var(--theme-text-muted)]">
             Chọn ký hiệu hoặc cấu trúc, sau đó nhập trực tiếp vào từng vị trí.
           </p>
         </div>
-        <button
-          type="button"
-          aria-label="Đóng trình nhập công thức"
-          onClick={onClose}
-          className="theme-button-neutral grid h-9 w-9 place-items-center rounded-lg"
-        >
-          <X className="h-4 w-4" />
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            disabled={
+              !toTiptapPreviewLatex(draft.latex) ||
+              hasUnfilledMathLivePlaceholder(draft.latex)
+            }
+            onClick={saveFormula}
+            className="theme-button-primary inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-lg px-4 text-sm font-extrabold disabled:opacity-50"
+          >
+            <Check className="h-4 w-4" />
+            {draft.isNew ? "Chèn công thức" : "Cập nhật"}
+          </button>
+          <button
+            type="button"
+            aria-label="Đóng trình nhập công thức"
+            onClick={onClose}
+            className="theme-button-neutral grid h-9 w-9 place-items-center rounded-lg"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
       </div>
       <div className="flex flex-wrap gap-2">
         {(["inline", "block"] as const).map((kind) => (
           <button
             key={kind}
             type="button"
-            onClick={() => onChange({ ...draft, kind })}
+            onClick={() => handleFormulaKindChange(kind)}
             className={cn(
               "min-h-9 rounded-lg border px-3 text-xs font-extrabold",
               draft.kind === kind
@@ -1657,20 +1870,10 @@ function FormulaComposer({
       <div className="flex flex-wrap gap-2">
         <VisualMathInput
           ariaLabel="Nhập công thức trực quan"
+          fieldSize="compact"
           value={draft.latex}
-          onChange={(latex) => onChange({ ...draft, latex })}
+          onChange={handleFormulaChange}
         />
-      </div>
-      <div className="flex justify-end">
-        <button
-          type="button"
-          disabled={!draft.latex.trim()}
-          onClick={saveFormula}
-          className="theme-button-primary inline-flex min-h-10 items-center gap-2 rounded-lg px-4 text-sm font-extrabold disabled:opacity-50"
-        >
-          <Check className="h-4 w-4" />
-          {draft.position === undefined ? "Chèn công thức" : "Cập nhật"}
-        </button>
       </div>
     </div>
   );

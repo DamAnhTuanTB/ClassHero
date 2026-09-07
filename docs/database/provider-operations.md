@@ -20,6 +20,9 @@ Domain này phục vụ màn `/admin/ai-settings` và không lưu secret provide
 
 - Tiền VND dùng integer; USD/tỷ giá dùng Decimal chỉ ở lớp accounting.
 - Usage event lưu cả price version, tỷ giá, raw unit, USD và VND tại thời điểm gọi; không tính ngược bằng bảng giá mới.
+- Usage event AI snapshot thêm `operation`, `reasoning_effort` và `latency_ms`.
+  `operation` là mã mục đích cụ thể của lượt gọi, không suy ngược từ tên model,
+  resource type hoặc cấu hình hiện tại. Bản ghi cũ được phép giữ `null`.
 - `provider_usage_events` là nguồn chuẩn khi hiển thị tổng số lượt gọi và tổng
   chi phí của một lần sinh. `ai_generations.estimated_cost_vnd` chỉ là projection
   denormalized để truy vấn nhanh/giữ tương thích; UI/API phải aggregate hoặc đối

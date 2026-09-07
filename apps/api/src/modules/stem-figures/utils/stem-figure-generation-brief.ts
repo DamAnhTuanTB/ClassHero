@@ -33,6 +33,7 @@ export function buildStemFigureGenerationBrief(input: {
   targetGrade: number | null;
   referenceAssets?: StemFigureGenerationBrief["referenceAssets"];
   referenceImageMode?: StemFigureGenerationBrief["referenceImageMode"];
+  targetMode?: StemFigureGenerationBrief["targetMode"];
   currentLatexSource?: string | null;
   adminInstructions?: string | null;
 }): StemFigureGenerationBrief {
@@ -49,16 +50,32 @@ export function buildStemFigureGenerationBrief(input: {
     (figureOrigin === "GENERATED_FROM_BRIEF" ? "NONE" : "SOURCE_CROP_ONLY");
   const referenceAssets =
     referenceImageMode === "NONE" ? [] : (input.referenceAssets ?? []);
+  const isProblemBlock = block.type === "example" || block.type === "exercise";
+  const targetMode = input.targetMode ?? null;
+  if (
+    targetMode &&
+    (referenceImageMode === "SOURCE_CROP_ONLY" || !isProblemBlock)
+  ) {
+    throw new Error(
+      "STEM figure QUESTION/SOLUTION target is only valid for a source-free create/edit of an example or exercise",
+    );
+  }
   return {
     figurePlanContractVersion: 3,
     figureOrigin,
     targetGrade: input.targetGrade,
     blockPath: input.blockPath,
-    blockContent: projectStemFigureBlock(block),
+    blockContent: projectStemFigureBlock(block, {
+      includeSolution:
+        isProblemBlock &&
+        (targetMode === "SOLUTION" ||
+          (targetMode === null && referenceImageMode === "NONE")),
+    }),
     sourceReferences:
       figureOrigin === "GENERATED_FROM_BRIEF" ? [] : input.plan.sourceReferences,
     referenceAssets,
     referenceImageMode,
+    ...(targetMode ? { targetMode } : {}),
     ...(input.currentLatexSource?.trim()
       ? { currentLatexSource: input.currentLatexSource.trim() }
       : {}),
@@ -66,12 +83,18 @@ export function buildStemFigureGenerationBrief(input: {
   };
 }
 
-export function projectStemFigureBlock(value: Record<string, unknown>) {
+export function projectStemFigureBlock(
+  value: Record<string, unknown>,
+  options: { includeSolution?: boolean } = {},
+) {
   const type = typeof value.type === "string" ? value.type : null;
-  if (type === "example") {
+  if (type === "example" || type === "exercise") {
     const projection: Record<string, unknown> = {
       type,
       ...(typeof value.problem === "string" ? { problem: value.problem } : {}),
+      ...(options.includeSolution && typeof value.solution === "string"
+        ? { solution: value.solution }
+        : {}),
       ...(typeof value.isGeometry === "boolean" ? { isGeometry: value.isGeometry } : {}),
     };
     const geometryStatement = readRecord(value.geometryStatement);

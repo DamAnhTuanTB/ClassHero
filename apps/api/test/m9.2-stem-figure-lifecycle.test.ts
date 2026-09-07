@@ -800,6 +800,109 @@ describe("M9.2 logical figure revision lifecycle", () => {
     expect(JSON.stringify(prepared.generationBrief)).not.toContain("current-error.svg");
   });
 
+  it("edits the current targeted Summary figure without resolving a textbook source", async () => {
+    const lessonId = "00000000-0000-4000-8000-000000000034";
+    const lessonSummaryId = "00000000-0000-4000-8000-000000000040";
+    const currentLatexSource = String.raw`\begin{tikzpicture}
+\draw (0,0) -- (1,0);
+\end{tikzpicture}`;
+    const current = revision({
+      id: currentRevisionId,
+      status: "SUCCEEDED",
+      sourceVersion: 1,
+      latexSource: currentLatexSource,
+      referenceSnapshotJson: null,
+    });
+    const prisma = {
+      lessonSummary: {
+        findUnique: vi.fn(async () => ({
+          contentJson: {
+            type: "lesson_summary_blocks",
+            version: 4,
+            data: {
+              title: "Bài kiểm thử",
+              targetGrade: 8,
+              sections: [
+                {
+                  displayHeading: "Bài tập",
+                  sourceEvidence: {
+                    kind: "CONTENT",
+                    text: "Nội dung nguồn",
+                    packetPageNumbers: [1],
+                  },
+                  blocks: [
+                    {
+                      type: "exercise",
+                      problem: "Cho tam giác ABC vuông tại A.",
+                      solution: "Dựng đường cao AH.",
+                      answer: "Kết quả cần tìm.",
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        })),
+      },
+    };
+    const figureReferences = { resolve: vi.fn() };
+    const service = new StemFiguresService(
+      prisma as never,
+      { get: vi.fn() } as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      figureReferences as never,
+      {} as never,
+    );
+    const figure = {
+      id: figureId,
+      lessonId,
+      lessonSummaryId,
+      aiGenerationId: null,
+      blockPath: "sections.0.blocks.0",
+      figureIndex: 1,
+      planJson: {
+        figurePlanContractVersion: 3,
+        localId: "F002",
+        figureOrigin: "GENERATED_FROM_BRIEF",
+        sourceReferences: [],
+      },
+      currentRevisionId,
+      pendingRevisionId: null,
+      currentRevision: current,
+      pendingRevision: null,
+    };
+
+    const prepared = await (
+      service as unknown as {
+        prepareCreateNewAi(
+          figure: unknown,
+          dto: unknown,
+        ): Promise<{ generationBrief: Record<string, unknown> }>;
+      }
+    ).prepareCreateNewAi(figure, {
+      referenceImageMode: "CURRENT_ONLY",
+      targetMode: "SOLUTION",
+      adminInstructions: "Dịch nhãn H ra xa cạnh BC.",
+    });
+
+    expect(figureReferences.resolve).not.toHaveBeenCalled();
+    expect(prepared.generationBrief).toMatchObject({
+      referenceImageMode: "CURRENT_ONLY",
+      targetMode: "SOLUTION",
+      currentLatexSource,
+      referenceAssets: [],
+      blockContent: {
+        type: "exercise",
+        problem: "Cho tam giác ABC vuông tại A.",
+        solution: "Dựng đường cao AH.",
+      },
+    });
+    expect(JSON.stringify(prepared.generationBrief)).not.toContain("answer");
+  });
+
   it("rejects textbook-reference mode when no OCR crop or page fallback can be resolved", async () => {
     const lessonId = "00000000-0000-4000-8000-000000000034";
     const aiGenerationId = "00000000-0000-4000-8000-000000000036";
@@ -1102,12 +1205,15 @@ describe("M9.2 logical figure revision lifecycle", () => {
 
     await service.ensureForBlock(lessonId, "actor-id", {
       blockPath: "sections.0.blocks.0",
+      figureIndex: 1,
     });
 
     expect(figureCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           blockPath: "sections.0.blocks.0",
+          figureIndex: 1,
+          localPlanId: "F002",
           planJson: expect.objectContaining({
             figurePlanContractVersion: 3,
             figureOrigin: "GENERATED_FROM_BRIEF",
@@ -1117,6 +1223,155 @@ describe("M9.2 logical figure revision lifecycle", () => {
         }),
       }),
     );
+  });
+
+  it("previews an AI figure for an empty exercise block without creating a logical figure", async () => {
+    const lessonId = "00000000-0000-4000-8000-000000000034";
+    const transaction = vi.fn();
+    const prisma = {
+      lessonSummary: { findFirst: vi.fn(async () => ensureSummaryRecord()) },
+      stemFigure: { findFirst: vi.fn(async () => null) },
+      $transaction: transaction,
+    };
+    const repair = {
+      previewCreateInput: vi.fn(async ({ brief }: { brief: unknown }) => ({
+        systemPrompt: "system",
+        userPrompt: "user",
+        providerInput: {},
+        configuration: {
+          resolvedProvider: "OPENAI",
+          resolvedModel: "gpt-5.6-luna",
+          temperature: null,
+          reasoningEffort: "high",
+          maxOutputTokens: 20_000,
+        },
+        context: { textInputTokens: 10, imageInputTokens: 0, estimatedTokens: 10 },
+        estimatedCost: {
+          available: true,
+          inputUpperBoundUsd: 0,
+          inputUpperBoundVnd: 0,
+          outputUpperBoundUsd: 0,
+          outputUpperBoundVnd: 0,
+          upperBoundUsd: 0,
+          upperBoundVnd: 0,
+          fxRateVndPerUsd: 25_000,
+        },
+        brief,
+      })),
+    };
+    const modelRouting = {
+      resolve: vi.fn(async () => createFigureAiRoute()),
+    };
+    const service = new StemFiguresService(
+      prisma as never,
+      { get: vi.fn() } as never,
+      {} as never,
+      { downloadObject: vi.fn() } as never,
+      {} as never,
+      repair as never,
+      {} as never,
+      modelRouting as never,
+    );
+
+    const preview = await service.previewCreateNewAiForBlock(lessonId, {
+      blockPath: "sections.1.blocks.0",
+      figureIndex: 1,
+      referenceImageMode: "NONE" as never,
+      targetMode: "SOLUTION",
+      adminInstructions: null,
+    });
+
+    expect(preview.generationBrief).toMatchObject({
+      blockPath: "sections.1.blocks.0",
+      blockContent: {
+        type: "example",
+        problem: "Nêu tên ba đỉnh.",
+        solution: "Ba đỉnh là A, B, C.",
+      },
+      referenceAssets: [],
+      referenceImageMode: "NONE",
+      targetMode: "SOLUTION",
+    });
+    expect(JSON.stringify(preview.generationBrief)).not.toContain('"answer"');
+    expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it("creates the logical figure only when an empty block AI request is submitted", async () => {
+    const lessonId = "00000000-0000-4000-8000-000000000034";
+    const actorUserId = "00000000-0000-4000-8000-000000000035";
+    const figureCreate = vi.fn(async () => ({ id: figureId }));
+    const revisionCreate = vi.fn(async () => ({ id: pendingRevisionId }));
+    const figureUpdate = vi.fn(async () => ({}));
+    const transactionClient = {
+      stemFigure: { create: figureCreate, update: figureUpdate },
+      stemFigureRevision: { create: revisionCreate },
+    };
+    const prisma = {
+      lessonSummary: { findFirst: vi.fn(async () => ensureSummaryRecord()) },
+      stemFigure: { findFirst: vi.fn(async () => null) },
+      $transaction: vi.fn(
+        async (callback: (client: typeof transactionClient) => Promise<unknown>) =>
+          callback(transactionClient),
+      ),
+    };
+    const jobs = {
+      enqueue: vi.fn(async () => ({ id: "job-block-ai", status: "QUEUED" })),
+    };
+    const modelRouting = {
+      resolve: vi.fn(async () => createFigureAiRoute()),
+    };
+    const service = new StemFiguresService(
+      prisma as never,
+      { get: vi.fn() } as never,
+      {} as never,
+      {} as never,
+      jobs as never,
+      {} as never,
+      {} as never,
+      modelRouting as never,
+    );
+
+    const result = await service.createNewAiForBlock(lessonId, actorUserId, {
+      blockPath: "sections.1.blocks.0",
+      figureIndex: 1,
+      referenceImageMode: "NONE" as never,
+      targetMode: "SOLUTION",
+      adminInstructions: null,
+      model: "gpt-5.6-luna",
+      reasoningEffort: "high",
+    });
+
+    expect(figureCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          blockPath: "sections.1.blocks.0",
+          figureIndex: 1,
+          status: "QUEUED",
+        }),
+      }),
+    );
+    expect(revisionCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          origin: "ADMIN_REGENERATE",
+          status: "QUEUED",
+          sourceVersion: 1,
+        }),
+      }),
+    );
+    expect(jobs.enqueue).toHaveBeenCalledWith(
+      figureId,
+      actorUserId,
+      expect.objectContaining({
+        generationBrief: expect.objectContaining({
+          targetMode: "SOLUTION",
+          blockContent: expect.objectContaining({
+            solution: "Ba đỉnh là A, B, C.",
+          }),
+        }),
+      }),
+    );
+    expect(result).toMatchObject({ figureId, jobId: "job-block-ai", status: "QUEUED" });
   });
 
   it("retries a budget-blocked initial source generation after budget is raised", async () => {
@@ -1547,6 +1802,7 @@ describe("M9.2 logical figure revision lifecycle", () => {
         stemFigures: [
           {
             id: figureId,
+            figureIndex: 1,
             status: StemFigureStatus.FAILED,
             currentRevision: {
               altText: "Hình hiện hành",
@@ -1572,6 +1828,7 @@ describe("M9.2 logical figure revision lifecycle", () => {
                     {
                       kind: "TEX_FIGURE",
                       figureId,
+                      figureIndex: 1,
                       status: "SUCCEEDED",
                       altText: "Hình hiện hành",
                       caption: "Caption hiện hành",
@@ -1702,5 +1959,33 @@ function ensureSummaryRecord() {
         ],
       },
     },
+  };
+}
+
+function createFigureAiRoute() {
+  return {
+    feature: "SUMMARY",
+    version: 1,
+    model: "gpt-5.6-luna",
+    temperature: null,
+    reasoningEffort: "high",
+    maxOutputTokens: 20_000,
+    candidates: [
+      {
+        catalogItemId: "catalog-luna",
+        priceVersionId: "price-luna",
+        category: "AI_MODEL",
+        provider: "OPENAI",
+        model: "gpt-5.6-luna",
+        maxInputTokens: 200_000,
+        available: true,
+        capabilitiesJson: {
+          aiConfiguration: "REASONING_EFFORT",
+          reasoningEffortLevels: ["low", "medium", "high"],
+        },
+        rates: [],
+      },
+    ],
+    hasConfiguration: true,
   };
 }

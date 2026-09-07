@@ -11,6 +11,7 @@ import {
   FileCheck2,
   ChevronRight,
   PenTool,
+  Pencil,
   Scale,
   Bookmark,
   GraduationCap,
@@ -20,6 +21,7 @@ import {
   Sigma,
   FileBadge,
   PlayCircle,
+  NotebookPen,
   GripVertical,
   Copy,
   Trash2,
@@ -37,10 +39,9 @@ import {
   StemFigureMathText,
   type StemFigureVisual,
 } from "@/components/common/content/stem-figure";
-import {
-  LessonSummaryExampleCard,
-  type LessonSummaryFigureRenderer,
-} from "@/components/common/content/lesson-summary-example-content";
+import { LessonSummaryExampleCard } from "@/components/common/content/lesson-summary-example-content";
+import { LessonSummaryExerciseCard } from "@/components/common/content/lesson-summary-exercise-card";
+import type { LessonSummaryFigureRenderer } from "@/components/common/content/lesson-summary-problem-content";
 import {
   getLessonSummarySectionAnchorId,
   LESSON_SUMMARY_OBJECTIVES_ANCHOR_ID,
@@ -131,6 +132,7 @@ interface SummaryBlockRendererProps {
     blockPath: string;
     block: BlockData;
   }) => React.ReactNode;
+  onBlockEdit?: (input: { blockPath: string; block: BlockData }) => void;
   phaseOneBlockJsonByPath?: Readonly<Record<string, unknown>> | null;
   onPhaseOneBlockJsonChange?: (blockPath: string, value: unknown) => void;
   onBlockTypeChange?: (blockPath: string, targetType: ConvertibleBlockType) => void;
@@ -158,6 +160,7 @@ const BLOCK_CONFIG: Record<string, { label: string; color: string; icon: any }> 
   note: { label: "Chú ý", color: "rose", icon: AlertCircle },
 
   example: { label: "Ví dụ", color: "blue", icon: PlayCircle },
+  exercise: { label: "Bài tập", color: "cyan", icon: NotebookPen },
 };
 
 const CONVERTIBLE_BLOCK_TYPES: ConvertibleBlockType[] = [
@@ -262,6 +265,7 @@ export function SummaryBlockRenderer({
   showEditorialMetadata = false,
   renderBlockImageActions,
   renderBlockSourceAction,
+  onBlockEdit,
   phaseOneBlockJsonByPath,
   onPhaseOneBlockJsonChange,
   onBlockTypeChange,
@@ -365,6 +369,7 @@ export function SummaryBlockRenderer({
     const base = { type, title: "Tiêu đề khối mới" };
     switch (type) {
       case "example":
+      case "exercise":
         return {
           ...base,
           problem: "Nhập đề bài tại đây...",
@@ -621,7 +626,7 @@ export function SummaryBlockRenderer({
               </ul>
             </div>
 
-            {!isReadOnly && viewMode === "UI_ONLY" && (
+            {!isReadOnly && viewMode === "UI_ONLY" && !isObjectivesEditing && (
               <div className="absolute right-2 top-2 z-10 opacity-0 transition-opacity group-hover/obj:opacity-100 focus-within:opacity-100">
                 <ImmediateTooltip content="Chỉnh sửa mục tiêu học tập">
                   <button
@@ -1051,17 +1056,23 @@ export function SummaryBlockRenderer({
                   typeof phaseOneBlockJson === "object" &&
                   phaseOneBlockJson !== null &&
                   !Array.isArray(phaseOneBlockJson);
-                runningCounts[block.type] = (runningCounts[block.type] || 0) + 1;
+                const displayedBlockType = block.type;
+                runningCounts[displayedBlockType] =
+                  (runningCounts[displayedBlockType] || 0) + 1;
 
                 // Only assign a number for "example" blocks, if there is more than 1 in the lesson
                 const computedDisplayNumber =
-                  block.type === "example" && (globalTypeCounts[block.type] ?? 0) > 1
-                    ? runningCounts[block.type]
-                    : undefined;
+                  displayedBlockType === "exercise"
+                    ? runningCounts[displayedBlockType]
+                    : displayedBlockType === "example" &&
+                        (globalTypeCounts[displayedBlockType] ?? 0) > 1
+                      ? runningCounts[displayedBlockType]
+                      : undefined;
 
                 // Override the AI's displayNumber (if any) with the mathematically correct one
                 const blockToRender = {
                   ...block,
+                  type: displayedBlockType,
                   displayNumber: computedDisplayNumber,
                   figures: Array.isArray(block.figures)
                     ? block.figures.map((visual: unknown) =>
@@ -1313,6 +1324,20 @@ export function SummaryBlockRenderer({
                                   onBlockTypeChange(blockPath, targetType)
                                 }
                               />
+                            ) : null}
+                            {viewMode === "UI_ONLY" && onBlockEdit ? (
+                              <ImmediateTooltip content="Chỉnh sửa khối bằng Tiptap">
+                                <button
+                                  aria-label="Chỉnh sửa khối bằng Tiptap"
+                                  type="button"
+                                  onClick={() =>
+                                    onBlockEdit({ blockPath, block: blockToRender })
+                                  }
+                                  className="rounded p-1.5 text-slate-500 transition-colors hover:text-blue-600 dark:text-slate-400"
+                                >
+                                  <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                                </button>
+                              </ImmediateTooltip>
                             ) : null}
                             {viewMode === "UI_ONLY" && (
                               <ImmediateTooltip content="Chỉnh sửa nội dung khối">
@@ -1754,6 +1779,14 @@ function BlockItem({
           showEditorialMetadata={showEditorialMetadata}
         />
       );
+    case "exercise":
+      return (
+        <ExerciseBlock
+          block={block}
+          renderStemFigure={renderStemFigure}
+          showEditorialMetadata={showEditorialMetadata}
+        />
+      );
     case "knowledge":
     case "property":
     case "theorem":
@@ -1976,6 +2009,25 @@ function ExampleBlock({
   return (
     <LessonSummaryExampleCard
       answerLabel="Kết luận"
+      block={block}
+      displayNumber={block.displayNumber}
+      renderFigure={renderStemFigure}
+      showEditorialWarning={showEditorialMetadata}
+    />
+  );
+}
+
+function ExerciseBlock({
+  block,
+  renderStemFigure,
+  showEditorialMetadata,
+}: {
+  block: BlockData;
+  renderStemFigure?: LessonSummaryFigureRenderer;
+  showEditorialMetadata: boolean;
+}) {
+  return (
+    <LessonSummaryExerciseCard
       block={block}
       displayNumber={block.displayNumber}
       renderFigure={renderStemFigure}

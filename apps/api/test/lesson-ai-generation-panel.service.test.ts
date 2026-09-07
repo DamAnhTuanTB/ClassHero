@@ -11,7 +11,10 @@ describe("LessonAiGenerationPanelService", () => {
         findFirst: vi.fn(async () => ({
           id: "lesson-1",
           title: "Bài học",
-          learningPath: { targetAudiences: [] },
+          learningPath: {
+            domain: { name: "Toán", slug: "toan" },
+            targetAudiences: [],
+          },
           documents: [
             {
               id: "document-1",
@@ -184,6 +187,7 @@ describe("LessonAiGenerationPanelService", () => {
       quizReady: true,
       quizReason: null,
     });
+    expect(panel.lesson.subjectKey).toBe("MATH");
     expect(panel.jobs.SUMMARY).toMatchObject({
       aiGenerationId: "generation-summary",
       estimatedCostVnd: 1_096,

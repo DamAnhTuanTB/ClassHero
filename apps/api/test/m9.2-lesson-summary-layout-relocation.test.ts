@@ -176,6 +176,8 @@ describe("M9.2 lesson Summary layout relocation", () => {
         "sections.0.blocks.0": mapped.phaseOneBlocks["sections.0.blocks.1"],
         "sections.1.blocks.0": mapped.phaseOneBlocks["sections.1.blocks.0"],
         "sections.1.blocks.1": mapped.phaseOneBlocks["sections.1.blocks.1"],
+        "sections.1.blocks.2": mapped.phaseOneBlocks["sections.1.blocks.2"],
+        "sections.1.blocks.3": mapped.phaseOneBlocks["sections.1.blocks.3"],
       },
       phaseOneLayoutOperations: [
         { type: "DELETE_BLOCK", sectionIndex: 0, blockIndex: 0 },
@@ -242,8 +244,14 @@ function createProviderOutput() {
       },
     ],
     applicationExercises: {
-      standardExercise: exampleBlock("STANDARD_EXERCISE"),
-      realWorldExercise: exampleBlock("REAL_WORLD_EXERCISE"),
+      standardExercises: [
+        exampleBlock("STANDARD_EXERCISE"),
+        exampleBlock("STANDARD_EXERCISE"),
+      ],
+      realWorldExercises: [
+        exampleBlock("REAL_WORLD_EXERCISE"),
+        exampleBlock("REAL_WORLD_EXERCISE"),
+      ],
     },
   });
 }
@@ -252,7 +260,7 @@ function exampleBlock(
   exampleKind: "ILLUSTRATION" | "STANDARD_EXERCISE" | "REAL_WORLD_EXERCISE",
 ) {
   return {
-    type: "example" as const,
+    type: exampleKind === "ILLUSTRATION" ? "example" : "exercise",
     exampleKind,
     problem: "Nêu một ví dụ.",
     solution: "Áp dụng kiến thức.",

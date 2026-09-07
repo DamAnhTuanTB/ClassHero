@@ -38,6 +38,7 @@ import {
 import type { AiFeatureRoute } from "#api/modules/provider-operations/types/provider-operations.types";
 import { buildStemFigureGenerationBrief } from "#api/modules/stem-figures/utils/stem-figure-generation-brief";
 import { compareStemFigurePositions } from "#api/modules/stem-figures/utils/stem-figure-position";
+import { StoredFileCleanupService } from "#api/modules/files/services/stored-file-cleanup.service";
 
 @Injectable()
 export class LessonSummaryGenerationService {
@@ -57,6 +58,9 @@ export class LessonSummaryGenerationService {
     @Optional()
     @Inject(AiProviderCallService)
     private readonly providerCall?: AiProviderCallService,
+    @Optional()
+    @Inject(StoredFileCleanupService)
+    private readonly fileCleanup?: StoredFileCleanupService,
   ) {}
 
   async generate(
@@ -133,6 +137,15 @@ export class LessonSummaryGenerationService {
       subject.key,
       "CONTEXTUAL",
       input.data.targetGrade,
+      {
+        standardExerciseCount: input.data.standardExerciseCount,
+        realWorldExerciseCount: input.data.realWorldExerciseCount,
+      },
+    );
+    const validationSchema = getLessonSummaryProviderTransportOutputSchema(
+      subject.key,
+      "CONTEXTUAL",
+      input.data.targetGrade,
     );
     const schemaHash = hashAiValue(
       buildAiStructuredTextFormat(
@@ -156,12 +169,19 @@ export class LessonSummaryGenerationService {
               backgroundJobId: context.backgroundJobId,
               attempt: context.attempt,
               callSequence: 1,
+              operation: "SUMMARY_GENERATION",
               routeSnapshot: normalizeSummaryRouteSnapshot(context.providerRouteSnapshot),
             },
             structuredInput,
             providerSchema,
+            validationSchema,
           )
-        : await this.aiService.generateStructured(structuredInput, providerSchema);
+        : await this.aiService.generateStructured(
+            structuredInput,
+            providerSchema,
+            undefined,
+            validationSchema,
+          );
     } finally {
       await this.packets.cleanup(draft.packetObjectKey).catch(() => undefined);
     }
@@ -269,15 +289,31 @@ export class LessonSummaryGenerationService {
       }
       const before = await transaction.lessonSummary.findUnique({
         where: { lessonId: context.lessonId! },
-        select: { id: true, aiGenerationId: true },
+        select: {
+          id: true,
+          aiGenerationId: true,
+          stemFigures: {
+            select: {
+              revisions: { select: { deliveryFileId: true } },
+            },
+          },
+        },
       });
+      const previousDeliveryFileIds = (before?.stemFigures ?? []).flatMap((figure) =>
+        figure.revisions.flatMap((revision) =>
+          revision.deliveryFileId ? [revision.deliveryFileId] : [],
+        ),
+      );
+      if (previousDeliveryFileIds.length > 0 && !this.fileCleanup) {
+        throw new Error("Stored file cleanup service is unavailable");
+      }
       const persistedBase = await transaction.lessonSummary.upsert({
         where: { lessonId: context.lessonId! },
         create: {
           lessonId: context.lessonId!,
           contentJson: {
             type: "lesson_summary_blocks",
-            version: 3,
+            version: 4,
             data: output,
           },
           source: ContentSource.AI,
@@ -293,7 +329,7 @@ export class LessonSummaryGenerationService {
         update: {
           contentJson: {
             type: "lesson_summary_blocks",
-            version: 3,
+            version: 4,
             data: output,
           },
           source: ContentSource.AI,
@@ -311,6 +347,12 @@ export class LessonSummaryGenerationService {
         // must be removed too before recreating the same block positions.
         where: { lessonSummaryId: persistedBase.id },
       });
+      const stagedFileIds = this.fileCleanup
+        ? await this.fileCleanup.stageDetachedFigureFiles(
+            transaction,
+            previousDeliveryFileIds,
+          )
+        : [];
       const contentWithFigures = structuredClone(output);
       const createdFigures = [];
       for (const item of figuresToPersist) {
@@ -386,7 +428,7 @@ export class LessonSummaryGenerationService {
         data: {
           contentJson: {
             type: "lesson_summary_blocks",
-            version: 3,
+            version: 4,
             data: contentWithFigures,
           },
         },
@@ -416,8 +458,17 @@ export class LessonSummaryGenerationService {
         });
       }
 
-      return { persisted, createdFigures };
+      return { persisted, createdFigures, stagedFileIds };
     });
+
+    if (this.fileCleanup) {
+      const cleanup = await this.fileCleanup.deleteStagedFiles(summary.stagedFileIds);
+      if (cleanup.pendingFileCleanupCount > 0) {
+        this.logger.warn(
+          `Lesson Summary regeneration left ${cleanup.pendingFileCleanupCount} file(s) pending cleanup`,
+        );
+      }
+    }
 
     const importedSourceFigureIds = new Set<string>();
     if (useTextbookSourceImages) {
@@ -812,10 +863,11 @@ function normalizeSummaryRouteSnapshot(
 function normalizeFigureRouteSnapshot(
   route: AiGenerationExecutionContext["providerRouteSnapshot"],
 ) {
-  const normalized = normalizeSummaryRouteSnapshot(route);
-  if (!normalized) return undefined;
+  if (!route) return undefined;
+  const selectedCandidate =
+    route.candidates.find((candidate) => candidate.available) ?? route.candidates[0];
   return {
-    ...normalized,
-    maxOutputTokens: Math.min(normalized.maxOutputTokens, 6_000),
+    ...route,
+    candidates: selectedCandidate ? [selectedCandidate] : [],
   };
 }

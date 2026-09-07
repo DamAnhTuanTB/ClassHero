@@ -144,6 +144,11 @@ Các màn UI chính phải được map về task theo từng lớp để tránh
 | Admin manual notifications                | `M10.4`                                           | `M10.4`                                 | `M1.5`                                        | `M10.3`, `M10.6`                              | In-app lưu DB; realtime/email/Zalo là kênh bổ sung.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | Admin news/events/livestream              | `M12.4`                                           | `M12.4`                                 | `M1.5`                                        | -                                             | Student/parent xem ở `M12.5`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
+Riêng các control Reasoning Effort của màn Cài đặt AI: modal catalog luôn liệt
+kê đủ `none | minimal | low | medium | high | xhigh | max` theo thứ tự tăng dần
+để admin tự chọn capability cho từng model; các select ở `Thiết lập mặc định`
+và modal generation chỉ hiển thị tập đã chọn, cũng theo đúng thứ tự này.
+
 Nếu thêm màn mới vào file này, phải cập nhật bảng trên, `docs/09-implementation-plan.md` và `docs/implementation/Mx.md` tương ứng.
 
 ---
@@ -801,7 +806,11 @@ Màn chi tiết buổi học admin:
   Bấm chi phí mở modal lịch sử mọi lần sinh của set, gồm trạng thái, model, thời
   điểm, số lượt gọi và chi phí. Bấm một dòng lần sinh mở lại đúng modal
   `Chi tiết các lượt gọi AI` dùng ở Sinh kiến thức; trong modal này, từng dòng
-  usage tiếp tục mở dialog chi tiết công thức/token/đơn giá hiện có.
+  usage hiển thị tên tác vụ cụ thể, Reasoning Effort, thời gian phản hồi, chi phí
+  và thời điểm; từng dòng tiếp tục mở dialog chi tiết công thức/token/đơn giá.
+  Taxonomy phải phân biệt sinh nội dung, tạo/chỉnh sửa/tinh chỉnh/sửa lỗi ảnh,
+  hình đề/hình lời giải Quiz và tinh chỉnh/tạo lại lời giải Quiz. Event cũ thiếu
+  snapshot hiển thị fallback rõ ràng, không tự nhận là một tác vụ mới.
 - Form câu hỏi quiz hỗ trợ `MULTIPLE_CHOICE`, `TRUE_FALSE`,
   `MULTI_STATEMENT_TRUE_FALSE`, `TEXT_INPUT`, mức độ, gợi ý và lời giải chi
   tiết. Multiple choice dùng danh sách phương án động:
@@ -829,6 +838,12 @@ Trong lesson detail `/admin/lessons/[lessonId]`:
   phát hành gần nhất của cùng bộ và không tạo mốc phát hành mới.
 - Modal Summary cho chọn tài liệu READY, cấu hình văn phong/độ dài/model/prompt và
   xem prompt + chi phí ước tính. Generate luôn dựng request mới nhất phía server.
+- Cùng nhóm cấu hình nội dung có hai numeric text field đặt cạnh nhau trên màn
+  rộng và xếp dọc trên mobile: `Số bài tập vận dụng` và
+  `Số bài tập ứng dụng thực tế`. Cả hai mặc định `2`, chỉ nhận số nguyên `1..10`,
+  validate realtime và được giữ lại khi mở modal sinh lại từ cấu hình gần nhất.
+  Đây là mục tiêu gửi AI; kết quả thiếu/thừa vẫn được render nếu cấu trúc bài hợp
+  lệ.
 - Modal Summary có checkbox `Dùng ảnh gốc sách giáo khoa`, mặc định bỏ chọn, kèm
   helper text `Giữ nguyên crop ảnh nguồn đã trích xuất và không dùng AI vẽ lại.
 Hình chưa có crop chính xác sẽ cần kiểm tra thủ công.` Checkbox chỉ xuất hiện
@@ -839,7 +854,11 @@ Hình chưa có crop chính xác sẽ cần kiểm tra thủ công.` Checkbox ch
   `Dùng ảnh gốc sách giáo khoa` đang được chọn và mặc định bỏ chọn. Bỏ checkbox
   cha phải reset checkbox con về `false`. Khi bật, helper text giải thích mọi crop
   SGK được giảm nhiễu/làm nét local trước khi lưu, không tăng số lượt gọi AI.
-- Summary content contract version 3 render `TEX_FIGURE` tại vị trí block. JSON
+- Summary content contract version 4 render `TEX_FIGURE` tại vị trí block. Khối
+  `example` dùng nhãn Ví dụ, icon play và tông xanh; khối `exercise` độc lập dùng
+  nhãn `Bài tập 1`, `Bài tập 2`, ... theo thứ tự, icon sổ-bút và tông cyan xanh
+  lam ngọc, không dùng sắc tím.
+  Không suy `exercise` từ heading và không có fallback cho dữ liệu cũ. JSON
   admin của mỗi reference hiển thị `figureOrigin=TEXTBOOK_SOURCE` nếu hình bám
   nguồn SGK hoặc `GENERATED_FROM_BRIEF` nếu hình được đề xuất/dựng thêm từ block.
   UI lấy giá trị backend-derived từ figure API; không suy nguồn từ caption hoặc
@@ -870,6 +889,21 @@ Hình chưa có crop chính xác sẽ cần kiểm tra thủ công.` Checkbox ch
 mã code`, `Tải ảnh lên` và `Xem ảnh sách giáo khoa` khi figure đích có reference
   SGK; nhiều figure bắt buộc chọn target. Action cuối và icon mở nhanh ở chính
   figure cùng mở một khung ảnh nguồn ngay trong block để đối chiếu với ảnh hiện tại.
+- Với block `example`/`exercise` chưa có figure, menu thay `Tạo mới bằng AI` bằng
+  `Tạo hình cho đề bài` và `Tạo hình cho lời giải`. Mỗi action mở modal có title,
+  mô tả và payload target tương ứng, nhưng giữ nguyên toàn bộ control model,
+  prompt/request preview, token/chi phí và pending/submit của luồng Quiz. Nếu slot
+  `0` đã có hình mang reference SGK, menu vẫn giữ `Tạo mới bằng AI` để vẽ lại hình
+  hiện tại và thêm `Tạo hình cho lời giải` ở slot `1`; action lời giải không dùng
+  ảnh/code hình đề. Với block không có hình đề từ SGK, hai action target tiếp tục
+  hiển thị sau khi một hoặc cả hai slot đã được sinh. Mỗi modal luôn có `Tạo mới
+lại`; `Chỉnh sửa hình hiện tại` chỉ xuất hiện khi đúng slot target có asset hiện
+  hành dạng `AI_TEX`, và bị ẩn khi slot chưa có hình, thiếu asset hoặc chỉ có raster.
+  Action lời giải disabled kèm lý do khi block chưa có lời giải chữ.
+- Renderer `example`/`exercise` đặt hình slot `0` trong phần đề bài và đặt
+  hình slot `1` ngay sau tiêu đề `Lời giải`, trước prose lời giải. Modal
+  `Toàn bộ hình minh họa` hiển nhãn `Ảnh N · Hình đề bài` hoặc
+  `Ảnh N · Hình lời giải` theo slot; figure bổ sung giữ nhãn riêng.
 - Toolbar của bốn block `knowledge`, `property`, `theorem`, `note` có icon
   `Chuyển đổi loại khối`. Click/tap mở menu ba type đích còn lại; icon và hover
   của từng lựa chọn dùng đúng màu chủ đạo của type đích (Kiến thức vàng, Tính
@@ -930,7 +964,8 @@ liệu`; modal có model cùng control capability-aware cho Temperature/Reasonin
   draft preview đã sanitize trước. Khi source đã thay đổi, `Áp dụng` vẫn bấm
   được; nếu chưa có draft hợp lệ thì UI tự chạy cùng bước compile/validator và
   chỉ promote revision khi kết quả là `DRAFT_READY`. Không có PDF, SyncTeX,
-  click-preview-to-source hoặc kéo-thả đối tượng SVG.
+  click-preview-to-source hoặc kéo-thả đối tượng SVG. `Biên dịch` chỉ cập nhật
+  preview và không đóng popover `Chỉnh nhanh` đang mở.
 - Editor source của Summary và Quiz có bộ `Chỉnh nhanh` dùng chung. Các phép biến
   đổi source là deterministic và giới hạn theo cú pháp: node nhãn phải khớp toàn
   bộ nội dung; nét phụ chỉ xóa command có option dashed/dotted; độ đậm chỉ sửa
@@ -948,8 +983,9 @@ liệu`; modal có model cùng control capability-aware cho Temperature/Reasonin
   của asset cũ không có marker.
 - Popover `Chỉnh nhanh` có section đầu `Nhãn và số đo (N)` dạng danh sách cuộn.
   Mỗi row dùng nhãn loại ngắn (`Nhãn`, `Số đo`, `Chú thích`, `Nhãn linh kiện`),
-  input chứa nguyên nội dung text có thể sửa an toàn, icon cài đặt và icon xóa có
-  tooltip/`aria-label` theo đúng row. Icon cài đặt nằm cạnh icon xóa; mặc định
+  input chứa nguyên nội dung text có thể sửa an toàn, icon áp dụng, icon cài đặt
+  và icon xóa có tooltip/`aria-label` theo đúng row. Icon áp dụng nằm trước icon
+  cài đặt, chỉ bật khi row có draft mới và chạy đúng một compile; mặc định
   row gọn và chỉ khi bấm mới xổ bên dưới input ba slider `Ngang (x)`/`Dọc (y)`
   (`-50pt–+50pt`, mốc `0`) và `Cỡ chữ` (`10%–200%`, mốc `100%`) của riêng row.
   Tại một thời điểm chỉ mở một row để giữ danh sách hai cột dễ quét. Cỡ chữ riêng
@@ -959,9 +995,50 @@ liệu`; modal có model cùng control capability-aware cho Temperature/Reasonin
 thể chỉnh nhanh`; nếu parser gặp text construct chưa hỗ trợ, panel báo số mục
   cần sửa trực tiếp trong mã và không tạo input giả. Input không compile ở từng
   keystroke: commit khi blur/Enter hoặc được flush trước khi bấm `Biên dịch`, với
-  guard chống double event/compile; Escape hoàn
+  guard chống double event/compile; single quoted `pic` label vẫn có slider khi
+  `pic text options` chứa font nền; chỉ nhiều quoted owner mới bị coi là mơ hồ. Escape hoàn
   nguyên row đang nhập. Trong lúc compile chỉ khóa row đang commit và các action
   làm đổi source; lỗi giữ input/source trước đó và đưa focus về row lỗi.
+  Row angle `pic` có thêm slider `Khoảng cách cung tới đỉnh` `4pt–50pt`; slider
+  đổi riêng bán kính nhóm cung của geometry đang chọn, không dịch text số đo hay
+  bất kỳ text slot khác.
+- Trước danh sách text slot, popover có card `Nhập góc nhanh` gồm `Tên góc`, `Số
+đo`, checkbox `Tự nối hai cạnh còn thiếu` mặc định bật và hai CTA `Thêm góc`/
+  `Bỏ góc`. Tên
+  góc nhận `ABD`, `∠ABD` hoặc `A-B-D`; helper cố định nói rõ điểm giữa là đỉnh,
+  không render dòng dự đoán/cảnh báo realtime dễ sai. Submit invalid vẫn bấm được để hiện
+  lỗi inline; pending mới khóa CTA. Thành công xóa hai ô nhập, tự compile preview
+  và dùng history/undo hiện có; source mơ hồ giữ nguyên và yêu cầu sửa code.
+  `Bỏ góc` không yêu cầu số đo và không hiện banner cảnh báo đỏ chỉ vì admin đang
+  nhập tên. Submit xóa toàn bộ `pic` cùng geometry kể cả viết đảo hai điểm ngoài,
+  đồng thời xóa nhãn độ dạng `node` rời khi ownership được xác định tường minh từ
+  named vertex/ba điểm; hai cạnh vẫn được giữ.
+  `Thêm góc` là upsert theo geometry không phân biệt thứ tự hai điểm ngoài: góc
+  chưa có thì thêm, góc đã có thì thay số đo và nhóm cung. Cùng số đo tái sử dụng
+  kiểu cung; số đo khác hoặc symbolic chưa chứng minh bằng nhau lấy kiểu khác.
+- Card `Chỉnh đoạn thẳng` đặt cạnh luồng nhập góc, gồm một input `Tên đoạn` nhận
+  `BD`/`B-D`, trạng thái `đang được nối` hoặc `chưa được nối`, nút `Nối` và `Bỏ
+nối`. Hai nút giữ handler thật, pending riêng, lỗi inline, auto preview và một
+  bước undo. Cạnh nối mới kế thừa độ dày phổ biến của path hình học hiện tại.
+  Không vô hiệu hóa nút chỉ vì input invalid; click phải hiện lỗi rõ.
+- Card `Thêm trung điểm` đặt sau công cụ đoạn thẳng, gồm input `Đoạn thẳng` nhận
+  `AB`/`A-B`, input `Tên trung điểm` và CTA `Thêm trung điểm`/`Xóa trung điểm`;
+  CTA xóa chỉ yêu cầu input đoạn thẳng, không bắt admin nhớ tên midpoint.
+  Submit `Thêm trung điểm` với tên mới trên đoạn đã có midpoint do tool quản lý
+  thực hiện ghi đè thay vì báo trùng hoặc tạo midpoint thứ hai. Không render dòng
+  preview/cảnh báo inline có thể nhấp nháy sai trong lúc source đang compile; lỗi
+  thật báo qua toast. Tên nhập thường được tự viết hoa; label mới kế thừa font-size
+  nhãn điểm hiện có, đặt lệch vuông góc đủ xa cạnh để không đè nét; marker dùng
+  glyph đủ dài để đọc được ở tỷ lệ preview. Thành công xóa draft, auto compile
+  preview và tạo một bước undo.
+- Card đặt tên tâm nằm sau công cụ midpoint. Checkbox `Thêm tên tâm đường tròn`
+  mặc định tắt; bật checkbox mới render input `Tên tâm` và CTA `Thêm tên tâm` bên
+  cạnh. Input tự viết hoa. Thành công đặt nhãn cạnh đúng tâm đường tròn đơn, kế
+  thừa font point label và không tạo thêm center dot; tên mới ghi đè block nhãn
+  tâm do tool quản lý.
+- Khi bấm thùng rác của text slot `Số đo` thuộc angle `pic`, UI xóa cả nhãn và
+  toàn bộ cung đồng tâm cùng geometry `X--V--Y`; cạnh/ray và các nhóm góc khác
+  vẫn giữ nguyên. Text slot đo góc dạng node rời không được suy diễn owner cung.
 - `Tạo mới bằng mã code` dùng lại editor/compile/error panel nhưng nạp snippet
   TikZ mới. Block chưa từng có hình hoặc đã xóa hình chỉ được gắn reference sau
   khi admin apply draft thành công; đóng modal/compile lỗi không tạo placeholder.

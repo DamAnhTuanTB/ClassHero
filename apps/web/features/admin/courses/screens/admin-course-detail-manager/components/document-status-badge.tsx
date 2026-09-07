@@ -42,7 +42,7 @@ export function DocumentStatusBadge({
     if (jobStatus === "RUNNING") {
       label = isCacheRun ? "Đang xử lý cache" : "Đang OCR mới";
     }
-    const p = typeof progress === "number" ? progress : 0;
+    const p = (typeof progress === "number" ? progress : 0).toFixed(1);
     label = `${label} (${p}%)`;
   }
 

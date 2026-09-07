@@ -84,10 +84,7 @@ export class AiService {
     assertEmbeddingInput(input);
 
     const embeddingConfig = this.getEmbeddingConfig();
-    if (
-      input.model !== undefined &&
-      input.model !== embeddingConfig.model
-    ) {
+    if (input.model !== undefined && input.model !== embeddingConfig.model) {
       throw new Error(
         `Embedding model override "${input.model}" does not match configured vector space "${embeddingConfig.model}".`,
       );
@@ -151,9 +148,12 @@ export class AiService {
     input: AiStructuredInput,
     schema: AiOutputSchema<TOutput>,
     providerName: AiProviderName = AiProviderName.OPENAI,
+    validationSchema: AiOutputSchema<TOutput> = schema,
   ): Promise<AiStructuredOutput<TOutput>> {
     const provider = this.getProvider(providerName);
-    return provider.generateStructured(input, schema);
+    return validationSchema === schema
+      ? provider.generateStructured(input, schema)
+      : provider.generateStructured(input, schema, validationSchema);
   }
 
   /**

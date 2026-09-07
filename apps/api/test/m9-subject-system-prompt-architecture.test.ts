@@ -294,6 +294,27 @@ describe("subject-owned AI system prompt architecture", () => {
     }
   });
 
+  it("keeps Phase 1 model review semantic while deterministic checks stay outside prompts", () => {
+    for (const subject of subjects) {
+      const snapshot = subject as QuizSubjectSnapshot;
+      const quiz = buildQuizSubjectSystemPrompt(snapshot);
+      const summary = buildLessonSummarySubjectSystemPrompt(subject);
+
+      expect(quiz).not.toContain("LATEX TRONG JSON");
+      expect(quiz).not.toContain("Rà mọi field hiển thị trước khi trả JSON");
+      expect(quiz).not.toContain("tự rà mọi field có LaTeX");
+      expect(quiz).toContain("KIỂM CHỨNG");
+      expect(quiz).toContain("kiểm tra độc lập");
+
+      expect(summary).toContain("Chỉ tự kiểm chứng tính đúng chuyên môn");
+      expect(summary).toContain("tính đúng chuyên môn");
+      expect(summary).toContain("độ khớp PDF/provenance");
+      expect(summary).toContain("Không chạy thêm vòng audit taxonomy/JSON shape");
+      expect(summary).toContain("không lặp checklist");
+      expect(summary).not.toContain("âm thầm kiểm tra taxonomy");
+    }
+  });
+
   it("declares and stabilizes standard notation in every learner-facing text prompt only", () => {
     const subjectSpecificRules = {
       MATH: ["công thức Toán", "đơn vị hoặc miền giá trị"],
@@ -397,7 +418,7 @@ describe("subject-owned AI system prompt architecture", () => {
       MATH: [
         "bảng biến thiên",
         "cung góc",
-        "mọi đường tròn hình học đều có đúng một marker tại tâm",
+        "Mọi đường tròn hình học phải có đúng một marker tại tâm",
         "nhãn trục, hàm số hoặc ô bảng",
       ],
       PHYSICS: [
@@ -618,9 +639,7 @@ describe("subject-owned AI system prompt architecture", () => {
     }
     for (const mode of ["QUESTION", "SOLUTION"] as const) {
       const prompt = buildQuizFigureRefinementSystemPrompt(math, mode);
-      expect(prompt).toContain(
-        "bắt buộc kiểm tra mọi đường tròn hình học đều có đúng một marker tại tâm",
-      );
+      expect(prompt).toContain("Mọi đường tròn hình học phải có đúng một marker tại tâm");
       expect(prompt).toContain("tâm chưa được authority đặt tên giữ marker không nhãn");
     }
 
@@ -649,6 +668,37 @@ describe("subject-owned AI system prompt architecture", () => {
       expect(buildStemFigureSystemPrompt(subject, "GENERATE_FROM_BLOCK")).not.toContain(
         "Mọi đường tròn hình học",
       );
+    }
+  });
+
+  it("runs one final semantic verification for authored Phase 2 figures", () => {
+    const semanticGate = "### KIỂM CHỨNG CHUYÊN MÔN CUỐI";
+    const countSemanticGates = (prompt: string) => prompt.split(semanticGate).length - 1;
+
+    for (const subject of subjects) {
+      const snapshot = subject as QuizSubjectSnapshot;
+      for (const mode of [
+        "REGENERATE_FROM_SOURCE",
+        "EDIT_CURRENT_SOURCE",
+        "GENERATE_FROM_BLOCK",
+        "GENERATE_SOLUTION_FROM_BLOCK",
+      ] as const) {
+        const prompt = buildStemFigureSystemPrompt(subject, mode);
+        expect(countSemanticGates(prompt)).toBe(1);
+        expect(prompt).not.toMatch(/trước khi trả (?:source|kết quả)/iu);
+        expect(prompt).not.toContain("tự kiểm source cuối");
+      }
+
+      expect(countSemanticGates(buildStemFigureSystemPrompt(subject, "REPAIR"))).toBe(0);
+
+      for (const mode of ["QUESTION", "SOLUTION"] as const) {
+        const authoredPrompt = buildQuizFigureSystemPrompt(snapshot, mode);
+        const refinementPrompt = buildQuizFigureRefinementSystemPrompt(snapshot, mode);
+        expect(countSemanticGates(authoredPrompt)).toBe(1);
+        expect(countSemanticGates(refinementPrompt)).toBe(1);
+        expect(authoredPrompt).not.toMatch(/trước khi trả (?:source|kết quả)/iu);
+        expect(refinementPrompt).not.toMatch(/trước khi trả (?:source|kết quả)/iu);
+      }
     }
   });
 
@@ -739,12 +789,19 @@ describe("subject-owned AI system prompt architecture", () => {
       expect(prompt).toContain("chia các góc thành từng nhóm quan hệ");
       expect(prompt).toContain("Các góc được khẳng định bằng nhau");
       expect(prompt).toContain("các góc được authority cho giá trị khác nhau");
-      expect(prompt).toContain("kiểu hoặc số cung khác nhau");
+      expect(prompt).toContain("hai biểu thức chứa biến khác nhau mặc định");
       expect(prompt).toContain(
-        "Chỉ thay `angle radius` của cùng một cung đơn không được tính là marker khác nhau",
+        "dùng số cung khác nhau theo thứ tự ổn định `1, 2, 3, ...`",
       );
-      expect(prompt).toContain("số cung đồng tâm hoặc kiểu nét nhìn thấy rõ");
-      expect(prompt).toContain("bán kính chỉ được điều chỉnh cục bộ để tránh va chạm");
+      expect(prompt).toContain(
+        "Chỉ thay `angle radius` của duy nhất một cung đơn không tạo thành marker group khác",
+      );
+      expect(prompt).toContain("Mọi cung đều phải là path `solid` độc lập");
+      expect(prompt).toContain("chênh lệch bán kính đúng `0.05cm`");
+      expect(prompt).toContain("có đầu phẳng `line cap=butt`");
+      expect(prompt).toContain("cấm dùng `double`, `dashed`, `densely dashed`, `dotted`");
+      expect(prompt).toContain("Nhóm hai cung phải là hai cung thật");
+      expect(prompt).toContain("nhóm ba cung phải là ba cung thật");
       expect(prompt).toContain("không tự thêm cung chỉ để phân nhóm");
       expect(prompt).toContain("chia các đoạn thành từng nhóm quan hệ bằng nhau");
       expect(prompt).toContain("`\\draw ... arc`");

@@ -1004,7 +1004,149 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
         length: "standard",
         targetWordCount: null,
       }),
-    ).toBe(8_000);
+    ).toBe(11_000);
+    expect(
+      resolveLessonSummaryOutputTokenFloor({
+        length: "standard",
+        targetWordCount: null,
+        standardExerciseCount: 4,
+        realWorldExerciseCount: 3,
+      }),
+    ).toBe(15_500);
+  });
+
+  it("locks provider exercise counts while tolerant backend parsing still maps mismatches", () => {
+    const output = buildMathProviderOutput({
+      title: "Phương trình đường thẳng",
+      displayHeading: "Vectơ chỉ phương",
+      theoryContent: "Vectơ chỉ phương song song với đường thẳng.",
+      illustrationProblem: "Xác định vectơ chỉ phương.",
+    });
+    output.applicationExercises.standardExercises.push(
+      textOnlyExample("STANDARD_EXERCISE"),
+    );
+    for (const subjectKey of ["MATH", "PHYSICS", "CHEMISTRY", "GENERAL"] as const) {
+      const candidate = subjectKey === "MATH" ? output : removeMathOnlyFields(output);
+      const schema = getLessonSummaryProviderTransportOutputSchema(
+        subjectKey,
+        "CONTEXTUAL",
+        12,
+        { standardExerciseCount: 3, realWorldExerciseCount: 2 },
+      );
+      const schemaJson = schema.toJSONSchema() as {
+        properties: {
+          applicationExercises: {
+            properties: {
+              standardExercises: { minItems: number; maxItems: number };
+              realWorldExercises: { minItems: number; maxItems: number };
+            };
+          };
+        };
+      };
+
+      expect(schema.safeParse(candidate).success).toBe(true);
+      expect(
+        schemaJson.properties.applicationExercises.properties.standardExercises,
+      ).toMatchObject({ minItems: 3, maxItems: 3 });
+      expect(
+        schemaJson.properties.applicationExercises.properties.realWorldExercises,
+      ).toMatchObject({ minItems: 2, maxItems: 2 });
+      const underCountCandidate = {
+        ...(candidate as Record<string, unknown>),
+        applicationExercises: {
+          ...((candidate as Record<string, unknown>).applicationExercises as Record<
+            string,
+            unknown
+          >),
+          standardExercises: (
+            (
+              (candidate as Record<string, unknown>).applicationExercises as Record<
+                string,
+                unknown
+              >
+            ).standardExercises as unknown[]
+          ).slice(0, 2),
+        },
+      };
+      const candidateApplicationExercises = (
+        candidate as {
+          applicationExercises: {
+            standardExercises: unknown[];
+            realWorldExercises: unknown[];
+          };
+        }
+      ).applicationExercises;
+      const overCountCandidate = {
+        ...(candidate as Record<string, unknown>),
+        applicationExercises: {
+          ...candidateApplicationExercises,
+          realWorldExercises: [
+            ...candidateApplicationExercises.realWorldExercises,
+            candidateApplicationExercises.realWorldExercises[0],
+          ],
+        },
+      };
+      const backendSchema = getLessonSummaryProviderTransportOutputSchema(
+        subjectKey,
+        "CONTEXTUAL",
+        12,
+      );
+      expect(schema.safeParse(underCountCandidate).success).toBe(false);
+      expect(schema.safeParse(overCountCandidate).success).toBe(false);
+      expect(backendSchema.safeParse(underCountCandidate).success).toBe(true);
+      expect(backendSchema.safeParse(overCountCandidate).success).toBe(true);
+    }
+
+    const mapped = mapLessonSummaryProviderOutput({
+      lessonId,
+      output,
+      packetPageCount: 1,
+      targetGrade: 12,
+      subjectKey: "MATH",
+    });
+    expect(mapped.content.sections.at(-1)?.blocks).toHaveLength(5);
+    expect(mapped.content.sections[0]?.blocks[1]?.type).toBe("example");
+    expect(mapped.content.sections.at(-1)?.blocks.map((block) => block.type)).toEqual([
+      "exercise",
+      "exercise",
+      "exercise",
+      "exercise",
+      "exercise",
+    ]);
+    expect(Object.values(mapped.phaseOneProviderPaths)).toEqual(
+      expect.arrayContaining([
+        "applicationExercises.standardExercises.2",
+        "applicationExercises.realWorldExercises.1",
+      ]),
+    );
+
+    const legacyApplicationExample = structuredClone(output) as unknown as {
+      applicationExercises: {
+        standardExercises: Array<Record<string, unknown>>;
+      };
+    };
+    legacyApplicationExample.applicationExercises.standardExercises[0]!.type = "example";
+    expect(
+      getLessonSummaryProviderTransportOutputSchema("MATH", "CONTEXTUAL", 12).safeParse(
+        legacyApplicationExample,
+      ).success,
+    ).toBe(false);
+
+    const withoutExercises = structuredClone(output);
+    withoutExercises.applicationExercises.standardExercises = [];
+    withoutExercises.applicationExercises.realWorldExercises = [];
+    const mappedWithoutExercises = mapLessonSummaryProviderOutput({
+      lessonId,
+      output: withoutExercises,
+      packetPageCount: 1,
+      targetGrade: 12,
+      subjectKey: "MATH",
+    });
+    expect(mappedWithoutExercises.content.sections).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ displayHeading: "Bài tập vận dụng" }),
+      ]),
+    );
   });
 
   it.each([
@@ -1144,10 +1286,16 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     expect(mapped.phaseOneBlocks["sections.0.blocks.0"]).toEqual(unit.theory);
     expect(mapped.phaseOneBlocks["sections.0.blocks.1"]).toEqual(unit.example);
     expect(mapped.phaseOneBlocks["sections.1.blocks.0"]).toEqual(
-      output.applicationExercises.standardExercise,
+      output.applicationExercises.standardExercises[0],
     );
     expect(mapped.phaseOneBlocks["sections.1.blocks.1"]).toEqual(
-      output.applicationExercises.realWorldExercise,
+      output.applicationExercises.standardExercises[1],
+    );
+    expect(mapped.phaseOneBlocks["sections.1.blocks.2"]).toEqual(
+      output.applicationExercises.realWorldExercises[0],
+    );
+    expect(mapped.phaseOneBlocks["sections.1.blocks.3"]).toEqual(
+      output.applicationExercises.realWorldExercises[1],
     );
   });
 
@@ -1184,13 +1332,62 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       },
     });
 
-    expect(result.success).toBe(true);
     if (!result.success) throw new Error(result.message);
+    expect(result.success).toBe(true);
     expect(result.mapped.content.sections[0]?.blocks[0]).toMatchObject({
       type: "knowledge",
       content: "Nội dung đã sửa trên raw JSON.",
     });
     expect(result.mapped.figures).toEqual([]);
+  });
+
+  it("accepts an admin GT/KL override even when the provider grade schema requires null", () => {
+    const output = buildMathProviderOutput({
+      title: "Phương trình đường thẳng",
+      displayHeading: "Vectơ chỉ phương",
+      theoryContent: "Nội dung ban đầu.",
+      illustrationProblem: "Chứng minh hai góc bằng nhau.",
+    });
+    const mapped = mapLessonSummaryProviderOutput({
+      lessonId,
+      output,
+      packetPageCount: 1,
+      targetGrade: 12,
+      subjectKey: "MATH",
+    });
+    const blocks = structuredClone(mapped.phaseOneBlocks);
+    const example = blocks["sections.0.blocks.1"] as Record<string, unknown>;
+    example.isGeometry = true;
+    example.geometryStatement = {
+      hypotheses: ["Tam giác $ABC$ cân tại $A$."],
+      conclusions: [String.raw`$\widehat{ABC}=\widehat{ACB}$.`],
+    };
+
+    const result = applyLessonSummaryPhaseOneBlockEdits({
+      lessonId,
+      blocks,
+      snapshot: {
+        type: "lesson_summary_phase_one_blocks",
+        version: 2,
+        providerOutput: output,
+        blocks: mapped.phaseOneBlocks,
+        providerPaths: mapped.phaseOneProviderPaths,
+        subjectKey: "MATH",
+        targetGrade: 12,
+        packetPageCount: 1,
+      },
+    });
+
+    if (!result.success) throw new Error(result.message);
+    expect(result.success).toBe(true);
+    expect(result.mapped.content.sections[0]?.blocks[1]).toMatchObject({
+      type: "example",
+      isGeometry: true,
+      geometryStatement: {
+        hypotheses: ["Tam giác $ABC$ cân tại $A$."],
+        conclusions: [String.raw`$\widehat{ABC}=\widehat{ACB}$.`],
+      },
+    });
   });
 
   it("persists a deleted block instead of rebuilding it from raw Phase 1", () => {
@@ -1362,12 +1559,14 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     expect(result.success).toBe(true);
     if (!result.success) throw new Error(result.message);
     expect(result.mapped.content.sections).toHaveLength(1);
-    expect(result.mapped.content.sections[0]?.blocks).toHaveLength(4);
+    expect(result.mapped.content.sections[0]?.blocks).toHaveLength(6);
     expect(Object.keys(result.snapshot.blocks)).toEqual([
       "sections.0.blocks.0",
       "sections.0.blocks.1",
       "sections.0.blocks.2",
       "sections.0.blocks.3",
+      "sections.0.blocks.4",
+      "sections.0.blocks.5",
     ]);
   });
 
@@ -1560,8 +1759,14 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
         },
       ],
       applicationExercises: {
-        standardExercise: textOnlyExample("STANDARD_EXERCISE"),
-        realWorldExercise: textOnlyExample("REAL_WORLD_EXERCISE"),
+        standardExercises: [
+          textOnlyExample("STANDARD_EXERCISE"),
+          textOnlyExample("STANDARD_EXERCISE"),
+        ],
+        realWorldExercises: [
+          textOnlyExample("REAL_WORLD_EXERCISE"),
+          textOnlyExample("REAL_WORLD_EXERCISE"),
+        ],
       },
     });
     const mapped = mapLessonSummaryProviderOutput({
@@ -1618,7 +1823,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
 
     const request = generateStructured.mock.calls[0]?.[1];
     expect(request.promptVersion).toBe(
-      "stem-figure-math-generate-from-block-v84-midpoint-marker-auto-repair",
+      "stem-figure-math-generate-from-block-v90-single-semantic-check",
     );
     expect(request.maxTokens).toBe(12_000);
     expect(request.systemPrompt).toContain("tự thiết kế một hình LuaLaTeX/TikZ mới");
@@ -1833,6 +2038,15 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
         },
       });
       brief.referenceImageMode = mode;
+      brief.blockContent = projectStemFigureBlock(
+        {
+          type: "example",
+          problem: "Vẽ hình minh họa.",
+          solution: "Dùng quan hệ đã cho để kiểm tra hình.",
+          answer: "Quan hệ đúng.",
+        },
+        { includeSolution: mode === "NONE" },
+      );
       if (mode === "SOURCE_CROP_ONLY") brief.figureOrigin = "TEXTBOOK_SOURCE";
       brief.referenceAssets = assets;
       brief.adminInstructions = adminInstructions;
@@ -1859,6 +2073,9 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
         blockContent: {
           type: "example",
           problem: "Vẽ hình minh họa.",
+          ...(mode === "NONE"
+            ? { solution: "Dùng quan hệ đã cho để kiểm tra hình." }
+            : {}),
         },
         reference: expectedReference,
         ...(currentLatexSource ? { currentLatexSource } : {}),
@@ -1925,7 +2142,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     >;
     expect(request.inputImages).toHaveLength(1);
     expect(request.promptVersion).toBe(
-      "stem-figure-math-edit-current-source-v83-midpoint-marker-auto-repair",
+      "stem-figure-math-edit-current-source-v90-single-semantic-check",
     );
     expect(providerBrief).toMatchObject({
       reference: {
@@ -1937,7 +2154,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     });
     expect(request.userPrompt).toContain("sửa tối thiểu currentLatexSource");
     expect(request.systemPrompt).toContain(
-      "ảnh reference là ảnh sách giáo khoa xác định hình đích cần đạt",
+      "ảnh reference, nếu có, là ảnh sách giáo khoa dùng để đối chiếu hình đích",
     );
     expect(request.systemPrompt).toContain("không viết lại toàn hình");
   });
@@ -2108,7 +2325,9 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
         "decorations.markings hoặc coordinate sloped",
       );
       expect(request.systemPrompt).toContain("co giãn x/y không đồng nhất");
-      expect(request.systemPrompt).toContain("bounding box nhãn không giao nhau");
+      expect(request.systemPrompt).toContain(
+        "nhãn không chồng nhau, không chạm nét và không bị cắt",
+      );
       expect(request.systemPrompt).toContain(
         "Cung góc và nhãn số đo là hai phần tử độc lập",
       );
@@ -2131,7 +2350,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
         );
         expect(request.systemPrompt).not.toContain("currentLatexSource");
         expect(request.promptVersion).toBe(
-          "stem-figure-math-regenerate-from-source-v83-midpoint-marker-auto-repair",
+          "stem-figure-math-regenerate-from-source-v90-single-semantic-check",
         );
       } else if (mode === "CURRENT_ONLY") {
         expect(request.systemPrompt).toContain(
@@ -2142,7 +2361,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
         );
         expect(request.systemPrompt).not.toContain("tự thiết kế một hình");
         expect(request.promptVersion).toBe(
-          "stem-figure-math-edit-current-source-v83-midpoint-marker-auto-repair",
+          "stem-figure-math-edit-current-source-v90-single-semantic-check",
         );
       } else {
         expect(request.systemPrompt).toContain(
@@ -2153,8 +2372,18 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
         );
         expect(request.systemPrompt).not.toContain("ảnh reference");
         expect(request.systemPrompt).not.toContain("currentLatexSource");
+        expect(request.systemPrompt).toContain(
+          "solution là nguồn có độ ưu tiên cao nhất",
+        );
+        expect(request.systemPrompt).toContain(
+          "dựa trên cả solution và problem, trong đó solution là nguồn ưu tiên cao hơn",
+        );
+        expect(request.systemPrompt).not.toContain("solution rồi problem");
+        expect(request.systemPrompt).toContain(
+          "không được yêu cầu, đọc, kế thừa hay phụ thuộc vào hình đề",
+        );
         expect(request.promptVersion).toBe(
-          "stem-figure-math-generate-from-block-v84-midpoint-marker-auto-repair",
+          "stem-figure-math-generate-solution-from-block-v90-single-semantic-check",
         );
       }
     },
@@ -2207,6 +2436,47 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     expect(chemistry).not.toContain("node `$(O)$`");
   });
 
+  it.each([
+    { key: "MATH", name: "Toán", slug: "toan", subjectRule: "điểm phụ, đường phụ" },
+    {
+      key: "PHYSICS",
+      name: "Vật lý",
+      slug: "vat-ly",
+      subjectRule: "vật, lực, vector, trạng thái",
+    },
+    {
+      key: "CHEMISTRY",
+      name: "Hóa học",
+      slug: "hoa-hoc",
+      subjectRule: "chất, liên kết, hạt, dụng cụ",
+    },
+    {
+      key: "GENERAL",
+      name: "Khoa học",
+      slug: "khoa-hoc",
+      subjectRule: "node, bước, vùng, connector",
+    },
+  ] as const)(
+    "keeps the Summary $key solution-figure prompt independent while matching Quiz solution authority",
+    ({ key, name, slug, subjectRule }) => {
+      const prompt = buildStemFigureSystemPrompt(
+        { key, name, slug },
+        "GENERATE_SOLUTION_FROM_BLOCK",
+      );
+      expect(prompt).toContain("solution là nguồn có độ ưu tiên cao nhất");
+      expect(prompt).toContain("problem chỉ bổ sung bối cảnh và dữ kiện ban đầu");
+      expect(prompt).toContain(
+        "dựa trên cả solution và problem, trong đó solution là nguồn ưu tiên cao hơn",
+      );
+      expect(prompt).not.toContain("solution rồi problem");
+      expect(prompt).toContain(
+        "không được yêu cầu, đọc, kế thừa hay phụ thuộc vào hình đề",
+      );
+      expect(prompt).toContain(subjectRule);
+      expect(prompt).not.toContain("adminInstructions");
+    },
+  );
+
   it("rejects an old generation brief before any provider call", () => {
     const oldBrief = {
       ...figureBrief({
@@ -2218,7 +2488,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     expect(stemFigureGenerationBriefSchema.safeParse(oldBrief).success).toBe(false);
   });
 
-  it("keeps only the owning block in a figure generation brief", () => {
+  it("keeps the owning example and its solution in a generated Phase 2 brief", () => {
     const output = stemFigureLessonContextSchema.parse({
       title: "Hai điểm xác định một đường thẳng",
       targetGrade: 6,
@@ -2239,6 +2509,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
             {
               type: "example",
               problem: "Vẽ đường thẳng đi qua A và B.",
+              solution: "Dựng đường thẳng duy nhất đi qua hai điểm A và B.",
               isGeometry: true,
               geometryStatement: { hypotheses: ["A và B phân biệt"] },
             },
@@ -2261,6 +2532,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     expect(brief.blockContent).toEqual({
       type: "example",
       problem: "Vẽ đường thẳng đi qua A và B.",
+      solution: "Dựng đường thẳng duy nhất đi qua hai điểm A và B.",
       isGeometry: true,
       geometryStatement: { hypotheses: ["A và B phân biệt"] },
     });
@@ -2271,6 +2543,265 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
         pairedTheory: output.sections[0]?.blocks[0],
       }).success,
     ).toBe(false);
+  });
+
+  it("keeps the textbook redraw brief problem-only for an example", () => {
+    const output = stemFigureLessonContextSchema.parse({
+      title: "Hai điểm xác định một đường thẳng",
+      targetGrade: 6,
+      sections: [
+        {
+          displayHeading: "Đường thẳng qua hai điểm",
+          sourceEvidence: {
+            kind: "CONTENT",
+            text: "Hai điểm phân biệt xác định một đường thẳng.",
+            packetPageNumbers: [1],
+          },
+          blocks: [
+            {
+              type: "example",
+              problem: "Vẽ đường thẳng đi qua A và B.",
+              solution: "Dựng đường thẳng duy nhất đi qua hai điểm A và B.",
+              answer: "Đường thẳng AB.",
+            },
+          ],
+        },
+      ],
+    });
+    const brief = buildStemFigureGenerationBrief({
+      output,
+      blockPath: "sections.0.blocks.0",
+      plan: {
+        figurePlanContractVersion: 3,
+        localId: "F001",
+        figureOrigin: "TEXTBOOK_SOURCE",
+        sourceReferences: [
+          {
+            packetPageNumber: 1,
+            printedPageLabel: "1",
+            figureLabel: "Hình 1",
+            sourceTarget: { scope: "WHOLE_FIGURE", locator: null },
+          },
+        ],
+      },
+      targetGrade: 6,
+      referenceImageMode: "SOURCE_CROP_ONLY",
+    });
+
+    expect(brief.blockContent).toEqual({
+      type: "example",
+      problem: "Vẽ đường thẳng đi qua A và B.",
+    });
+    expect(brief.blockContent).not.toHaveProperty("solution");
+    expect(brief.blockContent).not.toHaveProperty("answer");
+  });
+
+  it("keeps solution out of the default/source-safe exercise projection", () => {
+    expect(
+      projectStemFigureBlock({
+        type: "exercise",
+        problem: "Tính chiều cao của một cột cờ.",
+        solution: "Dùng hệ thức lượng.",
+        answer: "Cột cờ cao 8 m.",
+        isGeometry: false,
+      }),
+    ).toEqual({
+      type: "exercise",
+      problem: "Tính chiều cao của một cột cờ.",
+      isGeometry: false,
+    });
+  });
+
+  it("projects an exercise solution only for a no-source Phase 2 drawing", () => {
+    expect(
+      projectStemFigureBlock(
+        {
+          type: "exercise",
+          problem: "Tính chiều cao của một cột cờ.",
+          solution: "Dùng hệ thức lượng.",
+          answer: "Cột cờ cao 8 m.",
+          isGeometry: false,
+        },
+        { includeSolution: true },
+      ),
+    ).toEqual({
+      type: "exercise",
+      problem: "Tính chiều cao của một cột cờ.",
+      solution: "Dùng hệ thức lượng.",
+      isGeometry: false,
+    });
+  });
+
+  it("keeps a manually targeted Summary question figure problem-only", () => {
+    const output = stemFigureLessonContextSchema.parse({
+      title: "Bài toán hình học",
+      targetGrade: 8,
+      sections: [
+        {
+          displayHeading: "Ví dụ",
+          sourceEvidence: {
+            kind: "CONTENT",
+            text: "Bài toán hình học",
+            packetPageNumbers: [1],
+          },
+          blocks: [
+            {
+              type: "example",
+              problem: "Cho tam giác ABC vuông tại A.",
+              solution: "Dựng đường cao AH rồi áp dụng hệ thức lượng.",
+              answer: "Kết quả cần tìm.",
+            },
+          ],
+        },
+      ],
+    });
+
+    const brief = buildStemFigureGenerationBrief({
+      output,
+      blockPath: "sections.0.blocks.0",
+      plan: {
+        figurePlanContractVersion: 3,
+        localId: "F001",
+        figureOrigin: "GENERATED_FROM_BRIEF",
+        sourceReferences: [],
+      },
+      targetGrade: 8,
+      referenceImageMode: "NONE",
+      targetMode: "QUESTION",
+    });
+
+    expect(brief.targetMode).toBe("QUESTION");
+    expect(brief.blockContent).toEqual({
+      type: "example",
+      problem: "Cho tam giác ABC vuông tại A.",
+    });
+    expect(JSON.stringify(brief)).not.toContain("solution");
+    expect(JSON.stringify(brief)).not.toContain("answer");
+  });
+
+  it("keeps a manually targeted Summary solution figure solution-first", () => {
+    const output = stemFigureLessonContextSchema.parse({
+      title: "Bài toán hình học",
+      targetGrade: 8,
+      sections: [
+        {
+          displayHeading: "Bài tập",
+          sourceEvidence: {
+            kind: "CONTENT",
+            text: "Bài toán hình học",
+            packetPageNumbers: [1],
+          },
+          blocks: [
+            {
+              type: "exercise",
+              problem: "Cho tam giác ABC vuông tại A.",
+              solution: "Dựng đường cao AH rồi áp dụng hệ thức lượng.",
+              answer: "Kết quả cần tìm.",
+            },
+          ],
+        },
+      ],
+    });
+
+    const brief = buildStemFigureGenerationBrief({
+      output,
+      blockPath: "sections.0.blocks.0",
+      plan: {
+        figurePlanContractVersion: 3,
+        localId: "F002",
+        figureOrigin: "GENERATED_FROM_BRIEF",
+        sourceReferences: [],
+      },
+      targetGrade: 8,
+      referenceImageMode: "NONE",
+      targetMode: "SOLUTION",
+    });
+
+    expect(brief.targetMode).toBe("SOLUTION");
+    expect(brief.blockContent).toEqual({
+      type: "exercise",
+      problem: "Cho tam giác ABC vuông tại A.",
+      solution: "Dựng đường cao AH rồi áp dụng hệ thức lượng.",
+    });
+    expect(JSON.stringify(brief)).not.toContain("answer");
+  });
+
+  it("edits a targeted Summary solution source without requiring a textbook image", async () => {
+    const output = stemFigureLessonContextSchema.parse({
+      title: "Bài toán hình học",
+      targetGrade: 8,
+      sections: [
+        {
+          displayHeading: "Bài tập",
+          sourceEvidence: {
+            kind: "CONTENT",
+            text: "Bài toán hình học",
+            packetPageNumbers: [1],
+          },
+          blocks: [
+            {
+              type: "exercise",
+              problem: "Cho tam giác ABC vuông tại A.",
+              solution: "Dựng đường cao AH rồi áp dụng hệ thức lượng.",
+              answer: "Kết quả cần tìm.",
+            },
+          ],
+        },
+      ],
+    });
+    const brief = buildStemFigureGenerationBrief({
+      output,
+      blockPath: "sections.0.blocks.0",
+      plan: {
+        figurePlanContractVersion: 3,
+        localId: "F002",
+        figureOrigin: "GENERATED_FROM_BRIEF",
+        sourceReferences: [],
+      },
+      targetGrade: 8,
+      referenceImageMode: "CURRENT_ONLY",
+      targetMode: "SOLUTION",
+      currentLatexSource: validGemStyleFragment,
+      adminInstructions: "Dịch nhãn H ra xa cạnh BC.",
+    });
+
+    expect(brief).toMatchObject({
+      referenceImageMode: "CURRENT_ONLY",
+      targetMode: "SOLUTION",
+      currentLatexSource: validGemStyleFragment,
+      referenceAssets: [],
+      blockContent: {
+        type: "exercise",
+        problem: "Cho tam giác ABC vuông tại A.",
+        solution: "Dựng đường cao AH rồi áp dụng hệ thức lượng.",
+      },
+    });
+    expect(JSON.stringify(brief)).not.toContain("answer");
+
+    const generateStructured = vi.fn().mockResolvedValue({
+      data: { latexSource: validGemStyleFragment },
+    });
+    const service = new StemFigureRepairService(
+      { generateStructured } as never,
+      { get: vi.fn() } as never,
+    );
+    await service.createNew({
+      figureId: lessonId,
+      revisionId: chunkId,
+      aiGenerationId: null,
+      backgroundJobId: "00000000-0000-4000-8000-000000000003",
+      jobAttempt: 1,
+      subject: { key: "MATH", name: "Toán", slug: "toan" },
+      brief,
+      referenceImages: [],
+    });
+
+    const request = generateStructured.mock.calls[0]?.[1];
+    expect(request.promptVersion).toContain("edit-current-source");
+    expect(request.inputImages).toEqual([]);
+    expect(request.userPrompt).toContain("Không có ảnh reference");
+    expect(request.userPrompt).toContain("currentLatexSource");
+    expect(request.systemPrompt).toContain("ảnh reference, nếu có");
   });
 
   it("caps a same-label textbook figure at four usable crops in deterministic order", () => {
@@ -2330,6 +2861,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
         blockContent: {
           type: "example",
           problem: "Minh hoạ mặt phẳng trong Oxyz.",
+          solution: "Dựng mặt phẳng qua ba điểm không thẳng hàng.",
         },
       }),
     });
@@ -2340,7 +2872,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     );
     expect(request.systemPrompt).toContain("ưu tiên phép dựng TikZ đơn giản");
     expect(request.promptVersion).toBe(
-      "stem-figure-math-generate-from-block-v84-midpoint-marker-auto-repair",
+      "stem-figure-math-generate-solution-from-block-v90-single-semantic-check",
     );
   });
 
@@ -2529,6 +3061,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
         blockContent: {
           type: "example",
           problem: "Cho ba điểm không thẳng hàng.",
+          solution: "Dựng tam giác qua ba điểm đã cho.",
         },
       }),
     });
@@ -2539,7 +3072,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       "Chọn tập đối tượng và quan hệ tối thiểu nhưng đủ",
     );
     expect(request.promptVersion).toBe(
-      "stem-figure-math-generate-from-block-v84-midpoint-marker-auto-repair",
+      "stem-figure-math-generate-solution-from-block-v90-single-semantic-check",
     );
   });
 
@@ -2613,8 +3146,8 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     expect(previewStructuredRequest.mock.calls[0]?.[0]).toMatchObject({
       routeSnapshot: {
         model: "gpt-5.6-luna",
-        reasoningEffort: "medium",
-        maxOutputTokens: 12_000,
+        reasoningEffort: "xhigh",
+        maxOutputTokens: 20_000,
       },
     });
     expect(previewStructuredRequest.mock.calls[0]?.[1]).toMatchObject({
@@ -2626,8 +3159,8 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     expect(generateStructured.mock.calls[0]?.[0]).toMatchObject({
       routeSnapshot: {
         model: "gpt-5.6-luna",
-        reasoningEffort: "medium",
-        maxOutputTokens: 12_000,
+        reasoningEffort: "xhigh",
+        maxOutputTokens: 20_000,
       },
     });
     expect(generateStructured.mock.calls[0]?.[1]).toMatchObject({
@@ -3002,7 +3535,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     expect(request.systemPrompt).toContain("chỉ dựng hình con khớp sourceTarget");
   });
 
-  it("projects an example to problem-only provider context", async () => {
+  it("projects an example to solution-first provider context without answer", async () => {
     const generateStructured = vi.fn().mockResolvedValue({
       data: { latexSource: validGemStyleFragment },
     });
@@ -3018,29 +3551,82 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       backgroundJobId: "00000000-0000-4000-8000-000000000003",
       jobAttempt: 1,
       subject: { key: "MATH", name: "Toán", slug: "toan" },
-      brief: figureBrief({
-        blockPath: "sections.0.blocks.1",
-        blockContent: {
-          type: "example",
-          problem: "Tính khoảng cách từ M tới mặt phẳng P.",
-          solution: "Thay số vào công thức và rút gọn.",
-          answer: "Khoảng cách bằng 4.",
-        },
-      }),
+      brief: {
+        ...figureBrief({
+          blockPath: "sections.0.blocks.1",
+          blockContent: {
+            type: "example",
+            problem: "Tính khoảng cách từ M tới mặt phẳng P.",
+          },
+        }),
+        blockContent: projectStemFigureBlock(
+          {
+            type: "example",
+            problem: "Tính khoảng cách từ M tới mặt phẳng P.",
+            solution: "Thay số vào công thức và rút gọn.",
+            answer: "Khoảng cách bằng 4.",
+          },
+          { includeSolution: true },
+        ),
+      },
     });
 
     const request = generateStructured.mock.calls[0]?.[1];
     expect(request.userPrompt).toContain(
-      '"blockContent":{"type":"example","problem":"Tính khoảng cách từ M tới mặt phẳng P."}',
+      '"blockContent":{"type":"example","problem":"Tính khoảng cách từ M tới mặt phẳng P.","solution":"Thay số vào công thức và rút gọn."}',
     );
-    expect(request.userPrompt).not.toContain("solution");
     expect(request.userPrompt).not.toContain("answer");
+    expect(request.systemPrompt).toContain("solution là nguồn có độ ưu tiên cao nhất");
+    expect(request.systemPrompt).toContain("problem chỉ bổ sung bối cảnh");
+    expect(request.systemPrompt).not.toContain("solution rồi problem");
     expect(request.systemPrompt).toContain("ngôn ngữ minh họa sách giáo khoa");
     expect(request.systemPrompt).toContain(
       "Không chép nguyên đề bài, lý thuyết, phép tính trung gian hoặc kết luận lên hình",
     );
     expect(request.promptVersion).toBe(
-      "stem-figure-math-generate-from-block-v84-midpoint-marker-auto-repair",
+      "stem-figure-math-generate-solution-from-block-v90-single-semantic-check",
+    );
+    expect(request.inputImages).toEqual([]);
+  });
+
+  it("routes a manually targeted Summary question figure through problem-only mode", async () => {
+    const generateStructured = vi.fn().mockResolvedValue({
+      data: { latexSource: validGemStyleFragment },
+    });
+    const service = new StemFigureRepairService(
+      { generateStructured } as never,
+      { get: vi.fn() } as never,
+    );
+
+    await service.createNew({
+      figureId: lessonId,
+      revisionId: chunkId,
+      aiGenerationId: null,
+      backgroundJobId: "00000000-0000-4000-8000-000000000003",
+      jobAttempt: 1,
+      subject: { key: "MATH", name: "Toán", slug: "toan" },
+      brief: {
+        ...figureBrief({
+          blockPath: "sections.0.blocks.1",
+          blockContent: {
+            type: "example",
+            problem: "Cho tam giác ABC vuông tại A.",
+          },
+        }),
+        targetMode: "QUESTION",
+      },
+    });
+
+    const request = generateStructured.mock.calls[0]?.[1];
+    expect(request.promptVersion).toBe(
+      "stem-figure-math-generate-from-block-v90-single-semantic-check",
+    );
+    expect(request.userPrompt).toContain(
+      '"blockContent":{"type":"example","problem":"Cho tam giác ABC vuông tại A."}',
+    );
+    expect(request.userPrompt).not.toContain("solution");
+    expect(request.systemPrompt).not.toContain(
+      "solution là nguồn có độ ưu tiên cao nhất",
     );
     expect(request.inputImages).toEqual([]);
   });
@@ -3124,7 +3710,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       allowed: ["hình học", "isGeometry", "geometryStatement", "GT–KL"],
       forbidden: ["circuitikz", "chemfig", "mhchem"],
       heading: "# SYSTEM PROMPT SINH KIẾN THỨC MÔN TOÁN",
-      promptVersion: "lesson-summary-math-v34-no-orphan-intermediate-labels",
+      promptVersion: "lesson-summary-math-v41-lesson-core-exercise-diversity",
       forbiddenHeadings: [
         "SYSTEM PROMPT SINH KIẾN THỨC MÔN VẬT LÝ",
         "SYSTEM PROMPT SINH KIẾN THỨC MÔN HÓA HỌC",
@@ -3143,7 +3729,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
         "GT–KL",
       ],
       heading: "# SYSTEM PROMPT SINH KIẾN THỨC MÔN VẬT LÝ",
-      promptVersion: "lesson-summary-physics-v30-unambiguous-figure-ready-problem",
+      promptVersion: "lesson-summary-physics-v37-lesson-core-exercise-diversity",
       forbiddenHeadings: [
         "SYSTEM PROMPT SINH KIẾN THỨC MÔN TOÁN",
         "SYSTEM PROMPT SINH KIẾN THỨC MÔN HÓA HỌC",
@@ -3162,7 +3748,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
         "GT–KL",
       ],
       heading: "# SYSTEM PROMPT SINH KIẾN THỨC MÔN HÓA HỌC",
-      promptVersion: "lesson-summary-chemistry-v30-unambiguous-figure-ready-problem",
+      promptVersion: "lesson-summary-chemistry-v37-lesson-core-exercise-diversity",
       forbiddenHeadings: [
         "SYSTEM PROMPT SINH KIẾN THỨC MÔN TOÁN",
         "SYSTEM PROMPT SINH KIẾN THỨC MÔN VẬT LÝ",
@@ -3200,6 +3786,92 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
         expect(request.systemPrompt).not.toContain(value);
       }
       expect(request.metadata).toMatchObject({ subject });
+    },
+  );
+
+  it.each([
+    {
+      subject: { key: "MATH" as const, name: "Toán", slug: "toan" },
+      lessonTitle: "Phương trình bậc hai",
+      promptVersion: "lesson-summary-math-v41-lesson-core-exercise-diversity",
+    },
+    {
+      subject: { key: "MATH" as const, name: "Toán", slug: "toan" },
+      lessonTitle: "Tứ giác nội tiếp",
+      promptVersion: "lesson-summary-math-v41-lesson-core-exercise-diversity",
+    },
+    {
+      subject: { key: "PHYSICS" as const, name: "Vật lý", slug: "vat-ly" },
+      lessonTitle: "Công và công suất",
+      promptVersion: "lesson-summary-physics-v37-lesson-core-exercise-diversity",
+    },
+    {
+      subject: { key: "CHEMISTRY" as const, name: "Hóa học", slug: "hoa-hoc" },
+      lessonTitle: "Nồng độ dung dịch",
+      promptVersion: "lesson-summary-chemistry-v37-lesson-core-exercise-diversity",
+    },
+    {
+      subject: { key: "GENERAL" as const, name: "Môn khác", slug: "mon-khac" },
+      lessonTitle: "Bài học tổng quát",
+      promptVersion: "lesson-summary-general-v37-lesson-core-exercise-diversity",
+    },
+  ])(
+    "classifies real-world exercises and keeps AI-authored exercises diverse for $subject.name — $lessonTitle",
+    ({ subject, lessonTitle, promptVersion }) => {
+      const request = buildLessonSummaryStructuredInput({
+        lessonId,
+        lessonTitle,
+        targetGrade: 9,
+        subject,
+        documentIds: ["00000000-0000-4000-8000-000000000003"],
+        sourceHash: "a".repeat(64),
+        packet: testPacket,
+        configuration: {
+          style: "student_friendly",
+          styleInstructions: "",
+          length: "standard",
+          targetWordCount: null,
+          extraInstructions: "",
+        },
+      });
+
+      expect(request.systemPrompt).toContain(
+        "Với các bài `AI_AUTHORED` trong cùng một lượt, phải phân bổ trên các trọng tâm và dạng bài khác nhau của lesson",
+      );
+      expect(request.systemPrompt).toContain(
+        "bối cảnh tham gia trực tiếp vào dữ kiện hoặc mục tiêu cần giải quyết",
+      );
+      expect(request.systemPrompt).toContain(
+        "không trở thành bài ứng dụng thực tế chỉ vì có đơn vị, hình vẽ, tên vật thể hoặc thêm một câu dẫn đời sống",
+      );
+      expect(request.systemPrompt).toContain(
+        "không được lấy bài thường để bù vào `realWorldExercises[]`",
+      );
+      expect(request.systemPrompt).toContain(
+        "lời giải bắt buộc dùng ít nhất một kiến thức trọng tâm được trình bày trong theory section của lesson",
+      );
+      expect(request.systemPrompt).toContain(
+        "Nếu bỏ kiến thức trọng tâm của lesson mà bài vẫn giải được đầy đủ thì phải thay bài",
+      );
+      expect(request.systemPrompt).not.toContain(
+        "một bài có tình huống thực tế, vật thể, đơn vị, phương/hướng hoặc hình minh họa",
+      );
+      expect(request.systemPrompt).toContain(
+        "bỏ qua bối cảnh, vật thể, số liệu, đơn vị, ký hiệu và cách diễn đạt",
+      );
+      expect(request.systemPrompt).toContain(
+        "cùng kiến thức trọng tâm theo cùng chuỗi bước hoặc công thức chính thì là trùng dạng và phải thay một bài",
+      );
+      expect(request.systemPrompt).not.toContain(
+        "Chỉ lặp lại một trọng tâm khi số lượng yêu cầu lớn hơn số hướng bài hợp lệ",
+      );
+      expect(request.userPrompt).toContain(
+        "Mỗi bài phải bắt buộc dùng kiến thức trọng tâm của lesson",
+      );
+      expect(request.userPrompt).toContain(
+        "nếu bỏ bối cảnh và số liệu mà mạch giải chính vẫn giống nhau thì phải thay bài",
+      );
+      expect(request.promptVersion).toBe(promptVersion);
     },
   );
 
@@ -3347,6 +4019,75 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     expect(JSON.stringify(first.input[0])).toContain("prompt_cache_breakpoint");
     expect(JSON.stringify(first.input[0])).toContain("số đo lớn hơn là chiều dài");
     expect(first.input[1]).not.toEqual(second.input[1]);
+  });
+
+  it("partitions the provider schema cache by requested exercise counts", () => {
+    const buildProviderRequest = (
+      lessonTitle: string,
+      counts: { standardExerciseCount: number; realWorldExerciseCount: number },
+    ) => {
+      const request = buildLessonSummaryStructuredInput({
+        lessonId,
+        lessonTitle,
+        targetGrade: 7,
+        subject: { key: "MATH", name: "Toán", slug: "toan" },
+        documentIds: ["00000000-0000-4000-8000-000000000003"],
+        sourceHash: lessonTitle.repeat(4),
+        packet: testPacket,
+        configuration: {
+          style: "student_friendly",
+          styleInstructions: "",
+          length: "standard",
+          targetWordCount: null,
+          extraInstructions: "",
+          ...counts,
+          schemaReferenceStrategy: "ref_v2",
+          promptCacheKeyEnabled: true,
+          promptCacheRetention: "in_memory",
+        },
+      });
+      const structuredTextFormat = resolveAiStructuredTextFormat(
+        getLessonSummaryProviderTransportOutputSchema("MATH", "CONTEXTUAL", 7, counts),
+        request.outputName,
+        "ref_v2",
+      ).format;
+      return {
+        request,
+        providerRequest: buildOpenAiStructuredResponseRequest({
+          request,
+          model: "gpt-5.6",
+          structuredTextFormat,
+        }),
+      };
+    };
+    const first = buildProviderRequest("Bài A", {
+      standardExerciseCount: 3,
+      realWorldExerciseCount: 2,
+    });
+    const second = buildProviderRequest("Bài B", {
+      standardExerciseCount: 3,
+      realWorldExerciseCount: 2,
+    });
+    const differentCounts = buildProviderRequest("Bài C", {
+      standardExerciseCount: 2,
+      realWorldExerciseCount: 2,
+    });
+
+    expect(first.providerRequest.prompt_cache_key).toBe(
+      second.providerRequest.prompt_cache_key,
+    );
+    expect(first.providerRequest.input[0]).toEqual(second.providerRequest.input[0]);
+    expect(first.providerRequest.input[1]).not.toEqual(second.providerRequest.input[1]);
+    expect(first.request.userPrompt).toContain(
+      "tạo đúng 3 bài không thuộc dạng ứng dụng thực tế và đúng 2 bài ứng dụng thực tế",
+    );
+    expect(first.providerRequest.prompt_cache_key).not.toBe(
+      differentCounts.providerRequest.prompt_cache_key,
+    );
+    expect(first.providerRequest.input[0]).toEqual(
+      differentCounts.providerRequest.input[0],
+    );
+    expect(first.providerRequest.text).not.toEqual(differentCounts.providerRequest.text);
   });
 
   it("keeps every subject schema free of another subject's terminology", () => {
@@ -3726,8 +4467,11 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     expect(request.systemPrompt).not.toMatch(
       /Hình 5\.28|mặt trời|sơ đồ chuyển động|Ta thừa nhận định lí sau|\\widehat\{BAC\}|35\^\\circ/iu,
     );
-    expect(request.systemPrompt).toContain("luôn là ứng viên realWorldExercise phù hợp");
-    expect(request.systemPrompt).toContain("không được thay bài đó bằng một bài AI khác");
+    expect(request.systemPrompt).toContain(
+      "bối cảnh tham gia trực tiếp vào dữ kiện hoặc mục tiêu cần giải quyết",
+    );
+    expect(request.systemPrompt).toContain("type=exercise");
+    expect(request.systemPrompt).toContain("không được thay bài đó bằng bài AI khác");
     expect(request.systemPrompt).toContain("figures/sourceReferences bị bỏ mất");
     expect(request.systemPrompt).not.toContain("figure brief");
     expect(request.systemPrompt).not.toContain("brief hình");
@@ -3740,10 +4484,10 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     expect(request.systemPrompt).toContain("`\\iff`");
     expect(request.systemPrompt).toContain("`\\impliedby`");
     expect(request.promptVersion).toBe(
-      "lesson-summary-math-v34-no-orphan-intermediate-labels",
+      "lesson-summary-math-v41-lesson-core-exercise-diversity",
     );
     expect(request.schemaVersion).toBe(
-      "lesson-summary-pdf-packet-five-block-schema-v25-slim-provider-descriptions",
+      "lesson-summary-pdf-packet-six-block-schema-v29-exact-exercise-counts",
     );
   });
 
@@ -4275,6 +5019,16 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
         { generateStructured } as never,
         createConfig(),
       );
+      const routeSnapshot = {
+        feature: "SUMMARY",
+        version: 3,
+        model: "gpt-5.6-luna",
+        temperature: null,
+        reasoningEffort: "high",
+        maxOutputTokens: 20_000,
+        candidates: [],
+        hasConfiguration: true,
+      } as never;
       const diagnosticBatch = createStemFigureDiagnosticBatch({
         attemptId: "00000000-0000-4000-8000-000000000004",
         sourceVersion: 1,
@@ -4303,6 +5057,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
         latexSource: validLatex,
         diagnosticBatch,
         subject,
+        routeSnapshot,
         adminInstructions:
           "Giữ nguyên mọi quan hệ và nhãn do admin vừa đổi; chỉ sửa lỗi compiler.",
       });
@@ -4313,12 +5068,19 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
         promptVersion: string;
       };
       const serializedInput = `${request.systemPrompt}\n${request.userPrompt}`;
+      expect(generateStructured.mock.calls[0]?.[0]).toMatchObject({
+        routeSnapshot: {
+          model: "gpt-5.6-luna",
+          reasoningEffort: "high",
+          maxOutputTokens: 20_000,
+        },
+      });
       expect(serializedInput).toContain(allowed);
       expect(serializedInput).toContain(subject.name);
       expect(request.promptVersion).toBe(
         subject.key === "MATH"
-          ? "stem-figure-math-batch-repair-v32-midpoint-marker-auto-repair"
-          : `stem-figure-${subject.key.toLowerCase()}-batch-repair-v24-no-narrative-callouts`,
+          ? "stem-figure-math-batch-repair-v36-single-technical-pass"
+          : `stem-figure-${subject.key.toLowerCase()}-batch-repair-v25-single-technical-pass`,
       );
       expect(request.userPrompt).not.toContain("collectionComplete");
       expect(request.userPrompt).not.toContain('"column":null');
@@ -4640,7 +5402,7 @@ ${validLatex}`;
 
 function textOnlyExample(exampleKind: "STANDARD_EXERCISE" | "REAL_WORLD_EXERCISE") {
   return {
-    type: "example",
+    type: "exercise",
     exampleKind,
     problem: "Nêu một ví dụ.",
     solution: "Áp dụng định nghĩa.",
@@ -4707,10 +5469,26 @@ function buildMathProviderOutput(input: {
       },
     ],
     applicationExercises: {
-      standardExercise: textOnlyExample("STANDARD_EXERCISE"),
-      realWorldExercise: textOnlyExample("REAL_WORLD_EXERCISE"),
+      standardExercises: [
+        textOnlyExample("STANDARD_EXERCISE"),
+        textOnlyExample("STANDARD_EXERCISE"),
+      ],
+      realWorldExercises: [
+        textOnlyExample("REAL_WORLD_EXERCISE"),
+        textOnlyExample("REAL_WORLD_EXERCISE"),
+      ],
     },
   });
+}
+
+function removeMathOnlyFields(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(removeMathOnlyFields);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => key !== "isGeometry" && key !== "geometryStatement")
+      .map(([key, nested]) => [key, removeMathOnlyFields(nested)]),
+  );
 }
 
 function createConfig() {

@@ -1,3 +1,7 @@
+import type { ProviderUsageOperation } from "@learning-path/shared";
+
+export type { ProviderUsageOperation } from "@learning-path/shared";
+
 export type ProviderCategory = "AI_MODEL" | "OCR_SERVICE";
 export type AiFeature = "SUMMARY" | "QUIZ" | "FLASHCARD" | "TEST";
 export type AiModelPurpose = "TEXT" | "IMAGE";
@@ -157,6 +161,8 @@ export type UsageEvent = {
   provider: string;
   feature: AiFeature | null;
   purpose: AiModelPurpose | null;
+  operation: ProviderUsageOperation | null;
+  reasoningEffort: string | null;
   status: "RUNNING" | "SUCCEEDED" | "FAILED";
   cacheStatus: string | null;
   totalTokens: number;

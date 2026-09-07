@@ -39,6 +39,7 @@ export function AdminStemFigureBlockDetailsDialog({
           {
             kind: "TEX_FIGURE",
             figureId: figure.id,
+            figureIndex: figure.figureIndex,
             status: figure.status,
             altText: figure.altText,
             caption: figure.caption,

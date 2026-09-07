@@ -695,6 +695,7 @@ function QuizSetPanel({
   const isTest = assessmentKind === "test";
   const quizQuestionsQuery = useAdminQuizQuestions(
     activeSet.id,
+    lessonId,
     !isTest,
     isTest ? undefined : initialQuestions,
   );
@@ -2110,6 +2111,7 @@ function QuestionCard({
 
 function isQuestionNavigationShortcutTarget(target: EventTarget | null) {
   if (!(target instanceof Element)) return false;
+  if (target.closest("[data-quiz-question-shortcut]")) return false;
 
   return Boolean(
     target.closest(

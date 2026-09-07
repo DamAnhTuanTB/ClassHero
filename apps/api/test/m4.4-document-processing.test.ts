@@ -18,14 +18,68 @@ import type {
 import { DocumentProcessingProcessor } from "#api/workers/processors/document-processing.processor";
 import type { EmbeddingJobEnqueuer } from "#api/workers/services/embedding-job-enqueuer.service";
 import { parseMathpixImageFilename } from "#api/workers/services/image-extraction.service";
-import type { OcrArtifactBundle } from "#api/workers/services/mathpix-ocr.service";
+import {
+  inspectMathpixConversionReadiness,
+  validateMathpixArtifactBuffer,
+  type OcrArtifactBundle,
+} from "#api/workers/services/mathpix-ocr.service";
 import { buildOcrArtifactAudit } from "#api/workers/utils/ocr-artifact-audit";
+import { normalizeOcrPages } from "#api/workers/utils/ocr-artifact-normalizer";
 import { buildOcrImageManifest } from "#api/workers/utils/ocr-image-manifest";
 import { resolveOcrVisualReference } from "#api/workers/utils/ocr-visual-resolver";
 import {
   applyPrintedPageSequenceMapping,
   inferPrintedPageReference,
 } from "#api/workers/utils/ocr-printed-page";
+
+describe("M4.4 Mathpix conversion readiness", () => {
+  it("waits until every requested conversion is completed", () => {
+    expect(
+      inspectMathpixConversionReadiness({
+        status: "completed",
+        conversion_status: {
+          md: { status: "processing" },
+          "mmd.zip": { status: "completed" },
+          "html.zip": { status: "processing" },
+        },
+      }),
+    ).toEqual({ failedFormat: null, ready: false });
+
+    expect(
+      inspectMathpixConversionReadiness({
+        status: "completed",
+        conversion_status: {
+          md: { status: "completed" },
+          "mmd.zip": { status: "completed" },
+          "html.zip": { status: "completed" },
+        },
+      }),
+    ).toEqual({ failedFormat: null, ready: true });
+  });
+
+  it("reports failed conversions and rejects JSON cached as a ZIP", () => {
+    expect(
+      inspectMathpixConversionReadiness({
+        status: "completed",
+        conversion_status: {
+          md: { status: "completed" },
+          "mmd.zip": { status: "completed" },
+          "html.zip": { status: "error" },
+        },
+      }),
+    ).toEqual({ failedFormat: "html.zip", ready: false });
+
+    expect(() =>
+      validateMathpixArtifactBuffer(
+        "html.zip",
+        Buffer.from('{"status":"completed","conversion_status":{}}'),
+      ),
+    ).toThrow("invalid .html.zip conversion artifact");
+    expect(() =>
+      validateMathpixArtifactBuffer("html.zip", Buffer.from([0x50, 0x4b, 0x03, 0x04])),
+    ).not.toThrow();
+  });
+});
 
 describe("M4.4 document processing worker", () => {
   it("chunks source-document ranges with the lessonId from inputMeta", async () => {
@@ -629,6 +683,95 @@ describe("M4.4 OCR image manifest", () => {
 });
 
 describe("M4.4 printed page inference", () => {
+  it.each(["«Trang 16»", "«Trang 16 »", "“Trang 16”", "(Trang 16)"])(
+    "unwraps OCR page markers before reading %s",
+    (text) => {
+      expect(
+        inferPrintedPageReference({
+          pdfPageNumber: 16,
+          text,
+          lines: [
+            {
+              lineIndex: 0,
+              lineId: "page-info",
+              text,
+              type: "page_info",
+              confidence: 1,
+            },
+          ],
+        }),
+      ).toMatchObject({
+        printedPageNumber: 16,
+        printedPageLabel: "16",
+        source: "ocr_inferred",
+        warning: null,
+      });
+    },
+  );
+
+  it("uses Mathpix raw text when page_info text_display is empty", () => {
+    const pages = normalizeOcrPages(
+      {
+        linesJson: Buffer.from(
+          JSON.stringify({
+            pages: [
+              {
+                page: 1,
+                lines: [
+                  {
+                    id: "page-info",
+                    type: "page_info",
+                    text: "«Trang 16»",
+                    text_display: "",
+                    conversion_output: false,
+                    confidence: 1,
+                  },
+                ],
+              },
+            ],
+          }),
+        ),
+        md: Buffer.from(""),
+        mmd: Buffer.from(""),
+      },
+      1,
+    );
+
+    expect(pages[0]?.printedPage).toMatchObject({
+      pdfPageNumber: 1,
+      printedPageNumber: 16,
+      printedPageLabel: "16",
+      source: "ocr_inferred",
+      warning: null,
+    });
+  });
+
+  it.each(["C", "(D)", "IV"])(
+    "does not treat answer marker %s as a Roman printed page",
+    (text) => {
+      expect(
+        inferPrintedPageReference({
+          pdfPageNumber: 18,
+          text,
+          lines: [
+            {
+              lineIndex: 0,
+              lineId: "answer-marker",
+              text,
+              type: "text",
+              confidence: 1,
+            },
+          ],
+        }),
+      ).toMatchObject({
+        printedPageNumber: null,
+        printedPageLabel: null,
+        source: "unknown",
+        warning: "missing",
+      });
+    },
+  );
+
   it("infers printed page number from OCR boundary lines", () => {
     expect(
       inferPrintedPageReference({

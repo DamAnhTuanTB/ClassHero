@@ -10,6 +10,8 @@ import {
   formatCacheStatus,
   formatDateTime,
   formatNumber,
+  formatReasoningEffort,
+  formatUsageDuration,
   formatUsagePurpose,
   formatVnd,
   usageStatusLabels,
@@ -40,7 +42,7 @@ export function AdminAiGenerationUsageDialog({
         ariaLabel="Chi tiết các lượt gọi AI"
         isOpen={isOpen}
         onClose={onClose}
-        panelClassName="max-w-5xl"
+        panelClassName="max-w-7xl"
       >
         <header className="theme-dialog-header flex min-h-16 shrink-0 items-center px-4 py-3 pr-16 sm:px-5">
           <div>
@@ -48,7 +50,7 @@ export function AdminAiGenerationUsageDialog({
               Chi tiết các lượt gọi AI
             </h2>
             <p className="mt-0.5 text-sm font-medium text-[var(--theme-text-muted)]">
-              Các chi phí thực tế đã ghi nhận cho lần sinh nội dung này.
+              Tác vụ, thời gian phản hồi và chi phí thực tế của lần sinh này.
             </p>
           </div>
         </header>
@@ -85,13 +87,15 @@ export function AdminAiGenerationUsageDialog({
 
               <div className="overflow-hidden rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)]">
                 <div className="overflow-x-auto">
-                  <table className="min-w-full text-left text-sm">
+                  <table className="min-w-[1180px] text-left text-sm">
                     <thead className="bg-[var(--theme-surface-soft)] text-xs uppercase text-[var(--theme-text-muted)]">
                       <tr>
-                        <th className="px-4 py-3">Dịch vụ</th>
+                        <th className="px-4 py-3">Dịch vụ / loại tác vụ</th>
                         <th className="px-4 py-3">Mức sử dụng</th>
+                        <th className="px-4 py-3">Reasoning effort</th>
+                        <th className="px-4 py-3">Thời gian phản hồi</th>
                         <th className="px-4 py-3">Chi phí</th>
-                        <th className="px-4 py-3">Thời gian</th>
+                        <th className="px-4 py-3">Thời điểm</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--theme-border)]">
@@ -131,6 +135,12 @@ export function AdminAiGenerationUsageDialog({
                                 ? `${event.pages} trang`
                                 : `${formatNumber(event.totalTokens)} đơn vị AI`}
                             </td>
+                            <td className="whitespace-nowrap px-4 py-3 font-semibold text-[var(--theme-text)]">
+                              {formatReasoningEffort(event)}
+                            </td>
+                            <td className="whitespace-nowrap px-4 py-3 font-semibold text-[var(--theme-text)]">
+                              {formatUsageDuration(event.latencyMs, event.status)}
+                            </td>
                             <td className="whitespace-nowrap px-4 py-3 font-extrabold text-[var(--theme-text-strong)]">
                               {formatVnd(event.costVnd)}
                             </td>
@@ -142,7 +152,7 @@ export function AdminAiGenerationUsageDialog({
                       ) : (
                         <tr>
                           <td
-                            colSpan={4}
+                            colSpan={6}
                             className="px-4 py-10 text-center font-medium text-[var(--theme-text-muted)]"
                           >
                             Chưa có lượt sử dụng được ghi nhận.

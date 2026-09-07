@@ -35,6 +35,9 @@ Behavior:
 - Figure Summary/Quiz đã duyệt trả optional `displayScale` do backend hydrate từ
   source revision để giao diện co/phóng toàn bộ visual card nhất quán; response
   student không trả mã TikZ và asset cũ thiếu metadata giữ layout mặc định.
+- Figure Summary được hydrate thêm `figureIndex` từ logical figure. Với khối
+  `example`/`exercise`, client dùng slot `0` cho hình đề và slot `1` cho hình
+  lời giải; không suy vai trò từ vị trí phần tử trong mảng sau khi xóa hình.
 - File chỉ trả metadata an toàn và `accessUrl` public/signed có hạn; không trả
   `objectKey`, storage bucket hoặc thông tin nội bộ của provider.
 - Aggregate chỉ trả số câu/thẻ của set. Nội dung câu quiz đọc qua endpoint riêng;
@@ -197,9 +200,7 @@ Body định hướng:
   "idempotencyKey": "uuid",
   "timelineVersion": "string",
   "positionSeconds": 42,
-  "watchedIntervals": [
-    { "startSeconds": 30, "endSeconds": 42 }
-  ],
+  "watchedIntervals": [{ "startSeconds": 30, "endSeconds": 42 }],
   "reason": "HEARTBEAT"
 }
 ```

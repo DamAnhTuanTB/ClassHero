@@ -3,6 +3,8 @@
 import { EditorDialogShell } from "@/components/admin/courses/editor-dialog-shell";
 import type { UsageEvent } from "@/features/admin/ai-settings/types/provider-operations-types";
 import {
+  formatReasoningEffort,
+  formatUsageDuration,
   formatUsagePurpose,
   formatVnd,
 } from "@/features/admin/ai-settings/utils/provider-operations-formatters";
@@ -61,6 +63,31 @@ export function ProviderUsageEventDetailsDialog({
             <p className="mt-0.5 text-sm font-semibold text-[var(--theme-text-muted)]">
               {formatUsagePurpose(event)}
             </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            {[
+              {
+                label: "Thời gian phản hồi",
+                value: formatUsageDuration(event.latencyMs, event.status),
+              },
+              {
+                label: "Reasoning effort",
+                value: formatReasoningEffort(event),
+              },
+            ].map((item) => (
+              <div
+                key={item.label}
+                className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-3"
+              >
+                <p className="text-xs font-semibold uppercase text-[var(--theme-text-muted)]">
+                  {item.label}
+                </p>
+                <p className="mt-1 font-extrabold text-[var(--theme-text-strong)]">
+                  {item.value}
+                </p>
+              </div>
+            ))}
           </div>
 
           <div>

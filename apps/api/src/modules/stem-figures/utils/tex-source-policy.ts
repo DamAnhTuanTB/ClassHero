@@ -193,12 +193,20 @@ export function autoRepairStemFigureLatexSource(input: {
   source: string;
   subjectKey: LessonSummarySubjectKey;
   mode:
-    "REGENERATE_FROM_SOURCE" | "EDIT_CURRENT_SOURCE" | "GENERATE_FROM_BLOCK" | "REPAIR";
+    | "REGENERATE_FROM_SOURCE"
+    | "EDIT_CURRENT_SOURCE"
+    | "GENERATE_FROM_BLOCK"
+    | "GENERATE_SOLUTION_FROM_BLOCK"
+    | "REPAIR";
   authorityText: string;
 }) {
   const localHeader = autoRepairTikzLocalHeaderPlacement(input.source);
   const narrative = autoRepairTikzNarrativeCallouts(localHeader.source);
-  if (input.subjectKey !== "MATH" || input.mode !== "GENERATE_FROM_BLOCK") {
+  if (
+    input.subjectKey !== "MATH" ||
+    (input.mode !== "GENERATE_FROM_BLOCK" &&
+      input.mode !== "GENERATE_SOLUTION_FROM_BLOCK")
+  ) {
     return {
       source: narrative.source,
       changes: [...localHeader.changes, ...narrative.changes],

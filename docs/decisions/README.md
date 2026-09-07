@@ -70,3 +70,4 @@ Hệ quả tốt/xấu/cần lưu ý.
 | `ADR-0022-subject-isolated-ai-system-prompts.md` | Accepted   | Tách system prompt Toán/Lý/Hóa trong Sinh kiến thức và Quiz; chỉ chia sẻ contract kỹ thuật trung lập         |
 | `ADR-0023-phase-specific-ai-model-routing.md`    | Accepted   | Tách route model TEXT/IMAGE theo từng Summary/Quiz/Flashcard/Test và snapshot độc lập theo phase             |
 | `ADR-0024-independent-quiz-solution-figure.md`   | Accepted   | Phase 1 chỉ có hai boolean; hình đề và hình lời giải độc lập, SOLUTION dựng mới từ solution > problem       |
+| `ADR-0025-independent-summary-solution-figure.md` | Accepted  | Summary Ví dụ/Bài tập không ảnh nguồn bám invariant Quiz SOLUTION nhưng giữ runtime/prompt độc lập          |

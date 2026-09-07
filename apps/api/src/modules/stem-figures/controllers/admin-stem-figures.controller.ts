@@ -28,6 +28,7 @@ import {
 } from "#api/modules/stem-figures/dto/stem-figure-revision.dto";
 import {
   CreateNewStemFigureAiDto,
+  CreateStemFigureForBlockAiDto,
   EnsureStemFigureForBlockDto,
   RetryStemFigureDto,
   StemFigureMutationGuardDto,
@@ -61,6 +62,26 @@ export class AdminStemFiguresController {
     @Body() dto: EnsureStemFigureForBlockDto,
   ) {
     return this.figures.ensureForBlock(lessonId, user.id, dto);
+  }
+
+  @Post("blocks/create-new-ai")
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({ summary: "Create and enqueue a new AI figure for an empty block" })
+  createNewAiForBlock(
+    @Param("lessonId") lessonId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateStemFigureForBlockAiDto,
+  ) {
+    return this.figures.createNewAiForBlock(lessonId, user.id, dto);
+  }
+
+  @Post("blocks/create-new-ai/preview")
+  @ApiOperation({ summary: "Preview a new block figure without creating it" })
+  previewCreateNewAiForBlock(
+    @Param("lessonId") lessonId: string,
+    @Body() dto: CreateStemFigureForBlockAiDto,
+  ) {
+    return this.figures.previewCreateNewAiForBlock(lessonId, dto);
   }
 
   @Get()

@@ -21,7 +21,7 @@ const MATH_QUIZ_FIGURE_SPATIAL_LABEL_POLICY = [
   "- Cỡ chữ mặc định chỉ là baseline, không phải hằng số bắt buộc cho mọi text node. Với mọi nhãn chữ Toán học trên canvas như tên điểm, biểu thức góc, số đo, nhãn trục, hàm số hoặc ô bảng, sau khi chọn đúng coordinate/anchor/`pos`/phân giác phải ước lượng bounding box theo độ dài và độ phức tạp thật. Nếu nhãn dài vẫn chạm hoặc che cạnh, tia, cung, marker hay nhãn khác, giảm cỡ cục bộ theo từng bước bằng `font=\\small` rồi `font=\\footnotesize`; chỉ dùng `\\scriptsize` trong trường hợp đặc biệt mà kết quả vẫn đọc rõ. Không thu nhỏ nhãn ngắn để chữa một anchor sai và không co toàn bộ figure chỉ vì một nhãn dài.",
   "- Sau khi giảm cỡ, bắt buộc đặt lại anchor/`pos`/offset theo bounding box mới để nhãn vẫn gần sát đúng điểm, cạnh, cung hoặc đối tượng sở hữu; cấm giữ nguyên khoảng hở cũ làm nhãn trôi vào vùng trắng. Các nhãn cùng vai trò phải dùng cấp chữ nhất quán. Counterexample: tên điểm ngắn bị vướng phải đổi anchor hoặc phía đặt thay vì thu nhỏ; biểu thức dài đã neo đúng nhưng thiếu vùng trống mới là trường hợp cần giảm cỡ cục bộ.",
   "- Khi yêu cầu sửa tối thiểu, chỉ đổi nhãn trong phạm vi cần thiết; lượt được phép dựng lại hoặc tinh chỉnh toàn diện vẫn phải giữ đúng dữ kiện và authority chuyên môn.",
-  "- Trừ khi ảnh nguồn hoặc authority thể hiện rõ một leader line hay quy ước khác cần bảo toàn, trước khi trả source phải tự kiểm từng nhãn: điểm, path hoặc cung tương thích gần bounding box nhãn nhất phải là đúng đối tượng sở hữu và người xem phải nhận ra liên thuộc ngay. Nếu chưa đạt, sửa anchor hoặc vị trí; không dùng một offset tuyệt đối cho mọi hình.",
+  "- Trừ khi ảnh nguồn hoặc authority khóa một leader line hay quy ước khác, điểm, path hoặc cung tương thích gần bounding box nhãn nhất phải là đúng đối tượng sở hữu; sửa anchor hoặc vị trí khi liên thuộc chưa rõ và không dùng một offset tuyệt đối cho mọi hình.",
   "- Với vạch đánh dấu các đoạn bằng nhau, trước hết phải chia các đoạn thành từng nhóm quan hệ bằng nhau theo nguồn có thẩm quyền của đúng mode. Các đoạn trong cùng một nhóm dùng đúng cùng kiểu và số vạch; hai nhóm độc lập phải dùng kiểu hoặc số vạch khác nhau, trừ khi authority khẳng định chúng thuộc cùng một nhóm. Không gộp hai nhóm chỉ vì mỗi nhóm đều phát sinh từ quan hệ trung điểm. Counterexample: nếu authority khẳng định mọi đoạn đang xét cùng bằng nhau thì chúng được dùng chung một marker group.",
   "- Khi authority nói `M` là trung điểm của `AB`, hai marker bằng nhau phải nằm bên trong hai nửa đoạn `AM` và `MB`; nếu decorate trên toàn `AB` thì dùng hai vị trí tương đơng `.25` và `.75`, tuyệt đối không chồng cụm vạch tại `.5` lên chính điểm/tên `M`. Mỗi glyph marker chỉ dùng tối đa hai nét gọn; khi cần phân biệt nhiều nhóm, kết hợp một/hai nét với hướng nghiêng hoặc kiểu nét khác nhau thay vì bó 3–5 vạch dày đặc. Counterexample: marker của hai đoạn bằng nhau độc lập không có điểm trung gian vẫn được đặt tại midpoint của từng đoạn sở hữu.",
   "- Vạch chia trục/hệ trục, marker điểm dựng và marker đầu mút mở-đóng không phải vạch đánh dấu đoạn bằng nhau nên không được phân nhóm theo quy tắc này.",
@@ -30,9 +30,9 @@ const MATH_QUIZ_FIGURE_SPATIAL_LABEL_POLICY = [
 const MATH_QUIZ_ANGLE_MARKER_POLICY = [
   "### CHIỀU QUÉT VÀ NHÓM CUNG GÓC",
   "- Trong TikZ, `angle=X--V--Y` luôn quét ngược chiều kim đồng hồ từ tia `VX` đến tia `VY` trong hệ tọa độ có trục y hướng lên; góc cực `0, 90, 180, 270` cũng tăng ngược chiều kim đồng hồ. Phải dựa trên tọa độ cuối thực tế, không dựa vào tên điểm, thứ tự chữ cái hoặc comment.",
-  "- Với đa giác có các đỉnh liên tiếp theo chiều kim đồng hồ, góc trong tại `V` dùng `angle=Prev--V--Next`; nếu các đỉnh đi ngược chiều kim đồng hồ thì bắt buộc dùng `angle=Next--V--Prev`. Với đa giác lồi, cung góc trong phải nằm hoàn toàn phía trong và có độ quét nhỏ hơn `180°`; chỉ vẽ góc ngoài hoặc góc phản khi authority yêu cầu rõ. Trước khi trả source, tính lại chiều đa giác và độ quét của từng `\\pic` trên chính tọa độ cuối.",
-  "- Với cung đánh dấu góc, trước hết chia các góc thành từng nhóm quan hệ theo authority. Các góc được khẳng định bằng nhau dùng cùng kiểu và số cung; hai nhóm độc lập hoặc các góc được authority cho giá trị khác nhau phải dùng kiểu hoặc số cung khác nhau. Chỉ thay `angle radius` của cùng một cung đơn không được tính là marker khác nhau, vì bán kính chỉ là vị trí cung; hãy phân biệt bằng số cung đồng tâm hoặc kiểu nét nhìn thấy rõ. Trong cùng một nhóm, số cung và kiểu nét phải giống hệt nhau; bán kính chỉ được điều chỉnh cục bộ để tránh va chạm, không mang nghĩa phân nhóm. Không dùng chung một marker làm người xem hiểu nhầm các góc khác nhau là bằng nhau. Counterexample: mọi góc được authority khẳng định cùng bằng nhau dùng chung một marker group; góc không được authority cho phép đánh dấu thì không tự thêm cung chỉ để phân nhóm.",
-  "- Khi tạo mới cung có số đo, ưu tiên `\\pic` với ba coordinate tia có tên để có thể kiểm tra đỉnh, hai tia và marker group. Nếu dùng `\\draw ... arc` thủ công, độ quét literal phải bằng đúng số đo authority và kiểu nét/số cung vẫn phải tuân thủ phân nhóm. Hai góc khác số đo cùng chung một đỉnh vẫn là hai nhóm khác nhau, không được dùng hai cung đơn nét liền giống nhau.",
+  "- Với đa giác có các đỉnh liên tiếp theo chiều kim đồng hồ, góc trong tại `V` dùng `angle=Prev--V--Next`; nếu các đỉnh đi ngược chiều kim đồng hồ thì bắt buộc dùng `angle=Next--V--Prev`. Với đa giác lồi, cung góc trong phải nằm hoàn toàn phía trong và có độ quét nhỏ hơn `180°`; chỉ vẽ góc ngoài hoặc góc phản khi authority yêu cầu rõ. Chiều đa giác và độ quét của từng `\\pic` phải đúng trên chính tọa độ cuối.",
+  "- Với cung đánh dấu góc, trước hết chia các góc thành từng nhóm quan hệ theo authority. Các góc được khẳng định bằng nhau hoặc có cùng biểu thức số đo sau chuẩn hóa dùng cùng số cung; hai nhóm độc lập, các góc được authority cho giá trị khác nhau hoặc hai biểu thức chứa biến khác nhau mặc định dùng số cung khác nhau theo thứ tự ổn định `1, 2, 3, ...`. Mọi cung đều phải là path `solid` độc lập, đồng tâm, có chênh lệch bán kính đúng `0.05cm` (hoặc đơn vị tương đương) và có đầu phẳng `line cap=butt`; cấm dùng `double`, `dashed`, `densely dashed`, `dotted` hoặc biến thể nét đứt/chấm để tạo hay phân biệt marker góc. Nhóm hai cung phải là hai cung thật, không phải một path `double`; nhóm ba cung phải là ba cung thật. Chỉ thay `angle radius` của duy nhất một cung đơn không tạo thành marker group khác; bán kính khác nhau chỉ có nghĩa khi chúng tạo đủ số cung đồng tâm của cùng nhóm. Counterexample: mọi góc được authority khẳng định cùng bằng nhau dùng chung số cung; góc không được authority cho phép đánh dấu thì không tự thêm cung chỉ để phân nhóm.",
+  "- Khi tạo mới cung có số đo, ưu tiên nhiều `\\pic` độc lập với cùng ba coordinate tia có tên và các `angle radius` tăng đều để tạo marker group. Chỉ `\\pic` ngoài cùng mang nhãn góc để không lặp chữ. Nếu dùng nhiều `\\draw ... arc` thủ công, từng cung phải là nét liền riêng, có độ quét literal bằng đúng số đo authority và bán kính tăng đều. Hai góc khác số đo cùng chung một đỉnh vẫn là hai nhóm khác nhau, không được dùng cùng số cung.",
 ].join("\n");
 
 const MATH_QUIZ_VISUAL_COMPLETENESS_POLICY = [
@@ -51,7 +51,7 @@ const MATH_QUIZ_VISUAL_COMPLETENESS_POLICY = [
 
 const MATH_QUIZ_FIGURE_FINAL_GEOMETRY_GATE = [
   "### CỔNG CUỐI VỀ HÌNH HỌC VÀ KHẢ NĂNG ĐỌC",
-  "- Với đa giác đơn, các đỉnh trong path phải theo đúng thứ tự liên tiếp trên biên và không tạo cạnh cắt nhau; khi được tự chọn tọa độ, dùng thứ tự chiều kim đồng hồ. Khi đó góc trong tại đỉnh `V` phải dùng `angle=Prev--V--Next`; chỉ đảo quy ước khi authority thật sự yêu cầu góc ngoài hoặc góc phản. Ngay trước khi trả source, kiểm tra lại trên chính tọa độ cuối chứ không tin tên coordinate hoặc comment: thế điểm vào phương trình đường/đường tròn, dùng tích vô hướng cho vuông góc và tính lại khoảng cách hoặc số đo được gắn marker. Sau đó kiểm tra toàn canvas để bounding box của từng nhãn không cắt nét, marker, giao điểm hoặc nhãn không thuộc owner. Nếu sai hoặc vướng, sửa phép dựng, thứ tự biên/tia, `pos`, phía pháp tuyến hoặc anchor rồi tính và kiểm lại, không chỉ đổi con số hiển thị.",
+  "- Với đa giác đơn, các đỉnh trong path phải theo đúng thứ tự liên tiếp trên biên và không tạo cạnh cắt nhau; khi được tự chọn tọa độ, dùng thứ tự chiều kim đồng hồ. Góc trong tại đỉnh `V` dùng `angle=Prev--V--Next`; chỉ đảo khi authority yêu cầu góc ngoài hoặc góc phản. Trên tọa độ cuối, điểm phải thỏa phương trình đường/đường tròn, tích vô hướng phải khớp quan hệ vuông góc, khoảng cách/số đo phải khớp marker và bounding box nhãn không được cắt nét, marker, giao điểm hay nhãn khác. Khi lệch, sửa phép dựng, thứ tự biên/tia, `pos`, phía pháp tuyến hoặc anchor, không chỉ đổi con số hiển thị.",
 ].join("\n");
 
 type MathQuizVisualCompletenessMode = "QUESTION" | "SOLUTION";
@@ -60,7 +60,18 @@ function resolveMathQuizVisualCompletenessMode(mode: MathQuizVisualCompletenessM
   if (mode === "QUESTION") {
     return "- Móng hình trung tính luôn bắt buộc và không bị coi là lộ đáp án. Cổng chống lộ đáp án chỉ cấm annotation hoặc điểm nhấn tiết lộ kết luận; nếu phải bỏ một nhãn tọa độ nhạy cảm thì vẫn giữ marker, tick và đường dóng nền.";
   }
-  return "- Với hình lời giải, áp dụng checklist cho một hình hoàn chỉnh mới dựa trực tiếp vào solution rồi problem; không dùng hay kế thừa hình đề.";
+  return "- Với hình lời giải, áp dụng checklist cho một hình hoàn chỉnh mới dựa trực tiếp trên cả solution và problem, trong đó solution là nguồn ưu tiên cao hơn; không dùng hay kế thừa hình đề.";
+}
+
+function resolveMathQuizFinalSemanticCheck(mode: MathQuizVisualCompletenessMode) {
+  const authority =
+    mode === "QUESTION"
+      ? "problem và whitelist dữ kiện trực tiếp"
+      : "solution rồi đến problem";
+  return [
+    "### KIỂM CHỨNG CHUYÊN MÔN CUỐI",
+    `- Chỉ đối chiếu một lượt source cuối với ${authority}: mọi giá trị và quan hệ phải khớp phép dựng; nhãn đúng owner và không va chạm; cung góc đúng miền; dấu vuông và marker bằng nhau phải nằm đúng đối tượng. Sửa phép dựng, anchor hoặc vị trí nếu còn lệch.`,
+  ].join("\n");
 }
 
 const MATH_QUIZ_QUESTION_FIGURE_SYSTEM_PROMPT = [
@@ -85,7 +96,7 @@ const MATH_QUIZ_QUESTION_FIGURE_SYSTEM_PROMPT = [
   "- Nhãn trên cạnh, đoạn hoặc cung chỉ ghi giá trị/biểu thức và đơn vị như `3 cm`, `x + 1`, `r`; không lặp tên thành `AB = 3 cm`. Tên điểm và số đo là các nhãn riêng. Không viết câu hoặc phương trình quan hệ giữa các đối tượng đã đặt tên trực tiếp trên canvas; dùng phép dựng hoặc marker Toán chuẩn được phép.",
   "- Mọi đường tròn hình học được render trên canvas, gồm đường tròn trong cấu hình Hình học và đường tròn trên hệ tọa độ/đồ thị, bắt buộc có đúng một điểm đánh dấu đặt tại chính tâm hình học. Đây là quy ước hiển thị bắt buộc, kể cả khi tâm không tham gia lời giải hoặc problem chưa đặt tên tâm; marker không nhãn không biến tâm thành một dữ kiện được đặt tên. Ký hiệu `$(O)$` chỉ là cách gọi đường tròn trong văn bản đề, không phải nhãn canvas. Nếu authority đã đặt tên tâm thì gắn đúng một nhãn đó vào marker; nếu chưa đặt tên thì chỉ vẽ marker và cấm tự phát minh nhãn `$O$` hay tên khác. Với mode=EDIT_CURRENT, phải bổ sung marker còn thiếu, xóa node `$(O)$` dư và hợp nhất mọi marker/nhãn tâm trùng. Các đường tròn đồng tâm dùng chung một marker tại cùng coordinate. Lệnh TikZ `circle` chỉ dùng làm chấm điểm, node, đầu mút hoặc marker trang trí không phải đường tròn hình học và không kích hoạt quy tắc này.",
   "- Mọi nhãn độ dài, bán kính hoặc đường kính phải neo vào đúng cạnh, đoạn hoặc cung sở hữu, không được đặt bằng tọa độ rời khiến nhãn trôi trong vùng trắng. Với cạnh/đoạn thẳng, ưu tiên gắn node trực tiếp trên chính path bằng `node[midway, ...]` hoặc `node[pos=..., ...]`; có thể dùng `sloped` khi chữ xoay theo đoạn vẫn dễ đọc. Nếu giữ chữ nằm ngang, coordinate của node vẫn phải nội suy từ hai đầu mút của đúng đoạn sở hữu. Khoảng hở theo pháp tuyến chỉ vừa đủ tách bounding box chữ khỏi nét và phải giữ liên thuộc thị giác rõ ràng; cấm đẩy nhãn ra xa đến mức gần cạnh, đường hoặc cung khác hơn đối tượng sở hữu.",
-  "- Midpoint trống là vị trí hợp lệ nhưng không bắt buộc. Nếu midpoint hoặc vị trí ưu tiên đã có tên điểm, marker, nét hay nhãn khác, xử lý theo đúng thứ tự: trượt node dọc chính đối tượng bằng `pos`, đổi phía pháp tuyến, rồi điều chỉnh khoảng hở nhỏ. Chỉ khi không còn vị trí sát đối tượng mà không va chạm mới đặt nhãn xa hơn và bắt buộc dùng leader line mảnh nối rõ tới đúng đối tượng; tuyệt đối không để nhãn đứng tự do. Trước khi trả source, tự kiểm từng nhãn đo: path gần kề và hướng đặt phải làm người xem nhận ra ngay đúng đối tượng sở hữu.",
+  "- Midpoint trống là vị trí hợp lệ nhưng không bắt buộc. Nếu midpoint hoặc vị trí ưu tiên đã có tên điểm, marker, nét hay nhãn khác, xử lý theo đúng thứ tự: trượt node dọc chính đối tượng bằng `pos`, đổi phía pháp tuyến, rồi điều chỉnh khoảng hở nhỏ. Chỉ khi không còn vị trí sát đối tượng mà không va chạm mới đặt nhãn xa hơn và bắt buộc dùng leader line mảnh nối rõ tới đúng đối tượng; tuyệt đối không để nhãn đứng tự do. Path gần kề và hướng đặt của từng nhãn đo phải giúp nhận ra ngay đúng đối tượng sở hữu.",
   "- Đồ thị/hệ trục/đường số/miền nghiệm phải đúng trục, chiều, nhãn, đơn vị hoặc tỉ lệ; chỉ vẽ đường, điểm, giao, biên và tiệm cận có trong nguồn dữ kiện, không tự thêm giá trị.",
   "- Bảng biến thiên/xét dấu/dữ liệu/biểu đồ phải giữ đúng hàng, cột, mốc, nhãn, dấu, mũi tên, giá trị và đơn vị; căn thoáng, không tự thêm ô.",
   "",
@@ -101,9 +112,9 @@ const MATH_QUIZ_QUESTION_FIGURE_SYSTEM_PROMPT = [
   "- Nếu mode=EDIT_CURRENT, trước hết xóa mọi nét/annotation cũ không truy được về whitelist của problem, sau đó mới sửa tối thiểu theo adminInstructions và trả toàn bộ source hợp lệ. Nếu mode=REGENERATE, dựng lại chỉ từ problem.",
   "- Hình phải đúng chuyên môn: mọi đối tượng, quan hệ, ký hiệu và chú thích mang nghĩa phải nhất quán với problem, gắn đúng đối tượng và không tạo ra cách hiểu sai hoặc mơ hồ.",
   "- Bắt buộc dựng trước, chú thích sau; cấm chọn hình tùy ý rồi gắn số đo. Mọi giá trị nhìn thấy phải đúng với tọa độ/phép dựng.",
-  "- Trước khi trả latexSource, tự kiểm source cuối: đối chiếu từng giá trị, quan hệ và ký hiệu nhìn thấy với phép dựng cùng problem. Nếu lệch, sửa phép dựng thay vì chỉ sửa nhãn. Tự kiểm nội bộ, không trả thêm field/báo cáo.",
+  "- Mọi giá trị, quan hệ và ký hiệu nhìn thấy phải khớp phép dựng cùng problem; nếu lệch phải sửa phép dựng thay vì chỉ sửa nhãn.",
   "- Chỉ dùng tập đối tượng và quan hệ tối thiểu đủ cho thông điệp thị giác; cấm phát minh dữ kiện hoặc chi tiết không giúp hiểu câu hỏi.",
-  "- Trước khi trả kết quả, đối chiếu lại từng nét mang nghĩa với whitelist của problem. Xóa mọi chi tiết không có căn cứ trực tiếp, kể cả chi tiết đúng về toán học nhưng thuộc mạch suy luận. Cấm thiếu/thừa nét, nối/gắn nhãn sai hoặc đổi quan hệ. Bố cục thoáng, ít màu; ký hiệu quan hệ độc lập không chồng, chạm hoặc tụ sát; không cắt nhãn.",
+  "- Mọi nét mang nghĩa phải có căn cứ trực tiếp trong whitelist của problem; xóa chi tiết chỉ thuộc mạch suy luận. Cấm thiếu/thừa nét, nối hoặc gắn nhãn sai, đổi quan hệ, để ký hiệu chồng/chạm/tụ sát hay cắt nhãn.",
   "- Hình rõ trên nền trắng; cấm sao chép ảnh sách giáo khoa.",
 ].join("\n");
 
@@ -129,7 +140,7 @@ const MATH_QUIZ_SOLUTION_FIGURE_SYSTEM_PROMPT = [
   "- Nhãn trên cạnh, đoạn hoặc cung chỉ ghi giá trị/biểu thức và đơn vị như `3 cm`, `x + 1`, `r`; không lặp tên thành `AB = 3 cm`. Tên điểm và số đo là các nhãn riêng. Không viết câu hoặc phương trình quan hệ giữa các đối tượng đã đặt tên trực tiếp trên canvas; dùng phép dựng hoặc marker Toán chuẩn được phép.",
   "- Mọi đường tròn hình học được render trên canvas, gồm đường tròn trong cấu hình Hình học và đường tròn trên hệ tọa độ/đồ thị, bắt buộc có đúng một điểm đánh dấu đặt tại chính tâm hình học. Marker tâm là quy ước hiển thị bắt buộc kể cả khi tâm không tham gia lời giải hoặc authority chưa đặt tên; khi chưa có tên thì giữ marker không nhãn và cấm tự phát minh `$O$` hay tên khác. Ký hiệu `$(O)$` chỉ là cách gọi đường tròn trong văn bản bên ngoài canvas, không phải nhãn canvas. Khi vẽ lại hoặc chỉnh source hiện tại, phải bổ sung marker còn thiếu, xóa node `$(O)$` dư và hợp nhất mọi marker/nhãn tâm trùng; nếu authority đã đặt tên thì giữ đúng một nhãn đó gắn với marker. Các đường tròn đồng tâm dùng chung một marker. Lệnh TikZ `circle` chỉ dùng làm chấm điểm, node, đầu mút hoặc marker trang trí không phải đường tròn hình học và không kích hoạt quy tắc này.",
   "- Mọi nhãn độ dài, bán kính hoặc đường kính phải neo vào đúng cạnh, đoạn hoặc cung sở hữu, không được đặt bằng tọa độ rời khiến nhãn trôi trong vùng trắng. Với cạnh/đoạn thẳng, ưu tiên gắn node trực tiếp trên chính path bằng `node[midway, ...]` hoặc `node[pos=..., ...]`; có thể dùng `sloped` khi chữ xoay theo đoạn vẫn dễ đọc. Nếu giữ chữ nằm ngang, coordinate của node vẫn phải nội suy từ hai đầu mút của đúng đoạn sở hữu. Khoảng hở theo pháp tuyến chỉ vừa đủ tách bounding box chữ khỏi nét và phải giữ liên thuộc thị giác rõ ràng; cấm đẩy nhãn ra xa đến mức gần cạnh, đường hoặc cung khác hơn đối tượng sở hữu.",
-  "- Midpoint trống là vị trí hợp lệ nhưng không bắt buộc. Nếu midpoint hoặc vị trí ưu tiên đã có tên điểm, marker, nét hay nhãn khác, xử lý theo đúng thứ tự: trượt node dọc chính đối tượng bằng `pos`, đổi phía pháp tuyến, rồi điều chỉnh khoảng hở nhỏ. Chỉ khi không còn vị trí sát đối tượng mà không va chạm mới đặt nhãn xa hơn và bắt buộc dùng leader line mảnh nối rõ tới đúng đối tượng; tuyệt đối không để nhãn đứng tự do. Trước khi trả source, tự kiểm từng nhãn đo: path gần kề và hướng đặt phải làm người xem nhận ra ngay đúng đối tượng sở hữu.",
+  "- Midpoint trống là vị trí hợp lệ nhưng không bắt buộc. Nếu midpoint hoặc vị trí ưu tiên đã có tên điểm, marker, nét hay nhãn khác, xử lý theo đúng thứ tự: trượt node dọc chính đối tượng bằng `pos`, đổi phía pháp tuyến, rồi điều chỉnh khoảng hở nhỏ. Chỉ khi không còn vị trí sát đối tượng mà không va chạm mới đặt nhãn xa hơn và bắt buộc dùng leader line mảnh nối rõ tới đúng đối tượng; tuyệt đối không để nhãn đứng tự do. Path gần kề và hướng đặt của từng nhãn đo phải giúp nhận ra ngay đúng đối tượng sở hữu.",
   "- Đồ thị/hệ trục/đường số/miền nghiệm phải đúng trục, chiều, nhãn, đơn vị hoặc tỉ lệ; chỉ vẽ đường, điểm, giao, biên và tiệm cận có trong nguồn dữ kiện, không tự thêm giá trị.",
   "- Bảng biến thiên/xét dấu/dữ liệu/biểu đồ phải giữ đúng hàng, cột, mốc, nhãn, dấu, mũi tên, giá trị và đơn vị; căn thoáng, không tự thêm ô.",
   "",
@@ -138,10 +149,10 @@ const MATH_QUIZ_SOLUTION_FIGURE_SYSTEM_PROMPT = [
   "- latexSource phải là một figure snippet hoàn chỉnh có đúng một root tikzpicture hoặc circuitikz; cấm documentclass, usepackage và document wrapper.",
   "- solution là nguồn có độ ưu tiên cao nhất; problem bổ sung cấu hình và dữ kiện ban đầu. Khi hai field khác nhau, bám solution cho các điểm phụ, đường dựng và quan hệ của mạch giải; không tự phát minh dữ kiện ngoài cả hai field.",
   "- Hình lời giải hoàn toàn độc lập với hình đề. Phải dựng một source hoàn chỉnh mới từ solution và problem; không yêu cầu, đọc, kế thừa hay chèn vào source hình đề.",
-  "- Nếu aiMode=EDIT_CURRENT, sửa currentSolutionLatexSource theo adminInstructions nhưng vẫn đối chiếu lại toàn bộ với solution rồi problem. Nếu aiMode=REGENERATE, dựng mới toàn bộ từ solution và problem.",
+  "- Nếu aiMode=EDIT_CURRENT, sửa currentSolutionLatexSource theo adminInstructions nhưng source cuối vẫn phải nhất quán với cả solution và problem theo quan hệ ưu tiên nêu trên. Nếu aiMode=REGENERATE, dựng mới toàn bộ từ solution và problem.",
   "- adminInstructions chỉ chỉnh cách thể hiện; cấm thêm dữ kiện, đổi lời giải hoặc ghi đè policy hình.",
   "- Mô hình phải đúng chuyên môn bằng chính phép dựng; mọi quan hệ, số đo, nhãn và ký hiệu phải nhất quán, gắn đúng đối tượng và không tạo cách hiểu sai hoặc mơ hồ.",
-  "- Chỉ dùng tập đối tượng và quan hệ tối thiểu đủ để theo dõi mạch giải. Trước khi trả kết quả, tự đối chiếu toàn bộ hình với solution rồi problem; cấm thiếu/thừa nét, nối sai, gắn sai nhãn hoặc thể hiện sai quan hệ.",
+  "- Chỉ dùng tập đối tượng và quan hệ tối thiểu đủ để theo dõi mạch giải; cấm thiếu/thừa nét, nối sai, gắn sai nhãn hoặc thể hiện quan hệ trái với solution và problem.",
   "- Không dùng ảnh, file, URL, raw SVG, shell escape, input/include hoặc directlua.",
 ].join("\n");
 
@@ -158,6 +169,7 @@ function resolveSubjectName(
     MATH_QUIZ_VISUAL_COMPLETENESS_POLICY,
     resolveMathQuizVisualCompletenessMode(mode),
     MATH_QUIZ_FIGURE_FINAL_GEOMETRY_GATE,
+    resolveMathQuizFinalSemanticCheck(mode),
   ]
     .join("\n\n")
     .replaceAll("__SUBJECT_NAME__", subject.name);
@@ -205,21 +217,20 @@ const MATH_QUIZ_REFINEMENT_SYSTEM_PROMPT = [
   "- Mọi số đo nhìn thấy phải đúng với tọa độ cuối. Với TikZ angle=X--V--Y, kiểm tra đúng miền quét từ tia VX đến VY; cung góc, dấu vuông góc và vạch bằng nhau phải neo đúng đối tượng, đúng hướng và không bị méo.",
   "- Với vạch đánh dấu các đoạn bằng nhau, phải chia các đoạn thành từng nhóm quan hệ bằng nhau từ authority trước khi nhìn candidate. Các đoạn cùng nhóm dùng cùng kiểu và số vạch; các nhóm độc lập dùng marker khác nhau, trừ khi authority khẳng định chúng cùng một nhóm. Không gộp hai nhóm chỉ vì mỗi nhóm đều phát sinh từ quan hệ trung điểm. Counterexample: mọi đoạn được authority khẳng định cùng bằng nhau được dùng chung marker group. Vạch chia trục/hệ trục, marker điểm dựng và marker đầu mút mở-đóng không thuộc quy tắc này.",
   "- Trong refinement, marker của quan hệ `M` là trung điểm `AB` phải là một cặp gọn nằm trong `AM` và `MB` (hoặc tại `.25`/`.75` trên toàn `AB`), không được bó 2–5 vạch tại `.5` chồng lên điểm/tên `M`; mỗi glyph tối đa hai nét. Cung của hai góc có số đo khác nhau, kể cả cùng đỉnh, phải khác marker group; ưu tiên `\\pic` tia có tên, còn `\\draw ... arc` thủ công phải có độ quét literal khớp authority.",
-  "- Tên điểm, nhãn độ dài, marker và nét phải tách nhau, không chồng, chạm, bị cắt hoặc bị đẩy sang đối tượng khác làm sai liên thuộc. Mọi nhãn độ dài, bán kính hoặc đường kính phải neo vào đúng path sở hữu bằng node trên path hoặc coordinate nội suy từ đúng hai đầu mút; khoảng hở pháp tuyến chỉ vừa đủ tách chữ khỏi nét. Khi va chạm, trượt dọc path bằng `pos`, đổi phía rồi mới tăng nhẹ khoảng hở; nếu buộc phải đặt xa thì dùng leader line, cấm để nhãn trôi tự do trong vùng trắng. Trước khi trả source tinh chỉnh, bắt buộc kiểm tra mọi đường tròn hình học đều có đúng một marker tại tâm; tâm chưa được authority đặt tên giữ marker không nhãn, còn `$(O)$` không bao giờ là nhãn canvas. Lệnh `circle` dùng làm chấm điểm/node/marker không phải đường tròn hình học.",
+  "- Tên điểm, nhãn độ dài, marker và nét phải tách nhau, không chồng, chạm, bị cắt hoặc bị đẩy sang đối tượng khác làm sai liên thuộc. Mọi nhãn độ dài, bán kính hoặc đường kính phải neo vào đúng path sở hữu bằng node trên path hoặc coordinate nội suy từ đúng hai đầu mút; khoảng hở pháp tuyến chỉ vừa đủ tách chữ khỏi nét. Khi va chạm, trượt dọc path bằng `pos`, đổi phía rồi mới tăng nhẹ khoảng hở; nếu buộc phải đặt xa thì dùng leader line, cấm để nhãn trôi tự do trong vùng trắng. Mọi đường tròn hình học phải có đúng một marker tại tâm; tâm chưa được authority đặt tên giữ marker không nhãn, còn `$(O)$` không bao giờ là nhãn canvas. Lệnh `circle` dùng làm chấm điểm/node/marker không phải đường tròn hình học.",
   "- Đồ thị, hệ trục, đường số, miền nghiệm, bảng biến thiên, bảng xét dấu, bảng dữ liệu và biểu đồ phải đúng trục, mốc, hàng/cột, dấu, chiều, giá trị và đơn vị được nêu.",
   "- Không dùng marker mũi tên/chevron hoặc câu chữ trên canvas để khẳng định hai đường song song; mũi tên chỉ mang nghĩa trục, tia, vector hoặc luồng biến đổi khi authority yêu cầu.",
   "- Chỉ giữ các đối tượng và nét cần thiết theo authority; được tổ chức lại tọa độ, anchor, tỉ lệ, bố cục hoặc dựng lại toàn bộ source khi candidate sai, vô lý hay gây hiểu nhầm.",
   "",
   "### ĐÁNH GIÁ MỞ",
   "- Danh sách lỗi trên chỉ là ví dụ, không phải danh sách đóng. Nếu hình sai Toán học, thiếu/thừa dữ kiện, sai topology, vô lý, mơ hồ hoặc khó đọc thì bắt buộc sửa theo authority; tuyệt đối không phát minh dữ kiện.",
-  "- Trước khi trả kết quả, tự đối chiếu toàn bộ source cuối với figurePlan và ảnh candidate. Giữ phần đang đúng khi hợp lý nhưng không ưu tiên bảo toàn source hơn tính đúng.",
 ];
 
 function resolveMathRefinementAuthority(mode: "QUESTION" | "SOLUTION") {
   if (mode === "QUESTION") {
     return "hình đề; problem trong figurePlan là nguồn dữ kiện duy nhất";
   }
-  return "hình lời giải độc lập; solution là nguồn ưu tiên cao nhất, sau đó mới đến problem";
+  return "hình lời giải độc lập; dùng cả solution và problem, trong đó solution là nguồn ưu tiên cao nhất";
 }
 
 function resolveMathRefinementInputReferences(_mode: "QUESTION" | "SOLUTION") {

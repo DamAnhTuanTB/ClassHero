@@ -1,6 +1,6 @@
 "use client";
 
-import { AI_REASONING_EFFORT_LEVELS, isAiReasoningEffort } from "@learning-path/shared";
+import { isAiReasoningEffort } from "@learning-path/shared";
 import { Bot, Eye, EyeOff, Loader2, Pencil, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { OptionField } from "@/components/common/forms/option-field";
 import { TextareaField } from "@/components/common/forms/textarea-field";
 import { TextField } from "@/components/common/forms/text-field";
+import { buildAiReasoningEffortOptions } from "@/lib/ai-reasoning-effort";
 import { StemFigureMathText } from "@/components/common/content/stem-figure";
 import { AdminAiJsonInputViewer } from "@/features/admin/ai-generation/components/admin-ai-json-input-viewer";
 import { AdminAiPromptContentPreview } from "@/features/admin/ai-generation/components/admin-ai-prompt-content-preview";
@@ -860,24 +861,7 @@ function buildReasoningOptions(
       }
     | undefined,
 ) {
-  const labels: Record<string, string> = {
-    none: "Không (None)",
-    low: "Thấp (Low)",
-    medium: "Trung bình (Medium)",
-    high: "Cao (High)",
-    xhigh: "Rất cao (Extra High)",
-  };
-  const levels = (model?.capabilities?.reasoningEffortLevels ?? [])
-    .filter(isAiReasoningEffort)
-    .sort(
-      (left, right) =>
-        AI_REASONING_EFFORT_LEVELS.indexOf(left) -
-        AI_REASONING_EFFORT_LEVELS.indexOf(right),
-    );
-  return [
-    { value: "", label: "Mặc định của model" },
-    ...levels.map((level) => ({ value: level, label: labels[level] ?? level })),
-  ];
+  return buildAiReasoningEffortOptions(model?.capabilities?.reasoningEffortLevels);
 }
 
 function buildRequestStatistics(preview: AdminQuizFigureCreateAiPreview) {

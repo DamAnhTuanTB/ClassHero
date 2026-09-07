@@ -9,30 +9,51 @@ import { z } from "zod";
 import { lessonSummarySubjectKeySchema } from "#api/modules/ai/types/lesson-summary-subject.types";
 
 export const LESSON_SUMMARY_PROMPT_VERSIONS = {
-  MATH: "lesson-summary-math-v34-no-orphan-intermediate-labels",
-  PHYSICS: "lesson-summary-physics-v30-unambiguous-figure-ready-problem",
-  CHEMISTRY: "lesson-summary-chemistry-v30-unambiguous-figure-ready-problem",
-  GENERAL: "lesson-summary-general-v30-unambiguous-figure-ready-problem",
+  MATH: "lesson-summary-math-v41-lesson-core-exercise-diversity",
+  PHYSICS: "lesson-summary-physics-v37-lesson-core-exercise-diversity",
+  CHEMISTRY: "lesson-summary-chemistry-v37-lesson-core-exercise-diversity",
+  GENERAL: "lesson-summary-general-v37-lesson-core-exercise-diversity",
 } as const;
 export const LESSON_SUMMARY_SCHEMA_VERSION =
-  "lesson-summary-pdf-packet-five-block-schema-v25-slim-provider-descriptions";
+  "lesson-summary-pdf-packet-six-block-schema-v29-exact-exercise-counts";
 export const LESSON_SUMMARY_MAX_CONTEXT_TOKENS = 12_000;
 export const LESSON_SUMMARY_MAX_OUTPUT_TOKENS = 8_000;
 export const LESSON_SUMMARY_MIN_OUTPUT_TOKENS = 8_000;
 export const LESSON_SUMMARY_MAX_CONFIGURED_OUTPUT_TOKENS = 32_000;
+export const LESSON_SUMMARY_DEFAULT_STANDARD_EXERCISE_COUNT = 2;
+export const LESSON_SUMMARY_DEFAULT_REAL_WORLD_EXERCISE_COUNT = 2;
+export const LESSON_SUMMARY_MIN_APPLICATION_EXERCISE_COUNT = 1;
+export const LESSON_SUMMARY_MAX_APPLICATION_EXERCISE_COUNT = 10;
+
+export type LessonSummaryApplicationExerciseCounts = {
+  standardExerciseCount: number;
+  realWorldExerciseCount: number;
+};
 
 export function resolveLessonSummaryOutputTokenFloor(input: {
   length: z.infer<typeof lessonSummaryLengthSchema>;
   targetWordCount: number | null;
+  standardExerciseCount?: number;
+  realWorldExerciseCount?: number;
 }) {
   const lengthFloor = input.length === "detailed" ? 12_000 : 8_000;
   const requestedContentFloor = input.targetWordCount
     ? Math.ceil(input.targetWordCount * 3) + 4_000
     : 0;
+  const requestedExerciseCount =
+    (input.standardExerciseCount ?? LESSON_SUMMARY_DEFAULT_STANDARD_EXERCISE_COUNT) +
+    (input.realWorldExerciseCount ?? LESSON_SUMMARY_DEFAULT_REAL_WORLD_EXERCISE_COUNT);
+  const exerciseFloor =
+    LESSON_SUMMARY_MIN_OUTPUT_TOKENS + Math.max(0, requestedExerciseCount - 2) * 1_500;
 
   return Math.min(
     LESSON_SUMMARY_MAX_CONFIGURED_OUTPUT_TOKENS,
-    Math.max(LESSON_SUMMARY_MIN_OUTPUT_TOKENS, lengthFloor, requestedContentFloor),
+    Math.max(
+      LESSON_SUMMARY_MIN_OUTPUT_TOKENS,
+      lengthFloor,
+      requestedContentFloor,
+      exerciseFloor,
+    ),
   );
 }
 
@@ -42,7 +63,6 @@ export const lessonSummaryStyleSchema = z.enum([
   "academic",
 ]);
 export const lessonSummaryLengthSchema = z.enum(["short", "standard", "detailed"]);
-
 const nonEmptyText = (maxLength: number) => z.string().trim().min(1).max(maxLength);
 const LESSON_SUMMARY_SEMANTIC_LAYOUT_DESCRIPTION =
   "Không coi ngắt dòng do dàn trang là ranh giới ngữ nghĩa. Bảo toàn câu, đoạn, danh sách, hệ điều kiện, dấu câu dẫn và cấu trúc công thức theo chức năng trong nguồn; chọn inline hay display theo vai trò và độ phức tạp, không theo vị trí xuống dòng trong ảnh PDF.";
@@ -126,6 +146,10 @@ const exampleBlockSchema = z
   })
   .strict();
 
+const exerciseBlockSchema = exampleBlockSchema.extend({
+  type: z.literal("exercise"),
+});
+
 const noteBlockSchema = baseBlockSchema
   .extend({
     type: z.literal("note"),
@@ -200,6 +224,7 @@ const reviewIssuesShape = {
 const reviewedKnowledgeBlockSchema = knowledgeBlockSchema.extend(reviewIssuesShape);
 const reviewedPropertyBlockSchema = propertyBlockSchema.extend(reviewIssuesShape);
 const reviewedExampleBlockSchema = exampleBlockSchema.extend(reviewIssuesShape);
+const reviewedExerciseBlockSchema = exerciseBlockSchema.extend(reviewIssuesShape);
 const reviewedNoteBlockSchema = noteBlockSchema.extend(reviewIssuesShape);
 const reviewedTheoremBlockSchema = theoremBlockSchema.extend(reviewIssuesShape);
 
@@ -207,6 +232,7 @@ export const lessonSummaryMvpBlockSchema = z.discriminatedUnion("type", [
   reviewedKnowledgeBlockSchema,
   reviewedPropertyBlockSchema,
   reviewedExampleBlockSchema,
+  reviewedExerciseBlockSchema,
   reviewedNoteBlockSchema,
   reviewedTheoremBlockSchema,
 ]);
@@ -430,13 +456,18 @@ const providerAiAuthoredExampleProvenanceShape = {
   sourcePageNumbers: providerAiAuthoredExamplePageNumbersSchema,
 };
 
-function createLessonSummaryProviderExampleTransportSchema(
-  exampleKind: "ILLUSTRATION" | "STANDARD_EXERCISE" | "REAL_WORLD_EXERCISE",
+function createLessonSummaryProviderExampleTransportSchema<
+  TKind extends "ILLUSTRATION" | "STANDARD_EXERCISE" | "REAL_WORLD_EXERCISE",
+>(
+  exampleKind: TKind,
   figureSchema: typeof transportFiguresSchema = transportFiguresSchema,
   targetGrade: number | null = null,
 ) {
+  const blockType = (
+    exampleKind === "ILLUSTRATION" ? "example" : "exercise"
+  ) as TKind extends "ILLUSTRATION" ? "example" : "exercise";
   const baseShape = {
-    type: z.literal("example"),
+    type: z.literal(blockType),
     exampleKind: z.literal(exampleKind),
     problem: lessonSummaryProviderProblemFieldSchema,
     solution: lessonSummaryProviderSolutionFieldSchema,
@@ -503,12 +534,17 @@ function createLessonSummaryProviderExampleTransportSchema(
   ]);
 }
 
-function createLessonSummaryProviderNonMathExampleTransportSchema(
-  exampleKind: "ILLUSTRATION" | "STANDARD_EXERCISE" | "REAL_WORLD_EXERCISE",
+function createLessonSummaryProviderNonMathExampleTransportSchema<
+  TKind extends "ILLUSTRATION" | "STANDARD_EXERCISE" | "REAL_WORLD_EXERCISE",
+>(
+  exampleKind: TKind,
   figureSchema: typeof transportFiguresSchema = transportFiguresSchema,
 ) {
+  const blockType = (
+    exampleKind === "ILLUSTRATION" ? "example" : "exercise"
+  ) as TKind extends "ILLUSTRATION" ? "example" : "exercise";
   const baseShape = {
-    type: z.literal("example"),
+    type: z.literal(blockType),
     exampleKind: z.literal(exampleKind),
     problem: lessonSummaryProviderProblemFieldSchema,
     solution: lessonSummaryProviderSolutionFieldSchema,
@@ -567,6 +603,7 @@ const lessonSummaryNonMathSectionItemSchema = z.discriminatedUnion("itemType", [
  */
 function createLessonSummaryProviderTransportOutputBaseSchema(
   targetGrade: number | null = null,
+  counts?: LessonSummaryApplicationExerciseCounts,
 ) {
   const illustrationSchema = createLessonSummaryProviderExampleTransportSchema(
     "ILLUSTRATION",
@@ -616,8 +653,12 @@ function createLessonSummaryProviderTransportOutputBaseSchema(
         .max(19),
       applicationExercises: z
         .object({
-          standardExercise: standardExerciseSchema,
-          realWorldExercise: realWorldExerciseSchema,
+          standardExercises: counts
+            ? z.array(standardExerciseSchema).length(counts.standardExerciseCount)
+            : z.array(standardExerciseSchema),
+          realWorldExercises: counts
+            ? z.array(realWorldExerciseSchema).length(counts.realWorldExerciseCount)
+            : z.array(realWorldExerciseSchema),
         })
         .strict(),
     })
@@ -628,51 +669,59 @@ function createLessonSummaryProviderTransportOutputBaseSchema(
 const lessonSummaryProviderTransportOutputBaseSchema =
   createLessonSummaryProviderTransportOutputBaseSchema();
 
-const lessonSummaryProviderNonMathTransportOutputSchema = z
-  .object({
-    title: transportText(240),
-    objectives: z.array(transportText(500)).min(1).max(10).nullable(),
-    theorySections: z
-      .array(
-        z
-          .object({
-            displayHeading: transportText(240),
-            sourceEvidence: sourceEvidenceSchema,
-            items: z.array(lessonSummaryNonMathSectionItemSchema).min(1).max(60),
-          })
-          .strict(),
-      )
-      .min(1)
-      .max(19),
-    applicationExercises: z
-      .object({
-        standardExercise: lessonSummaryNonMathStandardExerciseTransportSchema,
-        realWorldExercise: lessonSummaryNonMathRealWorldExerciseTransportSchema,
-      })
-      .strict(),
-  })
-  .strict()
-  .describe(LESSON_SUMMARY_PROVIDER_ROOT_FORMATTING_DESCRIPTION);
-
-const LESSON_SUMMARY_PROVIDER_SCHEMAS = {
-  MATH: lessonSummaryProviderTransportOutputBaseSchema,
-  PHYSICS: lessonSummaryProviderNonMathTransportOutputSchema,
-  CHEMISTRY: lessonSummaryProviderNonMathTransportOutputSchema,
-  GENERAL: lessonSummaryProviderNonMathTransportOutputSchema,
-} as const;
+function createLessonSummaryProviderNonMathTransportOutputSchema(
+  counts?: LessonSummaryApplicationExerciseCounts,
+) {
+  return z
+    .object({
+      title: transportText(240),
+      objectives: z.array(transportText(500)).min(1).max(10).nullable(),
+      theorySections: z
+        .array(
+          z
+            .object({
+              displayHeading: transportText(240),
+              sourceEvidence: sourceEvidenceSchema,
+              items: z.array(lessonSummaryNonMathSectionItemSchema).min(1).max(60),
+            })
+            .strict(),
+        )
+        .min(1)
+        .max(19),
+      applicationExercises: z
+        .object({
+          standardExercises: counts
+            ? z
+                .array(lessonSummaryNonMathStandardExerciseTransportSchema)
+                .length(counts.standardExerciseCount)
+            : z.array(lessonSummaryNonMathStandardExerciseTransportSchema),
+          realWorldExercises: counts
+            ? z
+                .array(lessonSummaryNonMathRealWorldExerciseTransportSchema)
+                .length(counts.realWorldExerciseCount)
+            : z.array(lessonSummaryNonMathRealWorldExerciseTransportSchema),
+        })
+        .strict(),
+    })
+    .strict()
+    .describe(LESSON_SUMMARY_PROVIDER_ROOT_FORMATTING_DESCRIPTION);
+}
 
 /**
  * Select the provider schema by subject. Subject-specific fields stay in the
  * matching schema instead of leaking into requests for another course domain.
+ * Passing `counts` locks the schema sent to the provider; omitting it keeps the
+ * backend ingestion/editor schema tolerant of count mismatches.
  */
 export function getLessonSummaryProviderTransportOutputSchema(
   subjectKey: "MATH" | "PHYSICS" | "CHEMISTRY" | "GENERAL",
   _figureRequirement: LessonSummaryFigureRequirement = "CONTEXTUAL",
   targetGrade: number | null = null,
+  counts?: LessonSummaryApplicationExerciseCounts,
 ) {
   return subjectKey === "MATH"
-    ? createLessonSummaryProviderTransportOutputBaseSchema(targetGrade)
-    : LESSON_SUMMARY_PROVIDER_SCHEMAS[subjectKey];
+    ? createLessonSummaryProviderTransportOutputBaseSchema(targetGrade, counts)
+    : createLessonSummaryProviderNonMathTransportOutputSchema(counts);
 }
 
 export const lessonSummaryProviderTransportOutputSchema =
@@ -680,7 +729,7 @@ export const lessonSummaryProviderTransportOutputSchema =
 
 export type LessonSummaryProviderTransportOutput =
   | z.infer<typeof lessonSummaryProviderTransportOutputBaseSchema>
-  | z.infer<typeof lessonSummaryProviderNonMathTransportOutputSchema>;
+  | z.infer<ReturnType<typeof createLessonSummaryProviderNonMathTransportOutputSchema>>;
 
 export type StemFigurePlanDraft = z.infer<typeof stemFigurePlanDraftSchema>;
 export type StemFigureRenderPlan = z.infer<typeof stemFigureRenderPlanSchema>;
@@ -728,7 +777,7 @@ export const lessonSummaryOutputSchema = z
           })
           .strict(),
       )
-      .min(2)
+      .min(1)
       .max(20),
     warnings: z.array(nonEmptyText(1_000)).nullable().optional(),
     warningDetails: z
@@ -758,6 +807,18 @@ export const lessonSummaryJobInputSchema = z
     styleInstructions: z.string().trim().max(1_000).default(""),
     length: lessonSummaryLengthSchema.default("standard"),
     targetWordCount: z.number().int().min(50).max(5_000).nullable().default(null),
+    standardExerciseCount: z
+      .number()
+      .int()
+      .min(LESSON_SUMMARY_MIN_APPLICATION_EXERCISE_COUNT)
+      .max(LESSON_SUMMARY_MAX_APPLICATION_EXERCISE_COUNT)
+      .default(LESSON_SUMMARY_DEFAULT_STANDARD_EXERCISE_COUNT),
+    realWorldExerciseCount: z
+      .number()
+      .int()
+      .min(LESSON_SUMMARY_MIN_APPLICATION_EXERCISE_COUNT)
+      .max(LESSON_SUMMARY_MAX_APPLICATION_EXERCISE_COUNT)
+      .default(LESSON_SUMMARY_DEFAULT_REAL_WORLD_EXERCISE_COUNT),
     extraInstructions: z.string().trim().max(2_000).default(""),
     systemInstructions: z
       .string()

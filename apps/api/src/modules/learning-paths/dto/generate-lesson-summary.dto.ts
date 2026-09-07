@@ -22,7 +22,13 @@ import {
   Min,
 } from "class-validator";
 
-import { LESSON_SUMMARY_MIN_OUTPUT_TOKENS } from "#api/modules/ai/types/lesson-summary.types";
+import {
+  LESSON_SUMMARY_DEFAULT_REAL_WORLD_EXERCISE_COUNT,
+  LESSON_SUMMARY_DEFAULT_STANDARD_EXERCISE_COUNT,
+  LESSON_SUMMARY_MAX_APPLICATION_EXERCISE_COUNT,
+  LESSON_SUMMARY_MIN_APPLICATION_EXERCISE_COUNT,
+  LESSON_SUMMARY_MIN_OUTPUT_TOKENS,
+} from "#api/modules/ai/types/lesson-summary.types";
 
 export class GenerateLessonSummaryDto {
   @ApiPropertyOptional({ description: "Immutable request draft returned by preview" })
@@ -102,6 +108,30 @@ export class GenerateLessonSummaryDto {
   @Min(50)
   @Max(5_000)
   targetWordCount?: number;
+
+  @ApiPropertyOptional({
+    default: LESSON_SUMMARY_DEFAULT_STANDARD_EXERCISE_COUNT,
+    minimum: LESSON_SUMMARY_MIN_APPLICATION_EXERCISE_COUNT,
+    maximum: LESSON_SUMMARY_MAX_APPLICATION_EXERCISE_COUNT,
+    description: "Số bài tập vận dụng không thuộc dạng ứng dụng thực tế",
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(LESSON_SUMMARY_MIN_APPLICATION_EXERCISE_COUNT)
+  @Max(LESSON_SUMMARY_MAX_APPLICATION_EXERCISE_COUNT)
+  standardExerciseCount?: number;
+
+  @ApiPropertyOptional({
+    default: LESSON_SUMMARY_DEFAULT_REAL_WORLD_EXERCISE_COUNT,
+    minimum: LESSON_SUMMARY_MIN_APPLICATION_EXERCISE_COUNT,
+    maximum: LESSON_SUMMARY_MAX_APPLICATION_EXERCISE_COUNT,
+    description: "Số bài tập vận dụng ứng dụng thực tế",
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(LESSON_SUMMARY_MIN_APPLICATION_EXERCISE_COUNT)
+  @Max(LESSON_SUMMARY_MAX_APPLICATION_EXERCISE_COUNT)
+  realWorldExerciseCount?: number;
 
   @ApiPropertyOptional({
     maxLength: LESSON_SUMMARY_MAX_SYSTEM_INSTRUCTIONS_CHARACTERS,

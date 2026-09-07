@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AI_REASONING_EFFORT_LEVELS } from "@learning-path/shared";
 
 const nonnegativeDecimal = z
   .string()
@@ -38,7 +39,7 @@ export const providerCatalogItemSchema = z.object({
   displayName: z.string().trim().min(1, "Vui lòng nhập tên hiển thị"),
   externalKey: z.string().trim().min(1, "Vui lòng nhập tên model"),
   aiConfiguration: z.enum(["TEMPERATURE", "REASONING_EFFORT"]),
-  reasoningEffortLevels: z.array(z.string()).optional(),
+  reasoningEffortLevels: z.array(z.enum(AI_REASONING_EFFORT_LEVELS)).optional(),
 });
 
 export type ProviderCatalogItemFormValues = z.infer<typeof providerCatalogItemSchema>;

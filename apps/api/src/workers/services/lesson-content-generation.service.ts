@@ -46,6 +46,7 @@ import {
   buildTestPrompt,
   resolveLessonContentPromptVersion,
 } from "#api/modules/ai/utils/lesson-content-generation-prompt";
+import type { ProviderUsageOperation } from "#api/modules/provider-operations/types/provider-operations.types";
 
 @Injectable()
 export class LessonContentGenerationService {
@@ -110,7 +111,7 @@ export class LessonContentGenerationService {
     );
     const output = this.providerCall
       ? await this.providerCall.generateStructured(
-          providerContext(context),
+          providerContext(context, "FLASHCARD_GENERATION"),
           request,
           generatedFlashcardOutputSchema,
         )
@@ -158,7 +159,7 @@ export class LessonContentGenerationService {
     const providerSchema = getGeneratedTestOutputSchema(source.subject.key);
     const output = this.providerCall
       ? await this.providerCall.generateStructured(
-          providerContext(context),
+          providerContext(context, "TEST_GENERATION"),
           request,
           providerSchema,
         )
@@ -323,12 +324,16 @@ type RetrievedSource = Awaited<
   ReturnType<LessonContentGenerationContextService["retrieve"]>
 >;
 
-function providerContext(context: AiGenerationExecutionContext) {
+function providerContext(
+  context: AiGenerationExecutionContext,
+  operation: ProviderUsageOperation,
+) {
   return {
     feature: context.type,
     aiGenerationId: context.aiGenerationId,
     backgroundJobId: context.backgroundJobId,
     attempt: context.attempt,
+    operation,
     routeSnapshot: context.providerRouteSnapshot,
   };
 }

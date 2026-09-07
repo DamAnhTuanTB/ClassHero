@@ -1,24 +1,34 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { AppModule } from "../src/app.module";
 import { PrismaService } from "../src/common/prisma/prisma.service";
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { QuizService } from "../src/modules/quiz/services/quiz.service";
 import { QuizSetReviewActionDto } from "../src/modules/quiz/dto/review-quiz-set.dto";
 import {
   AiExplanationTargetType,
   Difficulty,
+  FilePurpose,
+  FileStatus,
+  FileVisibility,
   QuestionType,
+  QuizFigureRevisionOrigin,
+  QuizFigureRevisionStatus,
+  QuizFigureRole,
+  QuizFigureSourceKind,
+  QuizFigureStatus,
   ReviewStatus,
   UserRole,
 } from "@prisma/client";
 import { RequestContext } from "../src/common/api/request-context";
 import { randomUUID } from "crypto";
 import { createTestCourseCatalogRelation } from "./helpers/course-catalog-fixture";
+import { ObjectStorageService } from "../src/modules/files/services/object-storage.service";
 
 describe("M6.2 Quiz CRUD Integration Test", () => {
   let moduleRef: TestingModule;
   let quizService: QuizService;
   let prisma: PrismaService;
+  let objectStorage: ObjectStorageService;
 
   let testUserId: string;
   let testLessonId: string;
@@ -38,6 +48,7 @@ describe("M6.2 Quiz CRUD Integration Test", () => {
 
     quizService = moduleRef.get(QuizService);
     prisma = moduleRef.get(PrismaService);
+    objectStorage = moduleRef.get(ObjectStorageService);
 
     // Setup basic relations
     const user = await prisma.user.create({
@@ -591,6 +602,45 @@ describe("M6.2 Quiz CRUD Integration Test", () => {
         explanationId: explanation.id,
       },
     });
+    const deliveryFile = await prisma.file.create({
+      data: {
+        provider: objectStorage.fileProvider,
+        purpose: FilePurpose.AI_DIAGRAM,
+        bucket: objectStorage.bucketName,
+        objectKey: `test/quiz-delete-${randomUUID()}.svg`,
+        originalName: "quiz-delete.svg",
+        mimeType: "image/svg+xml",
+        sizeBytes: BigInt(64),
+        visibility: FileVisibility.PUBLIC,
+        status: FileStatus.READY,
+      },
+    });
+    const figure = await prisma.quizFigure.create({
+      data: {
+        lessonId: testLessonId,
+        quizQuestionId: questionId,
+        role: QuizFigureRole.QUESTION,
+        subjectKey: "MATH",
+        subjectName: "Toán",
+        subjectSlug: "toan",
+        status: QuizFigureStatus.SUCCEEDED,
+      },
+    });
+    const revision = await prisma.quizFigureRevision.create({
+      data: {
+        quizFigureId: figure.id,
+        sourceKind: QuizFigureSourceKind.AI_TEX,
+        origin: QuizFigureRevisionOrigin.INITIAL_AI,
+        status: QuizFigureRevisionStatus.SUCCEEDED,
+        sourceVersion: 1,
+        altText: "Hình Quiz cần xóa",
+        deliveryFileId: deliveryFile.id,
+      },
+    });
+    await prisma.quizFigure.update({
+      where: { id: figure.id },
+      data: { currentRevisionId: revision.id },
+    });
     const attempt = await prisma.quizAttempt.create({
       data: {
         studentUserId: testUserId,
@@ -608,6 +658,9 @@ describe("M6.2 Quiz CRUD Integration Test", () => {
         isCorrect: true,
       },
     });
+    const deleteObject = vi
+      .spyOn(objectStorage, "deleteObject")
+      .mockResolvedValue(undefined);
 
     await expect(
       quizService.deleteQuizSet(set.id, testUserId, mockContext),
@@ -616,6 +669,8 @@ describe("M6.2 Quiz CRUD Integration Test", () => {
       deletedQuestionCount: 1,
       deletedAttemptCount: 1,
       deletedExplanationCount: 1,
+      deletedFileCount: 1,
+      pendingFileCleanupCount: 0,
     });
 
     const [
@@ -624,12 +679,14 @@ describe("M6.2 Quiz CRUD Integration Test", () => {
       deletedAttempt,
       deletedAnswer,
       deletedExplanation,
+      deletedFile,
     ] = await Promise.all([
       prisma.quizSet.findUnique({ where: { id: set.id } }),
       prisma.quizQuestion.findUnique({ where: { id: questionId } }),
       prisma.quizAttempt.findUnique({ where: { id: attempt.id } }),
       prisma.quizAttemptAnswer.findUnique({ where: { id: answer.id } }),
       prisma.aiExplanation.findUnique({ where: { id: explanation.id } }),
+      prisma.file.findUnique({ where: { id: deliveryFile.id } }),
     ]);
     expect([
       deletedSet,
@@ -637,7 +694,11 @@ describe("M6.2 Quiz CRUD Integration Test", () => {
       deletedAttempt,
       deletedAnswer,
       deletedExplanation,
-    ]).toEqual([null, null, null, null, null]);
+      deletedFile,
+    ]).toEqual([null, null, null, null, null, null]);
+    expect(deleteObject).toHaveBeenCalledOnce();
+    expect(deleteObject).toHaveBeenCalledWith(deliveryFile.objectKey);
+    deleteObject.mockRestore();
     await expect(
       prisma.auditLog.findFirst({
         where: {

@@ -36,10 +36,15 @@ export interface AiProvider {
   /** Tạo text completion và trả metadata usage/provider. */
   generateText(input: AiTextInput): Promise<AiTextOutput>;
 
-  /** Tạo structured output, bắt buộc parse lại qua Zod trước khi trả. */
+  /**
+   * Tạo structured output. `schema` ràng buộc request gửi provider;
+   * `validationSchema` có thể dung sai hơn khi backend cần giữ output hợp lệ
+   * về cấu trúc nhưng không muốn loại cả kết quả vì một ràng buộc tạo sinh.
+   */
   generateStructured<TOutput>(
     input: AiStructuredInput,
     schema: AiOutputSchema<TOutput>,
+    validationSchema?: AiOutputSchema<TOutput>,
   ): Promise<AiStructuredOutput<TOutput>>;
 }
 

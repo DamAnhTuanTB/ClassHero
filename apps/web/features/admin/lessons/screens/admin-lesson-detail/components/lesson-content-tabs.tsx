@@ -44,6 +44,14 @@ export function LessonContentTabs({
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    const isQuizQuestionShortcut =
+      (event.key === "ArrowLeft" || event.key === "ArrowRight") &&
+      event.target instanceof Element &&
+      Boolean(event.target.closest("[data-quiz-question-shortcut]"));
+    if (isQuizQuestionShortcut) {
+      return;
+    }
+
     if (event.key === "ArrowRight") {
       event.preventDefault();
       focusTabAt((activeTabIndex + 1) % lessonContentTabs.length);
@@ -84,6 +92,9 @@ export function LessonContentTabs({
               role="tab"
               aria-selected={isActive}
               aria-controls={panelId}
+              data-quiz-question-shortcut={
+                isActive && tab.key === "quiz" ? "true" : undefined
+              }
               tabIndex={isActive ? 0 : -1}
               onClick={() => onChange(tab.key)}
               className={cn(

@@ -20,7 +20,10 @@ describe("ProviderOperationsAdminService usage events", () => {
         category: ProviderCatalogCategory.AI_MODEL,
         provider: "OPENAI",
         feature: AiGenerationType.SUMMARY,
+        operation: "SUMMARY_FIGURE_EDITING",
+        reasoningEffort: "high",
         status: ProviderUsageStatus.SUCCEEDED,
+        latencyMs: 12_450,
         costVnd: 179,
         estimatedCostUsd: new Prisma.Decimal("0.007"),
         fxRateVndPerUsd: new Prisma.Decimal("25500"),
@@ -70,6 +73,9 @@ describe("ProviderOperationsAdminService usage events", () => {
     );
     expect(result.items[0]).toMatchObject({
       costVnd: 179,
+      operation: "SUMMARY_FIGURE_EDITING",
+      reasoningEffort: "high",
+      latencyMs: 12_450,
       backgroundJob: { resourceType: "STEM_FIGURE" },
       aiGeneration: {
         id: aiGenerationId,

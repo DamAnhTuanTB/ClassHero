@@ -55,6 +55,8 @@ export const adminAiGenerationFormSchema = z
       .max(1_000, "Cách trình bày tối đa 1.000 ký tự"),
     summaryLength: summaryLengthSchema,
     summaryTargetWordCount: optionalNumericTextSchema("Số lượng từ", 50, 5_000),
+    standardExerciseCount: numericTextSchema("Số bài tập bình thường", 1, 10),
+    realWorldExerciseCount: numericTextSchema("Số bài tập ứng dụng thực tế", 1, 10),
     extraInstructions: z.string().trim().max(2_000, "Yêu cầu bổ sung tối đa 2.000 ký tự"),
     systemInstructions: z
       .string()
@@ -68,7 +70,12 @@ export const adminAiGenerationFormSchema = z
     summaryReasoningEffort: z.union([z.literal(""), z.enum(AI_REASONING_EFFORT_LEVELS)]),
     summaryMaxOutputTokens: optionalNumericTextSchema("Số token đầu ra", 8_000, 32_000),
     summaryFigureModel: z.string().max(200),
-    summaryFigureTemperature: optionalNumericTextSchema("Temperature tạo hình", 0, 1, true),
+    summaryFigureTemperature: optionalNumericTextSchema(
+      "Temperature tạo hình",
+      0,
+      1,
+      true,
+    ),
     summaryFigureReasoningEffort: z.union([
       z.literal(""),
       z.enum(AI_REASONING_EFFORT_LEVELS),
@@ -94,7 +101,7 @@ export const adminAiGenerationFormSchema = z
       context.addIssue({
         code: "custom",
         path: ["autoEnhanceTextbookSourceImages"],
-        message: "Chỉ có thể làm nét khi dùng ảnh gốc sách giáo khoa",
+        message: "Chỉ có thể làm nét khi dùng ảnh gốc của tài liệu",
       });
     }
     if (values.type === "SUMMARY" && values.documentIds.length === 0) {
@@ -113,7 +120,11 @@ export const adminAiGenerationFormSchema = z
         });
       }
     }
-    if (values.type === "SUMMARY" && values.summaryFigureModel && !values.summaryFigureMaxOutputTokens) {
+    if (
+      values.type === "SUMMARY" &&
+      values.summaryFigureModel &&
+      !values.summaryFigureMaxOutputTokens
+    ) {
       context.addIssue({
         code: "custom",
         path: ["summaryFigureMaxOutputTokens"],

@@ -16,6 +16,7 @@ import { getStemFigureDisplayPercent } from "@/lib/stem-figure-display";
 export type StemFigureVisual = {
   kind: "TEX_FIGURE";
   figureId: string;
+  figureIndex?: number;
   altText: string;
   caption: string | null;
   status?: "QUEUED" | "RENDERING" | "REPAIRING" | "SUCCEEDED" | "NEEDS_REVIEW" | "FAILED";

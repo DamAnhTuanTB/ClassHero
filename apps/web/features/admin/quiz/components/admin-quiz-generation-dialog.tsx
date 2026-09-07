@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AI_REASONING_EFFORT_LEVELS, isAiReasoningEffort } from "@learning-path/shared";
+import { isAiReasoningEffort } from "@learning-path/shared";
 import { Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useForm, type UseFormReturn } from "react-hook-form";
@@ -11,6 +11,7 @@ import { CheckboxField } from "@/components/common/forms/checkbox-field";
 import { OptionField } from "@/components/common/forms/option-field";
 import { TextareaField } from "@/components/common/forms/textarea-field";
 import { TextField } from "@/components/common/forms/text-field";
+import { buildAiReasoningEffortOptions } from "@/lib/ai-reasoning-effort";
 import { usePreviewAdminQuizPrompt } from "@/features/admin/ai-generation/hooks/use-admin-ai-generation";
 import type {
   AdminAiConfigurationCapability,
@@ -223,34 +224,12 @@ export function AdminQuizGenerationDialog({
     (option) => option.model === selectedFigureModel,
   );
   const figureCapability = selectedFigureModelInfo?.capabilities?.aiConfiguration;
-  const figureReasoningOptions = buildReasoningOptions(
+  const figureReasoningOptions = buildAiReasoningEffortOptions(
     selectedFigureModelInfo?.capabilities?.reasoningEffortLevels,
   );
-  const reasoningOptions = [
-    { value: "", label: "Mặc định của model" },
-    ...(selectedModelInfo?.capabilities?.reasoningEffortLevels ?? [])
-      .filter(isAiReasoningEffort)
-      .sort((left, right) => {
-        const order: readonly string[] = AI_REASONING_EFFORT_LEVELS;
-        return (
-          (order.indexOf(left) > -1 ? order.indexOf(left) : 99) -
-          (order.indexOf(right) > -1 ? order.indexOf(right) : 99)
-        );
-      })
-      .map((level) => ({
-        value: level,
-        label:
-          {
-            minimal: "Tối thiểu (Minimal)",
-            low: "Thấp (Low)",
-            medium: "Trung bình (Medium)",
-            high: "Cao (High)",
-            none: "Không (None)",
-            xhigh: "Rất cao (Extra High)",
-            max: "Tối đa (Max)",
-          }[level as string] || level,
-      })),
-  ];
+  const reasoningOptions = buildAiReasoningEffortOptions(
+    selectedModelInfo?.capabilities?.reasoningEffortLevels,
+  );
   function validateModelSelection() {
     if (!form.getValues("model") && !modelConfiguration.isDefaultConfigured) {
       form.setError("model", { message: "Vui lòng chọn model" });
@@ -1046,24 +1025,6 @@ function toPayload(
       ? { figureMaxOutputTokens: Number(values.figureMaxOutputTokens) }
       : {}),
   };
-}
-
-function buildReasoningOptions(levels: string[] | undefined) {
-  const labels: Record<string, string> = {
-    minimal: "Tối thiểu (Minimal)",
-    low: "Thấp (Low)",
-    medium: "Trung bình (Medium)",
-    high: "Cao (High)",
-    none: "Không (None)",
-    xhigh: "Rất cao (Extra High)",
-    max: "Tối đa (Max)",
-  };
-  return [
-    { value: "", label: "Mặc định của model" },
-    ...(levels ?? [])
-      .filter(isAiReasoningEffort)
-      .map((level) => ({ value: level, label: labels[level] ?? level })),
-  ];
 }
 
 function applyResolvedDefaultConfiguration(

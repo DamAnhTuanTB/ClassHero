@@ -71,6 +71,8 @@ import {
   useAdminReplaceAllTextbookImages,
 } from "@/features/admin/ai-generation/hooks/use-admin-replace-all-textbook-images";
 import { AdminLessonSummaryPublishActions } from "@/features/admin/ai-generation/components/admin-lesson-summary-publish-actions";
+import { AdminLessonSummaryBlockEditorDialog } from "@/features/admin/ai-generation/components/admin-lesson-summary-block-editor-dialog";
+import { isLessonSummaryEditableBlock } from "@/features/admin/ai-generation/utils/lesson-summary-block-editor";
 
 const ReactJson = dynamic(() => import("@microlink/react-json-view"), { ssr: false });
 const ReplaceAllTextbookImagesDialog = dynamic(
@@ -130,6 +132,7 @@ export function AdminLessonSummaryTab({
     number[] | null
   >(null);
   const [sourceCropFigureId, setSourceCropFigureId] = useState<string | null>(null);
+  const [editingBlockPath, setEditingBlockPath] = useState<string | null>(null);
   const unresolvedReviewIssueCount = countUnresolvedReviewIssues(content);
   const textbookImageBulkReplacePlan = useMemo(
     () => createTextbookImageBulkReplacePlan(figuresQuery.data ?? []),
@@ -143,6 +146,7 @@ export function AdminLessonSummaryTab({
           {
             kind: "TEX_FIGURE",
             figureId: figure.id,
+            figureIndex: figure.figureIndex,
             ...(figure.figureOrigin ? { figureOrigin: figure.figureOrigin } : {}),
             status: figure.status,
             altText: figure.altText,
@@ -178,7 +182,7 @@ export function AdminLessonSummaryTab({
           figure={figure}
           isSourceCropOpen={sourceCropFigureId === figure.id}
           lessonId={lessonId}
-          modelConfiguration={panelQuery.data?.summaryConfiguration}
+          modelConfiguration={panelQuery.data?.summaryFigureConfiguration}
           onSourceCropOpenChange={(isOpen) =>
             setSourceCropFigureId((current) =>
               isOpen ? figure.id : current === figure.id ? null : current,
@@ -207,15 +211,20 @@ export function AdminLessonSummaryTab({
     return groups;
   }, [figuresQuery.data]);
   const renderBlockImageActions = useCallback(
-    ({ blockPath }: { blockPath: string }) => (
+    ({ blockPath, block }: { blockPath: string; block: Record<string, unknown> }) => (
       <AdminBlockImageActions
         blockPath={blockPath}
+        blockType={typeof block.type === "string" ? block.type : null}
         figures={stemFiguresByBlockPath.get(blockPath) ?? []}
+        hasSolutionText={
+          typeof block.solution === "string" && block.solution.trim().length > 0
+        }
         lessonId={lessonId}
+        modelConfiguration={panelQuery.data?.summaryFigureConfiguration}
         onViewTextbookSource={(figure) => setSourceCropFigureId(figure.id)}
       />
     ),
-    [lessonId, stemFiguresByBlockPath],
+    [lessonId, panelQuery.data?.summaryFigureConfiguration, stemFiguresByBlockPath],
   );
   const renderBlockSourceAction = useCallback(({ block }: { block: unknown }) => {
     const sourcePageNumbers = readBlockSourcePageNumbers(block);
@@ -302,6 +311,7 @@ export function AdminLessonSummaryTab({
     );
     setPhaseOneLayoutOperations([]);
     setContentError(undefined);
+    setEditingBlockPath(null);
   }, [summaryQuery.data]);
 
   const referencedStemFigureIds = useMemo(
@@ -347,6 +357,14 @@ export function AdminLessonSummaryTab({
   }
 
   const summary = summaryQuery.data;
+  const editingBlockCandidate = editingBlockPath
+    ? phaseOneBlockJsonByPath?.[editingBlockPath]
+    : null;
+  const editingBlock = isLessonSummaryEditableBlock(editingBlockCandidate)
+    ? editingBlockCandidate
+    : null;
+  const lessonSubjectKey =
+    panelQuery.data?.lesson.subjectKey ?? figuresQuery.data?.[0]?.subject.key ?? null;
   const stemFigureBlockers = (figuresQuery.data ?? []).filter(
     (figure) => referencedStemFigureIds.has(figure.id) && !figure.hasCurrentAsset,
   );
@@ -476,7 +494,7 @@ export function AdminLessonSummaryTab({
                 content={content}
                 figures={figuresQuery.data ?? []}
                 lessonId={lessonId}
-                modelConfiguration={panelQuery.data?.summaryConfiguration}
+                modelConfiguration={panelQuery.data?.summaryFigureConfiguration}
                 onNavigateToBlock={handleNavigateToBlock}
               />
             ) : null}
@@ -665,6 +683,11 @@ export function AdminLessonSummaryTab({
               renderStemFigure={renderStemFigure}
               renderBlockImageActions={renderBlockImageActions}
               renderBlockSourceAction={renderBlockSourceAction}
+              onBlockEdit={
+                phaseOneBlockJsonByPath
+                  ? ({ blockPath }) => setEditingBlockPath(blockPath)
+                  : undefined
+              }
               phaseOneBlockJsonByPath={phaseOneBlockJsonByPath}
               onPhaseOneBlockJsonChange={(blockPath, value) => {
                 setPhaseOneBlockJsonByPath((current) =>
@@ -772,6 +795,29 @@ export function AdminLessonSummaryTab({
           sourcePageNumbers={selectedSourcePageNumbers}
           sourcePages={summary?.sourcePages ?? []}
           onClose={() => setSelectedSourcePageNumbers(null)}
+        />
+      ) : null}
+      {editingBlockPath && editingBlock ? (
+        <AdminLessonSummaryBlockEditorDialog
+          block={editingBlock}
+          blockPath={editingBlockPath}
+          figures={(figuresQuery.data ?? []).filter(
+            (figure) => figure.blockPath === editingBlockPath,
+          )}
+          isOpen
+          lessonId={lessonId}
+          subjectKey={lessonSubjectKey}
+          onClose={() => setEditingBlockPath(null)}
+          onSave={(nextBlock) => {
+            setPhaseOneBlockJsonByPath((current) =>
+              current ? { ...current, [editingBlockPath]: nextBlock } : current,
+            );
+            setContent((current) =>
+              applyPhaseOneBlockPreview(current, editingBlockPath, nextBlock),
+            );
+            setEditingBlockPath(null);
+            toast.success("Đã cập nhật khối. Hãy lưu nội dung để ghi nhận thay đổi.");
+          }}
         />
       ) : null}
     </div>

@@ -86,8 +86,12 @@ const formulaCategories: FormulaCategory[] = [
       { label: "Không thuộc", latex: "\\notin", preview: "\\notin" },
       { label: "Tập con", latex: "\\subset", preview: "\\subset" },
       { label: "Tập con hoặc bằng", latex: "\\subseteq", preview: "\\subseteq" },
-      { label: "Suy ra", latex: "\\implies", preview: "\\implies" },
-      { label: "Khi và chỉ khi", latex: "\\iff", preview: "\\iff" },
+      { label: "Suy ra", latex: "\\Rightarrow", preview: "\\Rightarrow" },
+      {
+        label: "Khi và chỉ khi",
+        latex: "\\Leftrightarrow",
+        preview: "\\Leftrightarrow",
+      },
     ],
   },
   {
@@ -149,9 +153,24 @@ const formulaCategories: FormulaCategory[] = [
         preview: "\\left|x\\right|",
       },
       {
-        label: "Vector",
-        latex: "\\vec{#?}",
-        preview: "\\vec{F}",
+        label: "Vector phải",
+        latex: "\\overrightarrow{#@}",
+        preview: "\\overrightarrow{AB}",
+      },
+      {
+        label: "Vector trái",
+        latex: "\\overleftarrow{#@}",
+        preview: "\\overleftarrow{AB}",
+      },
+      {
+        label: "Góc",
+        latex: "\\widehat{#?}",
+        preview: "\\widehat{ABC}",
+      },
+      {
+        label: "Số đo góc",
+        latex: "#?^{\\circ}",
+        preview: "60^{\\circ}",
       },
       {
         label: "Hóa học",
@@ -177,16 +196,6 @@ const formulaCategories: FormulaCategory[] = [
       { label: "Ánh xạ", latex: "\\mapsto", preview: "\\mapsto" },
       { label: "Suy ra phải", latex: "\\Rightarrow", preview: "\\Rightarrow" },
       { label: "Tương đương", latex: "\\Leftrightarrow", preview: "\\Leftrightarrow" },
-      {
-        label: "Vector phải",
-        latex: "\\overrightarrow{#@}",
-        preview: "\\overrightarrow{AB}",
-      },
-      {
-        label: "Vector trái",
-        latex: "\\overleftarrow{#@}",
-        preview: "\\overleftarrow{AB}",
-      },
     ],
   },
 ];
@@ -232,6 +241,15 @@ const mathPreviewCache = new Map<string, string>();
 const mathfieldInteractionStyles = `
   :host([data-empty]) .ML__content-placeholder .ML__text {
     background: transparent !important;
+  }
+
+  .ML__center:has(.ML__stretchy) {
+    transform: translateX(-50%);
+  }
+
+  .ML__cmr.ML__selected {
+    border-radius: 0.15em;
+    background: var(--selection-background-color) !important;
   }
 
   .ML__toggles {
@@ -307,6 +325,7 @@ export function VisualMathInput({
   accent = "primary",
   ariaLabel,
   disabled = false,
+  fieldSize = "default",
   onBlur,
   onChange,
   onFocus,
@@ -321,6 +340,7 @@ export function VisualMathInput({
   accent?: "emerald" | "primary";
   ariaLabel: string;
   disabled?: boolean;
+  fieldSize?: "compact" | "default";
   onBlur?: () => void;
   onChange: (value: string) => void;
   onFocus?: () => void;
@@ -696,6 +716,7 @@ export function VisualMathInput({
     <div
       className={cn(
         "visual-math-input",
+        fieldSize === "compact" && "visual-math-input--compact",
         preset === "student-answer" && "visual-math-input--student-answer",
         accent === "emerald" && "visual-math-input--emerald",
         status === "correct" && "visual-math-input--correct",

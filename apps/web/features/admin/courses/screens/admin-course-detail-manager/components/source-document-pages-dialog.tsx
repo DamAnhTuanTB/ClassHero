@@ -9,13 +9,11 @@ import {
   XCircle,
   ChevronDown,
   ChevronUp,
-  ImageIcon,
   Check,
   X,
 } from "lucide-react";
 import { EditorDialogShell } from "@/components/admin/courses/editor-dialog-shell";
 import {
-  getPageVisualSummary,
   getPrintedPageView,
   formatQualityPercent,
 } from "@/features/admin/courses/admin-course-documents-utils";
@@ -33,6 +31,7 @@ import { toast } from "sonner";
 import { MathpixMarkdownRenderer } from "@/components/shared/mathpix-markdown-renderer";
 import { useAdminFileAccessUrl } from "@/features/admin/courses/hooks/use-admin-file-access-url";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
+import { SourceDocumentOcrPreviewView } from "@/features/admin/courses/screens/admin-course-detail-manager/components/source-document-ocr-preview-view";
 
 type ViewMode = "html" | "pages";
 
@@ -149,31 +148,37 @@ export function SourceDocumentPagesDialog({
         ) : null}
 
         <div className="flex flex-wrap items-center gap-3 sm:ml-auto">
-          <div className="relative">
-            <input
-              type="text"
-              value={searchPrintedPage}
-              onChange={(e) => setSearchPrintedPage(e.target.value)}
-              placeholder="Tìm số trang in..."
-              className="h-7 w-32 shrink-0 rounded-md border border-[var(--theme-border-strong)] bg-[var(--theme-surface)] pl-2 pr-6 text-xs font-semibold text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] focus:border-[var(--theme-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--theme-primary)]"
-            />
-            {searchPrintedPage && (
-              <button
-                type="button"
-                onClick={() => setSearchPrintedPage("")}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[var(--theme-text-muted)] hover:text-[var(--theme-text-strong)]"
-                aria-label="Xóa"
-              >
-                <X className="h-3.5 w-3.5" aria-hidden="true" />
-              </button>
-            )}
-          </div>
+          {viewMode === "pages" ? (
+            <div className="relative">
+              <input
+                type="text"
+                value={searchPrintedPage}
+                onChange={(e) => setSearchPrintedPage(e.target.value)}
+                placeholder="Tìm số trang in..."
+                className="h-7 w-32 shrink-0 rounded-md border border-[var(--theme-border-strong)] bg-[var(--theme-surface)] pl-2 pr-6 text-xs font-semibold text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] focus:border-[var(--theme-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--theme-primary)]"
+              />
+              {searchPrintedPage && (
+                <button
+                  type="button"
+                  onClick={() => setSearchPrintedPage("")}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[var(--theme-text-muted)] hover:text-[var(--theme-text-strong)]"
+                  aria-label="Xóa"
+                >
+                  <X className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
+              )}
+            </div>
+          ) : null}
 
           {/* View mode toggle */}
           <div className="flex rounded-md border border-[var(--theme-border)] bg-[var(--theme-surface)]">
             <button
               type="button"
-              onClick={() => setViewMode("html")}
+              onClick={() => {
+                setViewMode("html");
+                setFilterMode("all");
+                setSearchPrintedPage("");
+              }}
               className={`px-2.5 py-1 text-xs font-bold rounded-l-md transition-colors ${
                 viewMode === "html"
                   ? "bg-[var(--theme-primary)] text-white"
@@ -231,18 +236,16 @@ export function SourceDocumentPagesDialog({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 flex flex-col overflow-y-auto">
+      <div
+        className={`min-h-0 flex-1 flex flex-col ${
+          viewMode === "html" ? "overflow-hidden" : "overflow-y-auto"
+        }`}
+      >
         {viewMode === "html" ? (
-          <div className="flex flex-col">
-            <OcrRenderedPagesView pages={paginatedPages} />
-            {visibleCount < filteredPages.length && (
-              <div ref={lastElementRef} className="p-6 text-center pb-12">
-                <span className="text-sm font-semibold text-[var(--theme-text-muted)] animate-pulse">
-                  Đang tải thêm...
-                </span>
-              </div>
-            )}
-          </div>
+          <SourceDocumentOcrPreviewView
+            enabled={isOpen}
+            sourceDocument={sourceDocument}
+          />
         ) : filteredPages.length === 0 ? (
           <div className="m-4 rounded-lg border border-dashed border-[var(--theme-border-strong)] bg-[var(--theme-surface)] p-6 text-center">
             <FileText
@@ -275,64 +278,6 @@ export function SourceDocumentPagesDialog({
         )}
       </div>
     </EditorDialogShell>
-  );
-}
-
-function OcrRenderedPagesView({ pages }: { pages: AdminSourceDocumentPageApi[] }) {
-  if (pages.length === 0) {
-    return (
-      <div className="m-4 rounded-lg border border-dashed border-[var(--theme-border-strong)] bg-[var(--theme-surface)] p-6 text-center">
-        <FileText
-          className="mx-auto h-9 w-9 text-[var(--theme-text-muted)]"
-          aria-hidden="true"
-        />
-        <p className="mt-3 text-sm font-extrabold text-[var(--theme-text-strong)]">
-          Chưa có nội dung
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex-1 w-full bg-[var(--theme-surface-soft)] p-2 sm:p-4 lg:p-8 flex justify-center">
-      <div className="w-full max-w-3xl bg-white border border-[var(--theme-border)] rounded-md shadow-sm p-3 sm:p-6 lg:p-8">
-        <div className="flex flex-col gap-4">
-          {pages.map((page, index) => {
-            const text =
-              page.orderedContent ??
-              page.mathpixMarkdown ??
-              page.fullText ??
-              page.textPreview;
-            const printed = getPrintedPageView(page);
-            return (
-              <div
-                key={page.id}
-                className={
-                  index > 0 ? "border-t border-[var(--theme-border-strong)] pt-8" : ""
-                }
-              >
-                <div className="mb-4 text-xs font-bold text-[var(--theme-text-muted)]">
-                  Trang PDF {page.pageNumber}{" "}
-                  {printed.printedPageLabel
-                    ? `(Trang in: ${printed.printedPageLabel})`
-                    : ""}
-                </div>
-                {text ? (
-                  <MathpixMarkdownRenderer
-                    className="mmd-content--ocr-document"
-                    content={text}
-                  />
-                ) : (
-                  <p className="italic text-[var(--theme-text-muted)]">
-                    Không có nội dung
-                  </p>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -569,7 +514,7 @@ function PrintedPageConfirmForm({ page }: { page: AdminSourceDocumentPageApi }) 
       queryClient.invalidateQueries({
         queryKey: adminCourseDocumentQueryKeys.all, // invalidate all to refresh documents and pages
       });
-    } catch (err) {
+    } catch {
       toast.error("Lỗi khi xác nhận trang in");
     } finally {
       setIsSubmitting(false);

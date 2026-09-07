@@ -114,8 +114,8 @@ export function useAdminStemFigures(lessonId: string) {
 export function useEnsureAdminStemFigureForBlock(lessonId: string) {
   const session = useAuthSessionStore((state) => state.session);
   return useMutation({
-    mutationFn: (blockPath: string) =>
-      ensureAdminStemFigureForBlock(lessonId, blockPath, session?.accessToken ?? ""),
+    mutationFn: (input: { blockPath: string; figureIndex?: number }) =>
+      ensureAdminStemFigureForBlock(lessonId, input, session?.accessToken ?? ""),
   });
 }
 

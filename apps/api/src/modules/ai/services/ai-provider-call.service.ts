@@ -22,7 +22,10 @@ import { isAiProviderOutputError } from "#api/modules/ai/utils/ai-output-validat
 import { buildAiUserPrompt } from "#api/modules/ai/utils/ai-prompt";
 import { AiModelRoutingService } from "#api/modules/provider-operations/services/ai-model-routing.service";
 import { ProviderUsageService } from "#api/modules/provider-operations/services/provider-usage.service";
-import type { AiFeatureRoute } from "#api/modules/provider-operations/types/provider-operations.types";
+import type {
+  AiFeatureRoute,
+  ProviderUsageOperation,
+} from "#api/modules/provider-operations/types/provider-operations.types";
 import {
   estimateAiStructuredInputTokens,
   resolveAiStructuredTextFormat,
@@ -92,6 +95,7 @@ type RoutedAiCallContext = {
   backgroundJobId?: string | null;
   attempt?: number;
   callSequence?: number;
+  operation?: ProviderUsageOperation;
   routeSnapshot?: AiFeatureRoute;
   idempotencyKey?: string;
   /** Disable provider failover for flows whose retry contract permits compiler repair only. */
@@ -214,6 +218,7 @@ export class AiProviderCallService {
     context: RoutedAiCallContext,
     input: AiStructuredInput,
     schema: AiOutputSchema<TOutput>,
+    validationSchema: AiOutputSchema<TOutput> = schema,
   ): Promise<AiStructuredOutput<TOutput>> {
     const route = context.routeSnapshot ?? (await this.routing.resolve(context.feature));
     const availableCandidates = route.candidates.filter(
@@ -260,6 +265,12 @@ export class AiProviderCallService {
           backgroundJobId: context.backgroundJobId,
           feature: context.feature,
           purpose: route.purpose ?? null,
+          operation:
+            context.operation ??
+            (route.purpose === "IMAGE"
+              ? "DIAGRAM_GENERATION"
+              : defaultContentOperation(context.feature)),
+          reasoningEffort: resolvedInput.reasoningEffort ?? null,
           attempt: context.attempt,
         },
         {
@@ -296,11 +307,19 @@ export class AiProviderCallService {
         },
       );
       try {
-        const output = await this.aiService.generateStructured(
-          resolvedInput,
-          schema,
-          candidate.provider,
-        );
+        const output =
+          validationSchema === schema
+            ? await this.aiService.generateStructured(
+                resolvedInput,
+                schema,
+                candidate.provider,
+              )
+            : await this.aiService.generateStructured(
+                resolvedInput,
+                schema,
+                candidate.provider,
+                validationSchema,
+              );
         const usage = output.usage;
         const recorded = await this.usage.succeed(usageEvent.id, {
           promptTokens: usage?.promptTokens,
@@ -495,6 +514,21 @@ function fingerprintRequest(input: AiStructuredInput) {
 
 function toAiReasoningEffort(value: string | null): AiReasoningEffort | undefined {
   return isAiReasoningEffort(value) ? value : undefined;
+}
+
+function defaultContentOperation(feature: AiGenerationType): ProviderUsageOperation {
+  const operations: Record<string, ProviderUsageOperation> = {
+    SUMMARY: "SUMMARY_GENERATION",
+    QUIZ: "QUIZ_GENERATION",
+    FLASHCARD: "FLASHCARD_GENERATION",
+    TEST: "TEST_GENERATION",
+    EXPLANATION: "EXPLANATION_GENERATION",
+    CHAT: "CHAT_RESPONSE_GENERATION",
+    EMBEDDING: "EMBEDDING_GENERATION",
+    DOCUMENT_EXTRACT: "DOCUMENT_EXTRACTION",
+    DIAGRAM_RENDER: "DIAGRAM_GENERATION",
+  };
+  return operations[feature] ?? "DIAGRAM_GENERATION";
 }
 
 function capReasoningEffort(

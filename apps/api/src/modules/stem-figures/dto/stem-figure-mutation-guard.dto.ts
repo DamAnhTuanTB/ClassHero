@@ -27,11 +27,23 @@ export enum StemFigureReferenceImageMode {
   NONE = "NONE",
 }
 
+export const STEM_FIGURE_AI_TARGET_MODES = ["QUESTION", "SOLUTION"] as const;
+export type StemFigureAiTargetMode =
+  (typeof STEM_FIGURE_AI_TARGET_MODES)[number];
+
 export class EnsureStemFigureForBlockDto {
   @ApiProperty({ example: "sections.0.blocks.0" })
   @IsString()
   @Matches(/^sections\.\d+\.blocks\.\d+$/u)
   blockPath!: string;
+
+  @ApiProperty({ default: 0, maximum: 2, minimum: 0, required: false })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(2)
+  figureIndex?: number;
 }
 
 export class StemFigureMutationGuardDto {
@@ -65,10 +77,19 @@ export class RetryStemFigureDto extends StemFigureMutationGuardDto {
   diagnosticBatchHash?: string | null;
 }
 
-export class CreateNewStemFigureAiDto extends StemFigureMutationGuardDto {
+export class StemFigureAiCreateOptionsDto {
   @ApiProperty({ enum: StemFigureReferenceImageMode })
   @IsEnum(StemFigureReferenceImageMode)
   referenceImageMode!: StemFigureReferenceImageMode;
+
+  @ApiProperty({
+    enum: STEM_FIGURE_AI_TARGET_MODES,
+    nullable: true,
+    required: false,
+  })
+  @IsOptional()
+  @IsIn(STEM_FIGURE_AI_TARGET_MODES)
+  targetMode?: StemFigureAiTargetMode | null;
 
   @ApiProperty({ nullable: true, required: false, maxLength: 2_000 })
   @IsOptional()
@@ -112,6 +133,39 @@ export class CreateNewStemFigureAiDto extends StemFigureMutationGuardDto {
   @MinLength(1)
   @MaxLength(30_000)
   userPrompt?: string | null;
+}
+
+export class CreateNewStemFigureAiDto extends StemFigureAiCreateOptionsDto {
+  @ApiProperty({ nullable: true, required: false })
+  @IsOptional()
+  @IsUUID()
+  baseCurrentRevisionId?: string | null;
+
+  @ApiProperty({ nullable: true, required: false })
+  @IsOptional()
+  @IsUUID()
+  basePendingRevisionId?: string | null;
+
+  @ApiProperty()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  baseSourceVersion!: number;
+}
+
+export class CreateStemFigureForBlockAiDto extends StemFigureAiCreateOptionsDto {
+  @ApiProperty({ example: "sections.0.blocks.0" })
+  @IsString()
+  @Matches(/^sections\.\d+\.blocks\.\d+$/u)
+  blockPath!: string;
+
+  @ApiProperty({ default: 0, maximum: 2, minimum: 0, required: false })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(2)
+  figureIndex?: number;
 }
 
 export class UseStemFigureSourceCropDto extends StemFigureMutationGuardDto {

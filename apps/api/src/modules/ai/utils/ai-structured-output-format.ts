@@ -30,22 +30,31 @@ export function buildAiStructuredTextFormat<TOutput>(
   schema: AiOutputSchema<TOutput>,
   outputName: string,
   referenceStrategy: AiStructuredSchemaReferenceStrategy = "inline",
+  validationSchema: AiOutputSchema<TOutput> = schema,
 ): AutoParseableTextFormat<TOutput> {
-  return resolveAiStructuredTextFormat(schema, outputName, referenceStrategy).format;
+  return resolveAiStructuredTextFormat(
+    schema,
+    outputName,
+    referenceStrategy,
+    validationSchema,
+  ).format;
 }
 
 export function resolveAiStructuredTextFormat<TOutput>(
   schema: AiOutputSchema<TOutput>,
   outputName: string,
   referenceStrategy: AiStructuredSchemaReferenceStrategy = "inline",
+  validationSchema: AiOutputSchema<TOutput> = schema,
 ): AiStructuredTextFormatResolution<TOutput> {
   if (referenceStrategy === "auto") {
     const candidates: AiStructuredTextFormatResolution<TOutput>[] = [
-      resolveAiStructuredTextFormat(schema, outputName, "inline"),
+      resolveAiStructuredTextFormat(schema, outputName, "inline", validationSchema),
     ];
     for (const strategy of ["ref_v2", "ref"] as const) {
       try {
-        candidates.push(resolveAiStructuredTextFormat(schema, outputName, strategy));
+        candidates.push(
+          resolveAiStructuredTextFormat(schema, outputName, strategy, validationSchema),
+        );
       } catch {
         // Inline is the compatibility baseline. A compact serializer must never
         // make an otherwise valid generation request fail.
@@ -57,23 +66,48 @@ export function resolveAiStructuredTextFormat<TOutput>(
   }
 
   if (referenceStrategy === "inline") {
-    return toResolution(zodTextFormat(schema, outputName), "inline");
+    const format = zodTextFormat(schema, outputName);
+    return toResolution(
+      validationSchema === schema
+        ? format
+        : makeParseableTextFormat<TOutput>(
+            {
+              type: "json_schema",
+              name: outputName,
+              strict: true,
+              schema: format.schema,
+            },
+            (content) => validationSchema.parse(JSON.parse(content)),
+          ),
+      "inline",
+    );
   }
 
   if (referenceStrategy === "ref_v2") {
+    if (validationSchema !== schema) {
+      return toResolution(
+        buildReferenceTextFormat(schema, outputName, true, validationSchema),
+        "ref_v2",
+      );
+    }
     const cacheKey = `${outputName}:ref_v2`;
     const cached = compactFormatCache.get(schema as object)?.get(cacheKey);
     if (cached) {
       return toResolution(cached as AutoParseableTextFormat<TOutput>, "ref_v2");
     }
-    const format = deepFreeze(buildReferenceTextFormat(schema, outputName, true));
+    const format = deepFreeze(
+      buildReferenceTextFormat(schema, outputName, true, validationSchema),
+    );
     const schemaCache = compactFormatCache.get(schema as object) ?? new Map();
     schemaCache.set(cacheKey, format as AutoParseableTextFormat<unknown>);
     compactFormatCache.set(schema as object, schemaCache);
     return toResolution(format, "ref_v2");
   }
 
-  return toResolution(buildReferenceTextFormat(schema, outputName, false), "ref");
+  return toResolution(
+    buildReferenceTextFormat(schema, outputName, false, validationSchema),
+    "ref",
+  );
 }
 
 function toResolution<TOutput>(
@@ -91,6 +125,7 @@ function buildReferenceTextFormat<TOutput>(
   schema: AiOutputSchema<TOutput>,
   outputName: string,
   compactV2: boolean,
+  validationSchema: AiOutputSchema<TOutput>,
 ): AutoParseableTextFormat<TOutput> {
   const generatedSchema = toStrictJsonSchema(
     z.toJSONSchema(schema, {
@@ -123,7 +158,7 @@ function buildReferenceTextFormat<TOutput>(
       strict: true,
       schema: jsonSchema as unknown as Record<string, unknown>,
     },
-    (content) => schema.parse(JSON.parse(content)),
+    (content) => validationSchema.parse(JSON.parse(content)),
   );
 }
 

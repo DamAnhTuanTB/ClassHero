@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Optional } from "@nestjs/common";
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import { badRequestException, notFoundException } from "#api/common/errors/api-exception";
 import type { getRequestContext } from "#api/common/api/request-context";
@@ -38,6 +38,7 @@ import {
 import {
   quizFigureSelect,
   readQuizFigurePendingAiTargetMode,
+  serializeQuizFigureAccessUrl,
 } from "#api/modules/quiz-figures/services/quiz-figures.service";
 import { hashAiValue } from "#api/modules/ai/utils/ai-hash";
 import {
@@ -53,6 +54,8 @@ import {
 } from "#api/modules/quiz/utils/quiz-generation-content-normalizer";
 import { mapGeneratedQuizQuestion } from "#api/modules/quiz/utils/quiz-generation-mapper";
 import { validateQuizOutput } from "#api/modules/quiz/utils/quiz-generation-validation";
+import { StoredFileCleanupService } from "#api/modules/files/services/stored-file-cleanup.service";
+import { FilesService } from "#api/modules/files/services/files.service";
 
 type RequestContext = ReturnType<typeof getRequestContext>;
 
@@ -67,7 +70,11 @@ export interface UpdateQuizSetDto {
 
 @Injectable()
 export class QuizService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly fileCleanup?: StoredFileCleanupService,
+    @Optional() private readonly files?: FilesService,
+  ) {}
 
   // --- Quiz Set ---
 
@@ -336,7 +343,7 @@ export class QuizService {
   }
 
   async deleteQuizSet(setId: string, userId: string, context: RequestContext) {
-    return this.prisma.$transaction(async (transaction) => {
+    const deletion = await this.prisma.$transaction(async (transaction) => {
       const set = await transaction.quizSet.findFirst({
         where: { id: setId, deletedAt: null },
         select: {
@@ -346,7 +353,16 @@ export class QuizService {
           source: true,
           reviewStatus: true,
           questionCount: true,
-          questions: { select: { id: true } },
+          questions: {
+            select: {
+              id: true,
+              figures: {
+                select: {
+                  revisions: { select: { deliveryFileId: true } },
+                },
+              },
+            },
+          },
         },
       });
       if (!set) {
@@ -354,6 +370,16 @@ export class QuizService {
       }
 
       const questionIds = set.questions.map((question) => question.id);
+      const deliveryFileIds = set.questions.flatMap((question) =>
+        question.figures.flatMap((figure) =>
+          figure.revisions.flatMap((revision) =>
+            revision.deliveryFileId ? [revision.deliveryFileId] : [],
+          ),
+        ),
+      );
+      if (deliveryFileIds.length > 0 && !this.fileCleanup) {
+        throw new Error("Stored file cleanup service is unavailable");
+      }
       const deletedAttemptCount = (
         await transaction.quizAttempt.deleteMany({ where: { quizSetId: setId } })
       ).count;
@@ -371,6 +397,9 @@ export class QuizService {
               })
             ).count
           : 0;
+      const stagedFileIds = this.fileCleanup
+        ? await this.fileCleanup.stageDetachedFigureFiles(transaction, deliveryFileIds)
+        : [];
 
       await transaction.auditLog.create({
         data: {
@@ -390,6 +419,7 @@ export class QuizService {
             deletedQuestionCount: questionIds.length,
             deletedAttemptCount,
             deletedExplanationCount,
+            stagedFileCleanupCount: stagedFileIds.length,
           }),
           ipAddress: context.ipAddress,
           userAgent: context.userAgent,
@@ -397,12 +427,21 @@ export class QuizService {
       });
 
       return {
-        success: true,
-        deletedQuestionCount: questionIds.length,
-        deletedAttemptCount,
-        deletedExplanationCount,
+        response: {
+          success: true,
+          deletedQuestionCount: questionIds.length,
+          deletedAttemptCount,
+          deletedExplanationCount,
+        },
+        stagedFileIds,
       };
     });
+
+    const fileCleanup = this.fileCleanup
+      ? await this.fileCleanup.deleteStagedFiles(deletion.stagedFileIds)
+      : { deletedFileCount: 0, pendingFileCleanupCount: 0 };
+
+    return { ...deletion.response, ...fileCleanup };
   }
 
   // --- Quiz Question ---
@@ -515,39 +554,49 @@ export class QuizService {
       }
     }
 
-    return questions.map((question) => {
-      const reference = readQuizGenerationQuestionReference(question.sourceMetadataJson);
-      const generationQuestionJson = reference
-        ? readQuizGenerationQuestion(
-            outputByGenerationId.get(reference.aiGenerationId),
-            reference.generationQuestionIndex,
-          )
-        : null;
-      return {
-        ...question,
-        figures: question.figures.map((figure) => {
-          const deliveryFileId = figure.currentRevision?.deliveryFile?.id;
-          return {
-            ...figure,
-            pendingAiTargetMode: pendingAiTargetModeByFigureId.get(figure.id) ?? null,
-            openAiGenerationCostVnd: deliveryFileId
-              ? (openAiUsageByFigureAsset.get(
-                  quizFigureAssetKey(figure.id, deliveryFileId),
-                )?.costVnd ?? null)
-              : null,
-            openAiCachedInputTokens: deliveryFileId
-              ? (openAiUsageByFigureAsset.get(
-                  quizFigureAssetKey(figure.id, deliveryFileId),
-                )?.cachedInputTokens ?? null)
-              : null,
-          };
-        }),
-        sourceMetadataJson: stripQuizGeometryStatementFromMetadata(
+    return Promise.all(
+      questions.map(async (question) => {
+        const reference = readQuizGenerationQuestionReference(
           question.sourceMetadataJson,
-        ),
-        generationQuestionJson,
-      };
-    });
+        );
+        const generationQuestionJson = reference
+          ? readQuizGenerationQuestion(
+              outputByGenerationId.get(reference.aiGenerationId),
+              reference.generationQuestionIndex,
+            )
+          : null;
+        return {
+          ...question,
+          figures: await Promise.all(
+            question.figures.map(async (figure) => {
+              const deliveryFileId = figure.currentRevision?.deliveryFile?.id;
+              const serializedFigure = await serializeQuizFigureAccessUrl(
+                figure,
+                this.files,
+              );
+              return {
+                ...serializedFigure,
+                pendingAiTargetMode: pendingAiTargetModeByFigureId.get(figure.id) ?? null,
+                openAiGenerationCostVnd: deliveryFileId
+                  ? (openAiUsageByFigureAsset.get(
+                      quizFigureAssetKey(figure.id, deliveryFileId),
+                    )?.costVnd ?? null)
+                  : null,
+                openAiCachedInputTokens: deliveryFileId
+                  ? (openAiUsageByFigureAsset.get(
+                      quizFigureAssetKey(figure.id, deliveryFileId),
+                    )?.cachedInputTokens ?? null)
+                  : null,
+              };
+            }),
+          ),
+          sourceMetadataJson: stripQuizGeometryStatementFromMetadata(
+            question.sourceMetadataJson,
+          ),
+          generationQuestionJson,
+        };
+      }),
+    );
   }
 
   async createQuestion(

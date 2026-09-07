@@ -148,12 +148,12 @@ export function getAdminStemFigures(lessonId: string, token: string) {
 
 export function ensureAdminStemFigureForBlock(
   lessonId: string,
-  blockPath: string,
+  input: { blockPath: string; figureIndex?: number },
   token: string,
 ) {
   return apiRequest<AdminStemFigure>(
     `/admin/lessons/${lessonId}/stem-figures/blocks/ensure`,
-    { method: "POST", body: { blockPath }, token },
+    { method: "POST", body: input, token },
   );
 }
 
@@ -191,7 +191,20 @@ export function createNewAdminStemFigure(
   input: AdminStemFigureCreateAiInput,
   token: string,
 ) {
+  if (!input.figure) {
+    return apiRequest<{
+      figureId: string;
+      jobId: string;
+      status: string;
+      estimatedMaxCostVnd: number | null;
+    }>(`/admin/lessons/${lessonId}/stem-figures/blocks/create-new-ai`, {
+      method: "POST",
+      body: stemFigureBlockCreateAiBody(input),
+      token,
+    });
+  }
   return apiRequest<{
+    figureId?: string;
     jobId: string;
     status: string;
     estimatedMaxCostVnd: number | null;
@@ -199,13 +212,7 @@ export function createNewAdminStemFigure(
     method: "POST",
     body: {
       ...stemFigureMutationGuard(input.figure),
-      referenceImageMode: input.referenceImageMode,
-      adminInstructions: input.adminInstructions,
-      model: input.model,
-      temperature: input.temperature,
-      reasoningEffort: input.reasoningEffort,
-      systemPrompt: input.systemPrompt,
-      userPrompt: input.userPrompt,
+      ...stemFigureCreateAiOptionsBody(input),
     },
     token,
   });
@@ -216,23 +223,50 @@ export function previewCreateNewAdminStemFigure(
   input: AdminStemFigureCreateAiInput,
   token: string,
 ) {
+  if (!input.figure) {
+    return apiRequest<AdminStemFigureCreateAiPreview>(
+      `/admin/lessons/${lessonId}/stem-figures/blocks/create-new-ai/preview`,
+      {
+        method: "POST",
+        body: stemFigureBlockCreateAiBody(input),
+        token,
+      },
+    );
+  }
   return apiRequest<AdminStemFigureCreateAiPreview>(
     `/admin/lessons/${lessonId}/stem-figures/${input.figure.id}/create-new-ai/preview`,
     {
       method: "POST",
       body: {
         ...stemFigureMutationGuard(input.figure),
-        referenceImageMode: input.referenceImageMode,
-        adminInstructions: input.adminInstructions,
-        model: input.model,
-        temperature: input.temperature,
-        reasoningEffort: input.reasoningEffort,
-        systemPrompt: input.systemPrompt,
-        userPrompt: input.userPrompt,
+        ...stemFigureCreateAiOptionsBody(input),
       },
       token,
     },
   );
+}
+
+function stemFigureCreateAiOptionsBody(input: AdminStemFigureCreateAiInput) {
+  return {
+    referenceImageMode: input.referenceImageMode,
+    targetMode: input.targetMode,
+    adminInstructions: input.adminInstructions,
+    model: input.model,
+    temperature: input.temperature,
+    reasoningEffort: input.reasoningEffort,
+    systemPrompt: input.systemPrompt,
+    userPrompt: input.userPrompt,
+  };
+}
+
+function stemFigureBlockCreateAiBody(
+  input: AdminStemFigureCreateAiInput & { blockPath: string },
+) {
+  return {
+    blockPath: input.blockPath,
+    figureIndex: input.figureIndex,
+    ...stemFigureCreateAiOptionsBody(input),
+  };
 }
 
 export function replaceAdminStemFigure(

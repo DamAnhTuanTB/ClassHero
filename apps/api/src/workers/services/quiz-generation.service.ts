@@ -27,7 +27,10 @@ import { QuizFigureJobService } from "#api/modules/quiz-figures/services/quiz-fi
 import { QuizFigureArtifactService } from "#api/modules/quiz-figures/services/quiz-figure-artifact.service";
 import { buildQuizFigureRefinementImageDataUrl } from "#api/modules/quiz-figures/utils/quiz-figure-refinement-image";
 import { QuizGenerationContextService } from "#api/modules/quiz/services/quiz-generation-context.service";
-import type { AiFeatureRoute } from "#api/modules/provider-operations/types/provider-operations.types";
+import type {
+  AiFeatureRoute,
+  ProviderUsageOperation,
+} from "#api/modules/provider-operations/types/provider-operations.types";
 import {
   generatedQuizSourceCoverageAuditSchema,
   getGeneratedQuizOutputSchema,
@@ -37,6 +40,7 @@ import {
 import {
   getGeneratedQuizSolutionText,
   mapGeneratedQuizQuestion,
+  toQuizSolutionTiptap,
   toQuizTiptap,
 } from "#api/modules/quiz/utils/quiz-generation-mapper";
 import {
@@ -171,7 +175,7 @@ export class QuizGenerationService {
     try {
       output = this.providerCall
         ? await this.providerCall.generateStructured(
-            providerContext(context),
+            providerContext(context, { operation: "QUIZ_GENERATION" }),
             request,
             providerSchema,
           )
@@ -370,7 +374,13 @@ export class QuizGenerationService {
     const generate = <TOutput>(schema: AiOutputSchema<TOutput>) =>
       this.providerCall
         ? this.providerCall.generateStructured(
-            providerContext(context, 1),
+            providerContext(context, {
+              callSequence: 1,
+              operation:
+                input.mode === "REFINE"
+                  ? "QUIZ_SOLUTION_REFINEMENT"
+                  : "QUIZ_SOLUTION_REGENERATION",
+            }),
             request,
             schema,
           )
@@ -442,7 +452,7 @@ export class QuizGenerationService {
             : input.questionSnapshot.problem,
         solution: refinedSolution,
       };
-      const explanationJson = toQuizTiptap(refinedSolution);
+      const explanationJson = toQuizSolutionTiptap(refinedSolution);
       let explanationId = question.explanationId;
       if (explanationId) {
         await tx.aiExplanation.update({
@@ -845,13 +855,22 @@ function readImageRouteSnapshot(value: unknown): AiFeatureRoute | undefined {
     : undefined;
 }
 
-function providerContext(context: AiGenerationExecutionContext, callSequence?: number) {
+function providerContext(
+  context: AiGenerationExecutionContext,
+  options?: {
+    callSequence?: number;
+    operation?: ProviderUsageOperation;
+  },
+) {
   return {
     feature: context.type,
     aiGenerationId: context.aiGenerationId,
     backgroundJobId: context.backgroundJobId,
     attempt: context.attempt,
-    ...(callSequence === undefined ? {} : { callSequence }),
+    ...(options?.callSequence === undefined
+      ? {}
+      : { callSequence: options.callSequence }),
+    ...(options?.operation === undefined ? {} : { operation: options.operation }),
     routeSnapshot: context.providerRouteSnapshot,
   };
 }

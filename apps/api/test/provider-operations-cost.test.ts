@@ -299,7 +299,10 @@ describe("provider operations cost accounting", () => {
       AiProviderName.OPENAI,
     );
     expect(usage.reserveAndStart).toHaveBeenCalledWith(
-      expect.anything(),
+      expect.objectContaining({
+        operation: "SUMMARY_GENERATION",
+        reasoningEffort: "xhigh",
+      }),
       expect.objectContaining({
         usageUpperBound: expect.objectContaining({
           promptTokens: 32_000,

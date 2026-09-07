@@ -359,6 +359,10 @@ Các bước chung:
 1. Admin mở buổi học.
 2. Chọn loại nội dung cần tạo bằng AI.
 3. Nhập tham số như số lượng, độ khó, loại câu hỏi, thời gian làm bài nếu có.
+   Riêng `Sinh kiến thức`, admin nhập riêng số bài tập vận dụng không phải ứng
+   dụng thực tế và số bài ứng dụng thực tế; hai ô mặc định `2`/`2`. Preview và
+   lượt tạo thật phải dùng cùng hai giá trị làm mục tiêu. Nếu Phase 1 trả thiếu
+   hoặc thừa, hệ thống vẫn hiển thị toàn bộ bài hợp lệ thay vì chặn Summary.
    Với Quiz, modal có select `Bộ câu hỏi được chọn` liệt kê các bộ hiện có và
    mặc định là tab bộ đang mở. Admin có thể giữ hoặc đổi bộ đích; giá trị cuối
    cùng được gửi làm `targetQuizSetId`, cùng số câu và tài liệu nguồn đã chọn.
@@ -414,8 +418,9 @@ Các bước chung:
    Nhóm `Nhãn và số đo` quét source draft hiện tại và hiển thị từng text slot theo
    thứ tự source, gồm node độc lập, node gắn trên path và các field label TikZ/
    circuitikz đã được parser hỗ trợ chắc chắn. Mỗi dòng có loại nội dung, input
-   giá trị, icon cài đặt và action xóa. Mặc định row gọn; bấm icon cài đặt cạnh
-   icon xóa mới xổ vùng bên dưới input gồm slider `Ngang (x)`, `Dọc (y)` và
+   giá trị, icon áp dụng, icon cài đặt và action xóa. Icon áp dụng commit riêng
+   row và tương đương một lần `Biên dịch`; bấm icon cài đặt cạnh icon xóa mới xổ
+   vùng bên dưới input gồm slider `Ngang (x)`, `Dọc (y)` và
    `Cỡ chữ`. Hai trục dùng khoảng `-50pt–+50pt`, mốc vị trí source hiện tại là
    `0`; cỡ chữ dùng `10%–200%`, mốc cỡ hiện tại là `100%`. Sửa một dòng phải định
    danh theo source range/kind của chính slot đó, không replace theo chuỗi nên
@@ -423,13 +428,53 @@ Các bước chung:
    Slider cỡ chữ riêng là hệ số trên cỡ nền do `Nhãn chính/Nhãn phụ` quản lý:
    đổi slider nhóm phải scale cả cỡ nền và override riêng để giữ nguyên hệ số;
    đổi slider riêng sau đó cũng phải đọc đúng cỡ nền mới, không cộng dồn sai.
-   Xóa chỉ bỏ phần text: node chỉ có chức năng hiển thị chữ được bỏ cả command,
-   còn node/label gắn với path, marker hoặc linh kiện chỉ bỏ clause text và giữ
-   geometry. Sau khi blur, Enter, bấm xóa hoặc bấm `Biên dịch` khi input còn đang
+   Xóa nhãn thường chỉ bỏ phần text: node chỉ có chức năng hiển thị chữ được bỏ cả
+   command, còn node/label gắn với path hoặc linh kiện chỉ bỏ clause text và giữ
+   geometry. Riêng xóa số đo nằm trong angle `pic` phải xóa cả nhóm cung đồng tâm
+   cùng đỉnh/cặp tia, nhưng vẫn giữ hai cạnh tạo góc. Sau khi blur, Enter, bấm xóa hoặc bấm `Biên dịch` khi input còn đang
    focus, UI flush bản nháp mới nhất vào source rồi chạy đúng một lần compile/
    validator; thành công cập nhật preview/history, thất bại giữ lại source và
-   input hợp lệ trước đó kèm lỗi. Khi admin gõ code thủ công, danh sách được parse
+   input hợp lệ trước đó kèm lỗi. Bấm `Biên dịch` ở footer không đóng popover
+   `Chỉnh nhanh` hoặc vùng cài đặt row đang mở. Khi admin gõ code thủ công, danh sách được parse
    lại từ source mới và history quick action được reset như hiện tại.
+   Admin cũng có thể nhập nhanh tên góc và số đo, ví dụ `ABD` + `50`. UI xác nhận
+   `B` là đỉnh, liệt kê cạnh sẽ tự nối và số cung trước khi thực hiện. Khi admin
+   bấm `Thêm góc`, web biến đổi source một lần: giữ cạnh đã có, nối cạnh còn thiếu
+   nếu checkbox đang bật, chọn hướng TikZ tạo góc nhỏ, thêm đúng một nhãn số đo ở
+   cung ngoài cùng rồi compile preview. Nếu geometry góc đã tồn tại, thao tác thay
+   nhóm cung và số đo cũ; số đo bằng nhau dùng cùng kiểu cung, số đo khác hoặc chưa
+   chứng minh bằng nhau dùng kiểu đang còn trống. Thành công tạo một entry `Hoàn tác`; lỗi
+   parse/compile trả nguyên source hợp lệ trước đó và không promote revision.
+   Nếu admin chỉ nhập tên góc rồi bấm `Bỏ góc`, web đối chiếu geometry không phân
+   biệt thứ tự hai điểm ngoài, xóa số đo trong `pic` hoặc `node` rời neo đúng đỉnh
+   cùng mọi cung đồng tâm của góc đó, giữ nguyên hai cạnh và compile/rollback/
+   history theo cùng contract.
+   Card `Chỉnh đoạn thẳng` cho nhập `BD`, hiển thị đoạn đang nối hay chưa và có
+   hai action `Nối`/`Bỏ nối`. Nối chỉ thêm một `draw` khi cạnh chưa tồn tại; bỏ
+   nối tách path thẳng hoặc mở polygon cycle tại đúng cạnh, giữ các cạnh còn lại;
+   cạnh mới dùng độ dày chiếm ưu thế của các cạnh hiện có.
+   Mỗi action compile một lần, thành công tạo một entry history và lỗi rollback.
+   Card `Thêm trung điểm` cho nhập hai đầu đoạn và tên midpoint. Khi submit, web
+   kiểm tra hai điểm có thật, tên midpoint chưa dùng và cặp điểm chưa có midpoint;
+   cạnh chưa tồn tại được tự nối đúng một lần, sau đó thêm coordinate tỷ lệ `0.5`,
+   dấu điểm/nhãn với tên tự viết hoa, font-size kế thừa nhãn điểm hiện có và hai
+   marker cùng kiểu tại `.25`/`.75` trên đoạn toàn phần.
+   Nhóm đoạn khác lấy marker khác, rồi compile một lần; lỗi compile rollback toàn
+   bộ, gồm cả cạnh vừa tự nối, và không để lại midpoint dở dang.
+   Nếu đoạn đã có một midpoint do Chỉnh nhanh sở hữu và admin submit tên khác,
+   web thay nguyên tử block cũ bằng midpoint mới, giữ cạnh cùng kiểu marker và
+   không tạo thêm relation thứ hai. Midpoint cũ còn được geometry khác tham chiếu
+   thì từ chối ghi đè để tránh làm hỏng hình.
+   Khi bấm `Xóa trung điểm`, admin chỉ cần nhập đoạn thẳng; web tự tìm quan hệ
+   midpoint duy nhất do Chỉnh nhanh sở hữu rồi xóa point/label/marker đã xác định
+   chắc chắn. Đoạn nối hai đầu vẫn giữ nguyên. Midpoint còn được geometry khác
+   tham chiếu, có nhiều midpoint trên cùng đoạn hoặc source không xác định ownership
+   phải giữ nguyên và báo lỗi.
+   Checkbox `Thêm tên tâm đường tròn` mặc định tắt. Khi bật, admin nhập tên tâm;
+   UI tự viết hoa và CTA thêm tên sẽ tìm duy nhất một tâm đường tròn đơn trong
+   source, đặt nhãn có cùng font-size với point label hiện có cạnh chấm tâm rồi
+   compile một lần. Action không vẽ thêm chấm, không đổi đường tròn; nhập tên mới
+   sẽ thay block nhãn tâm do tool sở hữu nếu không có tham chiếu ngoài.
 10. Với Summary, output mới chỉ có năm loại block `knowledge`, `theorem`,
     `property`, `example`, `note`; mỗi theory đi liền một example, note giữ vị
     trí phù hợp. Hình nguồn trực tiếp bổ trợ block ở phía trước hoặc phía sau thì
@@ -465,7 +510,11 @@ Các bước chung:
     `GENERATED_FROM_BRIEF` khi không có hình nguồn, AI đề xuất vẽ thêm. AI phải
     khai field này trong structured output và backend reject nếu origin mâu thuẫn
     với `sourceReferences`. Với `GENERATED_FROM_BRIEF`, Stage 2 luôn chạy không
-    ảnh (`mode=NONE`), không được gửi crop hoặc PDF fallback. Ở chế độ `Song song`
+    ảnh (`mode=NONE`), không được gửi crop hoặc PDF fallback. Nếu block sở hữu là
+    `example` hoặc `exercise`, Stage 2 nhận `solution > problem` và dựng một hình
+    lời giải hoàn chỉnh, độc lập theo cùng invariant nghiệp vụ với Quiz
+    `SOLUTION`, nhưng vẫn dùng prompt/runtime riêng của Summary. Các block khác
+    tiếp tục sinh hình từ projection hiện tại. Ở chế độ `Song song`
     và `Chỉ xem JSON`, admin còn thấy nguyên `sourceReferences` Phase 1 của từng
     figure; mảng rỗng xác nhận hình do AI đề xuất vẽ mới, mảng có phần tử chỉ ra
     đúng trang/nhãn/phạm vi hình SGK.
@@ -478,6 +527,23 @@ code`, `Tải ảnh lên`, `Xem ảnh sách giáo khoa`; action cuối chỉ hi�
     hiện hành đều có icon `Đổi caption`; modal chấp nhận cả caption có nội dung và
     caption rỗng. Lưu caption chỉ cập nhật metadata trên revision hiện hành và
     Summary reference, không biên dịch, upload lại ảnh hoặc gọi AI.
+    Riêng Ví dụ/Bài tập chưa có figure thay `Tạo mới bằng AI` bằng `Tạo hình cho
+đề bài` và `Tạo hình cho lời giải`. Action đầu mở modal target `QUESTION`,
+    preview/execute chỉ gửi `problem` và dùng slot `0`; action sau mở modal target
+    `SOLUTION`, gửi `solution > problem`, không gửi `answer`, dùng slot `1` và bị
+    khóa nếu chưa có lời giải chữ. Với Ví dụ/Bài tập đã có hình slot `0` mang
+    reference SGK, menu giữ `Tạo mới bằng AI` cho hình hiện tại và thêm `Tạo hình
+cho lời giải`; hình lời giải là resource độc lập, không nhận ảnh/code hình đề.
+    Cả hai modal giữ cùng luồng cấu hình model, prompt/request preview, token, chi
+    phí, pending và submit như modal tạo hình Quiz tương ứng. Khi block không có
+    hình đề từ SGK, hai action target vẫn còn sau khi slot `0` hoặc `1` đã được
+    sinh. Modal target luôn hiện `Tạo mới lại`; chỉ hiện `Chỉnh sửa hình hiện tại`
+    khi đúng slot đang mở có asset `AI_TEX`. Slot chưa có hình, thiếu asset hoặc
+    chỉ có raster phải ẩn lựa chọn chỉnh sửa.
+    Khi hiển thị khối, hình slot `0` nằm trong phần đề bài; hình slot `1`
+    phải nằm ngay sau dòng `Lời giải` và trước nội dung lời giải. Modal
+    `Toàn bộ hình minh họa` gắn nhãn `Hình đề bài`/`Hình lời giải` cho
+    hai slot này để admin phân biệt được các resource cùng khối.
     Modal tạo hình AI có nút `Xem dữ liệu`, hiển thị cùng cây JSON của modal Tạo
     kiến thức và phản ánh request OpenAI đầy đủ theo lựa chọn/field hiện tại. Nếu
     admin nhập `Yêu cầu cho hình mới`, request phải phản ánh đúng cách làm đã
@@ -591,14 +657,21 @@ Acceptance Criteria:
 2. Với từng loại tóm tắt, Quiz, Flashcard và bài kiểm tra, cấu hình riêng hai
    route `Phase 1 - tạo text` và `Phase 2 - tạo ảnh`; mỗi route có model
    chính/dự phòng và được lưu bằng optimistic version độc lập.
-3. Xem OCR provider/cache/credential status, tỷ giá và ngân sách.
-4. Xem chi phí theo ngày/tuần/tháng, breakdown model/chức năng và usage event.
-5. Khi provider đổi giá, thêm price version với nguồn chính thức và ngày hiệu lực; lịch sử cũ không bị tính lại.
-6. Khi bật `Tạm dừng khi hết ngân sách`, UI hiển thị tiền đã dùng, đang giữ chỗ và còn lại. Mỗi paid call phải giữ chỗ nguyên tử trước; nếu không đủ số dư hoặc không ước lượng được upper bound thì job bị chặn trước provider call.
-7. Tại tab `Thiết lập mặc định`, admin nhập `Giới hạn token đầu vào` và
+3. Khi thêm/sửa model, UI liệt kê đủ
+   `none | minimal | low | medium | high | xhigh | max` theo thứ tự tăng dần;
+   admin tự tick tập capability của model. Các select Reasoning Effort phía sau
+   chỉ lấy tập đã tick và giữ nguyên thứ tự này.
+4. Xem OCR provider/cache/credential status, tỷ giá và ngân sách.
+5. Xem chi phí theo ngày/tuần/tháng, breakdown model/chức năng và usage event.
+   Mỗi lượt AI hiển thị thời gian phản hồi, Reasoning Effort đã resolve và tên
+   tác vụ được snapshot theo đúng mục đích, ví dụ sinh kiến thức, tạo Quiz, tạo
+   ảnh mới, chỉnh sửa/tinh chỉnh/sửa lỗi ảnh, tinh chỉnh hoặc tạo lại lời giải.
+6. Khi provider đổi giá, thêm price version với nguồn chính thức và ngày hiệu lực; lịch sử cũ không bị tính lại.
+7. Khi bật `Tạm dừng khi hết ngân sách`, UI hiển thị tiền đã dùng, đang giữ chỗ và còn lại. Mỗi paid call phải giữ chỗ nguyên tử trước; nếu không đủ số dư hoặc không ước lượng được upper bound thì job bị chặn trước provider call.
+8. Tại tab `Thiết lập mặc định`, admin nhập `Giới hạn token đầu vào` và
    `Giới hạn token đầu ra` cho từng phase của từng tính năng. Tab `Quản lý
 model` không hiển thị giới hạn kỹ thuật hoặc trần token.
-8. Modal sinh kiến thức và sinh Quiz hiển thị hai nhóm cấu hình model riêng cho
+9. Modal sinh kiến thức và sinh Quiz hiển thị hai nhóm cấu hình model riêng cho
    Phase 1/Phase 2. Bỏ trống override thì mỗi phase dùng đúng route mặc định của
    chính feature; thay model Phase 1 không được làm đổi model tạo ảnh và ngược lại.
 

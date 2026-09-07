@@ -159,72 +159,57 @@ export function mapLessonSummaryProviderOutput(input: {
   }
 
   const applicationBlocks: LessonSummaryMvpBlock[] = [];
-  const standardPath = `sections.${sections.length}.blocks.0`;
-  phaseOneBlocks[standardPath] = structuredClone(
-    input.output.applicationExercises.standardExercise,
-  );
-  phaseOneProviderPaths[standardPath] = "applicationExercises.standardExercise";
-  validateExampleProvenance(
-    input.output.applicationExercises.standardExercise,
-    input.packetPageCount,
-  );
-  applicationBlocks.push(
-    attachMissingFigureIssue(
-      mapLessonSummaryProviderExampleBlock(
-        input.output.applicationExercises.standardExercise,
-        input.subjectKey,
-        input.targetGrade,
-      ),
-      "applicationExercises.standardExercise",
-      standardPath,
+  const applicationExercises = [
+    ...input.output.applicationExercises.standardExercises.map(
+      (exercise, exerciseIndex) => ({
+        exercise,
+        providerPath: `applicationExercises.standardExercises.${exerciseIndex}`,
+      }),
     ),
-  );
-  addFigures(
-    figures,
-    standardPath,
-    input.output.applicationExercises.standardExercise.figures,
-    input.packetPageCount,
-    input.output.applicationExercises.standardExercise,
-    "Bài tập vận dụng",
-  );
-  const realWorldPath = `sections.${sections.length}.blocks.1`;
-  phaseOneBlocks[realWorldPath] = structuredClone(
-    input.output.applicationExercises.realWorldExercise,
-  );
-  phaseOneProviderPaths[realWorldPath] = "applicationExercises.realWorldExercise";
-  validateExampleProvenance(
-    input.output.applicationExercises.realWorldExercise,
-    input.packetPageCount,
-  );
-  applicationBlocks.push(
-    attachMissingFigureIssue(
-      mapLessonSummaryProviderExampleBlock(
-        input.output.applicationExercises.realWorldExercise,
-        input.subjectKey,
-        input.targetGrade,
-      ),
-      "applicationExercises.realWorldExercise",
-      realWorldPath,
+    ...input.output.applicationExercises.realWorldExercises.map(
+      (exercise, exerciseIndex) => ({
+        exercise,
+        providerPath: `applicationExercises.realWorldExercises.${exerciseIndex}`,
+      }),
     ),
-  );
-  addFigures(
-    figures,
-    realWorldPath,
-    input.output.applicationExercises.realWorldExercise.figures,
-    input.packetPageCount,
-    input.output.applicationExercises.realWorldExercise,
-    "Bài tập vận dụng",
-  );
-  sections.push({
-    order: sections.length + 1,
-    displayHeading: "Bài tập vận dụng",
-    sourceEvidence: input.output.theorySections.at(-1)?.sourceEvidence ?? {
-      kind: "CONTENT",
-      text: "Bài tập vận dụng tổng hợp từ nội dung trong PDF packet.",
-      packetPageNumbers: [input.packetPageCount],
-    },
-    blocks: applicationBlocks,
-  });
+  ];
+  for (const { exercise, providerPath } of applicationExercises) {
+    const blockPath = `sections.${sections.length}.blocks.${applicationBlocks.length}`;
+    phaseOneBlocks[blockPath] = structuredClone(exercise);
+    phaseOneProviderPaths[blockPath] = providerPath;
+    validateExampleProvenance(exercise, input.packetPageCount);
+    applicationBlocks.push(
+      attachMissingFigureIssue(
+        mapLessonSummaryProviderExampleBlock(
+          exercise,
+          input.subjectKey,
+          input.targetGrade,
+        ),
+        providerPath,
+        blockPath,
+      ),
+    );
+    addFigures(
+      figures,
+      blockPath,
+      exercise.figures,
+      input.packetPageCount,
+      exercise,
+      "Bài tập vận dụng",
+    );
+  }
+  if (applicationBlocks.length > 0) {
+    sections.push({
+      order: sections.length + 1,
+      displayHeading: "Bài tập vận dụng",
+      sourceEvidence: input.output.theorySections.at(-1)?.sourceEvidence ?? {
+        kind: "CONTENT",
+        text: "Bài tập vận dụng tổng hợp từ nội dung trong PDF packet.",
+        packetPageNumbers: [input.packetPageCount],
+      },
+      blocks: applicationBlocks,
+    });
+  }
 
   const content = lessonSummaryOutputSchema.parse({
     lessonId: input.lessonId,
@@ -245,10 +230,10 @@ export function mapLessonSummaryProviderExampleBlock(
   example: LessonSummaryProviderExampleBlock,
   subjectKey: LessonSummarySubjectKey = "MATH",
   targetGrade: number | null = null,
-): LessonSummaryMvpBlock & { type: "example" } {
+): LessonSummaryMvpBlock & { type: "example" | "exercise" } {
   const solution = requireText(normalizeSolution(example.solution), "solution");
   return {
-    type: "example",
+    type: example.exampleKind === "ILLUSTRATION" ? "example" : "exercise",
     problem: normalizeMathText(requireText(example.problem, "problem")),
     solution,
     answer: normalizeMathText(requireText(example.answer, "answer")),

@@ -50,8 +50,31 @@ Các subtask mới nhất:
 
 - Prompt/heuristic/validator/policy AI phải dựa trên invariant tổng quát; không
   hard-code lesson, figure, số liệu hoặc hình cụ thể để vá regression.
+- Với lỗi prompt đơn giản, ưu tiên sửa bằng một invariant ngắn ngay trong prompt
+  đang sở hữu hành vi. Không đề xuất thêm schema, audit field hoặc validator nếu
+  chưa có bằng chứng rằng prompt-only không đủ hoặc downstream thật sự cần chúng.
+- Khi sửa lỗi bài tập AI thiếu đa dạng, phải kiểm tra cả hai ý độc lập: độ phủ
+  giữa các trọng tâm/dạng bài của lesson và việc lặp cùng một cách giải dưới các
+  bối cảnh hoặc số liệu khác nhau; không chỉ sửa một trong hai.
+- Live Summary `1` bài chuẩn + `5` bài thực tế với Luna High đã chứng minh prompt
+  ngắn có thể cải thiện độ phủ nhưng không bảo đảm tuyệt đối chống trùng semantic:
+  schema/cardinality vẫn pass khi model tự đánh giá sai hai mạch giải gần nhau.
+  Nếu sản phẩm cần bảo đảm cứng, phải có quyết định riêng cho semantic review/gate;
+  không giả vờ schema cấu trúc có thể kiểm chứng nội dung này.
+- Không thêm vào prompt một ngoại lệ cho phép model tự tuyên bố thiếu lựa chọn rồi
+  bỏ qua mục tiêu chất lượng đang sửa. Trường hợp biên dùng làm counterexample/test;
+  chỉ đưa escape clause vào production khi product contract thật sự bắt buộc.
+- Khi phân loại bài ứng dụng thực tế, bối cảnh đời sống/kĩ thuật/khoa học phải tham
+  gia thực chất vào dữ kiện hoặc mục tiêu cần giải quyết. Chỉ có đơn vị, hình vẽ,
+  tên vật thể hoặc một câu dẫn đời sống không làm bài toán thuần túy thành bài thực
+  tế. Ưu tiên bài nguồn phải diễn ra trong đúng nhóm; không lấy bài nguồn thường
+  đưa sang nhóm thực tế chỉ để tránh tạo `AI_AUTHORED`.
 - Trong modal tạo Summary, hai prompt hiển thị là prompt cuối gửi provider;
   backend/worker không được âm thầm nối thêm prompt nghiệp vụ.
+- Khi Summary bật `Dùng hình sách giáo khoa`, một logical figure plan Phase 1 có
+  thể chứa nhiều `sourceReferences`; worker cố ý materialize mọi OCR crop được
+  resolve chắc chắn thành các figure/card riêng trong cùng block. Không nhầm
+  luồng tự động này với action thủ công `Dùng hình này`, vốn chỉ chọn một crop.
 - Khi Stage 2 có ảnh tham chiếu, ảnh là ground truth cho baseline; yêu cầu admin
   chỉ là delta có thẩm quyền trong phạm vi được nhập.
 - Backend sở hữu compiler envelope, package/toolbox allowlist, source policy,

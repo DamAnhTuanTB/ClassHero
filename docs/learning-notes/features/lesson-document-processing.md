@@ -71,6 +71,10 @@ Worker `M4.4` hiện làm các việc chính:
 - Nhận job từ Redis/BullMQ bằng `backgroundJobId`.
 - Cập nhật DB status `QUEUED -> RUNNING -> SUCCEEDED/FAILED`, kèm `attempts`, `error_message`, `started_at`, `finished_at`.
 - Với Mathpix, `.mmd` và `lines.json` là output mặc định; request conversion cho `.mmd.zip`, `.md`, `.html.zip`, rồi download đủ `.mmd`, `.md`, `.mmd.zip`, `lines.json`, `.html.zip`.
+- Trạng thái OCR `completed` không đồng nghĩa các conversion đã sẵn sàng. Worker
+  phải chờ `conversion_status` của `md`, `mmd.zip` và `html.zip` đều `completed`,
+  đồng thời kiểm tra chữ ký ZIP trước khi cache; endpoint conversion có thể trả
+  JSON trạng thái với HTTP 200 khi conversion vẫn còn `processing`.
 - Lưu artifact vào object storage theo key có `options_hash`, kèm `manifest.json`, `metadata.json`, `pages.json`, `image-manifest.json` và `artifact-audit.json`.
 - Lưu `image-manifest.json` normalized cho crop/ảnh provider trả về, gồm page/order, object key, bbox raw/normalized, page dimensions, nearby text/caption, kind heuristic, `qualityFlags` và `isUsableForAi` để visual Q&A, viewer, quiz hình/bảng dùng lại. Với Mathpix `.mmd.zip`, crop filename có dạng `{pdfId}-{page}_{height}_{width}_{topLeftY}_{topLeftX}.jpg`; parser phải đổi về bbox chuẩn `{ x: topLeftX, y: topLeftY, w: width, h: height }`.
 - Lưu `printedPage` trong `pages.json`, `image-manifest.json`, source page metadata và chunk metadata: `pdfPageNumber`, `printedPageNumber`, `printedPageLabel`, source/confidence/evidence/warning. M4.4 infer từ boundary lines và có offset rule toàn tài liệu để bù trang thiếu chắc chắn. Nhờ vậy câu hỏi kiểu "hình ở trang 35 sách toán" có thể map số trang học sinh thấy sang đúng PDF page/crop trước khi gọi AI.
@@ -119,6 +123,16 @@ Worker `M4.4` hiện làm các việc chính:
   đó; preview dùng `orderedContent` để thay URL ảnh chứ không tự sắp lại text và
   `providerImages` bằng bbox/order metadata. `ocrImages[]` chỉ là metadata/fallback
   cho consumer chuyên biệt, không phải nguồn dựng thứ tự hiển thị chính.
+- Nhãn trang trong `lines.json` có thể nằm ở `text` dù `text_display` rỗng và có
+  dấu bao Unicode như `«Trang 16»`. Normalizer phải bỏ dấu bao ở biên trước khi
+  parse, ưu tiên semantic `page_info`, và không coi đáp án `C`/`D`/`IV` trong
+  body text là số trang La Mã. Giữ artifact gốc giúp sửa rule rồi dựng lại page
+  metadata từ cache mà không gọi lại OCR trả phí.
+- Bản xem OCR “Toàn bộ” cần render trực tiếp MMD gốc của provider để giữ bảng,
+  danh sách, công thức và ảnh gần output gốc nhất, đồng thời tránh HTML conversion
+  đã nhúng hàng chục nghìn SVG có thể lên hàng trăm MB và làm API OOM khi bọc vào
+  JSON. Bản text/Markdown đã normalize vẫn dùng cho chế độ “Từng trang”, tìm kiếm,
+  mapping số trang và RAG; không dùng nội dung preview làm dữ liệu retrieval.
 - Retrieval/RAG sau này phải filter theo `lesson_id`, nên chunk cuối cùng luôn gắn với lesson.
 - Page range của lesson document xác định phạm vi được đưa vào bài học; page range
   của chunk mới là bằng chứng truy vết của riêng đoạn đó. Hai cấp metadata này không

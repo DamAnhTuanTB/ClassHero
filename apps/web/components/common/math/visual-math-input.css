@@ -173,6 +173,10 @@
   --smart-fence-color: var(--visual-math-accent);
 }
 
+.visual-math-input--compact .visual-math-input__field-host math-field {
+  font-size: 1rem;
+}
+
 .visual-math-input__field-host math-field:focus-within {
   border-color: var(--visual-math-accent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--visual-math-accent) 18%, transparent);

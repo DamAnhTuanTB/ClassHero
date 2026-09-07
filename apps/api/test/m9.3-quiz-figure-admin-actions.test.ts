@@ -153,7 +153,7 @@ describe("M9.3 Quiz figure admin actions", () => {
     );
   });
 
-  it("reserves the full-source output budget for an independent solution figure", async () => {
+  it("preserves the configured output budget for an independent solution figure", async () => {
     const prisma = {
       quizFigure: {
         findFirst: vi
@@ -192,7 +192,7 @@ describe("M9.3 Quiz figure admin actions", () => {
       temperature: null,
       reasoningEffort: "medium",
       maxInputTokens: 20_000,
-      maxOutputTokens: 8_000,
+      maxOutputTokens: 20_000,
       candidates: [
         {
           provider: "OPENAI",
@@ -221,7 +221,7 @@ describe("M9.3 Quiz figure admin actions", () => {
     expect(jobs.enqueue).toHaveBeenCalledWith(
       figureId,
       actorUserId,
-      expect.objectContaining({ maxOutputTokens: 12_000 }),
+      expect.objectContaining({ maxOutputTokens: 20_000 }),
       expect.objectContaining({ aiMode: "REGENERATE" }),
     );
   });

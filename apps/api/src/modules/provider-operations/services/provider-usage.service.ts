@@ -18,6 +18,7 @@ import {
 import type {
   PriceRateSnapshot,
   ProviderUsageAmounts,
+  ProviderUsageOperation,
 } from "#api/modules/provider-operations/types/provider-operations.types";
 import {
   calculateProviderCost,
@@ -40,6 +41,8 @@ type StartUsageInput = {
   sourceDocumentId?: string | null;
   feature?: AiGenerationType | null;
   purpose?: AiModelPurpose | null;
+  operation?: ProviderUsageOperation | null;
+  reasoningEffort?: string | null;
   attempt?: number;
   cacheStatus?: string | null;
 };
@@ -100,6 +103,8 @@ export class ProviderUsageService {
         sourceDocumentId: true,
         feature: true,
         purpose: true,
+        operation: true,
+        reasoningEffort: true,
         attempt: true,
         cacheStatus: true,
         createdAt: true,
@@ -117,6 +122,8 @@ export class ProviderUsageService {
         sourceDocumentId: event.sourceDocumentId,
         feature: event.feature,
         purpose: event.purpose,
+        operation: event.operation as ProviderUsageOperation | null,
+        reasoningEffort: event.reasoningEffort,
         attempt: event.attempt,
         cacheStatus: event.cacheStatus,
       },
@@ -521,6 +528,8 @@ export class ProviderUsageService {
         sourceDocumentId: input.sourceDocumentId ?? null,
         feature: input.feature ?? null,
         purpose: input.purpose ?? null,
+        operation: input.operation ?? null,
+        reasoningEffort: input.reasoningEffort ?? null,
         attempt: Math.max(1, input.attempt ?? 1),
         cacheStatus: input.cacheStatus ?? null,
         fxRateVndPerUsd,

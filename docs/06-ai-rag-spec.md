@@ -199,13 +199,21 @@ Mục đích:
   hiện tại chưa phát sinh paid call Phase 2.
 - OpenAI là primary, Gemini là fallback khi có credential. Fallback chỉ chạy cho timeout, 429 và 5xx; lỗi schema/Zod, business hoặc safety không được gọi model thứ hai.
 - Embedding không đi qua màn Cài đặt AI: vẫn cố định OpenAI model/dimension của vector space hiện tại.
-- Mỗi provider attempt ghi `provider_usage_events` với model, price version, token/page, latency, USD/VND và quan hệ job/generation/document.
+- Mỗi provider attempt ghi `provider_usage_events` với model, price version,
+  token/page, latency, USD/VND, Reasoning Effort đã resolve, mã tác vụ theo đúng
+  mục đích và quan hệ job/generation/document. Mã tác vụ phải được truyền từ
+  workflow gọi AI; không suy ngược từ model hoặc gom mọi lượt hình vào một loại.
 - Tổng chi phí/tổng lượt gọi hiển thị cho một generation phải cộng từ các
   `provider_usage_events` đã ghi nhận. Snapshot trên `ai_generations` không được
   dùng làm nguồn duy nhất vì phase tạo figure hoặc thao tác tạo lại ảnh có thể
   phát sinh thêm provider attempt sau khi generation chính đã hoàn tất.
 - Bảng giá được nhập thủ công từ nguồn chính thức, có ngày hiệu lực; không scrape tự động và không tính lại lịch sử bằng giá mới.
 - Ô chọn chỉ lấy model text/structured-output `ACTIVE` trong catalog và nhóm theo provider; preview/audio/image/deprecated không được seed vào luồng sinh nội dung học tập.
+- Catalog dùng một danh sách Reasoning Effort hợp nhất cho mọi model:
+  `none | minimal | low | medium | high | xhigh | max`, sắp từ bé đến lớn.
+  Hệ thống không tự suy đoán capability theo tên model; admin chọn các mức phù
+  hợp cho từng model. API chuẩn hóa thứ tự khi lưu, còn mọi select route/override
+  chỉ hiển thị tập đã chọn theo đúng thứ tự chuẩn.
 - Budget mặc định cảnh báo mềm ở 70/90/100%; hard stop chỉ có hiệu lực khi admin chủ động bật.
 - Từ `M9.12`, hard stop dùng reservation nguyên tử trước paid call. Gateway khóa và kiểm tra đồng thời ngân sách `ALL` + `AI/OCR`, giữ worst-case cost rồi mới gọi provider; thiếu dữ liệu để ước lượng thì fail-closed.
 - Với AI, worst-case input/output lấy từ `ai_feature_model_configs` của đúng
@@ -604,6 +612,11 @@ dùng document chunks theo contract riêng.
   nhiều dữ kiện, nhiều mệnh đề dễ độc lập hoặc câu chữ đánh đố không làm tăng độ
   khó. Khi request yêu cầu phân bổ cố định, candidate chưa đạt mức phải được thay
   bằng câu sâu hơn trong đúng phạm vi lesson, không chỉ đổi nhãn.
+  Trong default system prompt, ba mức nằm trong section lớn riêng
+  `VI. PHÂN LOẠI ĐỘ KHÓ`; mỗi mức là một đoạn với nhãn đậm và tên ngắn mô tả
+  độ sâu (`Áp dụng trực tiếp`, `Hai bước phụ thuộc`, `Ba bước và kết hợp kiến
+thức`). Không dùng ba bullet dài liền nhau vì preview khó nhận ra ranh giới khi
+  nội dung tự xuống dòng.
 - Mọi nội dung hiển thị của Quiz, đặc biệt lời giải, chỉ dùng kiến thức
   trong nguồn hoặc các kiến thức học sinh đã được học trước đó ở cùng khối hoặc
   khối dưới. Không dùng định lý, thuật ngữ hoặc phương pháp của khối lớp
@@ -668,10 +681,9 @@ dùng document chunks theo contract riêng.
   bằng chữ hoa, có ít nhất hai từ và không chứa cú pháp toán. Dấu `$` được chèn
   trước dấu câu. Decimal, công thức nhiều vế, code span, display math, currency
   escape và trường hợp mơ hồ phải giữ nguyên.
-  Default prompt của mọi môn phải phân biệt rõ JSON thô với giá trị sau giải mã:
-  dấu `\\` mở đầu lệnh được ghi thành `\\\\` trong JSON thô và trở lại đúng một
-  dấu `\\` sau giải mã; prompt phải có ví dụ đúng, cấm `U+001C` thật cùng các
-  dạng `u001c...`/escape hai lần và yêu cầu rà mọi field chữ trước khi trả output.
+  Structured Outputs sở hữu JSON transport; default prompt không yêu cầu model
+  phân biệt raw escape, rà ký tự điều khiển hoặc sửa delimiter. Các lỗi cơ học
+  chắc chắn được giao cho normalizer sau khi provider trả structured output.
   Nếu provider vẫn thay dấu `\\` bằng `U+001C` đã decode hoặc chuỗi escape như
   `u001cwidehat`, normalizer phải khôi phục dấu `\\` trước mọi tên lệnh thuộc
   allowlist, không chỉ riêng `widehat`; alias lỗi đã biết như `u001croot` được
@@ -793,7 +805,8 @@ Quiz và Test tiếp tục dùng contract câu hỏi riêng của M9.3:
   lời giải Test Toán; Flashcard, answer ngắn, prompt vẽ hình và các subject khác
   không bị ép dùng quy ước đánh số này. Đây là invariant prompt-only; không thêm
   semantic validator hay đổi JSON shape. Corrective dùng prompt version mới
-  `lesson-summary-math-v34`, `quiz-math-v78`, `lesson-content-math-v12` và
+  `lesson-summary-math-v41-lesson-core-exercise-diversity`,
+  `quiz-math-v78`, `lesson-content-math-v12` và
   `quiz-solution-refinement-math-v4`; các subject refinement khác dùng `v2`.
 
 ### 5.1. Summary generation
@@ -806,7 +819,8 @@ Quiz và Test tiếp tục dùng contract câu hỏi riêng của M9.3:
 > `.codex/plans/m9-2-remove-visual-intent-hard-cutover-plan.md` và ADR-0018.
 
 Input API giữ các trường cấu hình nội dung như `documentIds`, `style`,
-`length`, `targetWordCount`, prompt override, model và giới hạn output. Client
+`length`, `targetWordCount`, `standardExerciseCount`,
+`realWorldExerciseCount`, prompt override, model và giới hạn output. Client
 không được gửi raw context; server luôn tải đúng canonical PDFs/range
 thuộc lesson, dựng packet + manifest deterministic, kiểm source hash và tạo
 immutable prompt preview từ cùng builder với worker.
@@ -845,10 +859,11 @@ trả một con số tổng không giải thích được nguồn.
 
 Contract provider:
 
-- Structured output mới chỉ sinh năm block `knowledge`, `theorem`, `property`,
-  `example`, `note`; phương pháp/quy trình nằm trong `knowledge`, không sinh
-  `procedure`. Schema/reader/renderer không giữ nhánh tương thích ngược cho loại
-  block này; bài cũ phải sinh lại theo contract mới.
+- Structured output mới chỉ sinh sáu block `knowledge`, `theorem`, `property`,
+  `example`, `exercise`, `note`; phương pháp/quy trình nằm trong `knowledge`,
+  không sinh `procedure`. `example` chỉ thuộc ví dụ minh họa trong UNIT;
+  `exercise` chỉ thuộc hai mảng bài tập vận dụng. Schema/reader/renderer không
+  giữ nhánh tương thích ngược; bài cũ phải sinh lại theo contract mới.
 - `theorem`/`property` chỉ dùng khi nhãn, câu dẫn hoặc ngữ cảnh giới thiệu thực sự
   thông báo đó là một định lí/tính chất; không phụ thuộc một cụm từ cố định. Bản
   thân bảng điều kiện, chuỗi tương đương, công thức quan trọng, từ nối, quy tắc
@@ -857,7 +872,7 @@ Contract provider:
 - Mỗi section dùng `items[]`: `UNIT { theory, example }` hoặc `NOTE { note }`.
   Mapper flatten `UNIT` thành theory rồi example liền nhau; note giữ đúng vị trí
   trước/giữa/sau unit và không thể chen vào giữa cặp bắt buộc.
-- Theory/note có `sourcePageNumbers`. Example có `origin` và
+- Theory/note có `sourcePageNumbers`. Example/exercise có `origin` và
   `sourcePageNumbers`; lời giải là string bắt buộc, phải diễn giải đầy đủ theo
   thứ tự và phong cách SGK, không rút thành gợi ý ngắn.
 - Mọi field nội dung `content`, `problem`, `solution`, `answer` phải bảo toàn và
@@ -915,6 +930,41 @@ Contract provider:
   cả Toán và các subject profile còn lại. `solution` giữ policy riêng về quyền sở
   hữu thân lời giải, thứ tự lập luận và phong cách SGK trong đúng một definition;
   JSON shape, required field và giới hạn ký tự không đổi.
+- Section cuối `Bài tập vận dụng` chứa hai mảng theo thứ tự:
+  `standardExercises[]` cho bài vận dụng không phải ứng dụng thực tế và
+  `realWorldExercises[]` cho bài ứng dụng thực tế. Request nhận riêng số lượng
+  mỗi nhóm trong khoảng `1..10`, mặc định `2` và `2`; user prompt nêu đúng hai
+  số này như mục tiêu sinh. Provider schema gửi OpenAI/Gemini khóa từng mảng bằng
+  `minItems=maxItems` theo đúng số lượng request. Backend parse lại cùng output
+  bằng schema dung sai không khóa số lượng, nên mapper vẫn giữ thứ tự toàn bộ bài
+  chuẩn trước toàn bộ bài thực tế, tạo raw
+  provider path có index cho từng block và vẫn persist/hiển thị nếu provider trả
+  thiếu hoặc thừa; nếu cả hai mảng rỗng, chỉ section bài tập được bỏ qua để phần
+  kiến thức hợp lệ còn lại vẫn hiển thị. Mọi phần tử trong hai mảng bắt buộc có
+  `type=exercise`; `type=example` bị schema từ chối, không có adapter dữ liệu cũ.
+  `realWorldExercises[]` chỉ nhận bài có tình huống đời sống, kĩ thuật hoặc khoa
+  học mà bối cảnh tham gia trực tiếp vào dữ kiện hoặc mục tiêu cần giải quyết.
+  Đơn vị, hình vẽ, tên vật thể hoặc một câu dẫn đời sống không đủ biến bài toán
+  thuần túy thành bài thực tế. Ưu tiên nguồn chỉ diễn ra trong đúng nhóm; nếu
+  nguồn thiếu bài thực tế thì sinh `AI_AUTHORED`, không lấy bài thường để bù.
+  Mỗi bài của cả hai nhóm phải cần ít nhất một kiến thức trọng tâm được trình
+  bày trong theory section của lesson; kiến thức cũ chỉ hỗ trợ lời giải không
+  được tính là trọng tâm. Nếu bỏ kiến thức trọng tâm mà bài vẫn giải được đầy
+  đủ thì model phải thay bài. Với các bài `AI_AUTHORED`, khi bỏ bối cảnh, vật
+  thể, số liệu, đơn vị, ký hiệu và cách diễn đạt, hai bài vẫn dùng cùng trọng
+  tâm theo cùng chuỗi bước hoặc công thức chính thì được xem là trùng dạng và
+  phải thay một bài. Đây là invariant prompt-only; không thêm schema, audit
+  field hoặc semantic validator. Vì schema chỉ kiểm tra cấu trúc và số lượng,
+  quy tắc này định hướng model nhưng không tạo bảo đảm semantic tuyệt đối; mapper
+  vẫn giữ output có cấu trúc hợp lệ nếu model tự đánh giá sai độ trùng.
+  Corrective này dùng prompt version
+  `lesson-summary-math-v41-lesson-core-exercise-diversity`,
+  `lesson-summary-{physics|chemistry|general}-v37-lesson-core-exercise-diversity`;
+  schema giữ nguyên
+  `lesson-summary-pdf-packet-six-block-schema-v29-exact-exercise-counts`.
+  Cache classification là `NEW_STABLE_PREFIX_WARMUP`: prompt mới tạo stable
+  prefix/key mới và cần warm-up một lần cho từng subject/model/cặp số lượng;
+  sau warm-up, các lesson/PDF cùng contract tiếp tục reuse prefix đó.
 - Với strategy `ref_v2`, provider schema Summary có regression budget tối đa
   `22.000` byte cho Toán lớp 7–9, `18.500` byte cho Toán lớp 10–12 và `17.500`
   byte cho subject không phải Toán. Thay đổi hợp lệ vượt trần phải được review và
@@ -923,7 +973,12 @@ Contract provider:
   bắt buộc `isGeometry=true` và `geometryStatement` có cả GT lẫn KL. Với Hình học
   lớp 10–12, `isGeometry=true` nhưng `geometryStatement=null`; nội dung không
   phải Hình học dùng `isGeometry=false` và cũng bắt buộc null.
-- Mỗi theory/example có `figures[]`, tối đa một logical figure cho mỗi block.
+- Mỗi theory/example/exercise có `figures[]`; structured output Phase 1 có tối
+  đa một logical figure plan cho mỗi block. Một plan `TEXTBOOK_SOURCE` được chứa
+  nhiều `sourceReferences`. Khi `useTextbookSourceImages=true`, mỗi reference
+  phân giải chắc chắn thành `OCR_CROP` được materialize thành một figure hiển thị
+  riêng trong cùng block; vì vậy một plan Phase 1 có thể tạo nhiều card hình SGK.
+  Giới hạn một logical figure áp dụng cho plan, không phải số crop hiển thị.
   Figure trong structured output Phase 1 chỉ chứa `figureOrigin`,
   `sourceReferences`; JSON Schema gửi provider không có `altText` hoặc caption
   hiển thị. Backend tự tạo `altText` accessibility từ ngữ cảnh block sau khi
@@ -960,8 +1015,8 @@ Contract provider:
   hiện có chỉ cập nhật metadata, tuyệt đối không gọi provider,
   không enqueue Stage 2 và không tự sinh asset mới; thêm/xóa phần tử `figures[]`
   qua raw bị reject và phải dùng menu ảnh chuyên dụng. Với UNIT, block lý thuyết
-  nhận object `theory` và block ví dụ nhận object `example`; note và hai bài vận
-  dụng nhận đúng object tương ứng của chúng.
+  nhận object `theory` và block ví dụ nhận object `example`; note và từng bài vận
+  dụng nhận đúng object theo path có index của chúng.
 - Xóa block, xóa toàn bộ section hoặc xóa heading để gộp section là editorial
   layout operation tách khỏi provider schema: frontend phải đồng thời đánh lại
   raw block path và gửi
@@ -971,7 +1026,7 @@ Contract provider:
   soft-delete; figure chỉ đổi vị trí giữ nguyên asset và được đổi `blockPath`.
 - Prompt phải nói rõ hệ thống phục vụ lớp 3 đến lớp 12, không kế thừa giới hạn
   lớp 3–9 của renderer cũ.
-- Với từng knowledge/theorem/property/example, model đọc mạch PDF ở cả phía
+- Với từng knowledge/theorem/property/example/exercise, model đọc mạch PDF ở cả phía
   trước và phía sau. Nếu hình nguồn trực tiếp minh họa, giải thích hoặc cung cấp
   dữ kiện cho block thì bắt buộc tạo figure và trỏ đúng `sourceReferences`; hình
   không cần nằm sát block. Nếu không có hình nguồn liên quan, model tự quyết định
@@ -1224,11 +1279,17 @@ cầu không được tính là lỗi source fidelity. Hard gate ngữ nghĩa đ
 giữ nguyên theo ảnh và phần delta theo yêu cầu admin.
 
 Với `Bài tập vận dụng`, Stage 1 phải inventory bài tập nguồn trước
-khi chọn. Bài nguồn có tình huống thực tế, vật thể, đơn vị,
-phương/hướng hoặc hình minh họa liên quan trực tiếp luôn ưu tiên hơn
-bài `AI_AUTHORED`. Khi đã chọn bài nguồn có hình, figure plan và
-source reference đúng nhãn là bắt buộc; không được thay bài rồi làm mất
-hình tham chiếu.
+khi chọn đủ số lượng của từng nhóm. Bài nguồn phù hợp chưa dùng được ưu tiên hơn
+`AI_AUTHORED` trong đúng nhóm của nó. Nhóm thực tế chỉ nhận bài có bối cảnh đời
+sống, kĩ thuật hoặc khoa học tham gia trực tiếp vào dữ kiện hoặc mục tiêu cần
+giải quyết; chỉ có đơn vị, hình vẽ, tên vật thể hay câu dẫn đời sống không đủ.
+Nếu nguồn thiếu bài thực tế thì sinh thêm `AI_AUTHORED`, không lấy bài thường để
+bù. Khi đã chọn bài nguồn có hình, figure plan và source reference đúng nhãn là
+bắt buộc; không được thay bài rồi làm mất hình tham chiếu.
+Mỗi bài được chọn hoặc tự tạo phải bắt buộc vận dụng ít nhất một kiến thức trọng
+tâm trình bày trong theory section của lesson; kiến thức cũ chỉ được hỗ trợ. Với
+các bài tự tạo, bỏ lớp bối cảnh và số liệu để so mạch giải; cùng trọng tâm và
+cùng chuỗi bước hoặc công thức chính là trùng dạng và phải thay một bài.
 
 Nguồn Summary không còn ghép OCR chunks vào prompt. Server dựng một PDF packet
 tạm thời, deterministic theo thứ tự document/range/page, giữ nguyên nội dung PDF
@@ -1251,10 +1312,13 @@ Workflow validate/promote searchable PDF vẫn có thể dùng độc lập cho 
 search/copy text hoặc vận hành OCR, nhưng không phải precondition của Summary và
 không được chặn PDF scan ở prompt preview/generate.
 
-Ngân sách output của Summary phải thích nghi theo `targetWordCount`, có floor đủ
-cho nội dung chi tiết và figure plan. Ngân sách output của lượt chuyên vẽ được
-định tuyến riêng; reasoning cao được hạ về mức phù hợp để không chiếm hết output
-trước khi model trả source. `incomplete/max_output_tokens` xảy ra trước khi có
+Ngân sách output của Summary phải thích nghi theo `targetWordCount` và tổng số
+bài tập vận dụng, có floor đủ cho nội dung chi tiết và figure plan. Ngân sách
+output của lượt chuyên vẽ được định tuyến riêng. Runtime phải chuyển nguyên
+`reasoningEffort` và `maxOutputTokens` của route `IMAGE` xuống provider; không
+được tự hạ reasoning hoặc cap/nâng output đã được cấu hình. Default cục bộ chỉ
+áp dụng khi route hoặc field tương ứng thật sự vắng mặt.
+`incomplete/max_output_tokens` xảy ra trước khi có
 source là provider-output failure, không được ghi thành compile failure và không
 được BullMQ gọi lại y hệt một paid request đã xác định là không hợp lệ.
 
@@ -1262,7 +1326,7 @@ Sau khi provider output qua JSON Schema và Zod:
 
 ```txt
 Summary mapper
-  -> lesson_summaries.content_json version 3
+  -> lesson_summaries.content_json version 4
   -> tạo figure plan cho từng TEX_FIGURE reference
   -> từng figure gọi model độc lập để lấy raw source
   -> lưu raw source rồi enqueue DIAGRAM_RENDERING riêng từng figure
@@ -1287,7 +1351,7 @@ raw source TeX/TikZ nguyên bản
   -> admin có thể xóa/thay/sinh lại/sửa source
 ```
 
-Retry sửa compiler mặc định là 2 và bị chặn bởi `maxRepairAttempts` của từng
+Retry sửa compiler mặc định là 1 và bị chặn bởi `maxRepairAttempts` của từng
 figure. Batch compiler chưa đầy đủ thì dừng `NEEDS_REVIEW`, không gửi partial log
 để sửa. Mỗi compile/validate/repair lưu attempt audit. Generation và compiler
 repair tự động không dùng AI Vision; validator chỉ kiểm an toàn và tính hợp lệ kỹ
@@ -1339,12 +1403,21 @@ không có source TikZ.
 
 Prompt chuyên vẽ chỉ ràng buộc semantic invariant và compiler contract tổng quát,
 không đóng khung theo template từng bài, không nhắc mã figure/tên bài live và không
-thêm nhánh riêng để một fixture cụ thể vượt gate. Ngoài đối chiếu toàn bộ brief,
-model phải tự audit cú pháp typed argument và lexical scope của TeX:
-macro/coordinate cần dùng ở nhiều `scope` phải khai báo trước các scope hoặc tính
-lại tại từng scope; không được khai báo `\pgfmathsetmacro` trong một group rồi
-dùng ở sibling group.
-Mỗi prompt figure subject-owned phải tự chứa compiler invariant cơ học tương ứng,
+thêm nhánh riêng để một fixture cụ thể vượt gate. Mỗi lượt tạo/refinement chỉ có
+một cổng kiểm chứng chuyên môn cuối theo subject/visual family. Model không phải
+chạy thêm vòng tự audit schema, source policy, compile, sanitizer hoặc validator;
+các phần này do backend xử lý deterministic. Source vẫn phải tuân trực tiếp các
+invariant cú pháp cần cho output hợp lệ: macro/coordinate cần dùng ở nhiều `scope`
+phải khai báo trước các scope hoặc tính lại tại từng scope; không được khai báo
+`\pgfmathsetmacro` trong một group rồi dùng ở sibling group.
+Nếu model đặt `\pgfmathsetmacro`, `\pgfmathsetlengthmacro` hoặc
+`\pgfmathtruncatemacro` ở local header trước drawing root, deterministic repair
+phải chuyển khai báo nguyên vẹn vào đầu `tikzpicture|circuitikz` trước policy
+check. Repair áp dụng cho cả source vừa sinh và source đã persist khi retry; nhờ
+đó retry lỗi placement không gọi lại provider. Macro trong comment hoặc nằm lồng
+trong argument hợp lệ là counterexample và không được di chuyển.
+Mỗi prompt figure subject-owned phải tự chứa compiler invariant cơ học tương ứng
+dưới dạng ràng buộc trực tiếp, không phải một vòng tự rà riêng,
 không import prompt prose giữa môn hay giữa Summary/Quiz. Với miền hoặc tọa độ lớn,
 không tạo tích/giá trị trung gian vượt giới hạn fixed-point của TeX rồi dựa vào
 `scale`/`xscale`/`yscale` để thu nhỏ sau; model chuẩn hóa tọa độ hoặc phân tích
@@ -1425,10 +1498,27 @@ User prompt Quiz dùng cùng quy ước trình bày dễ đọc của Sinh kiế
 phong, số câu, độ khó, loại câu và yêu cầu bổ sung của admin nếu có. Builder và
 prompt version vẫn thuộc riêng domain Quiz; không import hoặc gọi builder của
 Summary.
+Default system prompt Quiz của mỗi môn phải giữ đúng tám section lớn theo thứ
+tự `I. Hồ sơ môn học`, `II. Kiểm chứng`, `III. Vai trò và nguồn kiến thức`,
+`IV. Tính mới so với ngân hàng Quiz`, `V. Bốn loại câu hỏi`, `VI. Phân loại độ
+khó`, `VII. Đề bài và lời giải`, `VIII. Hình minh họa`. Policy nội dung nằm ở
+system prompt; description trong provider schema chỉ giữ nghĩa field và
+constraint không thể hiện bằng shape. Các rule LaTeX, hint và lời giải phải viết
+cô đọng theo invariant. Model chỉ tự kiểm chứng phần không thể xác minh
+deterministic: tính đúng chuyên môn, điều kiện áp dụng, mạch suy luận, độ khớp
+nguồn, tính mới và quan hệ ngữ nghĩa giữa dữ kiện với đáp án/hình. Structured
+schema chịu trách nhiệm shape/required/enum và exact count của Quiz; mục tiêu số
+lượng bài Summary chỉ được nêu một lần trong contract sinh, không lặp ở audit
+cuối. Normalizer/backend chịu trách nhiệm JSON transport, ký tự điều khiển,
+delimiter/môi trường LaTeX và ranh
+giới đoạn kết luận có thể sửa chắc chắn. Default prompt không yêu cầu model chạy
+thêm vòng rà riêng cho các lỗi cơ học này. Custom system prompt vẫn là full
+override và không bị chèn policy mặc định.
 Mỗi lần preview/tạo Quiz, backend lấy toàn bộ câu hỏi còn tồn tại trong lesson ở
 mọi trạng thái review, thuộc mọi Quiz set chưa xóa, rồi nối một index JSONL gọn
-vào cuối user prompt. Mỗi dòng chỉ giữ `questionType`, đề bài đã chuyển sang plain
-text và phần phương án/mệnh đề khi chúng mang nội dung câu hỏi; không gửi đáp án,
+vào cuối user prompt. Mỗi dòng là tuple dùng mã loại `M`/`T`/`S`/`I` tương ứng
+`MULTIPLE_CHOICE`/`TRUE_FALSE`/`MULTI_STATEMENT_TRUE_FALSE`/`TEXT_INPUT`, kèm đề
+bài đã chuyển sang plain text và phần phương án/mệnh đề khi chúng mang nội dung câu hỏi; không gửi đáp án,
 giá trị đúng-sai, hint, solution, figure, ID, review status hay metadata. Các dòng
 trùng hệt sau chuẩn hóa whitespace chỉ gửi một lần. Model phải tránh câu trùng
 hoặc gần trùng: cùng mục tiêu, cấu trúc dữ kiện/quan hệ và phương pháp/thao tác tư
@@ -1479,6 +1569,12 @@ soát cuối. Hai lesson/ngân hàng câu hỏi khác nhau nhưng cùng model + 
 contract phải giữ cùng cache key và cùng developer prefix. Prompt version chống
 trùng mới cần một lượt warm-up, sau đó thay đổi danh sách câu hỏi không được làm
 mất cache prefix ổn định.
+Mỗi lần rút gọn hoặc đổi nghĩa system prompt/schema phải tăng version tương ứng;
+rollout hiện dùng `quiz-math-v89-semantic-review-only`,
+`quiz-{physics|chemistry|general}-v84-semantic-review-only` và
+`quiz-pdf-figure-schema-v38-compact-descriptions`. Đây là contract cache mới nên
+lượt đầu warm-up prefix; các lượt sau có cùng model và contract tiếp tục reuse
+cache dù index câu hỏi hiện có thay đổi.
 Sau khi persist, `ai_generations.output_json` của Quiz là mutable working
 snapshot giống Sinh kiến thức, không phải bản provider bất biến. Khi admin lưu
 một câu AI, backend giữ các field provider-only, ghi projection hiện tại vào đúng
@@ -1536,7 +1632,6 @@ Output schema:
       "explanation": {
         "problem": "string",
         "solution": "string",
-        "answer": "string",
         "isGeometry": false
       },
       "figure": {
@@ -1559,8 +1654,7 @@ cầu trực tiếp và một kết quả số:
   "hint": "Xác định công thức rồi thay số.",
   "explanation": {
     "problem": "Tính giá trị của biểu thức ...",
-    "solution": "string",
-    "answer": "25/2"
+    "solution": "string"
   },
   "figure": {
     "requiresQuestionFigure": false,
@@ -1624,7 +1718,6 @@ Với `questionType = TRUE_FALSE`, output dùng một boolean chung:
   "explanation": {
     "problem": "string",
     "solution": "string",
-    "answer": "string",
     "isGeometry": false
   },
   "figure": {
@@ -1646,14 +1739,16 @@ Với `questionType = MULTI_STATEMENT_TRUE_FALSE`, output dùng nhiều mệnh �
   "questionType": "MULTI_STATEMENT_TRUE_FALSE",
   "difficulty": "MEDIUM",
   "statements": [
-    { "id": "statement-a", "text": "Mệnh đề thứ nhất", "value": true },
-    { "id": "statement-b", "text": "Mệnh đề thứ hai", "value": false }
+    { "id": "a", "text": "Mệnh đề thứ nhất", "value": true },
+    { "id": "b", "text": "Mệnh đề thứ hai", "value": false }
   ],
   "hint": "string",
   "explanation": {
     "problem": "string",
-    "solution": "string",
-    "answer": "string",
+    "statementSolutions": [
+      { "statementId": "a", "solution": "string" },
+      { "statementId": "b", "solution": "string" }
+    ],
     "isGeometry": false
   },
   "figure": {
@@ -1716,16 +1811,16 @@ Validation:
   tiếp đúng đại lượng, đối tượng hoặc yêu cầu của đề; không viết “Vậy chọn phương
   án C”, “Vậy đáp án là C” hoặc cách diễn đạt tương đương. ID và nội dung phương
   án đúng chỉ nằm trong dữ liệu chấm `correctOptionId`.
-- Quy tắc chuỗi dấu bằng của Quiz là invariant cứng áp dụng cho mọi field hiển
+- Quy tắc chuỗi dấu bằng của Quiz là invariant ngữ nghĩa áp dụng cho mọi field hiển
   thị có nội dung toán học, gồm `problem`, `solution`, `hint`,
   `options[].text` và `statements[].text`: một chuỗi tính/biến đổi duy nhất
   có từ hai dấu `=` cấp ngoài cùng trở lên phải được xuất thành display
   `aligned`/`split` với đúng một dấu `=` trên mỗi dòng, bất kể model ban đầu định
   viết inline hay display. Tuyệt đối không để chuỗi đó trong `$...$`. Công thức
   ngắn, vừa một dòng hoặc không tràn ngang không phải ngoại lệ. Invariant phải
-  nằm trong cả system prompt và description của structured schema, kèm hai phản
-  ví dụ `$A=B=C$`, `$$A=B=C$$`, một ví dụ đúng `aligned` và bước tự quét lại
-  trước khi trả output. Không áp dụng cho các phương trình độc lập, hệ phương
+  nằm trong system prompt, kèm hai phản ví dụ `$A=B=C$`, `$$A=B=C$$`, một ví dụ
+  đúng `aligned` và bước tự kiểm tra vì backend không thể xác định chắc chắn hai
+  dấu bằng có thuộc cùng một mạch biến đổi hay không. Không áp dụng cho các phương
   trình, phép gán nhiều đại lượng hoặc dấu `=` trong cấu trúc lồng nhau.
 - Quy tắc trên không thể bị lách bằng cách tách mỗi phép biến đổi thành một
   display chỉ có một dấu `=`. Prompt/schema phải yêu cầu nhận diện chuỗi theo
@@ -1733,20 +1828,18 @@ Validation:
   lập, nêu phép biến đổi chính và điều kiện bảo toàn nghiệm/miền giá trị. Trước
   khi trả output, model đối chiếu từng cặp bước kề nhau; các phương trình độc lập,
   phép gán khác đại lượng và phép tính một bước vẫn là ngoại lệ hợp lệ.
-- Để tránh lặp input không cần thiết, các invariant định dạng toàn cục về chuỗi
-  dấu bằng, dấu câu/căn hàng, cân bằng môi trường LaTeX và xuống dòng ý con chỉ
-  xuất hiện một lần tại root provider schema. Các field không phải lời giải chỉ
-  giữ description nghiệp vụ riêng. Mọi `solution` và
+- Để tránh lặp input không cần thiết, provider schema chỉ giữ shape, constraint
+  máy kiểm được và description ngắn về nghĩa field. Policy chuyên môn/trình bày
+  không được nhân bản vào từng field. Mọi `solution` và
   `statementSolutions[].solution` dùng chung đúng một string schema trong
-  `$defs` qua `$ref`; schema dùng chung vẫn giữ nguyên toàn bộ policy SGK,
-  chuỗi dấu bằng, dấu câu/căn hàng, cân bằng LaTeX và kết luận
-  theo đoạn. Policy riêng của từng loại câu nằm tại object cha gần nhất,
-  nên không bị xóa hoặc làm ngắn. Giới hạn `solution` dùng chung là
-  10.000 ký tự; JSON shape và required field không thay đổi.
+  `$defs` qua `$ref`; policy riêng của từng loại câu nằm tại object cha gần nhất.
+  Giới hạn `solution` dùng chung là 10.000 ký tự; JSON shape và required field
+  không thay đổi.
 - Mọi môi trường LaTeX trong display math phải có cặp `\begin{X}`/`\end{X}`
   đúng tên, đóng theo thứ tự lồng ngược và nằm trọn trước dấu `$$` kết thúc.
-  Invariant này nằm trong cả system prompt và description provider schema. Sau
-  structured output, backend Quiz chạy normalizer deterministic trên toàn bộ
+  Đây là invariant cơ học do backend sở hữu, không phải một vòng tự rà trong
+  system prompt hoặc description provider schema. Sau structured output,
+  backend Quiz chạy normalizer deterministic trên toàn bộ
   chuỗi của từng câu: sửa inline math mở bằng `$` nhưng bị model đóng nhầm bằng
   backtick hoặc bị thiếu dấu đóng trước ranh giới câu đủ chắc chắn theo evidence
   gate ở trên; đưa dấu `$$` đặt nhầm ra sau thẻ đóng,
@@ -1763,7 +1856,9 @@ Validation:
   `statements[].value` cho nhiều mệnh đề. Provider schema không có
   `explanation.answer`; mapper không persist `quizExplanationBlock.answer`.
   Renderer dựng dòng `Đáp án:` từ dữ liệu chấm và không lặp tiêu đề `Lời giải`
-  bên trong card. JSON lịch sử còn field `answer` bị loại khi project/lưu lại.
+  bên trong card. Projection Tiptap của lời giải không ghép lại dòng đáp án;
+  Markdown strong hợp lệ như `**b)**` được chuyển thành mark `bold` để editor
+  không lộ ký tự `**`. JSON lịch sử còn field `answer` bị loại khi project/lưu lại.
 - Figure không có quota cứng theo môn hoặc tên bài. `isGeometry` không phải trigger
   máy móc nhưng là tín hiệu bắt buộc: câu Hình học có cấu hình cụ thể và quan hệ
   vị trí tham gia mạch giải mặc định phải có `requiresQuestionFigure=true`, kể cả khi chữ đã
@@ -1817,8 +1912,9 @@ Validation:
   Policy Hóa học tách cấu tạo/phân tử, mô hình tiểu phân, phản ứng/năng lượng,
   dụng cụ thí nghiệm và đồ thị. General chỉ khóa completeness tổng quát cho
   node/kết nối, ranh giới, định lượng và legend, không mượn vocabulary chuyên môn.
-- `QUESTION` áp dụng checklist trong cổng chống lộ đáp án; `SOLUTION` dùng
-  `solution` rồi `problem` và trả full source độc lập. Summary
+- `QUESTION` áp dụng checklist trong cổng chống lộ đáp án; `SOLUTION` dùng cả
+  `solution` và `problem`, trong đó `solution` là nguồn ưu tiên cao hơn, và trả
+  full source độc lập. Summary
   `GENERATE_FROM_BLOCK` áp dụng checklist đầy đủ; source-regenerate/edit chỉ
   dùng checklist để tránh làm rơi phần tử của baseline hoặc delta được phép,
   không tự bổ sung phần absent khỏi ảnh; `REPAIR` kỹ thuật không nhận checklist
@@ -1850,6 +1946,31 @@ Validation:
   tiếp tục bảo toàn nhãn quan sát được ngoài phạm vi delta; repair kỹ thuật không
   được tự thiết kế lại nội dung. Thay đổi này chỉ ở prompt và prompt version;
   không đổi JSON Schema, source policy, persistence hoặc renderer.
+- Riêng Summary `GENERATED_FROM_BRIEF` có block `example` hoặc `exercise`, Phase 2
+  dùng mode riêng `GENERATE_SOLUTION_FROM_BLOCK`: projection gửi nguyên
+  `problem` và `solution`, loại `answer`; authority là `solution > problem` và
+  output phải là một hình lời giải hoàn chỉnh không phụ thuộc hình đề, ảnh SGK
+  hoặc source khác. Nhánh này áp dụng cả worker tự động và modal admin `Tạo mới
+bằng AI` khi `referenceImageMode=NONE`. Nó phải bám đầy đủ invariant nghiệp vụ
+  của Quiz `SOLUTION` nhưng được triển khai độc lập trong prompt/runtime Summary,
+  không import prompt prose hay builder Quiz. `TEXTBOOK_SOURCE`, current-source
+  edit và các loại block khác giữ nguyên mode, projection và authority cũ.
+- Manual authoring của cùng block nhận target tường minh `QUESTION | SOLUTION`.
+  `QUESTION` khóa projection ở `problem`, chọn `GENERATE_FROM_BLOCK` và không gửi
+  `solution`/`answer`; `SOLUTION` chọn `GENERATE_SOLUTION_FROM_BLOCK`, gửi
+  `solution > problem` và loại `answer`. `referenceImageMode=NONE` tạo mới lại;
+  khi đúng slot đã có source TikZ hiện hành, `CURRENT_ONLY` được phép đi cùng
+  target để sửa tối thiểu source đó mà không yêu cầu ảnh SGK. Cả hai mode giữ ánh
+  xạ cố định slot `0/1` và projection target; `SOURCE_CROP_ONLY` không hợp lệ cho
+  target độc lập. Target không đọc/kế thừa figure, source hay ảnh của slot còn lại
+  và được snapshot trong generation brief để preview, execute, worker dùng cùng
+  mode; lượt tự động Phase 2 không có target vẫn giữ hành vi hình lời giải hiện hành.
+- Khi block Summary chưa có logical figure, mở modal và xem dữ liệu phải dùng
+  block-level preview chỉ đọc Summary; không gọi `blocks/ensure`, không tạo
+  figure/revision và không enqueue. Submit mới tạo/phục hồi logical figure, tạo
+  revision AI ở trạng thái `QUEUED` rồi enqueue. Danh sách Model trong modal lấy
+  từ cấu hình route `SUMMARY/IMAGE`; lỗi preview hoặc việc block chưa có figure
+  không được làm dropdown mất dữ liệu.
 - Lượt admin `Tạo mới bằng AI` tái sử dụng plan đã persist của chính QuizFigure và
   tạo revision `ADMIN_REGENERATE`. `REGENERATE` dựng lại từ plan; `EDIT_CURRENT`
   gửi source TikZ hiện tại và bắt buộc sửa tối thiểu, giữ phần không liên quan.
@@ -1948,8 +2069,8 @@ Validation:
   rồi kiểm tra bounding box nhãn không cắt nét, marker, giao điểm hoặc nhãn không
   thuộc owner. Thay đổi này không thêm vòng gọi AI; nó gom nghĩa vụ lặp và đặt
   kiểm tra quan trọng sát thời điểm trả source. Version Quiz Figure Toán hiện hành
-  cho QUESTION/SOLUTION là `v61-independent-midpoint-marker-auto-repair`;
-  refinement Toán dùng `v34-admin-instructions`. Trên tọa độ cuối,
+  cho QUESTION/SOLUTION là `v64-independent-symbolic-angle-groups`;
+  refinement Toán dùng `v37-independent-symbolic-angle-groups`. Trên tọa độ cuối,
   model phải thế điểm vào
   phương trình đường/đường tròn, dùng tích vô hướng kiểm tra vuông góc và tính
   lại khoảng cách/số đo mang marker; tên coordinate hoặc comment không được xem
@@ -2086,23 +2207,33 @@ Validation:
   Quiz Toán áp dụng cho source AI mới; Summary chỉ áp dụng
   `GENERATE_FROM_BLOCK`. Cú pháp/authority mơ hồ được giữ nguyên.
 - Trong prompt figure Toán, cung đánh dấu góc cũng phải được phân theo authority:
-  các góc được khẳng định bằng nhau dùng cùng kiểu/số cung; hai nhóm độc lập hoặc
-  các góc được cho giá trị khác nhau dùng kiểu/số cung khác nhau để không ngụ ý
-  bằng nhau sai. Việc chỉ thay `angle radius` của một cung đơn không tạo
-  marker group khác vì bán kính chỉ xác định vị trí; nhóm khác phải
-  khác số cung đồng tâm hoặc kiểu nét nhìn thấy rõ. Nếu authority khẳng
-  định mọi góc thuộc cùng một nhóm thì dùng
-  chung marker; góc không được phép đánh dấu không được tự thêm cung chỉ để tạo
-  nhóm. Source/ảnh baseline và technical repair chỉ đổi nhóm trong phạm vi được
-  authority cho phép.
+  các góc được khẳng định bằng nhau hoặc có cùng biểu thức số đo sau chuẩn hóa
+  dùng cùng số cung; hai nhóm độc lập, các góc được cho giá trị khác nhau hoặc
+  hai biểu thức chứa biến khác nhau mặc định dùng số cung khác nhau theo thứ tự ổn định
+  `1, 2, 3, ...` để không ngụ ý bằng nhau sai. Mỗi dấu phải là một path cung
+  `solid` độc lập, đồng tâm, có chênh lệch bán kính đúng `0.05cm` (hoặc đơn vị
+  tương đương) và có đầu phẳng `line cap=butt`; cấm dùng
+  TikZ `double`, nét đứt hoặc nét chấm cho marker góc vì có thể tạo đầu bo/nối
+  giả hoặc biến cung ngắn thành một vạch rời. Nhóm hai cung là hai path thật,
+  nhóm ba cung là ba path thật. Việc chỉ thay `angle radius` của duy nhất một
+  cung đơn không tạo marker group khác; các bán kính khác nhau chỉ có nghĩa khi
+  cùng tạo đủ số cung đồng tâm của một nhóm. Nếu authority khẳng định mọi góc
+  thuộc cùng một nhóm thì dùng chung số cung; góc không được phép đánh dấu không
+  được tự thêm cung chỉ để tạo nhóm. Source/ảnh baseline và technical repair chỉ
+  đổi nhóm trong phạm vi được authority cho phép.
   Backend áp dụng thêm auto-repair deterministic trước compile cho source AI mới
-  của Quiz và Summary tự dựng từ block khi map được chắc chắn từng số đo góc số
-  literal trong authority vào TikZ `\pic` theo tên đỉnh hoặc vào cung
-  `\draw ... arc` có độ quét literal trùng khớp. Nếu hai giá trị
-  số khác nhau vẫn có cùng marker signature, backend giữ nhóm đầu là một cung và
-  gán nhóm sau một kiểu/số cung khác; chỉ đổi `angle radius` vẫn bị xem là cùng
-  marker. Các góc có cùng trị số giữ cùng marker. Repair phải idempotent và bỏ
-  qua biểu thức còn biến, authority mâu thuẫn, cung thủ công không khớp độ quét, custom
+  của Quiz và Summary tự dựng từ block. Với TikZ `\pic` có tên ba điểm rõ ràng,
+  backend map cả số literal lẫn biểu thức đại số trong authority; hai biểu thức
+  khác nhau mặc định là hai nhóm, còn biểu thức giống nhau sau khi bỏ khoảng
+  trắng, ngoặc ngoài và `\left`/`\right` giữ cùng nhóm. Với cung thủ công
+  `\draw ... arc`, backend chỉ sửa khi độ quét literal trùng số đo literal vì
+  không được đoán giá trị biến. Nếu có từ hai nhóm khác nhau, backend giữ nhóm đầu là một cung, nhóm sau là hai cung, rồi ba
+  cung... bằng cách nhân thành các `\pic`/`\draw ... arc` solid độc lập với bán
+  kính tăng đều từng `0.05cm` (hoặc đơn vị tương đương); nhãn số đo chỉ nằm trên
+  cung ngoài cùng. Backend đồng thời loại
+  `double`, dash/dot và ép `line cap=butt`. Các góc có cùng trị số giữ cùng số
+  cung. Repair phải idempotent và bỏ
+  qua authority mâu thuẫn, biểu thức không phân tích an toàn, cung thủ công không khớp độ quét, custom
   style không phân tích chắc chắn, source do admin nhập và mode Summary có
   source/ảnh baseline làm authority.
 - Prompt Sinh kiến thức Phase 1, Quiz Phase 1 và mọi prompt figure Phase 2 phải có
@@ -2303,6 +2434,14 @@ provider figure draft
 rút gọn `figureOrigin`; source locator, source và artifact không bị copy vào từng
 block. Quiz/Test/Flashcard/Explanation/Chat không tạo `StemFigure`; Quiz có
 `QuizFigure` và pipeline riêng ở M9.3, các flow còn lại chưa sinh figure.
+
+Xóa Summary phải cascade toàn bộ `StemFigure`/revision/attempt, đồng thời dọn
+delivery object khỏi MinIO/R2 và hard-delete metadata file khi asset không còn
+được figure nào khác tham chiếu. Full regeneration chỉ dọn figure và asset cũ sau
+khi Summary mới đã persist thành công; lỗi trước persistence phải giữ nguyên bản
+cũ. Cùng invariant áp dụng khi hard-delete Quiz set và các `QuizFigure` của set.
+Storage tạm lỗi giữ tombstone `files.status=DELETED` để asset không được tái sử
+dụng và có thể nhận diện phần cleanup còn thiếu.
 
 Admin regeneration có một preview gate trước provider. Stage 2 nhận đúng một
 trong ba mode nội bộ: `SOURCE_CROP_ONLY`, `CURRENT_ONLY`, `NONE`. Hai mode đầu

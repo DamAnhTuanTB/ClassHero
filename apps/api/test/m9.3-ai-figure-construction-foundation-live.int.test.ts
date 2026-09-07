@@ -10,13 +10,14 @@ import {
 } from "#api/modules/quiz-figures/types/quiz-figure-generation.types";
 import { assertQuizFigureLatexSource } from "#api/modules/quiz-figures/utils/quiz-figure-source-policy";
 
+loadEnv({ path: resolve(process.cwd(), ".env"), override: false, quiet: true });
 loadEnv({ path: resolve(process.cwd(), "../../.env"), override: false, quiet: true });
 
 const runLiveTest = process.env.RUN_OPENAI_CONSTRUCTION_FOUNDATION_LIVE_TESTS === "1";
 const outputDirectory =
   process.env.OPENAI_CONSTRUCTION_FOUNDATION_OUTPUT_DIR ??
   "/tmp/ai-figure-construction-foundation-live";
-const maximumBudgetVnd = 20_000;
+const maximumBudgetVnd = 5_000;
 
 type SubjectKey = "MATH" | "PHYSICS" | "CHEMISTRY" | "GENERAL";
 
@@ -255,6 +256,13 @@ describe.skipIf(!runLiveTest)("AI figure construction-foundation live matrix", (
     if (!apiKey) throw new Error("OPENAI_API_KEY is required for the live test.");
 
     const model = process.env.OPENAI_CONSTRUCTION_FOUNDATION_MODEL ?? "gpt-5.6-luna";
+    const reasoningEffort =
+      process.env.OPENAI_CONSTRUCTION_FOUNDATION_REASONING_EFFORT === "medium"
+        ? "medium"
+        : "high";
+    const maxOutputTokens = Number(
+      process.env.OPENAI_CONSTRUCTION_FOUNDATION_MAX_OUTPUT_TOKENS ?? 3_000,
+    );
     const provider = new OpenAiProvider({
       apiKey,
       requestTimeoutMs: 180_000,
@@ -291,7 +299,7 @@ describe.skipIf(!runLiveTest)("AI figure construction-foundation live matrix", (
         plan: { version: 1, role: "QUESTION", problem: testCase.problem },
       });
       const result = await provider.generateStructured(
-        { ...input, model, maxTokens: 3_000 },
+        { ...input, model, reasoningEffort, maxTokens: maxOutputTokens },
         generatedQuizQuestionFigureSchema,
       );
       const source = result.data.latexSource;
@@ -334,6 +342,8 @@ describe.skipIf(!runLiveTest)("AI figure construction-foundation live matrix", (
           label: testCase.label,
           subject: testCase.subjectKey,
           promptVersion: input.promptVersion,
+          reasoningEffort,
+          maxOutputTokens,
           promptTokens: result.usage?.promptTokens ?? null,
           cachedInputTokens: result.usage?.cachedInputTokens ?? null,
           completionTokens: result.usage?.completionTokens ?? null,
@@ -357,6 +367,8 @@ describe.skipIf(!runLiveTest)("AI figure construction-foundation live matrix", (
     console.info(
       `[CONSTRUCTION FOUNDATION LIVE TOTAL] ${JSON.stringify({
         ...usage,
+        reasoningEffort,
+        maxOutputTokens,
         cases: liveCases.length,
         failures: failures.map((result) => result.label),
         conservativeCostVnd: Math.round(conservativeCostVnd(usage.input, usage.output)),

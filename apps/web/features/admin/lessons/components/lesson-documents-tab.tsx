@@ -16,7 +16,10 @@ import {
 } from "@/features/admin/courses/admin-course-documents-utils";
 import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
 import { AdminDataErrorState } from "@/components/admin/admin-data-error-state";
-import { toLessonFormValues } from "@/features/admin/courses/admin-courses-utils";
+import {
+  findLessonMatch,
+  toLessonFormValues,
+} from "@/features/admin/courses/admin-courses-utils";
 import { useAdminCourseDetailManager } from "@/features/admin/courses/hooks/use-admin-course-detail-manager";
 import { useAdminCourseDocumentsManager } from "@/features/admin/courses/hooks/use-admin-course-documents-manager";
 import { LessonDocumentsFields } from "@/features/admin/courses/screens/admin-course-detail-manager/components/lesson-documents-fields";
@@ -33,13 +36,7 @@ export function LessonDocumentsTab({
 }) {
   const { actions, isSavingLesson, path, viewState } =
     useAdminCourseDetailManager(learningPathId);
-  const lessonMatch = useMemo(
-    () =>
-      path?.chapters
-        .flatMap((chapter) => chapter.lessons.map((lesson) => ({ chapter, lesson })))
-        .find((item) => item.lesson.id === lessonId) ?? null,
-    [lessonId, path],
-  );
+  const lessonMatch = useMemo(() => findLessonMatch(path, lessonId), [lessonId, path]);
   const lesson = lessonMatch?.lesson ?? null;
   const documentsManager = useAdminCourseDocumentsManager(path, {
     loadAllSourcePages: viewState === "ready",
@@ -183,7 +180,7 @@ export function LessonDocumentsTab({
     }
 
     const didSave = await actions.saveLesson(preparedValues, documentsManager, {
-      chapterId: lessonMatch.chapter.id,
+      chapterId: lessonMatch.chapter?.id ?? null,
       closeEditor: false,
       lessonId,
     });

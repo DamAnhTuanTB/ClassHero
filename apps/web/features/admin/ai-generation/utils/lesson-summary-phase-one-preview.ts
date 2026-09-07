@@ -224,7 +224,7 @@ function mapRawBlockForPreview(
       ...preserved,
     });
   }
-  if (type === "example") {
+  if (type === "example" || type === "exercise") {
     return compact({
       type,
       problem: rawBlock.problem,

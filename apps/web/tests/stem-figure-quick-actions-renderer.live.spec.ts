@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 
+import { updateStemFigureMidpoint } from "@/lib/stem-figure-geometry-actions";
 import {
   applyStemFigureQuickAction,
   extractStemFigureTextSlots,
@@ -165,5 +166,42 @@ test.describe("M9.23 real TeX renderer", () => {
       }
     }
     expect(renderCount).toBe(10);
+  });
+
+  test("compiles a quick midpoint with an auto-connected segment and its deletion", async ({
+    request,
+  }) => {
+    const source = String.raw`\begin{tikzpicture}
+  \coordinate (A) at (0,0);
+  \coordinate (B) at (4,0);
+\end{tikzpicture}`;
+    const added = updateStemFigureMidpoint(
+      source,
+      { midpointName: "M", segmentName: "AB" },
+      "ADD",
+    );
+    expect(added.issue).toBeNull();
+    const removed = updateStemFigureMidpoint(
+      added.source,
+      { segmentName: "AB" },
+      "REMOVE",
+    );
+    expect(removed.issue).toBeNull();
+
+    for (const latexSource of [added.source, removed.source]) {
+      const response = await request.post(`${rendererUrl}/render`, {
+        data: { latexSource, subjectKey: "MATH" },
+        headers: { authorization: `Bearer ${rendererToken}` },
+      });
+      const body = (await response.json()) as {
+        code?: string;
+        log?: string;
+        ok?: boolean;
+      };
+      expect(
+        body.ok,
+        `Midpoint quick action: ${body.code ?? "UNKNOWN"}\n${body.log ?? ""}`,
+      ).toBe(true);
+    }
   });
 });

@@ -31,6 +31,11 @@ price-version API không nhận hai field này.
 - Không được gửi trùng `(feature, purpose)`. Model phải đúng category/capability
   của feature; fallback khác primary.
 - Catalog trả toàn bộ model AI `ACTIVE` phù hợp capability để UI nhóm ô chọn theo provider; model thiếu credential vẫn được hiển thị nhưng bị vô hiệu hóa kèm lý do.
+- `reasoningEffortLevels` chỉ nhận các giá trị
+  `none | minimal | low | medium | high | xhigh | max`, không trùng lặp. Catalog
+  luôn liệt kê đủ hợp bảy giá trị để admin tự chọn theo model; backend chuẩn hóa
+  tập đã chọn theo thứ tự tăng dần trên trước khi lưu. Các select cấu hình model
+  chính/dự phòng và override generation dùng cùng thứ tự này.
 - Price version chỉ thêm mới. Backend đóng khoảng hiệu lực cũ thay vì overwrite.
 - Timeline dùng múi giờ `Asia/Ho_Chi_Minh`, tuần bắt đầu thứ Hai.
 - Response chỉ có boolean `credentialConfigured`, tuyệt đối không trả secret/key.
@@ -40,6 +45,10 @@ price-version API không nhận hai field này.
   riêng lượt gọi với tổng chi phí của toàn lần sinh. Hai giá trị tổng này phải
   được aggregate từ `provider_usage_events`, không đọc snapshot tổng đã cũ trên
   `ai_generations`.
+- Mỗi item trả thêm `operation`, `reasoningEffort` và `latencyMs` của chính
+  provider attempt. `operation` dùng taxonomy mục đích cụ thể (sinh từng loại
+  nội dung, tạo/chỉnh sửa/tinh chỉnh/sửa lỗi hình, tinh chỉnh/tạo lại lời giải),
+  không dùng một nhãn hình minh họa chung. Event cũ có thể trả `null`.
 - `GET /usage/events` trả thêm `summary.totalCostVnd` và `summary.totalCalls` cho
   toàn bộ tập kết quả đã lọc, độc lập với trang hiện tại. Filter UUID
   `aiGenerationId` trả toàn bộ lượt gọi thuộc đúng lần sinh và không áp dụng cửa

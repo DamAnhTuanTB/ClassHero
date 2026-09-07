@@ -252,6 +252,14 @@ backend lại từ chối.
 
 Figure hiện light-only. UI dark đặt figure trên surface sáng, không tự đảo màu.
 
+Preview một mutation AI không nên tạo durable resource chỉ để lấy ID. Khi request
+có thể được dựng từ resource cha và tọa độ logic, ví dụ Summary + `blockPath`,
+hãy dùng endpoint preview chỉ đọc; endpoint submit mới tạo resource con và job
+trong cùng luồng nghiệp vụ. `ensure` chỉ phù hợp với editor/upload thật sự cần ID
+trước submit. Ranh giới này làm thao tác mở/đóng modal không để lại ghost record,
+đồng thời dropdown cấu hình phải lấy theo route AI đích thay vì phụ thuộc vào
+resource con đã tồn tại.
+
 ### Structural edit phải đồng bộ ba lớp dữ liệu
 
 Summary AI có ba biểu diễn liên quan nhưng khác vai trò: preview đã map để render,

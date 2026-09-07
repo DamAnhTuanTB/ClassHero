@@ -26,11 +26,12 @@ export interface OcrArtifactBundle {
   processingTimeMs: number;
 }
 
-interface MathpixStatusResponse {
+export interface MathpixStatusResponse {
   status: string;
   num_pages?: number;
   num_pages_completed?: number;
   percent_done?: number;
+  conversion_status?: Record<string, { status?: string }>;
 }
 
 const MATHPIX_API_BASE = "https://api.mathpix.com";
@@ -47,6 +48,40 @@ export const MATHPIX_CONVERSION_FORMATS = ["mmd.zip", "md", "html.zip"] as const
 
 export type MathpixOutputFormat = (typeof MATHPIX_OUTPUT_FORMATS)[number];
 export type MathpixConversionFormat = (typeof MATHPIX_CONVERSION_FORMATS)[number];
+
+export function inspectMathpixConversionReadiness(status: MathpixStatusResponse): {
+  failedFormat: MathpixConversionFormat | null;
+  ready: boolean;
+} {
+  const failedFormat =
+    MATHPIX_CONVERSION_FORMATS.find((format) => {
+      const conversionStatus = status.conversion_status?.[format]?.status;
+      return conversionStatus === "error" || conversionStatus === "failed";
+    }) ?? null;
+  const ready = MATHPIX_CONVERSION_FORMATS.every(
+    (format) => status.conversion_status?.[format]?.status === "completed",
+  );
+
+  return { failedFormat, ready };
+}
+
+export function validateMathpixArtifactBuffer(ext: string, buffer: Buffer): void {
+  if (!ext.endsWith(".zip")) {
+    return;
+  }
+
+  const signature = buffer.subarray(0, 4).toString("hex");
+  const isZip =
+    signature === "504b0304" || signature === "504b0506" || signature === "504b0708";
+
+  if (!isZip) {
+    throw new ProviderRequestError({
+      provider: "MATHPIX",
+      message: `Mathpix returned an invalid .${ext} conversion artifact.`,
+      providerCode: "invalid_conversion_artifact",
+    });
+  }
+}
 
 export type MathpixPdfOptions = {
   conversion_formats: Record<string, true | Record<string, unknown>>;
@@ -154,8 +189,22 @@ export class MathpixOcrService {
       const status = await this.getStatus(pdfId);
 
       if (status.status === "completed") {
-        this.logger.log(`Mathpix completed pdf_id=${pdfId}, pages=${status.num_pages}`);
-        return { numPages: status.num_pages ?? 0 };
+        const conversions = inspectMathpixConversionReadiness(status);
+
+        if (conversions.failedFormat) {
+          throw new ProviderRequestError({
+            provider: "MATHPIX",
+            message: `Mathpix failed to convert ${conversions.failedFormat}.`,
+            providerCode: "conversion_error",
+          });
+        }
+
+        if (conversions.ready) {
+          this.logger.log(
+            `Mathpix completed pdf_id=${pdfId}, pages=${status.num_pages}, conversions=ready`,
+          );
+          return { numPages: status.num_pages ?? 0 };
+        }
       }
 
       if (status.status === "error") {
@@ -207,7 +256,9 @@ export class MathpixOcrService {
       throw await buildMathpixResponseError(response, `download .${ext}`);
     }
 
-    return Buffer.from(await response.arrayBuffer());
+    const buffer = Buffer.from(await response.arrayBuffer());
+    validateMathpixArtifactBuffer(ext, buffer);
+    return buffer;
   }
 
   /**

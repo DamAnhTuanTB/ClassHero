@@ -40,6 +40,11 @@ Rules:
 - Generic client upload không nhận `AI_DIAGRAM`. Backend tạo SVG Summary sau
   compile + validator hoặc nhận JPEG/PNG/WebP qua endpoint admin thay thế figure
   chuyên biệt, rồi tự tạo file purpose `AI_DIAGRAM`.
+- Khi hard-delete Quiz set, xóa Summary hoặc thay Summary bằng một generation mới
+  đã persist thành công, delivery file hình chỉ được xóa nếu không còn
+  `StemFigureRevision`/`QuizFigureRevision` nào tham chiếu. Backend đánh dấu
+  `DELETED`, xóa object MinIO/R2 rồi hard-delete row `files`; nếu storage tạm lỗi
+  thì giữ tombstone để không tái sử dụng nhầm asset.
 
 ### 4.2. `source_documents`
 

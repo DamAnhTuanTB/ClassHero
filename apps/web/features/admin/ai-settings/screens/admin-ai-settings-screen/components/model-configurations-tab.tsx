@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { FieldLabel } from "@/components/common/forms/field-label";
+import { buildAiReasoningEffortOptions } from "@/lib/ai-reasoning-effort";
 import { SelectContent } from "@/components/common/ui/select/content";
 import { SelectGroup } from "@/components/common/ui/select/group";
 import { SelectItem } from "@/components/common/ui/select/item";
@@ -196,53 +197,19 @@ export function ModelConfigurationsTab({ data, isSaving, onSave }: Props) {
                                       <SelectItem value="__default__">
                                         Mặc định của model
                                       </SelectItem>
-                                      {(() => {
-                                        const baseLevels =
-                                          capabilities.reasoningEffortLevels;
-                                        const levelsSet = new Set(baseLevels || []);
-                                        if (
-                                          configuration.reasoningEffort &&
-                                          configuration.reasoningEffort !== "__default__"
-                                        ) {
-                                          levelsSet.add(configuration.reasoningEffort);
-                                        }
-                                        const levels = Array.from(levelsSet);
-                                        const labels: Record<string, string> = {
-                                          minimal: "Tối thiểu (Minimal)",
-                                          low: "Thấp (Low)",
-                                          medium: "Trung bình (Medium)",
-                                          high: "Cao (High)",
-                                          none: "Không (None)",
-                                          xhigh: "Rất cao (Extra High)",
-                                          max: "Tối đa (Max)",
-                                        };
-                                        const options = levels?.length
-                                          ? [...levels].sort((a, b) => {
-                                              const order = [
-                                                "none",
-                                                "minimal",
-                                                "low",
-                                                "medium",
-                                                "high",
-                                                "xhigh",
-                                                "max",
-                                              ];
-                                              return (
-                                                (order.indexOf(a) > -1
-                                                  ? order.indexOf(a)
-                                                  : 99) -
-                                                (order.indexOf(b) > -1
-                                                  ? order.indexOf(b)
-                                                  : 99)
-                                              );
-                                            })
-                                          : [];
-                                        return options.map((level) => (
-                                          <SelectItem key={level} value={level}>
-                                            {labels[level] || level}
+                                      {buildAiReasoningEffortOptions(
+                                        capabilities.reasoningEffortLevels,
+                                        configuration.reasoningEffort,
+                                      )
+                                        .slice(1)
+                                        .map((option) => (
+                                          <SelectItem
+                                            key={option.value}
+                                            value={option.value}
+                                          >
+                                            {option.label}
                                           </SelectItem>
-                                        ));
-                                      })()}
+                                        ))}
                                     </SelectContent>
                                   </Select>
                                 </div>
@@ -376,56 +343,19 @@ export function ModelConfigurationsTab({ data, isSaving, onSave }: Props) {
                                         <SelectItem value="__default__">
                                           Mặc định của model
                                         </SelectItem>
-                                        {(() => {
-                                          const baseLevels =
-                                            capabilities.reasoningEffortLevels;
-                                          const levelsSet = new Set(baseLevels || []);
-                                          if (
-                                            configuration.fallbackReasoningEffort &&
-                                            configuration.fallbackReasoningEffort !==
-                                              "__default__"
-                                          ) {
-                                            levelsSet.add(
-                                              configuration.fallbackReasoningEffort,
-                                            );
-                                          }
-                                          const levels = Array.from(levelsSet);
-                                          const labels: Record<string, string> = {
-                                            minimal: "Tối thiểu (Minimal)",
-                                            low: "Thấp (Low)",
-                                            medium: "Trung bình (Medium)",
-                                            high: "Cao (High)",
-                                            none: "Không (None)",
-                                            xhigh: "Rất cao (Extra High)",
-                                            max: "Tối đa (Max)",
-                                          };
-                                          const options = levels?.length
-                                            ? [...levels].sort((a, b) => {
-                                                const order = [
-                                                  "none",
-                                                  "minimal",
-                                                  "low",
-                                                  "medium",
-                                                  "high",
-                                                  "xhigh",
-                                                  "max",
-                                                ];
-                                                return (
-                                                  (order.indexOf(a) > -1
-                                                    ? order.indexOf(a)
-                                                    : 99) -
-                                                  (order.indexOf(b) > -1
-                                                    ? order.indexOf(b)
-                                                    : 99)
-                                                );
-                                              })
-                                            : [];
-                                          return options.map((level) => (
-                                            <SelectItem key={level} value={level}>
-                                              {labels[level] || level}
+                                        {buildAiReasoningEffortOptions(
+                                          capabilities.reasoningEffortLevels,
+                                          configuration.fallbackReasoningEffort,
+                                        )
+                                          .slice(1)
+                                          .map((option) => (
+                                            <SelectItem
+                                              key={option.value}
+                                              value={option.value}
+                                            >
+                                              {option.label}
                                             </SelectItem>
-                                          ));
-                                        })()}
+                                          ))}
                                       </SelectContent>
                                     </Select>
                                   </div>

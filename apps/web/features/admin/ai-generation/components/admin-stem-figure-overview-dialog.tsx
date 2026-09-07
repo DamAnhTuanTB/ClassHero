@@ -151,6 +151,12 @@ function FigureOverviewCard({
     figure.blockPath,
   );
   const blockLocation = formatBlockLocation(content, blockPath);
+  const figureLabel = formatFigureLabel(
+    content,
+    blockPath,
+    figure.figureIndex,
+    index + 1,
+  );
 
   return (
     <article
@@ -160,9 +166,9 @@ function FigureOverviewCard({
       <div className="flex items-start justify-between gap-3 border-b border-[var(--theme-border)] px-3 py-2.5 sm:px-4">
         <div className="min-w-0">
           <p className="text-xs font-bold text-[var(--theme-text-muted)]">
-            Ảnh {index + 1}
+            {figureLabel}
           </p>
-          <p className="mt-0.5 line-clamp-2 text-sm font-extrabold text-[var(--theme-text-strong)]">
+          <p className="mt-0.5 text-sm font-normal text-[var(--theme-text-strong)]">
             <StemFigureMathText value={figure.caption ?? figure.altText} />
           </p>
         </div>
@@ -173,7 +179,7 @@ function FigureOverviewCard({
         contextActions={
           <>
             <button
-              aria-label={`Xem chi tiết khối chứa Ảnh ${index + 1}`}
+              aria-label={`Xem chi tiết khối chứa ${figureLabel}`}
               className="theme-button-primary-subtle grid h-9 w-9 place-items-center rounded-lg shadow-sm"
               onClick={() => onViewBlock(blockPath)}
               title="Xem chi tiết khối"
@@ -182,7 +188,7 @@ function FigureOverviewCard({
               <Eye className="h-4 w-4" aria-hidden="true" />
             </button>
             <button
-              aria-label={`Đi đến khối chứa Ảnh ${index + 1}`}
+              aria-label={`Đi đến khối chứa ${figureLabel}`}
               className="theme-button-primary-subtle grid h-9 w-9 place-items-center rounded-lg shadow-sm"
               onClick={() => onNavigateToBlock(blockPath)}
               title="Đi đến khối chứa hình"
@@ -286,6 +292,21 @@ function formatBlockLocation(content: AdminLessonSummaryContent, blockPath: stri
     ? `Phần ${sectionNumber}. ${sectionName}`
     : `Phần ${sectionNumber}`;
   return `${sectionLabel} - Khối ${blockName}`;
+}
+
+function formatFigureLabel(
+  content: AdminLessonSummaryContent,
+  blockPath: string,
+  figureIndex: number,
+  displayIndex: number,
+) {
+  const blockType = getAdminLessonSummaryBlock(content, blockPath)?.block.type;
+  if (blockType !== "example" && blockType !== "exercise") {
+    return `Ảnh ${displayIndex}`;
+  }
+  if (figureIndex === 0) return `Ảnh ${displayIndex} · Hình đề bài`;
+  if (figureIndex === 1) return `Ảnh ${displayIndex} · Hình lời giải`;
+  return `Ảnh ${displayIndex} · Hình bổ sung ${figureIndex + 1}`;
 }
 
 function formatBlockType(value: unknown) {

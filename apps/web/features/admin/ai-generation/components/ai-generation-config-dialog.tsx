@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AI_REASONING_EFFORT_LEVELS, isAiReasoningEffort } from "@learning-path/shared";
+import { isAiReasoningEffort } from "@learning-path/shared";
 import { Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { useEffect, useState, useRef, type ChangeEvent } from "react";
 import { useForm } from "react-hook-form";
@@ -10,6 +10,7 @@ import { CheckboxField } from "@/components/common/forms/checkbox-field";
 import { OptionField } from "@/components/common/forms/option-field";
 import { TextField } from "@/components/common/forms/text-field";
 import { TextareaField } from "@/components/common/forms/textarea-field";
+import { buildAiReasoningEffortOptions } from "@/lib/ai-reasoning-effort";
 import { AdminDocumentMultiSelectField } from "@/features/admin/ai-generation/components/admin-document-multi-select-field";
 import { AdminSummaryPromptPreview } from "@/features/admin/ai-generation/components/admin-summary-prompt-preview";
 import { usePreviewAdminLessonSummaryPrompt } from "@/features/admin/ai-generation/hooks/use-admin-ai-generation";
@@ -264,6 +265,8 @@ export function AiGenerationConfigDialog({
   const mediumRatioField = form.register("mediumRatio");
   const hardRatioField = form.register("hardRatio");
   const targetWordCountField = form.register("summaryTargetWordCount");
+  const standardExerciseCountField = form.register("standardExerciseCount");
+  const realWorldExerciseCountField = form.register("realWorldExerciseCount");
   const temperatureField = form.register("summaryTemperature");
   const maxOutputTokensField = form.register("summaryMaxOutputTokens");
   const figureTemperatureField = form.register("summaryFigureTemperature");
@@ -284,37 +287,10 @@ export function AiGenerationConfigDialog({
     (option) => option.model === selectedFigureModel,
   );
   const figureCapability = selectedFigureModelInfo?.capabilities?.aiConfiguration;
-  const figureReasoningOptions = buildReasoningOptions(
+  const figureReasoningOptions = buildAiReasoningEffortOptions(
     selectedFigureModelInfo?.capabilities?.reasoningEffortLevels,
   );
-
-  const reasoningOptions = [
-    { value: "", label: "Mặc định của model" },
-    ...(configuredReasoningEffortLevels?.length
-      ? configuredReasoningEffortLevels
-          .filter(isAiReasoningEffort)
-          .sort((a, b) => {
-            const order: readonly string[] = AI_REASONING_EFFORT_LEVELS;
-            return (
-              (order.indexOf(a) > -1 ? order.indexOf(a) : 99) -
-              (order.indexOf(b) > -1 ? order.indexOf(b) : 99)
-            );
-          })
-          .map((level) => ({
-            value: level,
-            label:
-              {
-                minimal: "Tối thiểu (Minimal)",
-                low: "Thấp (Low)",
-                medium: "Trung bình (Medium)",
-                high: "Cao (High)",
-                none: "Không (None)",
-                xhigh: "Rất cao (Extra High)",
-                max: "Tối đa (Max)",
-              }[level as string] || level,
-          }))
-      : []),
-  ];
+  const reasoningOptions = buildAiReasoningEffortOptions(configuredReasoningEffortLevels);
 
   const showTemperature =
     selectedModelId !== "" &&
@@ -339,6 +315,8 @@ export function AiGenerationConfigDialog({
         "styleInstructions",
         "summaryLength",
         "summaryTargetWordCount",
+        "standardExerciseCount",
+        "realWorldExerciseCount",
         "extraInstructions",
         "systemInstructions",
         "userPrompt",
@@ -556,7 +534,7 @@ export function AiGenerationConfigDialog({
                   <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-surface-muted)]">
                     <CheckboxField
                       id="ai-summary-use-textbook-source-images"
-                      label="Dùng ảnh gốc sách giáo khoa"
+                      label="Dùng ảnh gốc của tài liệu"
                       labelClassName="border-0"
                       checked={form.watch("useTextbookSourceImages")}
                       onChange={(event) => {
@@ -597,7 +575,7 @@ export function AiGenerationConfigDialog({
                         }
                       />
                       <p className="-mt-1 px-4 pb-3 text-xs font-semibold leading-5 text-[var(--theme-text-muted)]">
-                        Giảm nhiễu và làm nét toàn bộ ảnh sách giáo khoa trước khi lưu.
+                        Giảm nhiễu và làm nét toàn bộ ảnh của tài liệu trước khi lưu.
                         Không tăng số lượt gọi AI.
                       </p>
                     </div>
@@ -645,35 +623,59 @@ export function AiGenerationConfigDialog({
               </fieldset>
 
               {type === "SUMMARY" ? (
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <OptionField
-                    id="ai-summary-length"
-                    label="Độ dài Kiến thức"
-                    value={form.watch("summaryLength")}
-                    options={summaryLengthOptions}
-                    icon={null}
-                    error={form.formState.errors.summaryLength}
-                    onChange={(value) =>
-                      form.setValue("summaryLength", value as AdminSummaryLength, {
-                        shouldDirty: true,
-                        shouldTouch: true,
-                        shouldValidate: true,
-                      })
-                    }
-                  />
-                  <TextField
-                    id="ai-summary-target-word-count"
-                    label="Số lượng từ"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    placeholder="Để trống nếu không giới hạn"
-                    isOptional
-                    optionalLabel="Không bắt buộc"
-                    icon={null}
-                    error={form.formState.errors.summaryTargetWordCount}
-                    {...targetWordCountField}
-                    onChange={numericChange(targetWordCountField.onChange)}
-                  />
+                <div className="space-y-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <OptionField
+                      id="ai-summary-length"
+                      label="Độ dài Kiến thức"
+                      value={form.watch("summaryLength")}
+                      options={summaryLengthOptions}
+                      icon={null}
+                      error={form.formState.errors.summaryLength}
+                      onChange={(value) =>
+                        form.setValue("summaryLength", value as AdminSummaryLength, {
+                          shouldDirty: true,
+                          shouldTouch: true,
+                          shouldValidate: true,
+                        })
+                      }
+                    />
+                    <TextField
+                      id="ai-summary-target-word-count"
+                      label="Số lượng từ"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      placeholder="Để trống nếu không giới hạn"
+                      isOptional
+                      optionalLabel="Không bắt buộc"
+                      icon={null}
+                      error={form.formState.errors.summaryTargetWordCount}
+                      {...targetWordCountField}
+                      onChange={numericChange(targetWordCountField.onChange)}
+                    />
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <TextField
+                      id="ai-summary-standard-exercise-count"
+                      label="Số bài tập bình thường"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      icon={null}
+                      error={form.formState.errors.standardExerciseCount}
+                      {...standardExerciseCountField}
+                      onChange={numericChange(standardExerciseCountField.onChange)}
+                    />
+                    <TextField
+                      id="ai-summary-real-world-exercise-count"
+                      label="Số bài tập ứng dụng thực tế"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      icon={null}
+                      error={form.formState.errors.realWorldExerciseCount}
+                      {...realWorldExerciseCountField}
+                      onChange={numericChange(realWorldExerciseCountField.onChange)}
+                    />
+                  </div>
                 </div>
               ) : null}
               <TextareaField
@@ -1142,6 +1144,8 @@ function getDefaultValues(
     styleInstructions: getPresentationPreset("student_friendly", targetGrade),
     summaryLength: "standard",
     summaryTargetWordCount: "",
+    standardExerciseCount: "2",
+    realWorldExerciseCount: "2",
     extraInstructions: "",
     systemInstructions: "",
     userPrompt: "",
@@ -1211,6 +1215,14 @@ function getInitialValues(
       ? initialConfiguration.length
       : defaults.summaryLength,
     summaryTargetWordCount: readNumericText(initialConfiguration.targetWordCount),
+    standardExerciseCount: readNumericText(
+      initialConfiguration.standardExerciseCount,
+      defaults.standardExerciseCount,
+    ),
+    realWorldExerciseCount: readNumericText(
+      initialConfiguration.realWorldExerciseCount,
+      defaults.realWorldExerciseCount,
+    ),
     extraInstructions: readString(
       initialConfiguration.extraInstructions,
       defaults.extraInstructions,
@@ -1264,8 +1276,8 @@ function readBoolean(value: unknown, fallback: boolean) {
   return typeof value === "boolean" ? value : fallback;
 }
 
-function readNumericText(value: unknown) {
-  return typeof value === "number" && Number.isFinite(value) ? String(value) : "";
+function readNumericText(value: unknown, fallback = "") {
+  return typeof value === "number" && Number.isFinite(value) ? String(value) : fallback;
 }
 
 function isSummaryStyle(value: unknown): value is AdminSummaryStyle {
@@ -1353,6 +1365,8 @@ function toSummaryPayload(
     ...(values.summaryTargetWordCount
       ? { targetWordCount: Number(values.summaryTargetWordCount) }
       : {}),
+    standardExerciseCount: Number(values.standardExerciseCount),
+    realWorldExerciseCount: Number(values.realWorldExerciseCount),
     ...(extraInstructions ? { extraInstructions } : {}),
     ...(systemInstructions.trim() ? { systemInstructions } : {}),
     ...(userPrompt.trim() ? { userPrompt } : {}),
@@ -1381,24 +1395,6 @@ function toSummaryPayload(
       ? { figureMaxOutputTokens: Number(values.summaryFigureMaxOutputTokens) }
       : {}),
   };
-}
-
-function buildReasoningOptions(levels: string[] | undefined) {
-  const labels: Record<string, string> = {
-    minimal: "Tối thiểu (Minimal)",
-    low: "Thấp (Low)",
-    medium: "Trung bình (Medium)",
-    high: "Cao (High)",
-    none: "Không (None)",
-    xhigh: "Rất cao (Extra High)",
-    max: "Tối đa (Max)",
-  };
-  return [
-    { value: "", label: "Mặc định của model" },
-    ...(levels ?? [])
-      .filter(isAiReasoningEffort)
-      .map((level) => ({ value: level, label: labels[level] ?? level })),
-  ];
 }
 
 function numericChange(

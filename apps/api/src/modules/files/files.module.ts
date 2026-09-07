@@ -5,11 +5,12 @@ import { PrismaModule } from "#api/common/prisma/prisma.module";
 import { FilesController } from "#api/modules/files/controllers/files.controller";
 import { FilesService } from "#api/modules/files/services/files.service";
 import { ObjectStorageService } from "#api/modules/files/services/object-storage.service";
+import { StoredFileCleanupService } from "#api/modules/files/services/stored-file-cleanup.service";
 
 @Module({
   imports: [PrismaModule, JwtModule.register({})],
   controllers: [FilesController],
-  providers: [FilesService, ObjectStorageService, JwtAuthGuard],
-  exports: [FilesService, ObjectStorageService],
+  providers: [FilesService, ObjectStorageService, StoredFileCleanupService, JwtAuthGuard],
+  exports: [FilesService, ObjectStorageService, StoredFileCleanupService],
 })
 export class FilesModule {}

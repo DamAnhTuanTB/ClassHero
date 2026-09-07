@@ -38,19 +38,21 @@ const CaptionDialog = dynamic(
 );
 const RefinementDialog = dynamic(
   () =>
-    import(
-      "@/features/admin/quiz/components/admin-quiz-figure-refinement-dialog"
-    ).then((module) => module.AdminQuizFigureRefinementDialog),
+    import("@/features/admin/quiz/components/admin-quiz-figure-refinement-dialog").then(
+      (module) => module.AdminQuizFigureRefinementDialog,
+    ),
   { ssr: false },
 );
 
 export function AdminQuizFigureActionFrame({
   children,
+  displayPercent,
   figure,
   questionId,
   setId,
 }: {
   children: ReactNode;
+  displayPercent?: number | null;
   figure: AdminQuizFigure;
   questionId: string;
   setId: string;
@@ -66,9 +68,9 @@ export function AdminQuizFigureActionFrame({
   const revision = figure.currentRevision;
   const canRefine = Boolean(
     figure.status === "SUCCEEDED" &&
-      revision?.sourceKind === "AI_TEX" &&
-      revision.latexSource?.trim() &&
-      revision.deliveryFile?.mimeType === "image/svg+xml",
+    revision?.sourceKind === "AI_TEX" &&
+    revision.latexSource?.trim() &&
+    revision.deliveryFile?.mimeType === "image/svg+xml",
   );
 
   async function upload(file: File) {
@@ -98,60 +100,65 @@ export function AdminQuizFigureActionFrame({
 
   return (
     <>
-      <div
-        className="relative isolate mx-auto w-full max-w-2xl [&>:first-child]:pt-16"
-        data-testid="admin-quiz-figure-action-frame"
-      >
-        {children}
-        <div className="absolute right-14 top-3 z-30 flex items-center gap-2 sm:right-16 sm:top-4">
-          {canRefine ? (
-            <ImmediateTooltip content="Tinh chỉnh bằng AI">
+      <div className="mx-auto w-full max-w-2xl">
+        <div
+          className="relative isolate mx-auto w-full [&>:first-child]:pt-16"
+          data-testid="admin-quiz-figure-action-frame"
+          style={displayPercent == null ? undefined : { width: `${displayPercent}%` }}
+        >
+          {children}
+          <div className="absolute right-14 top-3 z-30 flex items-center gap-2 sm:right-16 sm:top-4">
+            {canRefine ? (
+              <ImmediateTooltip content="Tinh chỉnh bằng AI">
+                <button
+                  aria-label="Tinh chỉnh bằng AI"
+                  className="theme-button-primary-subtle grid h-9 w-9 place-items-center rounded-lg shadow-sm"
+                  onClick={() => setShowRefinement(true)}
+                  type="button"
+                >
+                  <WandSparkles className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </ImmediateTooltip>
+            ) : null}
+            {revision ? (
+              <ImmediateTooltip content="Chỉnh sửa caption">
+                <button
+                  aria-label="Chỉnh sửa caption"
+                  className="theme-button-primary-subtle grid h-9 w-9 place-items-center rounded-lg shadow-sm"
+                  onClick={() => setShowCaption(true)}
+                  type="button"
+                >
+                  <Captions className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </ImmediateTooltip>
+            ) : null}
+            <ImmediateTooltip content="Xóa ảnh">
               <button
-                aria-label="Tinh chỉnh bằng AI"
-                className="theme-button-primary-subtle grid h-9 w-9 place-items-center rounded-lg shadow-sm"
-                onClick={() => setShowRefinement(true)}
+                aria-label="Xóa ảnh"
+                className="grid h-9 w-9 place-items-center rounded-lg border border-red-200 bg-red-50 text-red-600 shadow-sm transition hover:bg-red-100 disabled:opacity-50 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300"
+                disabled={mutations.deleteFigure.isPending}
+                onClick={() => setShowDelete(true)}
                 type="button"
               >
-                <WandSparkles className="h-4 w-4" aria-hidden="true" />
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
               </button>
             </ImmediateTooltip>
-          ) : null}
-          {revision ? (
-            <ImmediateTooltip content="Chỉnh sửa caption">
-              <button
-                aria-label="Chỉnh sửa caption"
-                className="theme-button-primary-subtle grid h-9 w-9 place-items-center rounded-lg shadow-sm"
-                onClick={() => setShowCaption(true)}
-                type="button"
-              >
-                <Captions className="h-4 w-4" aria-hidden="true" />
-              </button>
-            </ImmediateTooltip>
-          ) : null}
-          <ImmediateTooltip content="Xóa ảnh">
-            <button
-              aria-label="Xóa ảnh"
-              className="grid h-9 w-9 place-items-center rounded-lg border border-red-200 bg-red-50 text-red-600 shadow-sm transition hover:bg-red-100 disabled:opacity-50 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300"
-              disabled={mutations.deleteFigure.isPending}
-              onClick={() => setShowDelete(true)}
-              type="button"
-            >
-              <Trash2 className="h-4 w-4" aria-hidden="true" />
-            </button>
-          </ImmediateTooltip>
+          </div>
+          <AdminStemFigureActionsMenu
+            canEditCode={Boolean(
+              revision?.sourceKind === "AI_TEX" && revision.latexSource,
+            )}
+            canRetryInfrastructure={false}
+            isCreating={mutations.createWithAi.isPending}
+            isReplacing={uploadMutation.isPending}
+            isRetrying={false}
+            onCreateWithAi={() => setShowAi(true)}
+            onCreateWithCode={() => setCodeMode("create")}
+            onEditCode={() => setCodeMode("edit")}
+            onReplaceImage={() => inputRef.current?.click()}
+            onRetryInfrastructure={() => undefined}
+          />
         </div>
-        <AdminStemFigureActionsMenu
-          canEditCode={Boolean(revision?.sourceKind === "AI_TEX" && revision.latexSource)}
-          canRetryInfrastructure={false}
-          isCreating={mutations.createWithAi.isPending}
-          isReplacing={uploadMutation.isPending}
-          isRetrying={false}
-          onCreateWithAi={() => setShowAi(true)}
-          onCreateWithCode={() => setCodeMode("create")}
-          onEditCode={() => setCodeMode("edit")}
-          onReplaceImage={() => inputRef.current?.click()}
-          onRetryInfrastructure={() => undefined}
-        />
       </div>
 
       <input

@@ -1,7 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { Inject, Injectable, Logger } from "@nestjs/common";
-import * as yauzl from "yauzl";
-import type { Entry as YauzlEntry } from "yauzl";
 import {
   BackgroundJobQueue,
   BackgroundJobStatus,
@@ -1347,12 +1345,10 @@ export class SourceDocumentsService {
         },
         learningPathId,
         deletedAt: null,
-        chapter: {
-          deletedAt: null,
-        },
         learningPath: {
           deletedAt: null,
         },
+        OR: [{ chapterId: null }, { chapter: { deletedAt: null } }],
       },
       select: {
         id: true,
@@ -1481,15 +1477,16 @@ export class SourceDocumentsService {
     return this.backgroundJobQueue.enqueueMany(enqueueIds);
   }
 
-  /**
-   * Get rendered HTML output from Mathpix OCR html.zip artifact.
-   * Returns the full HTML string for rendering in the frontend.
-   */
-  async getOcrHtml(sourceDocumentId: string): Promise<{ html: string }> {
+  async getOcrPreviewContent(sourceDocumentId: string) {
     const sourceDocument = await this.prisma.sourceDocument.findFirst({
       where: { id: sourceDocumentId, deletedAt: null },
       select: {
-        activeOcrArtifact: { select: { manifestObjectKey: true } },
+        activeOcrArtifact: {
+          select: {
+            imageManifestObjectKey: true,
+            manifestObjectKey: true,
+          },
+        },
       },
     });
     if (!sourceDocument?.activeOcrArtifact) {
@@ -1502,119 +1499,57 @@ export class SourceDocumentsService {
       sourceDocument.activeOcrArtifact.manifestObjectKey,
     );
     const manifest = JSON.parse(manifestBuffer.toString("utf8")) as {
-      artifactKeys?: { htmlZip?: string };
+      artifactKeys?: { mmd?: string };
     };
-    const htmlZipKey = manifest.artifactKeys?.htmlZip;
+    const mmdKey = manifest.artifactKeys?.mmd;
 
-    if (!htmlZipKey) {
+    if (!mmdKey) {
       throwNotFound(
-        "HTML_ARTIFACT_NOT_FOUND",
-        "HTML artifact not found for this document",
+        "OCR_PREVIEW_ARTIFACT_NOT_FOUND",
+        "OCR preview artifact not found for this document",
       );
     }
 
     try {
-      const zipBuffer = await this.storage.downloadObject(htmlZipKey);
-      const htmlContent = await this.extractHtmlWithImagesFromZip(zipBuffer);
-      return { html: htmlContent };
+      const [mmdBuffer, imageManifestBuffer] = await Promise.all([
+        this.storage.downloadObject(mmdKey),
+        sourceDocument.activeOcrArtifact.imageManifestObjectKey
+          ? this.storage.downloadObject(
+              sourceDocument.activeOcrArtifact.imageManifestObjectKey,
+            )
+          : Promise.resolve(null),
+      ]);
+      const objectKeys = readOcrPreviewManifestObjectKeys(
+        imageManifestBuffer?.toString("utf8") ?? null,
+        sourceDocumentId,
+      );
+      const signedImages = await Promise.all(
+        objectKeys.map(async (objectKey, index) => ({
+          caption: null,
+          imageId: objectKey,
+          kind: null,
+          mimeType: null,
+          objectKey,
+          orderInPage: index + 1,
+          url: await this.storage.createSignedGetUrl(objectKey),
+        })),
+      );
+      const content = rewriteOcrPreviewImageUrls(
+        mmdBuffer.toString("utf8"),
+        signedImages,
+      );
+
+      return {
+        content: content ?? "",
+        format: "mathpix_markdown" as const,
+      };
     } catch (error) {
-      this.logger.error(`Failed to extract OCR HTML for ${sourceDocumentId}: ${error}`);
+      this.logger.error(`Failed to build OCR preview for ${sourceDocumentId}: ${error}`);
       throwNotFound(
-        "OCR_HTML_EXTRACT_FAILED",
-        "Failed to extract HTML from OCR artifacts",
+        "OCR_PREVIEW_BUILD_FAILED",
+        "Failed to build OCR preview from artifacts",
       );
     }
-  }
-
-  /**
-   * Extract the main HTML file content and its images from a Mathpix html.zip buffer.
-   * Replaces image sources in the HTML with their base64 representations.
-   */
-  private extractHtmlWithImagesFromZip(zipBuffer: Buffer): Promise<string> {
-    return new Promise<string>((resolve, reject) => {
-      yauzl.fromBuffer(zipBuffer, { lazyEntries: true }, (err, zipfile) => {
-        if (err || !zipfile) return reject(err ?? new Error("No zipfile"));
-
-        let htmlContent = "";
-        const imageMap = new Map<string, string>();
-
-        zipfile.readEntry();
-
-        zipfile.on("entry", (entry: YauzlEntry) => {
-          if (
-            entry.fileName.endsWith(".html") &&
-            !entry.fileName.startsWith("__MACOSX")
-          ) {
-            zipfile.openReadStream(entry, (readErr, readStream) => {
-              if (readErr || !readStream)
-                return reject(readErr ?? new Error("No stream"));
-              const chunks: Buffer[] = [];
-              readStream.on("data", (chunk: Buffer) => chunks.push(chunk));
-              readStream.on("end", () => {
-                htmlContent = Buffer.concat(chunks).toString("utf-8");
-                zipfile.readEntry();
-              });
-              readStream.on("error", reject);
-            });
-          } else if (
-            entry.fileName.includes("images/") &&
-            !entry.fileName.endsWith("/")
-          ) {
-            zipfile.openReadStream(entry, (readErr, readStream) => {
-              if (readErr || !readStream)
-                return reject(readErr ?? new Error("No stream"));
-              const chunks: Buffer[] = [];
-              readStream.on("data", (chunk: Buffer) => chunks.push(chunk));
-              readStream.on("end", () => {
-                const imgBuffer = Buffer.concat(chunks);
-                const ext = entry.fileName.split(".").pop()?.toLowerCase() || "jpeg";
-                const mimeType = ext === "png" ? "image/png" : "image/jpeg";
-                const base64 = imgBuffer.toString("base64");
-
-                // Trích xuất phần "images/filename.ext" từ đường dẫn thật trong zip
-                // Mathpix HTML thường trỏ src="images/filename.ext"
-                const match = entry.fileName.match(/images\/[^/]+$/);
-                const srcKey = match ? match[0] : entry.fileName;
-
-                imageMap.set(srcKey, `data:${mimeType};base64,${base64}`);
-                zipfile.readEntry();
-              });
-              readStream.on("error", reject);
-            });
-          } else {
-            zipfile.readEntry();
-          }
-        });
-
-        zipfile.on("end", () => {
-          if (!htmlContent) {
-            reject(new Error("No HTML file found in zip"));
-            return;
-          }
-
-          // Replace all image sources with their base64 representation
-          for (const [fileName, base64Url] of imageMap.entries()) {
-            htmlContent = htmlContent
-              .split(`src="${fileName}"`)
-              .join(`src="${base64Url}"`);
-            htmlContent = htmlContent
-              .split(`src='${fileName}'`)
-              .join(`src='${base64Url}'`);
-
-            htmlContent = htmlContent
-              .split(`src="./${fileName}"`)
-              .join(`src="${base64Url}"`);
-            htmlContent = htmlContent
-              .split(`src='./${fileName}'`)
-              .join(`src='${base64Url}'`);
-          }
-
-          resolve(htmlContent);
-        });
-
-        zipfile.on("error", reject);
-      });
-    });
   }
 
   async confirmPrintedPage(
@@ -1728,4 +1663,24 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
+}
+
+function readOcrPreviewManifestObjectKeys(
+  serializedManifest: string | null,
+  sourceDocumentId: string,
+): string[] {
+  if (!serializedManifest) {
+    return [];
+  }
+
+  const manifest = asRecord(JSON.parse(serializedManifest));
+  const images = Array.isArray(manifest.images) ? manifest.images : [];
+  const expectedPrefix = `document-images/${sourceDocumentId}/`;
+
+  return images
+    .map((image) => asRecord(image).objectKey)
+    .filter(
+      (objectKey): objectKey is string =>
+        typeof objectKey === "string" && objectKey.startsWith(expectedPrefix),
+    );
 }

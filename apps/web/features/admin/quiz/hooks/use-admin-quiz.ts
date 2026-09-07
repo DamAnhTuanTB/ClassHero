@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 import {
   getAdminQuizSets,
@@ -156,12 +157,15 @@ export function useAdminQuizSetMutations(lessonId: string) {
 
 export function useAdminQuizQuestions(
   setId: string,
+  lessonId: string,
   enabled = true,
   initialData?: AdminQuizQuestion[],
 ) {
   const session = useAuthSessionStore((state) => state.session);
+  const queryClient = useQueryClient();
+  const wasPollingFigureJobsRef = useRef(false);
 
-  return useQuery({
+  const query = useQuery({
     ...getAdminQuizQuestionsQueryOptions({
       accessToken: session?.accessToken ?? "",
       setId,
@@ -173,6 +177,22 @@ export function useAdminQuizQuestions(
       hasActiveQuizFigureJobs(query.state.data) ? 2_000 : false,
     refetchIntervalInBackground: false,
   });
+
+  const hasActiveFigureJobs = hasActiveQuizFigureJobs(query.data);
+
+  useEffect(() => {
+    if (!query.dataUpdatedAt) return;
+
+    if (hasActiveFigureJobs || wasPollingFigureJobsRef.current) {
+      void queryClient.invalidateQueries({
+        queryKey: adminQuizQueryKeys.sets(lessonId),
+      });
+    }
+
+    wasPollingFigureJobsRef.current = hasActiveFigureJobs;
+  }, [hasActiveFigureJobs, lessonId, query.dataUpdatedAt, queryClient]);
+
+  return query;
 }
 
 export function hasActiveQuizFigureJobs(questions?: AdminQuizQuestion[]) {

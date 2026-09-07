@@ -1,6 +1,8 @@
 import type { AiStructuredInput } from "#api/modules/ai/types/ai-text.types";
 import type { LessonSummarySubjectSnapshot } from "#api/modules/ai/types/lesson-summary-subject.types";
 import {
+  LESSON_SUMMARY_DEFAULT_REAL_WORLD_EXERCISE_COUNT,
+  LESSON_SUMMARY_DEFAULT_STANDARD_EXERCISE_COUNT,
   LESSON_SUMMARY_MAX_OUTPUT_TOKENS,
   LESSON_SUMMARY_PROMPT_VERSIONS,
   resolveLessonSummaryOutputTokenFloor,
@@ -25,9 +27,17 @@ export function buildLessonSummaryUserPrompt(input: {
   configuration: Pick<
     LessonSummaryJobInput,
     "style" | "styleInstructions" | "length" | "targetWordCount" | "extraInstructions"
-  >;
+  > &
+    Partial<
+      Pick<LessonSummaryJobInput, "standardExerciseCount" | "realWorldExerciseCount">
+    >;
 }) {
   const configuration = input.configuration;
+  const standardExerciseCount =
+    configuration.standardExerciseCount ?? LESSON_SUMMARY_DEFAULT_STANDARD_EXERCISE_COUNT;
+  const realWorldExerciseCount =
+    configuration.realWorldExerciseCount ??
+    LESSON_SUMMARY_DEFAULT_REAL_WORLD_EXERCISE_COUNT;
   const resolvedStyleInstruction = (
     configuration.styleInstructions || styleInstructions[configuration.style]
   ).replace(/\.+$/, "");
@@ -42,6 +52,8 @@ export function buildLessonSummaryUserPrompt(input: {
     configuration.targetWordCount
       ? `- Độ dài: ${resolvedLengthInstruction}; mục tiêu khoảng ${configuration.targetWordCount} từ và có thể dao động hợp lý để bảo đảm nội dung đầy đủ, dễ đọc.`
       : `- Độ dài: ${resolvedLengthInstruction}; không cần bám theo một số từ cố định.`,
+    `- Bài tập vận dụng cuối bài: tạo đúng ${standardExerciseCount} bài không thuộc dạng ứng dụng thực tế và đúng ${realWorldExerciseCount} bài ứng dụng thực tế; không gộp hai nhóm, không trả thiếu hoặc vượt số lượng.`,
+    "- Mỗi bài phải bắt buộc dùng kiến thức trọng tâm của lesson. Với các bài tự tạo, nếu bỏ bối cảnh và số liệu mà mạch giải chính vẫn giống nhau thì phải thay bài.",
     ...(configuration.extraInstructions
       ? [`- Yêu cầu bổ sung của admin: ${configuration.extraInstructions}`]
       : []),
@@ -115,6 +127,8 @@ export function buildLessonSummaryStructuredInput(input: {
       resolveLessonSummaryOutputTokenFloor({
         length: input.configuration.length,
         targetWordCount: input.configuration.targetWordCount,
+        standardExerciseCount: input.configuration.standardExerciseCount,
+        realWorldExerciseCount: input.configuration.realWorldExerciseCount,
       }),
     ),
     metadata: {

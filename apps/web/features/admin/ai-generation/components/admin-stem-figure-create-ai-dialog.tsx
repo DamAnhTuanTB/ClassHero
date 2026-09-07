@@ -1,6 +1,6 @@
 "use client";
 
-import { AI_REASONING_EFFORT_LEVELS, isAiReasoningEffort } from "@learning-path/shared";
+import { isAiReasoningEffort } from "@learning-path/shared";
 import { Bot, Eye, EyeOff, ImageIcon, Loader2, Pencil, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { OptionField } from "@/components/common/forms/option-field";
 import { TextareaField } from "@/components/common/forms/textarea-field";
 import { TextField } from "@/components/common/forms/text-field";
+import { buildAiReasoningEffortOptions } from "@/lib/ai-reasoning-effort";
 import { StemFigureMathText } from "@/components/common/content/stem-figure";
 import { AdminAiJsonInputViewer } from "@/features/admin/ai-generation/components/admin-ai-json-input-viewer";
 import { AdminAiPromptContentPreview } from "@/features/admin/ai-generation/components/admin-ai-prompt-content-preview";
@@ -18,6 +19,7 @@ import { usePreviewCreateNewAdminStemFigure } from "@/features/admin/ai-generati
 import type {
   AdminAiModelConfiguration,
   AdminStemFigure,
+  AdminStemFigureAiTargetMode,
   AdminStemFigureCreateAiInput,
   AdminStemFigureCreateAiPreview,
   AdminStemFigureReferenceImageMode,
@@ -47,6 +49,24 @@ const MODE_OPTIONS: Array<{
   },
 ];
 
+const TARGET_MODE_OPTIONS: Array<{
+  value: AdminStemFigureReferenceImageMode;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: "NONE",
+    label: "Tạo mới lại",
+    description: "Tạo lại từ nội dung của đúng phần đề bài hoặc lời giải hiện tại.",
+  },
+  {
+    value: "CURRENT_ONLY",
+    label: "Chỉnh sửa hình hiện tại",
+    description:
+      "Sửa tối thiểu code TikZ hiện tại theo yêu cầu và giữ nguyên phần không cần đổi.",
+  },
+];
+
 type RequestPreviewTab = "system" | "user" | "input";
 type PromptDisplayMode = "PREVIEW" | "MARKDOWN";
 
@@ -57,6 +77,8 @@ const REQUEST_PREVIEW_TABS: Array<{ value: RequestPreviewTab; label: string }> =
 ];
 
 export function AdminStemFigureCreateAiDialog({
+  blockPath,
+  figureIndex,
   figure,
   initialAdminInstructions,
   initialMode,
@@ -64,16 +86,20 @@ export function AdminStemFigureCreateAiDialog({
   isOpen,
   lessonId,
   modelConfiguration,
+  targetMode,
   onClose,
   onCreate,
 }: {
-  figure: AdminStemFigure;
+  blockPath?: string;
+  figureIndex?: number;
+  figure?: AdminStemFigure;
   initialAdminInstructions: string;
   initialMode: AdminStemFigureReferenceImageMode;
   isCreating: boolean;
   isOpen: boolean;
   lessonId: string;
   modelConfiguration?: AdminAiModelConfiguration;
+  targetMode?: AdminStemFigureAiTargetMode | null;
   onClose: () => void;
   onCreate: (input: AdminStemFigureCreateAiInput) => Promise<void>;
 }) {
@@ -132,10 +158,12 @@ export function AdminStemFigureCreateAiDialog({
       previewRequestSequenceRef.current += 1;
       return;
     }
-    const openSessionKey = figure.id;
+    const openSessionKey = `${
+      figure?.id ?? `block:${blockPath}:${figureIndex ?? 0}`
+    }:${targetMode ?? "GENERIC"}`;
     if (openSessionKeyRef.current === openSessionKey) return;
     openSessionKeyRef.current = openSessionKey;
-    const resolvedMode = resolveAvailableMode(figure, initialMode);
+    const resolvedMode = resolveAvailableMode(figure, initialMode, targetMode);
     const initialModel = resolveInitialModel(modelConfiguration);
     setMode(resolvedMode);
     setAdminInstructions(initialAdminInstructions);
@@ -152,12 +180,15 @@ export function AdminStemFigureCreateAiDialog({
     setPreviewTransportKey(null);
     resetPreview();
   }, [
-    figure,
+    blockPath,
+    figure?.id,
+    figureIndex,
     initialAdminInstructions,
     initialMode,
     isOpen,
     modelConfiguration,
     resetPreview,
+    targetMode,
   ]);
   useEffect(() => {
     if (!isOpen) return;
@@ -187,7 +218,10 @@ export function AdminStemFigureCreateAiDialog({
   const hasUserPromptError =
     userPromptOverride !== null && userPromptOverride.trim().length === 0;
   const currentInput = buildCreateInput({
+    blockPath,
     figure,
+    figureIndex,
+    targetMode,
     mode,
     adminInstructions,
     model,
@@ -239,21 +273,28 @@ export function AdminStemFigureCreateAiDialog({
   }
 
   if (!isMounted || !isOpen) return null;
-  const hasSource = figure.sourceReferenceImages.length > 0;
+  const sourceReferenceImages = figure?.sourceReferenceImages ?? [];
+  const hasSource = sourceReferenceImages.length > 0;
   const usesFullPageFallback =
     hasSource &&
-    figure.sourceReferenceImages.every((image) => image.source === "PDF_PAGE");
+    sourceReferenceImages.every((image) => image.source === "PDF_PAGE");
   const canEditCurrent =
-    hasSource && figure.hasCurrentAsset && figure.currentAssetKind === "AI_TEX";
-  const visibleModeOptions = MODE_OPTIONS.filter(
+    Boolean(figure?.hasCurrentAsset) && figure?.currentAssetKind === "AI_TEX";
+  const visibleModeOptions = (targetMode ? TARGET_MODE_OPTIONS : MODE_OPTIONS).filter(
     (option) =>
+      option.value === "NONE" ||
       (option.value === "SOURCE_CROP_ONLY" && hasSource) ||
       (option.value === "CURRENT_ONLY" && canEditCurrent),
   );
   const selectedReferenceImages =
     mode === "SOURCE_CROP_ONLY" || mode === "CURRENT_ONLY"
-      ? figure.sourceReferenceImages
+      ? sourceReferenceImages
       : [];
+  const dialogTitle = targetMode
+    ? targetMode === "QUESTION"
+      ? "Tạo hình cho đề bài"
+      : "Tạo hình cho lời giải"
+    : "Tạo mới hình bằng AI";
 
   return createPortal(
     <div className="theme-dialog-overlay fixed inset-0 z-[80] flex items-center justify-center p-3 backdrop-blur-sm sm:p-6">
@@ -265,7 +306,7 @@ export function AdminStemFigureCreateAiDialog({
         type="button"
       />
       <section
-        aria-label="Tạo mới hình bằng AI"
+        aria-label={dialogTitle}
         aria-modal="true"
         className="theme-dialog-panel relative z-10 flex max-h-[calc(100dvh-1.5rem)] w-full max-w-6xl flex-col overflow-hidden rounded-xl"
         role="dialog"
@@ -273,11 +314,18 @@ export function AdminStemFigureCreateAiDialog({
         <header className="theme-dialog-header flex min-h-16 shrink-0 items-center justify-between gap-4 px-4 sm:px-6">
           <div className="min-w-0">
             <h2 className="truncate text-lg font-extrabold text-[var(--theme-text-strong)]">
-              Tạo mới hình bằng AI
+              {dialogTitle}
             </h2>
             <p className="line-clamp-1 text-xs text-[var(--theme-text-muted)]">
               <StemFigureMathText
-                value={figure.caption ?? "Tạo một phiên bản hình mới cho khối này"}
+                value={
+                  figure?.caption ??
+                  (targetMode === "QUESTION"
+                    ? "Sinh một hình mới từ nội dung đề hiện tại"
+                    : targetMode === "SOLUTION"
+                      ? "Tạo một hình hoàn chỉnh mới từ đề bài và lời giải"
+                      : "Tạo một phiên bản hình mới cho khối này")
+                }
               />
             </p>
           </div>
@@ -338,13 +386,16 @@ export function AdminStemFigureCreateAiDialog({
                 );
               })}
             </div>
-            {!hasSource && !canEditCurrent ? (
+            {mode === "NONE" ? (
               <div className="mt-3 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-100">
-                Khối này chưa có ảnh tham chiếu. AI sẽ tạo hình từ nội dung khối và yêu
-                cầu của bạn.
+                {targetMode === "QUESTION"
+                  ? "AI sẽ tạo hình đề bài chỉ từ nội dung đề hiện tại, không dùng lời giải hoặc đáp án."
+                  : targetMode === "SOLUTION"
+                    ? "AI sẽ tạo một hình lời giải hoàn chỉnh và độc lập, ưu tiên lời giải rồi dùng đề bài làm bối cảnh."
+                    : "Khối này chưa có ảnh tham chiếu. AI sẽ tạo hình mới từ nội dung khối. Với Ví dụ/Bài tập, AI ưu tiên lời giải và dựng một hình hoàn chỉnh, độc lập."}
               </div>
             ) : null}
-            {mode === "CURRENT_ONLY" && figure.hasCurrentAsset ? (
+            {mode === "CURRENT_ONLY" && figure?.hasCurrentAsset ? (
               <AdminStemFigureCurrentImagePreview figure={figure} />
             ) : null}
           </fieldset>
@@ -428,7 +479,11 @@ export function AdminStemFigureCreateAiDialog({
               disabled={isCreating}
               maxLength={2000}
               onChange={(event) => setAdminInstructions(event.target.value)}
-              placeholder="Ví dụ: Giữ nguyên bố cục nguồn, sửa vị trí nhãn để không chồng nét và bảo đảm đúng nét khuất."
+              placeholder={
+                hasSource
+                  ? "Ví dụ: Giữ nguyên bố cục nguồn, sửa vị trí nhãn để không chồng nét và bảo đảm đúng nét khuất."
+                  : "Ví dụ: Làm nổi bật bước dựng chính, giữ nhãn ngắn gọn và dễ đọc."
+              }
               value={adminInstructions}
             />
             <p className="mt-1 text-right text-xs text-[var(--theme-text-muted)]">
@@ -470,7 +525,9 @@ export function AdminStemFigureCreateAiDialog({
               </div>
             ) : (
               <div className="mt-3 flex min-h-24 items-center justify-center rounded-xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-surface-soft)] px-4 text-center text-sm text-[var(--theme-text-muted)]">
-                Không gửi ảnh kèm. AI sẽ dựa vào nội dung khối.
+                {targetMode === "QUESTION"
+                  ? "Không gửi ảnh kèm. AI chỉ dùng nội dung đề bài để dựng hình."
+                  : "Không gửi ảnh kèm. AI sẽ dựng hình độc lập dựa trên lời giải và dùng đề bài làm bối cảnh."}
               </div>
             )}
           </section>
@@ -711,12 +768,17 @@ export function AdminStemFigureCreateAiDialog({
 }
 
 function resolveAvailableMode(
-  figure: AdminStemFigure,
+  figure: AdminStemFigure | undefined,
   requested: AdminStemFigureReferenceImageMode,
+  targetMode?: AdminStemFigureAiTargetMode | null,
 ): AdminStemFigureReferenceImageMode {
+  if (!figure) return "NONE";
   const hasSource = figure.sourceReferenceImages.length > 0;
   const canEditCurrent =
-    hasSource && figure.hasCurrentAsset && figure.currentAssetKind === "AI_TEX";
+    figure.hasCurrentAsset && figure.currentAssetKind === "AI_TEX";
+  if (targetMode) {
+    return requested === "CURRENT_ONLY" && canEditCurrent ? "CURRENT_ONLY" : "NONE";
+  }
   if (requested === "SOURCE_CROP_ONLY" && hasSource) return requested;
   if (requested === "CURRENT_ONLY" && canEditCurrent) return requested;
   if (canEditCurrent) return "CURRENT_ONLY";
@@ -726,9 +788,11 @@ function resolveAvailableMode(
 
 function createPreviewInputKey(input: AdminStemFigureCreateAiInput) {
   return JSON.stringify({
-    figureId: input.figure.id,
-    sourceVersion: input.figure.sourceVersion,
+    target: input.figure
+      ? { figureId: input.figure.id, sourceVersion: input.figure.sourceVersion }
+      : { blockPath: input.blockPath, figureIndex: input.figureIndex ?? 0 },
     mode: input.referenceImageMode,
+    targetMode: input.targetMode,
     adminInstructions: input.adminInstructions,
     model: input.model,
     temperature: input.temperature,
@@ -740,9 +804,11 @@ function createPreviewInputKey(input: AdminStemFigureCreateAiInput) {
 
 function createPreviewTransportKey(input: AdminStemFigureCreateAiInput) {
   return JSON.stringify({
-    figureId: input.figure.id,
-    sourceVersion: input.figure.sourceVersion,
+    target: input.figure
+      ? { figureId: input.figure.id, sourceVersion: input.figure.sourceVersion }
+      : { blockPath: input.blockPath, figureIndex: input.figureIndex ?? 0 },
     mode: input.referenceImageMode,
+    targetMode: input.targetMode,
     adminInstructions: input.adminInstructions,
     model: input.model,
     temperature: input.temperature,
@@ -796,7 +862,10 @@ function replaceFigureUserPrompt(
 }
 
 function buildCreateInput(input: {
-  figure: AdminStemFigure;
+  blockPath?: string;
+  figure?: AdminStemFigure;
+  figureIndex?: number;
+  targetMode?: AdminStemFigureAiTargetMode | null;
   mode: AdminStemFigureReferenceImageMode;
   adminInstructions: string;
   model: string;
@@ -805,9 +874,9 @@ function buildCreateInput(input: {
   systemPromptOverride: string | null;
   userPromptOverride: string | null;
 }): AdminStemFigureCreateAiInput {
-  return {
-    figure: input.figure,
+  const options = {
     referenceImageMode: input.mode,
+    targetMode: input.targetMode ?? null,
     adminInstructions: input.adminInstructions.trim() || null,
     model: input.model || null,
     temperature: input.model ? input.temperature : null,
@@ -817,6 +886,15 @@ function buildCreateInput(input: {
         : null,
     systemPrompt: input.systemPromptOverride?.trim() || null,
     userPrompt: input.userPromptOverride?.trim() || null,
+  };
+  if (input.figure) return { ...options, figure: input.figure };
+  if (!input.blockPath) {
+    throw new Error("Missing block path for new STEM figure");
+  }
+  return {
+    ...options,
+    blockPath: input.blockPath,
+    figureIndex: input.figureIndex,
   };
 }
 
@@ -887,26 +965,7 @@ function parseTemperature(value: string) {
 function buildReasoningOptions(
   model: AdminAiModelConfiguration["modelOptions"][number] | undefined,
 ) {
-  const labels: Record<string, string> = {
-    none: "Không (None)",
-    minimal: "Tối thiểu (Minimal)",
-    low: "Thấp (Low)",
-    medium: "Trung bình (Medium)",
-    high: "Cao (High)",
-    xhigh: "Rất cao (Extra High)",
-    max: "Tối đa (Max)",
-  };
-  const levels = (model?.capabilities?.reasoningEffortLevels ?? [])
-    .filter(isAiReasoningEffort)
-    .sort(
-      (left, right) =>
-        AI_REASONING_EFFORT_LEVELS.indexOf(left) -
-        AI_REASONING_EFFORT_LEVELS.indexOf(right),
-    );
-  return [
-    { value: "", label: "Mặc định của model" },
-    ...levels.map((level) => ({ value: level, label: labels[level] ?? level })),
-  ];
+  return buildAiReasoningEffortOptions(model?.capabilities?.reasoningEffortLevels);
 }
 
 function buildFigureRequestStatistics(preview: AdminStemFigureCreateAiPreview) {

@@ -17,6 +17,14 @@ const THREE_POINT_ANGLE_PATTERN =
   /\\angle\s+([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})(?![A-Za-z0-9_'′″₀-₉])/gu;
 
 export function toQuizTiptap(text: string) {
+  return toQuizTiptapDocument(text, false);
+}
+
+export function toQuizSolutionTiptap(text: string) {
+  return toQuizTiptapDocument(text, true);
+}
+
+function toQuizTiptapDocument(text: string, parseStrongMarkdown: boolean) {
   const normalizedText = normalizeMathTextLatexCommands(
     normalizeMissingInlineMathClosers(normalizeQuizAngleNotation(text)),
   );
@@ -42,7 +50,11 @@ export function toQuizTiptap(text: string) {
     }
     const lines = token.value.split(/\n+/);
     lines.forEach((line, index) => {
-      if (line) inlineContent.push({ type: "text", text: line });
+      if (line) {
+        inlineContent.push(
+          ...(parseStrongMarkdown ? parseStrongMarkdownText(line) : [textNode(line)]),
+        );
+      }
       if (index < lines.length - 1) flushParagraph();
     });
   }
@@ -51,7 +63,6 @@ export function toQuizTiptap(text: string) {
 }
 
 export function mapGeneratedQuizQuestion(question: GeneratedQuizQuestion) {
-  const canonicalAnswer = getCanonicalQuizAnswer(question);
   const solution = getGeneratedQuizSolutionText(question);
   const block: QuizExplanationBlock = {
     type: "quizExplanation",
@@ -67,11 +78,7 @@ export function mapGeneratedQuizQuestion(question: GeneratedQuizQuestion) {
     difficulty: question.difficulty,
     questionJson: toQuizTiptap(block.problem),
     hintJson: question.hint ? toQuizTiptap(question.hint) : null,
-    explanationJson: toQuizTiptap(
-      [block.solution, `Đáp án: ${normalizeQuizAngleNotation(canonicalAnswer)}`]
-        .filter(Boolean)
-        .join("\n"),
-    ),
+    explanationJson: toQuizSolutionTiptap(block.solution),
     explanationBlock: block,
     recoveryIssues: [] as Array<{
       classification: "REVIEWABLE";
@@ -140,27 +147,6 @@ export function getGeneratedQuizSolutionText(question: GeneratedQuizQuestion) {
   throw new Error("Generated quiz explanation does not contain a solution.");
 }
 
-function getCanonicalQuizAnswer(question: GeneratedQuizQuestion) {
-  if (question.questionType === QuestionType.MULTI_STATEMENT_TRUE_FALSE) {
-    return question.statements
-      .map((statement) => `${statement.id}) ${statement.value ? "Đúng" : "Sai"}.`)
-      .join("\n");
-  }
-  if (question.questionType === QuestionType.TRUE_FALSE) {
-    return question.correctAnswer ? "Đúng." : "Sai.";
-  }
-  if (question.questionType === QuestionType.TEXT_INPUT) {
-    return question.correctAnswer;
-  }
-  const correctOption = question.options.find(
-    (option) => option.id === question.correctOptionId,
-  );
-  if (!correctOption) {
-    throw new Error("Generated Quiz correctOptionId does not match any option.");
-  }
-  return `${question.correctOptionId}. ${correctOption.text}`;
-}
-
 function normalizeQuizAngleNotation(value: string) {
   return value
     .replace(
@@ -173,6 +159,29 @@ function normalizeQuizAngleNotation(value: string) {
       (_, first: string, vertex: string, second: string) =>
         `\\widehat{${first}${vertex}${second}}`,
     );
+}
+
+function parseStrongMarkdownText(value: string): Array<Record<string, unknown>> {
+  const nodes: Array<Record<string, unknown>> = [];
+  const pattern = /\*\*(\S(?:[^*\n]*?\S)?)\*\*|__(\S(?:[^_\n]*?\S)?)__/gu;
+  let cursor = 0;
+
+  for (const match of value.matchAll(pattern)) {
+    const start = match.index;
+    if (start > cursor) nodes.push(textNode(value.slice(cursor, start)));
+    nodes.push({
+      ...textNode(match[1] ?? match[2] ?? ""),
+      marks: [{ type: "bold" }],
+    });
+    cursor = start + match[0].length;
+  }
+
+  if (cursor < value.length) nodes.push(textNode(value.slice(cursor)));
+  return nodes.length > 0 ? nodes : [textNode(value)];
+}
+
+function textNode(text: string): Record<string, unknown> {
+  return { type: "text", text };
 }
 
 function trimParagraphBoundaryWhitespace(nodes: Array<Record<string, unknown>>) {

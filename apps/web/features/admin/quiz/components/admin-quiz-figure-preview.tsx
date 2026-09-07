@@ -36,12 +36,16 @@ export function AdminQuizFigurePreview({
 
   if (imageUrl) {
     return (
-      <AdminQuizFigureActionFrame figure={figure} questionId={questionId} setId={setId}>
+      <AdminQuizFigureActionFrame
+        displayPercent={displayPercent}
+        figure={figure}
+        questionId={questionId}
+        setId={setId}
+      >
         <figure
           aria-label={`${roleLabel} Quiz`}
           className="mx-auto w-full max-w-2xl rounded-xl border border-[var(--theme-border)] bg-white p-3 shadow-sm dark:bg-white"
           data-testid={`admin-quiz-${role.toLowerCase()}-figure`}
-          style={displayPercent === null ? undefined : { width: `${displayPercent}%` }}
         >
           <img
             src={imageUrl}

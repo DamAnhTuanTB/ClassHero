@@ -6,8 +6,8 @@ const mathTemplateCounts = [
   { category: "Chữ cái Hy Lạp", count: 14 },
   { category: "Phép toán", count: 14 },
   { category: "Quan hệ", count: 14 },
-  { category: "Cấu trúc", count: 15 },
-  { category: "Mũi tên", count: 10 },
+  { category: "Cấu trúc", count: 18 },
+  { category: "Mũi tên", count: 8 },
 ] as const;
 
 test("admin lesson preloads flashcard data before tab intent without a transient loader", async ({
@@ -243,6 +243,133 @@ test("admin math content uses the same typography across symbol groups", async (
   await expectNoFrameworkOverlay(page);
 });
 
+test("editing MathLive updates formula content and display mode immediately", async ({
+  page,
+}) => {
+  await seedAdminSession(page);
+  await setupFlashcardApiMock(page, { withMathQuestion: true });
+
+  await page.goto(`/admin/lessons/${lessonId}`);
+  await page.getByRole("tab", { name: "Quiz" }).click();
+  await page.getByRole("button", { name: "Sửa câu 1" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Chỉnh sửa câu hỏi" });
+  const selectedFormula = dialog
+    .locator('.tiptap-mathematics-render[data-type="inline-math"]')
+    .first();
+  await selectedFormula.click();
+
+  const mathfield = dialog.locator("math-field");
+  await expect(mathfield).toBeVisible({ timeout: 15_000 });
+  await mathfield.evaluate((element) => {
+    const field = element as HTMLElement & { value: string };
+    field.value = "\\frac{5}{7}";
+    field.dispatchEvent(new InputEvent("input", { bubbles: true }));
+  });
+
+  await expect(selectedFormula).toHaveAttribute("data-latex", "\\frac{5}{7}");
+  await dialog.getByRole("button", { name: "Một dòng riêng" }).click();
+
+  const blockFormula = dialog
+    .locator('.quiz-rich-content-prosemirror [data-type="block-math"]')
+    .first();
+  await expect(selectedFormula).toHaveCount(0);
+  await expect(blockFormula).toHaveAttribute("data-latex", "\\frac{5}{7}");
+
+  await dialog.getByRole("button", { name: "Cập nhật" }).click();
+  await expect(mathfield).toHaveCount(0);
+  await expect(blockFormula).toHaveAttribute("data-latex", "\\frac{5}{7}");
+
+  await dialog.getByRole("button", { name: "Hủy" }).click();
+  await expect(dialog).toBeHidden();
+  await expectNoFrameworkOverlay(page);
+});
+
+test("new MathLive content stays at the captured Tiptap cursor position", async ({
+  page,
+}) => {
+  await seedAdminSession(page);
+  await setupFlashcardApiMock(page);
+
+  await page.goto(`/admin/lessons/${lessonId}`);
+  await page.getByRole("tab", { name: "Quiz" }).click();
+  await page.getByRole("button", { name: "Thêm câu hỏi" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Thêm câu hỏi" });
+  const editor = dialog.locator(".quiz-rich-content-prosemirror").first();
+  await editor.click();
+  await page.keyboard.type("ABCD");
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("ArrowLeft");
+  await dialog.getByLabel("Chèn công thức Toán, Lý, Hóa").first().click();
+
+  const mathfield = dialog.locator("math-field");
+  await expect(mathfield).toBeVisible({ timeout: 15_000 });
+  await mathfield.evaluate((element) => {
+    const field = element as HTMLElement & { value: string };
+    field.value = "\\sqrt{9}";
+    field.dispatchEvent(new InputEvent("input", { bubbles: true }));
+  });
+
+  const liveFormula = editor.locator(
+    '.tiptap-mathematics-render[data-type="inline-math"]',
+  );
+  await expect(liveFormula).toHaveCount(1);
+  await expect(liveFormula).toHaveAttribute("data-latex", "\\sqrt{9}");
+  await expect
+    .poll(() =>
+      liveFormula.evaluate((element) => ({
+        after: element.nextSibling?.textContent,
+        before: element.previousSibling?.textContent,
+      })),
+    )
+    .toEqual({ after: "CD", before: "AB" });
+
+  await mathfield.evaluate((element) => {
+    const field = element as HTMLElement & { value: string };
+    field.value = "\\sqrt{16}";
+    field.dispatchEvent(new InputEvent("input", { bubbles: true }));
+  });
+  await expect(liveFormula).toHaveCount(1);
+  await expect(liveFormula).toHaveAttribute("data-latex", "\\sqrt{16}");
+
+  await editor.click();
+  await page.keyboard.press("End");
+  await dialog.getByLabel("Chèn công thức Toán, Lý, Hóa").first().click();
+  const nextMathfield = dialog.locator("math-field");
+  await expect(nextMathfield).toBeVisible({ timeout: 15_000 });
+  await nextMathfield.evaluate((element) => {
+    const field = element as HTMLElement & { value: string };
+    field.value = "\\sqrt{25}";
+    field.dispatchEvent(new InputEvent("input", { bubbles: true }));
+  });
+
+  await expect(liveFormula).toHaveCount(2);
+  await expect(liveFormula.nth(0)).toHaveAttribute("data-latex", "\\sqrt{16}");
+  await expect(liveFormula.nth(1)).toHaveAttribute("data-latex", "\\sqrt{25}");
+
+  await nextMathfield.evaluate((element) => {
+    const field = element as HTMLElement & { value: string };
+    field.value = "";
+    field.dispatchEvent(new InputEvent("input", { bubbles: true }));
+  });
+  await expect(liveFormula).toHaveCount(1);
+  await expect(liveFormula).toHaveAttribute("data-latex", "\\sqrt{16}");
+
+  await nextMathfield.evaluate((element) => {
+    const field = element as HTMLElement & { value: string };
+    field.value = "\\sqrt{36}";
+    field.dispatchEvent(new InputEvent("input", { bubbles: true }));
+  });
+  await expect(liveFormula).toHaveCount(2);
+  await expect(liveFormula.nth(0)).toHaveAttribute("data-latex", "\\sqrt{16}");
+  await expect(liveFormula.nth(1)).toHaveAttribute("data-latex", "\\sqrt{36}");
+
+  await dialog.getByRole("button", { name: "Hủy" }).click();
+  await expect(dialog).toBeHidden();
+  await expectNoFrameworkOverlay(page);
+});
+
 test("admin composes a fraction without a framework runtime error", async ({ page }) => {
   const consoleErrors: string[] = [];
   const pageErrors: string[] = [];
@@ -267,6 +394,17 @@ test("admin composes a fraction without a framework runtime error", async ({ pag
   const mathfield = dialog.locator("math-field");
   await expect(mathfield).toBeVisible({ timeout: 15_000 });
   await dialog.getByRole("button", { name: "Chèn phân số" }).click();
+  const liveFormula = dialog
+    .locator(".quiz-rich-content-prosemirror")
+    .first()
+    .locator('.tiptap-mathematics-render[data-type="inline-math"]');
+  await expect(liveFormula).toHaveCount(1);
+  await expect
+    .poll(() => liveFormula.getAttribute("data-latex"))
+    .not.toContain("\\placeholder");
+  await expect(dialog.locator(".quiz-rich-content-prosemirror").first()).not.toContainText(
+    "\\placeholder",
+  );
   await expect
     .poll(() =>
       mathfield.evaluate((element) => (element as HTMLElement & { value: string }).value),
@@ -281,6 +419,7 @@ test("admin composes a fraction without a framework runtime error", async ({ pag
   );
   expect(latex).toContain("1");
   expect(latex).toContain("2");
+  await expect(liveFormula).toHaveAttribute("data-latex", /\\frac.*1.*2/u);
 
   await dialog.getByRole("button", { name: "Đóng trình nhập công thức" }).click();
   await expect(mathfield).toHaveCount(0);
@@ -296,7 +435,9 @@ test("admin composes a fraction without a framework runtime error", async ({ pag
   expect(pageErrors).toEqual([]);
 });
 
-test("admin can type into vector and chemistry structures", async ({ page }) => {
+test("admin can type into directed vector and chemistry structures", async ({
+  page,
+}) => {
   await seedAdminSession(page);
   await setupFlashcardApiMock(page);
 
@@ -310,7 +451,7 @@ test("admin can type into vector and chemistry structures", async ({ page }) => 
   const mathfield = dialog.locator("math-field");
   await expect(mathfield).toBeVisible({ timeout: 15_000 });
 
-  await dialog.getByRole("button", { name: "Chèn vector" }).click();
+  await dialog.getByRole("button", { name: "Chèn vector phải" }).click();
   await expect
     .poll(() => mathfield.evaluate((element) => element.shadowRoot?.textContent ?? ""))
     .toContain("▢");
@@ -349,7 +490,7 @@ test("admin can type into vector and chemistry structures", async ({ page }) => 
     .poll(() =>
       mathfield.evaluate((element) => (element as HTMLElement & { value: string }).value),
     )
-    .toContain("\\vec{AB}");
+    .toContain("\\overrightarrow{AB}");
 
   await mathfield.evaluate((element) => {
     const field = element as HTMLElement & { value: string };
@@ -357,14 +498,14 @@ test("admin can type into vector and chemistry structures", async ({ page }) => 
     field.dispatchEvent(new InputEvent("input", { bubbles: true }));
   });
 
-  await dialog.getByRole("button", { name: "Chèn vector" }).click();
+  await dialog.getByRole("button", { name: "Chèn vector phải" }).click();
   await clickVectorPlaceholder();
   await page.keyboard.insertText("C");
   await expect
     .poll(() =>
       mathfield.evaluate((element) => (element as HTMLElement & { value: string }).value),
     )
-    .toContain("\\vec{C}");
+    .toContain("\\overrightarrow{C}");
 
   await mathfield.evaluate((element) => {
     const field = element as HTMLElement & { value: string };
@@ -415,6 +556,44 @@ test("admin can type into vector and chemistry structures", async ({ page }) => 
   await expectNoFrameworkOverlay(page);
 });
 
+test("angle template highlights its selected MathLive placeholder", async ({ page }) => {
+  await seedAdminSession(page);
+  await setupFlashcardApiMock(page);
+
+  await page.goto(`/admin/lessons/${lessonId}`);
+  await page.getByRole("tab", { name: "Quiz" }).click();
+  await page.getByRole("button", { name: "Thêm câu hỏi" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Thêm câu hỏi" });
+  await dialog.getByLabel("Chèn công thức Toán, Lý, Hóa").first().click();
+  await dialog.getByRole("button", { name: "Chèn góc", exact: true }).click();
+
+  const mathfield = dialog.locator("math-field");
+  const selectedPlaceholder = mathfield.locator(".ML__cmr.ML__selected");
+  await expect
+    .poll(() =>
+      mathfield.evaluate((element) => {
+        const selected = element.shadowRoot?.querySelector<HTMLElement>(
+          ".ML__cmr.ML__selected",
+        );
+        return selected ? getComputedStyle(selected).backgroundColor : null;
+      }),
+    )
+    .not.toBe("rgba(0, 0, 0, 0)");
+
+  await page.keyboard.type("ABC");
+  await expect
+    .poll(() =>
+      mathfield.evaluate((element) => (element as HTMLElement & { value: string }).value),
+    )
+    .toContain("\\widehat{ABC}");
+  await expect(selectedPlaceholder).toHaveCount(0);
+
+  await dialog.getByRole("button", { name: "Hủy" }).click();
+  await expect(dialog).toBeHidden();
+  await expectNoFrameworkOverlay(page);
+});
+
 test("math structure previews stay inside their buttons", async ({ page }) => {
   await seedAdminSession(page);
   await setupFlashcardApiMock(page);
@@ -427,7 +606,19 @@ test("math structure previews stay inside their buttons", async ({ page }) => {
   await dialog.getByLabel("Chèn công thức Toán, Lý, Hóa").first().click();
 
   const templateButtons = dialog.locator(".visual-math-input__template-button");
-  await expect(templateButtons).toHaveCount(15);
+  await expect(templateButtons).toHaveCount(18);
+  await expect(
+    dialog.getByRole("button", { name: "Chèn vector phải", exact: true }),
+  ).toBeVisible();
+  await expect(
+    dialog.getByRole("button", { name: "Chèn vector trái", exact: true }),
+  ).toBeVisible();
+  await expect(
+    dialog.getByRole("button", { name: "Chèn góc", exact: true }),
+  ).toBeVisible();
+  await expect(
+    dialog.getByRole("button", { name: "Chèn số đo góc", exact: true }),
+  ).toBeVisible();
 
   const overflowedTemplates = await templateButtons.evaluateAll((buttons) =>
     buttons.flatMap((button) => {
@@ -716,6 +907,7 @@ async function setupFlashcardApiMock(
           hintJson: null,
           gradingConfigJson: null,
           explanation: null,
+          figures: [],
           reviewStatus: "APPROVED",
         },
       ]

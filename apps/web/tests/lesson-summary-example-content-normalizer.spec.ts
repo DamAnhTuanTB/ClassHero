@@ -6,7 +6,9 @@ test("đưa danh sách a)-h) đang cùng dòng về các dòng riêng", () => {
     normalizeInlineSubpartBreaks(
       "a) Tìm một điểm thuộc đường thẳng. b) Tìm vectơ chỉ phương. c) Kết luận.",
     ),
-  ).toBe("a) Tìm một điểm thuộc đường thẳng.\nb) Tìm vectơ chỉ phương.\nc) Kết luận.");
+  ).toBe(
+    "a) Tìm một điểm thuộc đường thẳng.\n\nb) Tìm vectơ chỉ phương.\n\nc) Kết luận.",
+  );
 
   const letters = "abcdefgh";
   for (let index = 0; index < letters.length - 1; index += 1) {
@@ -16,7 +18,7 @@ test("đưa danh sách a)-h) đang cùng dòng về các dòng riêng", () => {
       normalizeInlineSubpartBreaks(
         `Dẫn nhập: ${first}) Ý thứ nhất. ${second}) Ý thứ hai.`,
       ),
-    ).toBe(`Dẫn nhập:\n${first}) Ý thứ nhất.\n${second}) Ý thứ hai.`);
+    ).toBe(`Dẫn nhập:\n\n${first}) Ý thứ nhất.\n\n${second}) Ý thứ hai.`);
   }
 });
 
@@ -32,31 +34,31 @@ test("bao phủ marker thường, Markdown emphasis, viết hoa và các loại 
         normalizeInlineSubpartBreaks(
           `Kết quả:${spacing}${first} x = 1${spacing}${second} y = 2`,
         ),
-      ).toBe(`Kết quả:\n${first} x = 1\n${second} y = 2`);
+      ).toBe(`Kết quả:\n\n${first} x = 1\n\n${second} y = 2`);
     }
   }
 });
 
 test("nhận marker thiếu khoảng trắng sau dấu đóng khi nội dung vẫn rõ", () => {
   expect(normalizeInlineSubpartBreaks("a)Tính x. b)Chứng minh y.")).toBe(
-    "a)Tính x.\nb)Chứng minh y.",
+    "a)Tính x.\n\nb)Chứng minh y.",
   );
   expect(normalizeInlineSubpartBreaks("a)$x=1$. b)\\(y=2\\).")).toBe(
-    "a)$x=1$.\nb)\\(y=2\\).",
+    "a)$x=1$.\n\nb)\\(y=2\\).",
   );
 });
 
-test("giữ nguyên marker đã xuống dòng, indentation và line ending Windows", () => {
+test("đưa marker đã xuống một dòng thành paragraph và giữ indentation, line ending", () => {
   const fixtures = [
-    "a) Tìm x.\nb) Tìm y.",
-    "  a) Tìm x.\n  b) Tìm y.",
-    "a) Tìm x.\r\nb) Tìm y.",
-    "a) Tìm x.\u2028b) Tìm y.",
-    "a) Tìm x.\u2029b) Tìm y.",
-  ];
+    ["a) Tìm x.\nb) Tìm y.", "a) Tìm x.\n\nb) Tìm y."],
+    ["  a) Tìm x.\n  b) Tìm y.", "  a) Tìm x.\n\n  b) Tìm y."],
+    ["a) Tìm x.\r\nb) Tìm y.", "a) Tìm x.\r\n\r\nb) Tìm y."],
+    ["a) Tìm x.\u2028b) Tìm y.", "a) Tìm x.\u2028\u2028b) Tìm y."],
+    ["a) Tìm x.\u2029b) Tìm y.", "a) Tìm x.\u2029\u2029b) Tìm y."],
+  ] as const;
 
-  for (const content of fixtures) {
-    expect(normalizeInlineSubpartBreaks(content)).toBe(content);
+  for (const [content, expected] of fixtures) {
+    expect(normalizeInlineSubpartBreaks(content)).toBe(expected);
   }
 });
 
@@ -92,6 +94,10 @@ test("không chèn newline vào công thức LaTeX hoặc code Markdown", () => 
   for (const content of protectedFixtures) {
     expect(normalizeInlineSubpartBreaks(content)).toBe(content);
   }
+
+  expect(
+    normalizeInlineSubpartBreaks("a) Tìm x.\nb) Tìm y.\n```text\na) foo\nb) bar\n```"),
+  ).toBe("a) Tìm x.\n\nb) Tìm y.\n```text\na) foo\nb) bar\n```");
 });
 
 test("chỉ tách marker thật khi danh sách chứa công thức hoặc code", () => {
@@ -100,10 +106,10 @@ test("chỉ tách marker thật khi danh sách chứa công thức hoặc code",
       String.raw`a) Tính $\text{ c) chỉ là chữ trong công thức }$. b) Kết luận.`,
     ),
   ).toBe(
-    `${String.raw`a) Tính $\text{ c) chỉ là chữ trong công thức }$.`}\nb) Kết luận.`,
+    `${String.raw`a) Tính $\text{ c) chỉ là chữ trong công thức }$.`}\n\nb) Kết luận.`,
   );
   expect(normalizeInlineSubpartBreaks("a) Đọc `c) không phải ý`. b) Trả lời.")).toBe(
-    "a) Đọc `c) không phải ý`.\nb) Trả lời.",
+    "a) Đọc `c) không phải ý`.\n\nb) Trả lời.",
   );
 });
 

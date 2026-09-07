@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { isAiReasoningEffort } from "@learning-path/shared";
 import {
@@ -24,6 +24,8 @@ import {
   LessonSummaryContextService,
 } from "#api/modules/ai/services/lesson-summary-context.service";
 import {
+  LESSON_SUMMARY_DEFAULT_REAL_WORLD_EXERCISE_COUNT,
+  LESSON_SUMMARY_DEFAULT_STANDARD_EXERCISE_COUNT,
   LESSON_SUMMARY_MAX_OUTPUT_TOKENS,
   LESSON_SUMMARY_SCHEMA_VERSION,
   getLessonSummaryProviderTransportOutputSchema,
@@ -69,6 +71,7 @@ import { AiModelRoutingService } from "#api/modules/provider-operations/services
 import type { AiFeatureRoute } from "#api/modules/provider-operations/types/provider-operations.types";
 import { supportsHighDetailPdfInput } from "#api/modules/provider-operations/utils/ai-model-capabilities";
 import { calculateProviderCost } from "#api/modules/provider-operations/utils/provider-cost-calculator";
+import { StoredFileCleanupService } from "#api/modules/files/services/stored-file-cleanup.service";
 
 @Injectable()
 export class LessonSummariesService {
@@ -84,6 +87,9 @@ export class LessonSummariesService {
     private readonly configService: ConfigService<EnvConfig, true>,
     @Inject(LessonSourcePacketService)
     private readonly packets: LessonSourcePacketService,
+    @Optional()
+    @Inject(StoredFileCleanupService)
+    private readonly fileCleanup?: StoredFileCleanupService,
   ) {}
 
   async getForAdmin(lessonId: string) {
@@ -460,7 +466,7 @@ export class LessonSummariesService {
 
       const reconciledContent = reconcileLessonSummaryReviewIssues({
         type: "lesson_summary_blocks",
-        version: 3,
+        version: 4,
         data: content,
       });
       const referencedFigureIds = collectStemFigureIds(reconciledContent);
@@ -522,7 +528,7 @@ export class LessonSummariesService {
     actorUserId: string,
     context: RequestContext = {},
   ) {
-    return this.prisma.$transaction(async (transaction) => {
+    const deletion = await this.prisma.$transaction(async (transaction) => {
       const lesson = await transaction.lesson.findFirst({
         where: {
           id: lessonId,
@@ -537,13 +543,32 @@ export class LessonSummariesService {
 
       const summary = await transaction.lessonSummary.findUnique({
         where: { lessonId },
-        select: lessonSummarySelect,
+        select: {
+          ...lessonSummarySelect,
+          stemFigures: {
+            select: {
+              revisions: { select: { deliveryFileId: true } },
+            },
+          },
+        },
       });
       if (!summary) {
-        return { deleted: false };
+        return { response: { deleted: false }, stagedFileIds: [] };
+      }
+
+      const deliveryFileIds = summary.stemFigures.flatMap((figure) =>
+        figure.revisions.flatMap((revision) =>
+          revision.deliveryFileId ? [revision.deliveryFileId] : [],
+        ),
+      );
+      if (deliveryFileIds.length > 0 && !this.fileCleanup) {
+        throw new Error("Stored file cleanup service is unavailable");
       }
 
       await transaction.lessonSummary.delete({ where: { id: summary.id } });
+      const stagedFileIds = this.fileCleanup
+        ? await this.fileCleanup.stageDetachedFigureFiles(transaction, deliveryFileIds)
+        : [];
       await transaction.auditLog.create({
         data: {
           actorUserId,
@@ -551,13 +576,20 @@ export class LessonSummariesService {
           entityType: "LessonSummary",
           entityId: summary.id,
           before: toInputJson(serializeLessonSummary(summary)),
+          metadata: toInputJson({ stagedFileCleanupCount: stagedFileIds.length }),
           ipAddress: context.ipAddress,
           userAgent: context.userAgent,
         },
       });
 
-      return { deleted: true };
+      return { response: { deleted: true }, stagedFileIds };
     });
+
+    const fileCleanup = this.fileCleanup
+      ? await this.fileCleanup.deleteStagedFiles(deletion.stagedFileIds)
+      : { deletedFileCount: 0, pendingFileCleanupCount: 0 };
+
+    return { ...deletion.response, ...fileCleanup };
   }
 
   async generate(lessonId: string, actorUserId: string, dto: GenerateLessonSummaryDto) {
@@ -717,6 +749,10 @@ export class LessonSummariesService {
         sourceContext.subject.key,
         "CONTEXTUAL",
         sourceContext.targetGrade,
+        {
+          standardExerciseCount: configuration.standardExerciseCount,
+          realWorldExerciseCount: configuration.realWorldExerciseCount,
+        },
       ),
       request.outputName,
       request.schemaReferenceStrategy,
@@ -1089,6 +1125,11 @@ export class LessonSummariesService {
         resolveLessonSummaryOutputTokenFloor({
           length: dto.length ?? "standard",
           targetWordCount: dto.targetWordCount ?? null,
+          standardExerciseCount:
+            dto.standardExerciseCount ?? LESSON_SUMMARY_DEFAULT_STANDARD_EXERCISE_COUNT,
+          realWorldExerciseCount:
+            dto.realWorldExerciseCount ??
+            LESSON_SUMMARY_DEFAULT_REAL_WORLD_EXERCISE_COUNT,
         }),
       ),
     };
@@ -1413,6 +1454,10 @@ function normalizeConfiguration(
     styleInstructions: dto.styleInstructions?.trim() ?? "",
     length: dto.length ?? "standard",
     targetWordCount: dto.targetWordCount ?? null,
+    standardExerciseCount:
+      dto.standardExerciseCount ?? LESSON_SUMMARY_DEFAULT_STANDARD_EXERCISE_COUNT,
+    realWorldExerciseCount:
+      dto.realWorldExerciseCount ?? LESSON_SUMMARY_DEFAULT_REAL_WORLD_EXERCISE_COUNT,
 
     extraInstructions: dto.extraInstructions?.trim() ?? "",
     systemInstructions: dto.systemInstructions ?? "",

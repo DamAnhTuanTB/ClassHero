@@ -29,6 +29,7 @@ export const studentLessonSummarySelect = {
     },
     select: {
       id: true,
+      figureIndex: true,
       status: true,
       currentRevision: {
         select: {

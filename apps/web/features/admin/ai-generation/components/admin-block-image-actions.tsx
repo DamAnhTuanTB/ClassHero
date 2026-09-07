@@ -1,17 +1,29 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { BookOpen, Bot, Code2, Image as ImageIcon, ImageUp, Loader2 } from "lucide-react";
+import {
+  BookOpen,
+  Bot,
+  Code2,
+  Image as ImageIcon,
+  ImageUp,
+  Loader2,
+  Plus,
+  Shapes,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import {
   useCreateNewAdminStemFigure,
+  useDeleteAdminStemFigure,
   useEnsureAdminStemFigureForBlock,
   useReplaceAdminStemFigure,
 } from "@/features/admin/ai-generation/hooks/use-admin-ai-generation";
 import type {
+  AdminAiModelConfiguration,
   AdminStemFigure,
+  AdminStemFigureAiTargetMode,
   AdminStemFigureReferenceImageMode,
 } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
@@ -30,28 +42,41 @@ const StemFigureEditorDialog = dynamic(
     ),
   { ssr: false },
 );
+const ACTIVE_FIGURE_STATUSES = new Set(["QUEUED", "RENDERING", "REPAIRING"]);
+
 export function AdminBlockImageActions({
   blockPath,
+  blockType,
   figures,
+  hasSolutionText,
   lessonId,
+  modelConfiguration,
   onViewTextbookSource,
 }: {
   blockPath: string;
+  blockType: string | null;
   figures: AdminStemFigure[];
+  hasSolutionText: boolean;
   lessonId: string;
+  modelConfiguration?: AdminAiModelConfiguration;
   onViewTextbookSource: (figure: AdminStemFigure) => void;
 }) {
   const ensureMutation = useEnsureAdminStemFigureForBlock(lessonId);
   const createMutation = useCreateNewAdminStemFigure(lessonId);
+  const deleteMutation = useDeleteAdminStemFigure(lessonId);
   const replaceMutation = useReplaceAdminStemFigure(lessonId);
   const inputRef = useRef<HTMLInputElement>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const transientTargetIdRef = useRef<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [selectedId, setSelectedId] = useState(
     figures.length === 1 ? (figures[0]?.id ?? "") : "",
   );
   const [dialog, setDialog] = useState<"ai" | "code" | null>(null);
   const [target, setTarget] = useState<AdminStemFigure | null>(null);
+  const [aiTargetMode, setAiTargetMode] =
+    useState<AdminStemFigureAiTargetMode | null>(null);
+  const [targetFigureIndex, setTargetFigureIndex] = useState(0);
 
   useEffect(() => {
     if (figures.length === 1) setSelectedId(figures[0]?.id ?? "");
@@ -69,8 +94,20 @@ export function AdminBlockImageActions({
   const hasTextbookSource = figures.some(
     (figure) => figure.sourceReferenceImages.length > 0,
   );
+  const isProblemBlock = blockType === "example" || blockType === "exercise";
+  const textbookQuestionFigure = figures.find(
+    (figure) =>
+      figure.figureIndex === 0 && figure.sourceReferenceImages.length > 0,
+  );
+  const solutionFigure = figures.find((figure) => figure.figureIndex === 1);
+  const isSolutionFigureActive = Boolean(
+    solutionFigure && ACTIVE_FIGURE_STATUSES.has(solutionFigure.status),
+  );
   const busy =
-    ensureMutation.isPending || createMutation.isPending || replaceMutation.isPending;
+    ensureMutation.isPending ||
+    createMutation.isPending ||
+    deleteMutation.isPending ||
+    replaceMutation.isPending;
 
   function openMenu() {
     if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
@@ -88,8 +125,9 @@ export function AdminBlockImageActions({
       return null;
     }
     try {
-      const ensured = await ensureMutation.mutateAsync(blockPath);
+      const ensured = await ensureMutation.mutateAsync({ blockPath });
       setSelectedId(ensured.id);
+      transientTargetIdRef.current = ensured.id;
       return ensured;
     } catch (error) {
       toast.error(
@@ -100,11 +138,55 @@ export function AdminBlockImageActions({
   }
 
   async function openDialog(next: "ai" | "code") {
+    if (next === "ai" && !selected && !needsSelection) {
+      setTarget(null);
+      setAiTargetMode(null);
+      setTargetFigureIndex(0);
+      setDialog("ai");
+      setIsOpen(false);
+      return;
+    }
     const figure = await resolveTarget();
     if (!figure) return;
     setTarget(figure);
+    setAiTargetMode(null);
     setDialog(next);
     setIsOpen(false);
+  }
+
+  function openTargetDialog(nextTargetMode: AdminStemFigureAiTargetMode) {
+    const figureIndex = nextTargetMode === "SOLUTION" ? 1 : 0;
+    setTarget(figures.find((figure) => figure.figureIndex === figureIndex) ?? null);
+    setTargetFigureIndex(figureIndex);
+    setAiTargetMode(nextTargetMode);
+    setDialog("ai");
+    setIsOpen(false);
+  }
+
+  function commitTransientTarget(figure: AdminStemFigure) {
+    if (transientTargetIdRef.current === figure.id) {
+      transientTargetIdRef.current = null;
+    }
+  }
+
+  async function discardTransientTarget(figure: AdminStemFigure | null) {
+    setDialog(null);
+    setTarget(null);
+    setAiTargetMode(null);
+    if (!figure || transientTargetIdRef.current !== figure.id) return;
+
+    transientTargetIdRef.current = null;
+    try {
+      await deleteMutation.mutateAsync(figure);
+    } catch (error) {
+      transientTargetIdRef.current = figure.id;
+      toast.error(
+        getUserFacingErrorMessage(
+          error,
+          "Chưa dọn được bản nháp hình chưa sử dụng.",
+        ),
+      );
+    }
   }
 
   return (
@@ -156,12 +238,51 @@ export function AdminBlockImageActions({
                 </select>
               </label>
             ) : null}
-            <BlockMenuItem
-              disabled={busy || needsSelection}
-              icon={Bot}
-              label="Tạo mới bằng AI"
-              onClick={() => void openDialog("ai")}
-            />
+            {isProblemBlock && !textbookQuestionFigure ? (
+              <>
+                <BlockMenuItem
+                  disabled={busy}
+                  icon={Plus}
+                  label="Tạo hình cho đề bài"
+                  onClick={() => openTargetDialog("QUESTION")}
+                />
+                <BlockMenuItem
+                  disabled={busy || !hasSolutionText || isSolutionFigureActive}
+                  icon={Shapes}
+                  label="Tạo hình cho lời giải"
+                  onClick={() => openTargetDialog("SOLUTION")}
+                  title={
+                    !hasSolutionText
+                      ? "Cần có lời giải bằng chữ trước."
+                      : isSolutionFigureActive
+                        ? "Hình lời giải đang được xử lý."
+                        : undefined
+                  }
+                />
+              </>
+            ) : (
+              <BlockMenuItem
+                disabled={busy || needsSelection}
+                icon={Bot}
+                label="Tạo mới bằng AI"
+                onClick={() => void openDialog("ai")}
+              />
+            )}
+            {isProblemBlock && textbookQuestionFigure ? (
+              <BlockMenuItem
+                disabled={busy || !hasSolutionText || isSolutionFigureActive}
+                icon={Shapes}
+                label="Tạo hình cho lời giải"
+                onClick={() => openTargetDialog("SOLUTION")}
+                title={
+                  !hasSolutionText
+                    ? "Cần có lời giải bằng chữ trước."
+                    : isSolutionFigureActive
+                      ? "Hình lời giải đang được xử lý."
+                      : undefined
+                }
+              />
+            ) : null}
             <BlockMenuItem
               disabled={busy || needsSelection}
               icon={Code2}
@@ -208,6 +329,7 @@ export function AdminBlockImageActions({
             if (!figure) return;
             try {
               await replaceMutation.mutateAsync({ figure, file });
+              commitTransientTarget(figure);
               toast.success("Đã tải ảnh lên.");
             } catch (error) {
               toast.error(getUserFacingErrorMessage(error, "Chưa tải được ảnh lên."));
@@ -217,20 +339,37 @@ export function AdminBlockImageActions({
         type="file"
       />
 
-      {dialog === "ai" && target ? (
+      {dialog === "ai" ? (
         <StemFigureCreateAiDialog
-          figure={target}
+          blockPath={target ? undefined : blockPath}
+          figure={target ?? undefined}
+          figureIndex={target ? undefined : targetFigureIndex}
           initialAdminInstructions=""
-          initialMode={defaultReferenceMode(target)}
+          initialMode={
+            aiTargetMode ? "NONE" : target ? defaultReferenceMode(target) : "NONE"
+          }
           isCreating={createMutation.isPending}
           isOpen
           lessonId={lessonId}
-          onClose={() => setDialog(null)}
+          modelConfiguration={modelConfiguration}
+          targetMode={aiTargetMode}
+          onClose={() => {
+            if (target) {
+              void discardTransientTarget(target);
+              return;
+            }
+            setDialog(null);
+            setTarget(null);
+            setAiTargetMode(null);
+          }}
           onCreate={async (input) => {
             try {
               await createMutation.mutateAsync(input);
+              if (input.figure) commitTransientTarget(input.figure);
               toast.success("Đã bắt đầu tạo hình mới bằng AI.");
               setDialog(null);
+              setTarget(null);
+              setAiTargetMode(null);
             } catch (error) {
               toast.error(getUserFacingErrorMessage(error, "Chưa tạo được hình mới."));
             }
@@ -243,7 +382,12 @@ export function AdminBlockImageActions({
           isOpen
           lessonId={lessonId}
           mode="create"
-          onClose={() => setDialog(null)}
+          onCancel={(latestFigure) => void discardTransientTarget(latestFigure)}
+          onClose={() => {
+            commitTransientTarget(target);
+            setDialog(null);
+            setTarget(null);
+          }}
         />
       ) : null}
     </>
@@ -255,11 +399,13 @@ function BlockMenuItem({
   icon: Icon,
   label,
   onClick,
+  title,
 }: {
   disabled: boolean;
   icon: typeof Bot;
   label: string;
   onClick: () => void;
+  title?: string;
 }) {
   return (
     <button
@@ -267,6 +413,7 @@ function BlockMenuItem({
       disabled={disabled}
       onClick={onClick}
       role="menuitem"
+      title={title}
       type="button"
     >
       <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />

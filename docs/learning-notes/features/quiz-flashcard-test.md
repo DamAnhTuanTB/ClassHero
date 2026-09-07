@@ -719,6 +719,42 @@ M6 là CRUD thủ công. Nội dung AI ở milestone sau phải đi qua cùng sc
   computed background và bounding box thật. Luôn dùng token đang tồn tại
   (`--theme-primary-soft`), vì một `var()` trỏ tới token không tồn tại làm cả
   declaration active trở thành invalid và browser quay về nền trong suốt.
+- Với MathLive `0.110`, accent co giãn như `\widehat{ABC}` có thể đặt mép trái
+  của `.ML__center` tại tâm cụm chữ, khiến dấu mũ lệch sang phải dù LaTeX và
+  KaTeX preview đều đúng. Override phải nằm trong shadow root và chỉ dịch
+  `.ML__center:has(.ML__stretchy)` sang trái `50%`; không sửa dữ liệu LaTeX hay
+  áp dụng cho mọi `.ML__center`. Regression runtime cần đo tâm của
+  `.ML__stretchy` so với tâm nhóm chữ và kiểm tra cả editor Kiến thức lẫn Quiz
+  vì hai nơi dùng chung `VisualMathInput`. Palette dùng chung cũng phải có hai
+  mẫu tách biệt: `Góc` chèn `\widehat{#?}` và `Số đo góc` chèn
+  `#?^{\circ}`, để luôn tạo ô nhập được chọn sẵn và người sửa không phải nhập
+  lệnh LaTeX thủ công.
+- Với helper MathLive nằm ngoài vùng Tiptap, chỉ cập nhật state nháp sẽ làm
+  công thức trong editor đứng yên đến khi admin bấm xác nhận. Khi sửa node đã
+  có, mỗi `input` phải cập nhật attrs `latex` của đúng node theo `position`. Khi
+  chèn mới, phải chụp `selection.from` của Tiptap trước khi chuyển focus sang
+  MathLive, chèn node nháp tại vị trí đã chụp ngay khi có LaTeX hợp lệ đầu tiên,
+  rồi giữ position đó trong ref để các phím tiếp theo cập nhật cùng node thay vì
+  chèn lặp. Ref này phải được reset vô điều kiện khi mở draft mới, kể cả khi
+  `position` mới là `undefined`; nếu chỉ đồng bộ giá trị có nghĩa thì lần chèn
+  thứ hai sẽ sửa nhầm node của lần đầu. Khi MathLive bị xóa rỗng, node preview
+  phải được xóa khỏi Tiptap nhưng vẫn giữ vị trí chèn đã chụp để có thể nhập lại
+  đúng chỗ. Placeholder nội bộ như `\\placeholder{}` chỉ được giữ trong
+  MathLive để hỗ trợ nhập theo ô; đường preview Tiptap phải loại bỏ placeholder
+  và không cho lưu khi còn ô chưa điền, tránh lộ lệnh nội bộ ra nội dung. Outer
+  modal vẫn là ranh giới lưu/hủy dữ liệu.
+- `inlineMath` và `blockMath` là hai node type ProseMirror khác nhau, không phải
+  hai giá trị attrs của cùng một node. Toggle `Trong dòng`/`Một dòng riêng` phải
+  thay node tại đúng `position` bằng transaction ngay khi bấm để preview đổi
+  realtime; sau transaction phải tìm lại position vì đổi block thành inline có
+  thể sinh paragraph bọc và làm vị trí tăng. Action xác nhận phải chạy lại cùng
+  bước bảo đảm node type trước khi đóng panel, không chỉ cập nhật `latex` hoặc
+  state `kind`, nếu không UI và JSON lưu sẽ lệch nhau.
+- Placeholder `#?` của MathLive có thể chỉ đổi màu chữ dù đã có
+  `.ML__selected`; biến `--selection-background-color` không tự tô nền cho glyph
+  ô vuông trong mọi cấu trúc accent. Shared shadow-root style phải đặt nền trực
+  tiếp cho `.ML__cmr.ML__selected`, rồi regression test kiểm computed background
+  và thao tác nhập vào `\widehat{#?}`.
 - MathLive mặc định dùng màu caret cho `--contains-highlight-color`, nên dấu căn
   hoặc dấu ngoặc có thể chuyển sang màu nhấn khi caret đang nằm bên trong cấu
   trúc. Preset nhập đáp án của học sinh phải đặt biến này về màu chữ đáp án; chỉ

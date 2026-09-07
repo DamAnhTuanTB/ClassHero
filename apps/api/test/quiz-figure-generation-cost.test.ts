@@ -107,4 +107,52 @@ describe("QuizService figure generation costs", () => {
     expect(result[0]?.figures[0]?.openAiGenerationCostVnd).toBeNull();
     expect(result[0]?.figures[0]?.openAiCachedInputTokens).toBeNull();
   });
+
+  it("hydrates a signed figure URL when local storage has no public base URL", async () => {
+    const prisma = {
+      quizQuestion: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: "question-1",
+            sourceMetadataJson: null,
+            figures: [
+              {
+                id: "figure-1",
+                status: "SUCCEEDED",
+                currentRevision: {
+                  deliveryFile: {
+                    id: "delivery-1",
+                    mimeType: "image/svg+xml",
+                    objectKey: "uploads/development/figure.svg",
+                    publicUrl: null,
+                    visibility: "PUBLIC",
+                  },
+                },
+              },
+            ],
+          },
+        ]),
+      },
+      quizFigureRenderAttempt: { findMany: vi.fn().mockResolvedValue([]) },
+    };
+    const files = {
+      resolveAccessUrl: vi.fn().mockResolvedValue("http://localhost:9000/signed.svg"),
+    };
+    const service = new QuizService(prisma as never, undefined, files as never);
+
+    const result = await service.listQuestionsBySet("quiz-set-1");
+
+    expect(files.resolveAccessUrl).toHaveBeenCalledWith(
+      expect.objectContaining({ objectKey: "uploads/development/figure.svg" }),
+    );
+    expect(result[0]?.figures[0]?.currentRevision?.deliveryFile?.publicUrl).toBe(
+      "http://localhost:9000/signed.svg",
+    );
+    expect(result[0]?.figures[0]?.currentRevision?.deliveryFile).not.toHaveProperty(
+      "objectKey",
+    );
+    expect(result[0]?.figures[0]?.currentRevision?.deliveryFile).not.toHaveProperty(
+      "visibility",
+    );
+  });
 });

@@ -9,7 +9,7 @@ export type OcrPreviewImageReference = {
   orderInPage: number;
 };
 
-type OcrPreviewImageWithUrl = OcrPreviewImageReference & {
+export type OcrPreviewImageWithUrl = OcrPreviewImageReference & {
   url: string;
 };
 
@@ -49,12 +49,10 @@ export function rewriteOcrPreviewImageUrls(
     images.map((image) => [getFilename(image.objectKey), image.url]),
   );
 
-  let rewrittenContent = content;
-  for (const [filename, url] of imageUrlByFilename) {
-    rewrittenContent = rewrittenContent
-      .replaceAll(`./images/${filename}`, url)
-      .replaceAll(`images/${filename}`, url);
-  }
+  const rewrittenContent = content.replace(
+    /(?:\.\/)?images\/([^\s<>"'{}()[\]]+)/gu,
+    (rawPath, filename: string) => imageUrlByFilename.get(filename) ?? rawPath,
+  );
 
   return rewrittenContent.replace(
     /https?:\/\/[^\s<>"'{}()[\]]+/gu,
@@ -108,7 +106,14 @@ function resolvePreviewImageUrl(
     const width = parsedUrl.searchParams.get("width");
     const topLeftY = parsedUrl.searchParams.get("top_left_y");
     const topLeftX = parsedUrl.searchParams.get("top_left_x");
-    if (!providerDocumentId || !pageNumber || !height || !width || !topLeftY || !topLeftX) {
+    if (
+      !providerDocumentId ||
+      !pageNumber ||
+      !height ||
+      !width ||
+      !topLeftY ||
+      !topLeftX
+    ) {
       return null;
     }
 

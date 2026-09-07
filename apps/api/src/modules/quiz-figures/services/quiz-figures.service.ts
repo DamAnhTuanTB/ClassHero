@@ -43,6 +43,7 @@ import type { AiFeatureRoute } from "#api/modules/provider-operations/types/prov
 import type { QuizSubjectSnapshot } from "#api/modules/quiz/types/quiz-generation.types";
 import { serializeQuizRichText } from "#api/modules/quiz/utils/quiz-generation-output";
 import { resolveQuizSubject } from "#api/modules/quiz/utils/quiz-subject";
+import { FilesService } from "#api/modules/files/services/files.service";
 
 @Injectable()
 export class QuizFiguresService {
@@ -58,6 +59,7 @@ export class QuizFiguresService {
     private readonly provider: AiProviderCallService,
     @Inject(AiModelRoutingService)
     private readonly modelRouting: AiModelRoutingService,
+    @Inject(FilesService) private readonly files: FilesService,
   ) {}
 
   async attachAdminUpload(input: {
@@ -102,10 +104,11 @@ export class QuizFiguresService {
       altText: input.altText,
       caption: input.caption,
     });
-    return this.prisma.quizFigure.findUniqueOrThrow({
+    const updated = await this.prisma.quizFigure.findUniqueOrThrow({
       where: { id: figure.id },
       select: quizFigureSelect,
     });
+    return serializeQuizFigureAccessUrl(updated, this.files);
   }
 
   compileDraft(
@@ -576,10 +579,11 @@ export class QuizFiguresService {
       where: { id: figure.id },
       data: { currentRevisionId: revision.id },
     });
-    return this.prisma.quizFigure.findUniqueOrThrow({
+    const updated = await this.prisma.quizFigure.findUniqueOrThrow({
       where: { id: figure.id },
       select: quizFigureSelect,
     });
+    return serializeQuizFigureAccessUrl(updated, this.files);
   }
 
   async deleteFigure(
@@ -694,7 +698,7 @@ export class QuizFiguresService {
         capability === "REASONING_EFFORT"
           ? (dto.reasoningEffort ?? base.reasoningEffort)
           : null,
-      maxOutputTokens: 12_000,
+      maxOutputTokens: base.maxOutputTokens,
     };
   }
 
@@ -970,11 +974,45 @@ export const quizFigureSelect = {
       altText: true,
       caption: true,
       deliveryFile: {
-        select: { id: true, mimeType: true, publicUrl: true },
+        select: {
+          id: true,
+          mimeType: true,
+          objectKey: true,
+          publicUrl: true,
+          visibility: true,
+        },
       },
     },
   },
 } as const;
+
+export async function serializeQuizFigureAccessUrl<
+  T extends {
+    currentRevision: {
+      deliveryFile: {
+        id: string;
+        mimeType: string;
+        objectKey: string;
+        publicUrl: string | null;
+        visibility: "PRIVATE" | "PUBLIC";
+      } | null;
+    } | null;
+  },
+>(figure: T, files?: Pick<FilesService, "resolveAccessUrl">) {
+  const revision = figure.currentRevision;
+  const file = revision?.deliveryFile;
+  if (!revision || !file) return figure;
+
+  const publicUrl = files ? await files.resolveAccessUrl(file) : file.publicUrl;
+  const { objectKey: _objectKey, visibility: _visibility, ...publicFile } = file;
+  return {
+    ...figure,
+    currentRevision: {
+      ...revision,
+      deliveryFile: { ...publicFile, publicUrl },
+    },
+  };
+}
 
 export function readQuizFigurePendingAiTargetMode(inputMeta: unknown) {
   if (!inputMeta || typeof inputMeta !== "object" || Array.isArray(inputMeta)) {

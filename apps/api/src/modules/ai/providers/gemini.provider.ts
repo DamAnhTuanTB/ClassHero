@@ -88,6 +88,7 @@ export class GeminiProvider implements AiProvider {
   async generateStructured<TOutput>(
     input: AiStructuredInput,
     schema: AiOutputSchema<TOutput>,
+    validationSchema: AiOutputSchema<TOutput> = schema,
   ): Promise<AiStructuredOutput<TOutput>> {
     const model = input.model ?? this.config.structuredModel;
     const startedAt = Date.now();
@@ -114,7 +115,7 @@ export class GeminiProvider implements AiProvider {
       throw new Error("Gemini returned invalid JSON for structured output.");
     }
     return {
-      data: parseAiStructuredOutput(schema, value),
+      data: parseAiStructuredOutput(validationSchema, value),
       provider: this.name,
       model: response.modelVersion ?? model,
       providerRequestId: response.responseId,

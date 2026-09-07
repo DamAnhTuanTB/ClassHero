@@ -27,6 +27,7 @@ import {
   type AdminQuizFigureRole,
 } from "@/features/admin/quiz/components/admin-quiz-figure-upload-fields";
 import {
+  useAdminQuizFigureMutations,
   useAdminQuizFigureUpload,
   useAdminQuizQuestionMutations,
 } from "@/features/admin/quiz/hooks/use-admin-quiz";
@@ -37,8 +38,10 @@ import {
   createEmptyTiptapDocument,
   getTiptapDocumentText,
   hasTiptapDocumentContent,
+  normalizeLessonSummaryAnglesInTiptapDocument,
 } from "@/lib/tiptap-rich-content";
 import { cn } from "@/lib/utils";
+import { resolveQuizExplanationEditorContent } from "@/features/admin/quiz/utils/quiz-explanation-editor";
 
 const requiredQuestionContentSchema = tiptapTextDocumentSchema.refine(
   hasTiptapDocumentContent,
@@ -182,9 +185,11 @@ export function AdminAssessmentQuestionEditorDialog({
     lessonId,
   );
   const uploadQuizFigure = useAdminQuizFigureUpload(setId);
+  const quizFigureMutations = useAdminQuizFigureMutations(setId);
   const quizQuestion =
     assessmentKind === "quiz" ? (question as AdminQuizQuestion | null) : null;
   const [draftFigureFiles, setDraftFigureFiles] = useState<AdminQuizDraftFigureFiles>({});
+  const [deletedFigureRoles, setDeletedFigureRoles] = useState<AdminQuizFigureRole[]>([]);
   const [isUploadingNewQuestionFigures, setIsUploadingNewQuestionFigures] =
     useState(false);
   const { createQuestion: createTestQuestion, updateQuestion: updateTestQuestion } =
@@ -213,24 +218,49 @@ export function AdminAssessmentQuestionEditorDialog({
     if (!isOpen) return;
     form.reset(question ? toFormValues(question) : createEmptyDefaults());
     setDraftFigureFiles({});
+    setDeletedFigureRoles([]);
   }, [form, isOpen, question]);
 
-  const selectQuizFigureFile = async (role: AdminQuizFigureRole, file: File) => {
-    if (!quizQuestion) {
-      setDraftFigureFiles((current) => ({ ...current, [role]: file }));
-      return;
-    }
+  const selectQuizFigureFile = (role: AdminQuizFigureRole, file: File) => {
+    setDraftFigureFiles((current) => ({ ...current, [role]: file }));
+    setDeletedFigureRoles((current) => current.filter((item) => item !== role));
+  };
 
+  const deleteQuizFigureForRole = (role: AdminQuizFigureRole) => {
+    const figure = quizQuestion?.figures?.find((item) => item.role === role);
+    setDraftFigureFiles((current) => {
+      const next = { ...current };
+      delete next[role];
+      return next;
+    });
+    setDeletedFigureRoles((current) => {
+      if (!figure) return current.filter((item) => item !== role);
+      return current.includes(role) ? current : [...current, role];
+    });
+  };
+
+  const applyExistingQuizFigureChanges = async (questionId: string) => {
+    setIsUploadingNewQuestionFigures(true);
     try {
-      await uploadQuizFigure.mutateAsync({
-        questionId: quizQuestion.id,
-        role,
-        file,
-        altText: getQuizFigureAltText(role),
-      });
-      toast.success("Đã cập nhật hình Quiz");
-    } catch (error) {
-      toast.error(getUserFacingErrorMessage(error, "Chưa thể tải hình Quiz lên."));
+      for (const role of ADMIN_QUIZ_FIGURE_ROLES) {
+        const figure = quizQuestion?.figures?.find((item) => item.role === role);
+        if (deletedFigureRoles.includes(role)) {
+          if (figure) {
+            await quizFigureMutations.deleteFigure.mutateAsync({ questionId, figure });
+          }
+          continue;
+        }
+        const file = draftFigureFiles[role];
+        if (!file) continue;
+        await uploadQuizFigure.mutateAsync({
+          questionId,
+          role,
+          file,
+          altText: getQuizFigureAltText(role),
+        });
+      }
+    } finally {
+      setIsUploadingNewQuestionFigures(false);
     }
   };
 
@@ -272,6 +302,7 @@ export function AdminAssessmentQuestionEditorDialog({
             questionId: question.id,
             data: payload,
           });
+          await applyExistingQuizFigureChanges(question.id);
         }
         toast.success("Đã cập nhật câu hỏi");
       } else {
@@ -312,9 +343,6 @@ export function AdminAssessmentQuestionEditorDialog({
           <h2 className="text-xl font-extrabold text-[var(--theme-text-strong)]">
             {question ? "Chỉnh sửa câu hỏi" : "Thêm câu hỏi mới"}
           </h2>
-          <p className="mt-1 text-sm font-medium text-[var(--theme-text-muted)]">
-            Thiết lập nội dung, phương án, đáp án đúng, gợi ý và lời giải.
-          </p>
         </header>
 
         <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-5 sm:p-6">
@@ -388,11 +416,22 @@ export function AdminAssessmentQuestionEditorDialog({
           {assessmentKind === "quiz" ? (
             <AdminQuizFigureUploadFields
               question={quizQuestion}
+              deletedRoles={deletedFigureRoles}
               draftFiles={draftFigureFiles}
-              disabled={uploadQuizFigure.isPending || isSaving}
+              disabled={
+                uploadQuizFigure.isPending ||
+                quizFigureMutations.deleteFigure.isPending ||
+                isSaving
+              }
+              deletingRole={
+                quizFigureMutations.deleteFigure.isPending
+                  ? quizFigureMutations.deleteFigure.variables?.figure.role
+                  : undefined
+              }
               pendingRole={
                 uploadQuizFigure.isPending ? uploadQuizFigure.variables?.role : undefined
               }
+              onDelete={deleteQuizFigureForRole}
               onFileSelect={selectQuizFigureFile}
             />
           ) : null}
@@ -404,9 +443,6 @@ export function AdminAssessmentQuestionEditorDialog({
                   <h3 className="text-sm font-extrabold text-[var(--theme-text-strong)]">
                     Các phương án trả lời
                   </h3>
-                  <p className="mt-1 text-xs font-medium text-[var(--theme-text-muted)]">
-                    Tối thiểu 2 phương án, có thể thêm bao nhiêu tùy nhu cầu.
-                  </p>
                 </div>
                 <button
                   type="button"
@@ -821,12 +857,12 @@ function toFormValues(
   return {
     questionType: question.questionType,
     difficulty: question.difficulty,
-    questionContent: question.questionJson,
+    questionContent: normalizeLessonSummaryAnglesInTiptapDocument(question.questionJson),
     options:
       question.questionType === "MULTIPLE_CHOICE" && question.optionsJson
         ? question.optionsJson.map((option) => ({
             optionId: option.id,
-            content: option.richText,
+            content: normalizeLessonSummaryAnglesInTiptapDocument(option.richText),
           }))
         : emptyDefaults.options,
     correctOptionId: correctAnswers[0] ?? "",
@@ -836,14 +872,16 @@ function toFormValues(
       question.optionsJson?.length
         ? question.optionsJson.map((statement) => ({
             statementId: statement.id,
-            content: statement.richText,
+            content: normalizeLessonSummaryAnglesInTiptapDocument(statement.richText),
             answer: statementAnswerById.get(statement.id) === false ? "false" : "true",
           }))
         : emptyDefaults.statements,
     acceptedAnswer:
       question.questionType === "TEXT_INPUT" ? (correctAnswers[0] ?? "") : "",
-    hintContent: question.hintJson ?? createEmptyTiptapDocument(),
-    explanationContent: question.explanation?.contentJson ?? createEmptyTiptapDocument(),
+    hintContent: question.hintJson
+      ? normalizeLessonSummaryAnglesInTiptapDocument(question.hintJson)
+      : createEmptyTiptapDocument(),
+    explanationContent: resolveQuizExplanationEditorContent(question),
   };
 }
 

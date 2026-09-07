@@ -6,6 +6,7 @@ import type {
   ProviderCatalogCategory,
   ProviderUsageMetric,
 } from "@prisma/client";
+export type { ProviderUsageOperation } from "@learning-path/shared";
 
 export type PriceRateSnapshot = {
   metric: ProviderUsageMetric;

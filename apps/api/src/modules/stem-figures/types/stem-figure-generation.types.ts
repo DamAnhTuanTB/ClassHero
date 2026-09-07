@@ -45,6 +45,7 @@ export const stemFigureGenerationBriefSchema = z
     referenceImageMode: z
       .enum(["SOURCE_CROP_ONLY", "CURRENT_ONLY", "NONE"])
       .default("SOURCE_CROP_ONLY"),
+    targetMode: z.enum(["QUESTION", "SOLUTION"]).nullable().optional(),
     currentLatexSource: stemFigureLatexSourceSchema.optional(),
     adminInstructions: z.string().trim().max(2_000).nullable().default(null),
   })

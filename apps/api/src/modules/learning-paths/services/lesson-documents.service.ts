@@ -78,12 +78,10 @@ export class LessonDocumentsService {
         lesson: {
           learningPathId,
           deletedAt: null,
-          chapter: {
-            deletedAt: null,
-          },
           learningPath: {
             deletedAt: null,
           },
+          OR: [{ chapterId: null }, { chapter: { deletedAt: null } }],
         },
       },
       select: lessonDocumentSelect,
@@ -118,10 +116,7 @@ export class LessonDocumentsService {
             );
 
           if (!created) {
-            throwBadRequest(
-              "VALIDATION_ERROR",
-              "Không thể tạo tài liệu trích xuất",
-            );
+            throwBadRequest("VALIDATION_ERROR", "Không thể tạo tài liệu trích xuất");
           }
 
           await this.auditDocumentChange(tx, {
@@ -407,12 +402,10 @@ export class LessonDocumentsService {
       where: {
         id: lessonId,
         deletedAt: null,
-        chapter: {
-          deletedAt: null,
-        },
         learningPath: {
           deletedAt: null,
         },
+        OR: [{ chapterId: null }, { chapter: { deletedAt: null } }],
       },
       select: {
         id: true,

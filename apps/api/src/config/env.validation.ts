@@ -137,7 +137,7 @@ const envSchema = z
       .min(1_000)
       .max(120_000)
       .default(30_000),
-    TEX_RENDER_MAX_AI_REPAIRS: z.coerce.number().int().min(0).max(5).default(2),
+    TEX_RENDER_MAX_AI_REPAIRS: z.coerce.number().int().min(0).max(5).default(1),
     TEX_RENDER_MAX_SOURCE_BYTES: z.coerce
       .number()
       .int()

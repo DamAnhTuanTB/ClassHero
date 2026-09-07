@@ -1,12 +1,17 @@
-import { resolveQuizCorrectAnswerDisplay } from "@/components/common/content/quiz-explanation-content-normalizer";
 import type {
   AdminMultiStatementAnswer,
   AdminQuizOption,
   AdminQuizQuestion,
   QuizQuestionType,
 } from "@/features/admin/quiz/api/admin-quiz-api";
-import { createMathTextTiptapDocument } from "@/lib/tiptap-rich-content";
-import { normalizeMissingInlineMathClosers } from "@learning-path/shared";
+import {
+  createMathMarkdownTiptapDocument,
+  createMathTextTiptapDocument,
+} from "@/lib/tiptap-rich-content";
+import {
+  normalizeLessonSummaryAngleNotation,
+  normalizeMissingInlineMathClosers,
+} from "@learning-path/shared";
 
 const QUESTION_TYPES = new Set<QuizQuestionType>([
   "MULTIPLE_CHOICE",
@@ -32,7 +37,6 @@ export function buildQuizQuestionPreviewFromGenerationJson(
   const problem = readString(explanation?.problem) ?? "";
   const hint = readString(sanitizedGenerationQuestionJson.hint);
   const mapped = mapQuestionSpecificFields(questionType, sanitizedGenerationQuestionJson);
-  const answer = buildPreviewAnswer(questionType, mapped);
   const solution = buildPreviewSolution(questionType, explanation);
   const explanationBlock = {
     type: "quizExplanation",
@@ -54,9 +58,7 @@ export function buildQuizQuestionPreviewFromGenerationJson(
     hintJson: hint ? createMathTextTiptapDocument(hint) : null,
     explanation: {
       id: current.explanation?.id ?? "generation-json-preview",
-      contentJson: createMathTextTiptapDocument(
-        [solution, answer ? `Đáp án: ${answer}` : ""].filter(Boolean).join("\n"),
-      ),
+      contentJson: createMathMarkdownTiptapDocument(solution),
       reviewStatus: current.explanation?.reviewStatus ?? "NEEDS_REVIEW",
       staleAt: null,
     },
@@ -85,7 +87,7 @@ function normalizeGenerationJsonText(
 
 function normalizeGenerationJsonValue(value: unknown): unknown {
   if (typeof value === "string") {
-    return normalizeMissingInlineMathClosers(value);
+    return normalizeLessonSummaryAngleNotation(normalizeMissingInlineMathClosers(value));
   }
   if (Array.isArray(value)) {
     return value.map(normalizeGenerationJsonValue);
@@ -161,19 +163,6 @@ function buildPreviewSolution(
         })
         .join("\n\n")
     : "";
-}
-
-function buildPreviewAnswer(
-  questionType: QuizQuestionType,
-  mapped: Pick<AdminQuizQuestion, "optionsJson" | "correctAnswerJson">,
-) {
-  return (
-    resolveQuizCorrectAnswerDisplay({
-      correctAnswer: mapped.correctAnswerJson,
-      optionIds: mapped.optionsJson?.map((option) => option.id),
-      questionType,
-    })?.content ?? ""
-  );
 }
 
 function readOptions(value: unknown): AdminQuizOption[] {

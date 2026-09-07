@@ -45,6 +45,9 @@ MVP tập trung vào việc giúp:
 - Có nhiều bộ quiz/flashcard/bài thi trong một buổi học.
 - Có kho bộ dự phòng do AI tạo.
 - Có AI tạo tóm tắt, quiz, flashcard, bài kiểm tra, lời giải chi tiết và chat theo buổi học.
+- Khi admin sinh kiến thức, số bài tập vận dụng chuẩn và số bài ứng dụng thực tế
+  được cấu hình độc lập, mặc định `2` cho mỗi nhóm. Đây là số lượng mục tiêu của
+  Phase 1; nếu AI trả thiếu hoặc thừa, các bài hợp lệ vẫn được lưu và hiển thị.
 - Sinh kiến thức và Quiz dùng system prompt chuyên môn độc lập cho Toán, Vật lý
   và Hóa học; không lấy quy tắc của một môn làm core cho môn khác. Chỉ hạ tầng
   kỹ thuật trung lập được phép dùng chung giữa các môn/domain.
@@ -53,6 +56,10 @@ MVP tập trung vào việc giúp:
   `Phase 2 - tạo ảnh`. Mỗi route có model chính/dự phòng, capability setting và
   giới hạn token đầu vào/đầu ra riêng; không yêu cầu admin nhập giới hạn kỹ thuật
   của provider ở catalog model.
+- Khi quản lý catalog model, UI liệt kê hợp đầy đủ các mức Reasoning Effort
+  `none | minimal | low | medium | high | xhigh | max` theo thứ tự tăng dần.
+  Admin tự chọn tập mức mà từng model hỗ trợ; mọi select cấu hình phía sau chỉ
+  hiển thị tập đã chọn và vẫn giữ thứ tự chuẩn này.
 - Khi sinh tóm tắt, admin có thể chọn dùng trực tiếp crop ảnh gốc sách giáo khoa
   đã trích xuất thay vì gọi AI vẽ lại hình.
 - Admin có thể chỉnh nhẹ ảnh raster sách giáo khoa đã dùng trong tóm tắt bằng
@@ -116,6 +123,10 @@ Admin có quyền:
   `cachedInputTokens > 0`, khung ảnh hiển thị thêm nhãn cache ngay trước nhãn chi
   phí. Ảnh upload/code, crop SGK hoặc provider khác không được suy diễn là đã
   dùng cache.
+- Trong lịch sử từng lượt gọi AI của Sinh kiến thức và Quiz, admin thấy thời
+  gian phản hồi, Reasoning Effort thực tế đã gửi và tên tác vụ đúng mục đích.
+  Các tác vụ sinh nội dung, tạo/tinh chỉnh/chỉnh sửa/sửa lỗi ảnh và tinh chỉnh
+  hoặc tạo lại lời giải không được gom dưới một nhãn chung.
 - Modal chỉnh sửa bằng mã code của cả Sinh kiến thức và Quiz có bộ `Chỉnh nhanh`
   dùng chung, dành cho admin không cần biết TikZ: ẩn nhãn độ dài, số đo góc hoặc
   nhãn chỉ chứa số; xóa nét phụ đứt/chấm; chọn độ đậm nét; dùng slider `10%–200%`
@@ -124,15 +135,16 @@ Admin có quyền:
   biến đổi source theo quy tắc xác
   định rồi tự gọi pipeline compile/validator hiện có để cập nhật preview; current
   revision chỉ đổi khi admin bấm `Áp dụng`. Bộ công cụ không gọi provider AI,
-  không xóa tên điểm/ký hiệu nguyên tố theo heuristic mơ hồ và không có action
-  thay đổi hình học tự động. Slider chỉ commit khi thả/blur/Enter để không gọi
+  không xóa tên điểm/ký hiệu nguyên tố theo heuristic mơ hồ và chỉ thay đổi hình
+  học khi admin nhập rõ tên góc/cạnh cần tạo. Slider chỉ commit khi thả/blur/Enter để không gọi
   compile liên tục trong lúc kéo. Thu/phóng dùng metadata comment an toàn trong source
   để cùng tỷ lệ được giữ ở preview, card admin và giao diện học sinh; ảnh cũ chưa
   chỉnh giữ nguyên cách hiển thị hiện tại.
 - Trong cùng bộ `Chỉnh nhanh`, nhóm `Nhãn và số đo` liệt kê riêng từng nội dung
   chữ mà transformer xác định chắc chắn đang được render bởi source TikZ, theo
   đúng thứ tự xuất hiện. Admin sửa trực tiếp giá trị trong input hoặc xóa đúng
-  mục đó mà không phải tìm dòng code. Icon cài đặt cạnh icon xóa mở ba slider
+  mục đó mà không phải tìm dòng code. Mỗi row có icon `Áp dụng` để commit riêng
+  nhãn và biên dịch đúng một lần, kế tiếp là icon cài đặt và icon xóa; icon cài đặt mở ba slider
   nằm ngay dưới input của chính slot: dịch ngang/dọc `-50pt–+50pt` với vị trí
   hiện tại là `0`, và cỡ chữ riêng `10%–200%` với cỡ hiện tại là `100%`. Thay đổi
   chỉ tác động text slot được chọn, giữ nguyên geometry/anchor và tự biên dịch
@@ -140,7 +152,60 @@ Admin có quyền:
   cỡ nền của nhóm `Nhãn chính/Nhãn phụ`, nên đổi hai lớp slider theo bất kỳ thứ
   tự nào cũng không làm mất tỷ lệ riêng. Source mơ hồ hoặc cú pháp text chưa được
   hỗ trợ phải được báo để admin sửa trong editor, không được đoán rồi thay nhầm
-  nội dung khác.
+  nội dung khác. Riêng row số đo góc có thêm slider `Khoảng cách cung tới đỉnh`
+  `4pt–50pt`; slider chỉ đổi bán kính toàn bộ nhóm cung của đúng góc và bù
+  `angle eccentricity` để text số đo giữ nguyên vị trí.
+- `Nhập góc nhanh` nhận tên góc ba điểm như `ABD` hoặc `A-B-D` (điểm giữa là
+  đỉnh) và số đo nguyên `1°–179°`. Nếu admin bật tự nối, hệ thống chỉ thêm hai
+  đoạn thẳng tạo góc còn thiếu, không nhân đôi cạnh đã có; sau đó thêm nhãn số đo
+  và nhóm cung liền có số lượng khác các nhóm số đo khác đang tồn tại. Góc cùng
+  số đo dùng cùng kiểu cung; góc khác số đo phải dùng kiểu khác, còn số đo đại số
+  chưa chứng minh bằng nhau vẫn chiếm một kiểu riêng. Nếu góc đã có, `Thêm góc`
+  thay nguyên tử số đo và toàn bộ nhóm cung cũ thay vì báo trùng hoặc thêm chồng.
+  Thao tác
+  dùng tọa độ Descartes hoặc tọa độ cực dạng số (kể cả cực tương đối quanh một
+  named point có tọa độ số) để chọn miền góc nhỏ, tự compile preview và tạo
+  đúng một bước hoàn tác. Point/geometry mơ hồ phải báo lỗi, không tự đoán.
+  Cùng card có action `Bỏ góc`: chỉ cần tên góc, hệ thống xóa toàn bộ số đo và
+  ký hiệu cung của đúng cặp tia đó, kể cả số đo nằm trong `pic` hoặc `node` rời
+  neo tường minh vào góc, nhưng giữ nguyên hai cạnh, named point và các nhóm góc
+  khác.
+- `Chỉnh đoạn thẳng` nhận hai tên điểm như `BD` hoặc `B-D`, cho phép admin `Nối`
+  một cạnh trực tiếp chưa có hoặc `Bỏ nối` đúng cạnh đang có. Cạnh trong path
+  thẳng dạng chuỗi/chu trình được tách hoặc mở chu trình mà không vô tình nối hai
+  điểm còn lại; lệnh vẽ phức tạp chưa chứng minh được boundary phải giữ nguyên và
+  yêu cầu sửa mã. Cạnh mới kế thừa độ dày chiếm ưu thế của các cạnh hình học đang
+  có. Mỗi thao tác tự compile preview và có một bước hoàn tác.
+- `Thêm trung điểm` nhận hai điểm như `AB` và tên điểm mới như `M`; nếu `AB` chưa
+  nối thì tự thêm đúng một cạnh, sau đó tạo coordinate chính xác tại
+  `($(A)!0.5!(B)$)`, dấu điểm/nhãn và một cặp marker bằng nhau nằm trong hai nửa
+  đoạn. Tên midpoint được chuẩn hóa viết hoa và nhãn mới kế thừa font-size của
+  các nhãn điểm hiện có. Mỗi đoạn độc lập phải dùng marker khác nhóm đã có; cùng một đoạn dùng
+  đúng một kiểu cho cả hai nửa. Nếu đoạn đã có đúng một midpoint do Chỉnh nhanh
+  quản lý và admin nhập tên mới, action thêm phải ghi đè atomic midpoint cũ, tái
+  sử dụng kiểu marker và không nhân đôi cạnh. Tên trùng với điểm khác hoặc source
+  không chứng minh an toàn phải báo lỗi và giữ nguyên hình. Action `Xóa trung điểm` chỉ cần input đoạn
+  thẳng, tự tìm quan hệ trung điểm duy nhất do Chỉnh nhanh quản lý, bỏ coordinate/
+  dấu điểm/nhãn/cặp marker của quan hệ đó nhưng luôn giữ đoạn gốc.
+- Card tên tâm đường tròn có checkbox `Thêm tên tâm đường tròn`; chỉ khi bật mới
+  hiện input và CTA `Thêm tên tâm`. Tên nhập được chuẩn hóa viết hoa. Transformer
+  chỉ nhận đúng một tâm của đường tròn đơn xác định từ source, thêm coordinate
+  khi cần và nhãn cạnh tâm với font-size kế thừa nhãn điểm; không tạo thêm chấm
+  tâm, không thay hình học và không gọi AI. Nhập tên mới lần nữa thay atomic block
+  nhãn tâm do Chỉnh nhanh quản lý; nhiều tâm hoặc tên đã dùng ở vị trí khác phải
+  giữ nguyên source và báo lỗi.
+- Khi Sinh kiến thức tự chạy Phase 2 cho khối Ví dụ/Bài tập không có ảnh gốc tài
+  liệu, hệ thống dựng một hình lời giải hoàn chỉnh từ `solution > problem`, không
+  phụ thuộc hình đề hay ảnh nguồn. Khi admin mở menu ảnh trên một khối chưa có
+  figure, action `Tạo mới bằng AI` được thay bằng hai action độc lập `Tạo hình cho
+  đề bài` và `Tạo hình cho lời giải`: hình đề chỉ dùng `problem`, hình lời giải
+  dùng `solution > problem`; hai hình lần lượt sở hữu slot `0` và `1`. Nếu khối đã
+  có hình đề được dựng từ ảnh SGK, menu giữ action vẽ lại hình hiện tại và thêm
+  `Tạo hình cho lời giải` không gửi/kế thừa ảnh SGK. Summary giữ prompt/runtime
+  riêng nhưng áp dụng cùng invariant nghiệp vụ với Quiz. Hai modal target luôn có
+  `Tạo mới lại`; chỉ khi đúng slot target đã có asset AI/TikZ hiện hành thì mới
+  hiện thêm `Chỉnh sửa hình hiện tại`. Lựa chọn chỉnh sửa dùng trực tiếp source
+  hiện tại và không phụ thuộc figure có ảnh SGK hay không. Khối thường giữ nguyên.
 - Menu ảnh của block có lựa chọn `Xem ảnh sách giáo khoa` khi figure đích có
   reference SGK; lựa chọn này mở cùng khung ảnh nguồn ngay trong block như icon
   mở nhanh ở figure. Trong khung, checkbox `Tự động làm nét ảnh` mặc định tắt.

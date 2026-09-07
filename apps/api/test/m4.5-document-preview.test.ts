@@ -81,6 +81,7 @@ describe("M4.5 private document previews", () => {
     const secondUrl = "https://storage.example/second.jpg?signed=two";
     const content = [
       "Đoạn trước hình 5.23",
+      "![](./images/local-image.jpg)",
       "\\begin{figure}",
       "\\includegraphics{https://cdn.mathpix.com/cropped/provider-id-42.jpg?height=276&width=553&top_left_y=3357&top_left_x=2721}",
       "\\caption{Hinh 5.23}",
@@ -92,6 +93,15 @@ describe("M4.5 private document previews", () => {
     ].join("\n");
 
     const rewritten = rewriteOcrPreviewImageUrls(content, [
+      {
+        caption: null,
+        imageId: "local",
+        kind: "image",
+        mimeType: "image/jpeg",
+        objectKey: "document-images/source-1/page-001/local-image.jpg",
+        orderInPage: 1,
+        url: "https://storage.example/local-image.jpg?signed=local",
+      },
       {
         caption: "Hình 5.23",
         imageId: "first",
@@ -116,6 +126,8 @@ describe("M4.5 private document previews", () => {
 
     expect(rewritten).not.toContain("cdn.mathpix.com");
     expect(rewritten).not.toContain("localhost:9000");
+    expect(rewritten).not.toContain("./images/local-image.jpg");
+    expect(rewritten).toContain("https://storage.example/local-image.jpg?signed=local");
     expect(rewritten?.indexOf("Đoạn trước")).toBeLessThan(
       rewritten?.indexOf(firstUrl) ?? -1,
     );

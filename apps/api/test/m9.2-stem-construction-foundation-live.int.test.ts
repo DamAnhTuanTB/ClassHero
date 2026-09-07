@@ -12,13 +12,14 @@ import type {
 import { StemFigureRepairService } from "#api/modules/stem-figures/services/stem-figure-repair.service";
 import type { StemFigureGenerationBrief } from "#api/modules/stem-figures/types/stem-figure-generation.types";
 
+loadEnv({ path: resolve(process.cwd(), ".env"), override: false, quiet: true });
 loadEnv({ path: resolve(process.cwd(), "../../.env"), override: false, quiet: true });
 
 const runLiveTest = process.env.RUN_OPENAI_STEM_FOUNDATION_LIVE_TESTS === "1";
 const outputDirectory =
   process.env.OPENAI_STEM_FOUNDATION_OUTPUT_DIR ??
   "/tmp/ai-stem-construction-foundation-live";
-const additionalBudgetVnd = 10_000;
+const additionalBudgetVnd = 5_000;
 
 type SubjectKey = "MATH" | "PHYSICS" | "CHEMISTRY" | "GENERAL";
 
@@ -29,6 +30,10 @@ type StemLiveCase = {
   title: string;
   content: string;
   quantitativeGraph?: boolean;
+  solutionFigure?: {
+    problem: string;
+    solution: string;
+  };
 };
 
 const subjects = {
@@ -39,6 +44,18 @@ const subjects = {
 } as const;
 
 const cases: StemLiveCase[] = [
+  {
+    label: "stem-math-example-solution",
+    subjectKey: "MATH",
+    targetGrade: 8,
+    title: "Đường cao trong tam giác",
+    content: "",
+    solutionFigure: {
+      problem: "Cho tam giác ABC vuông tại A. Tính khoảng cách từ A đến BC.",
+      solution:
+        "Kẻ đường cao AH vuông góc với BC tại H. Dùng hệ thức AB·AC = AH·BC để xác định AH.",
+    },
+  },
   {
     label: "stem-math-parabola",
     subjectKey: "MATH",
@@ -155,6 +172,11 @@ describe.skipIf(!runLiveTest)("StemFigure construction-foundation live matrix", 
     if (!apiKey) throw new Error("OPENAI_API_KEY is required for the live test.");
 
     const model = process.env.OPENAI_STEM_FOUNDATION_MODEL ?? "gpt-5.6-luna";
+    const reasoningEffort =
+      process.env.OPENAI_STEM_FOUNDATION_REASONING_EFFORT === "high" ? "high" : "medium";
+    const maxOutputTokens = Number(
+      process.env.OPENAI_STEM_FOUNDATION_MAX_OUTPUT_TOKENS ?? 3_000,
+    );
     const provider = new OpenAiProvider({
       apiKey,
       requestTimeoutMs: 180_000,
@@ -179,7 +201,7 @@ describe.skipIf(!runLiveTest)("StemFigure construction-foundation live matrix", 
           schema: AiOutputSchema<TOutput>,
         ) => {
           const result = await provider.generateStructured(
-            { ...input, model, maxTokens: 3_000 },
+            { ...input, model, reasoningEffort, maxTokens: maxOutputTokens },
             schema,
           );
           usage.calls += 1;
@@ -210,6 +232,7 @@ describe.skipIf(!runLiveTest)("StemFigure construction-foundation live matrix", 
       const parsed = stemFigureLatexSourceSchema.safeParse(source);
       if (!parsed.success) errors.push(`SOURCE_SCHEMA:${parsed.error.message}`);
       if (testCase.quantitativeGraph) errors.push(...checkGraphFoundation(source));
+      if (testCase.solutionFigure) errors.push(...checkSolutionFigure(source));
 
       const render = await renderFigure(source, testCase.subjectKey);
       if (!render.ok || !render.svg)
@@ -237,6 +260,8 @@ describe.skipIf(!runLiveTest)("StemFigure construction-foundation live matrix", 
     console.info(
       `[STEM FOUNDATION LIVE TOTAL] ${JSON.stringify({
         ...usage,
+        reasoningEffort,
+        maxOutputTokens,
         cases: liveCases.length,
         failures: failures.map((result) => result.label),
         conservativeCostVnd: Math.round(conservativeCostVnd(usage.input, usage.output)),
@@ -257,16 +282,31 @@ function buildBrief(testCase: StemLiveCase): StemFigureGenerationBrief {
     figureOrigin: "GENERATED_FROM_BRIEF",
     targetGrade: testCase.targetGrade,
     blockPath: "sections.0.blocks.0",
-    blockContent: {
-      type: "knowledge",
-      title: testCase.title,
-      content: testCase.content,
-    },
+    blockContent: testCase.solutionFigure
+      ? {
+          type: "example",
+          problem: testCase.solutionFigure.problem,
+          solution: testCase.solutionFigure.solution,
+        }
+      : {
+          type: "knowledge",
+          title: testCase.title,
+          content: testCase.content,
+        },
     sourceReferences: [],
     referenceAssets: [],
     referenceImageMode: "NONE",
     adminInstructions: null,
   };
+}
+
+function checkSolutionFigure(source: string) {
+  const errors: string[] = [];
+  if (!/\{\$?H\$?\}/u.test(source)) errors.push("SOLUTION_AUXILIARY_POINT_H");
+  if (!/right\s+angle|vuông|perp|rectangle/u.test(source)) {
+    errors.push("SOLUTION_PERPENDICULAR_MARKER");
+  }
+  return errors;
 }
 
 function checkGraphFoundation(source: string) {

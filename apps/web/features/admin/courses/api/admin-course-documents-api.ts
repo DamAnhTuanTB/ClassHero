@@ -112,9 +112,12 @@ export function getAdminSourceDocumentCacheStatus(
   );
 }
 
-export function getAdminSourceDocumentOcrHtml(sourceDocumentId: string, token: string) {
-  return apiRequest<{ html: string }>(
-    `/admin/source-documents/${sourceDocumentId}/ocr-html`,
+export function getAdminSourceDocumentOcrPreviewContent(
+  sourceDocumentId: string,
+  token: string,
+) {
+  return apiRequest<{ content: string; format: "mathpix_markdown" }>(
+    `/admin/source-documents/${sourceDocumentId}/ocr-preview-content`,
     { token },
   );
 }

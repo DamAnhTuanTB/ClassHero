@@ -20,7 +20,7 @@ const GENERAL_QUIZ_FIGURE_SPATIAL_LABEL_POLICY = [
   "- Cỡ chữ mặc định chỉ là baseline, không phải hằng số bắt buộc cho mọi text node. Với mọi nhãn chữ trên canvas như tên node/mốc, số đo, nhãn trục, bảng, quy trình hoặc đoạn mô tả, sau khi chọn đúng coordinate/anchor/`pos`/path phải ước lượng bounding box theo độ dài và độ phức tạp thật. Nếu nhãn dài vẫn chạm hoặc che đường nối, vùng, marker hay nhãn khác, ưu tiên xuống dòng hoặc `text width` cho prose phù hợp rồi giảm cỡ cục bộ theo từng bước bằng `font=\\small` và `font=\\footnotesize`; chỉ dùng `\\scriptsize` trong trường hợp đặc biệt mà kết quả vẫn đọc rõ. Không thu nhỏ nhãn ngắn để chữa một anchor sai và không co toàn bộ figure chỉ vì một nhãn dài.",
   "- Sau khi giảm cỡ hoặc xuống dòng, bắt buộc đặt lại anchor/`pos`/offset theo bounding box mới để nhãn vẫn gần sát đúng node, path, ô, vùng hoặc đối tượng sở hữu; cấm giữ nguyên khoảng hở cũ làm nhãn trôi vào vùng trắng. Các nhãn cùng vai trò phải dùng cấp chữ nhất quán. Counterexample: tên node ngắn bị vướng phải đổi anchor hay phía đặt thay vì thu nhỏ; đoạn mô tả dài có thể cần `text width`, còn biểu thức dài đã neo đúng nhưng thiếu vùng trống mới cần giảm cỡ cục bộ.",
   "- Khi yêu cầu sửa tối thiểu, chỉ đổi nhãn trong phạm vi cần thiết; lượt được phép dựng lại hoặc tinh chỉnh toàn diện vẫn phải giữ đúng dữ kiện và authority chuyên môn.",
-  "- Trừ khi ảnh nguồn hoặc authority thể hiện rõ một leader line hay quy ước khác cần bảo toàn, trước khi trả source phải tự kiểm từng nhãn: điểm, path hoặc cung tương thích gần bounding box nhãn nhất phải là đúng đối tượng sở hữu và người xem phải nhận ra liên thuộc ngay. Nếu chưa đạt, sửa anchor hoặc vị trí; không dùng một offset tuyệt đối cho mọi hình.",
+  "- Trừ khi ảnh nguồn hoặc authority khóa một leader line hay quy ước khác, điểm, path hoặc cung tương thích gần bounding box nhãn nhất phải là đúng đối tượng sở hữu; sửa anchor hoặc vị trí khi liên thuộc chưa rõ và không dùng một offset tuyệt đối cho mọi hình.",
 ].join("\n");
 
 const GENERAL_QUIZ_VISUAL_COMPLETENESS_POLICY = [
@@ -39,7 +39,18 @@ function resolveGeneralQuizVisualCompletenessMode(
   if (mode === "QUESTION") {
     return "- Móng hình trung tính luôn bắt buộc và không bị coi là lộ đáp án. Chỉ cấm thêm quan hệ, trạng thái, annotation hoặc điểm nhấn suy ra; không được vì vậy mà bỏ ranh giới, connector, topology, baseline/trục/tick/zero, marker hay legend mẫu nền.";
   }
-  return "- Với hình lời giải, áp dụng checklist cho một hình hoàn chỉnh mới dựa trực tiếp vào solution và problem; không dùng hay kế thừa hình đề.";
+  return "- Với hình lời giải, áp dụng checklist cho một hình hoàn chỉnh mới dựa trực tiếp trên cả solution và problem, trong đó solution là nguồn ưu tiên cao hơn; không dùng hay kế thừa hình đề.";
+}
+
+function resolveGeneralQuizFinalSemanticCheck(mode: GeneralQuizVisualCompletenessMode) {
+  const authority =
+    mode === "QUESTION"
+      ? "problem và whitelist dữ kiện trực tiếp"
+      : "solution rồi đến problem";
+  return [
+    "### KIỂM CHỨNG CHUYÊN MÔN CUỐI",
+    `- Chỉ đối chiếu một lượt source cuối với ${authority}: mọi node, vùng, connector, hướng, trạng thái và nhãn phải đúng topology, gắn đúng owner, không thiếu/thừa nội dung mang nghĩa và không gây hiểu sai; sửa trực tiếp source nếu còn lệch.`,
+  ].join("\n");
 }
 
 const GENERAL_QUIZ_QUESTION_FIGURE_SYSTEM_PROMPT = [
@@ -53,7 +64,6 @@ const GENERAL_QUIZ_QUESTION_FIGURE_SYSTEM_PROMPT = [
   "### QUY TẮC HÌNH MÔN HỌC CHƯA CÓ PROFILE RIÊNG CỦA QUIZ",
   "- Không mượn quy tắc chuyên môn của Toán, Vật lý hoặc Hóa học. Chỉ dùng ký hiệu và quy ước được nêu trực tiếp trong nguồn dữ kiện của lượt hiện tại.",
   "- Mọi nhãn phải gắn đúng đối tượng, không chồng chữ/nét, không bị cắt và không làm phát sinh quan hệ hoặc dữ kiện mới.",
-  "- Trước khi trả source, tự kiểm toàn canvas và sửa phép dựng, anchor hoặc vị trí nếu hình gây hiểu sai hay mơ hồ.",
   "",
   "### HỢP ĐỒNG LƯỢT VẼ HÌNH ĐỀ",
   "- Chỉ trả structured output chứa latexSource; cấm báo cáo tự kiểm và field ngoài schema.",
@@ -67,9 +77,9 @@ const GENERAL_QUIZ_QUESTION_FIGURE_SYSTEM_PROMPT = [
   "- Nếu mode=EDIT_CURRENT, trước hết xóa mọi nét/annotation cũ không truy được về whitelist của problem, sau đó mới sửa tối thiểu theo adminInstructions và trả toàn bộ source hợp lệ. Nếu mode=REGENERATE, dựng lại chỉ từ problem.",
   "- Hình phải đúng chuyên môn: mọi đối tượng, quan hệ, ký hiệu và chú thích mang nghĩa phải nhất quán với problem, gắn đúng đối tượng và không tạo ra cách hiểu sai hoặc mơ hồ.",
   "- Bắt buộc dựng trước, chú thích sau; cấm chọn hình tùy ý rồi gắn số đo. Mọi giá trị nhìn thấy phải đúng với tọa độ/phép dựng.",
-  "- Trước khi trả latexSource, tự kiểm source cuối: đối chiếu từng giá trị, quan hệ và ký hiệu nhìn thấy với phép dựng cùng problem. Nếu lệch, sửa phép dựng thay vì chỉ sửa nhãn. Tự kiểm nội bộ, không trả thêm field/báo cáo.",
+  "- Mọi giá trị, quan hệ và ký hiệu nhìn thấy phải khớp phép dựng cùng problem; nếu lệch phải sửa phép dựng thay vì chỉ sửa nhãn.",
   "- Chỉ dùng tập đối tượng và quan hệ tối thiểu đủ cho thông điệp thị giác; cấm phát minh dữ kiện hoặc chi tiết không giúp hiểu câu hỏi.",
-  "- Trước khi trả kết quả, đối chiếu lại từng nét mang nghĩa với whitelist của problem. Xóa mọi chi tiết không có căn cứ trực tiếp, kể cả chi tiết đúng về chuyên môn nhưng thuộc mạch suy luận. Cấm thiếu/thừa nét, nối/gắn nhãn sai hoặc đổi quan hệ. Bố cục thoáng, ít màu; ký hiệu quan hệ độc lập không chồng, chạm hoặc tụ sát; không cắt nhãn.",
+  "- Mọi nét mang nghĩa phải có căn cứ trực tiếp trong whitelist của problem; xóa chi tiết chỉ thuộc mạch suy luận. Cấm thiếu/thừa nét, nối hoặc gắn nhãn sai, đổi quan hệ, để ký hiệu chồng/chạm/tụ sát hay cắt nhãn.",
   "- Hình rõ trên nền trắng; cấm sao chép ảnh sách giáo khoa.",
 ].join("\n");
 
@@ -84,17 +94,16 @@ const GENERAL_QUIZ_SOLUTION_FIGURE_SYSTEM_PROMPT = [
   "### QUY TẮC HÌNH MÔN HỌC CHƯA CÓ PROFILE RIÊNG CỦA QUIZ",
   "- Không mượn quy tắc chuyên môn của Toán, Vật lý hoặc Hóa học. Chỉ dùng ký hiệu và quy ước được nêu trực tiếp trong nguồn dữ kiện của lượt hiện tại.",
   "- Mọi nhãn phải gắn đúng đối tượng, không chồng chữ/nét, không bị cắt và không làm phát sinh quan hệ hoặc dữ kiện mới.",
-  "- Trước khi trả source, tự kiểm toàn canvas và sửa phép dựng, anchor hoặc vị trí nếu hình gây hiểu sai hay mơ hồ.",
   "",
   "### HỢP ĐỒNG LƯỢT TẠO HÌNH LỜI GIẢI",
   "- Chỉ trả structured output chứa latexSource; không trả báo cáo tự kiểm hoặc field ngoài schema.",
   "- latexSource phải là một figure snippet hoàn chỉnh có đúng một root tikzpicture hoặc circuitikz; cấm documentclass, usepackage và document wrapper.",
   "- solution là nguồn có độ ưu tiên cao nhất; problem bổ sung bối cảnh và dữ kiện ban đầu. Khi hai field khác nhau, bám solution cho cấu hình và quan hệ của mạch giải, nhưng không tự phát minh dữ kiện ngoài cả hai field.",
   "- Hình lời giải hoàn toàn độc lập với hình đề. Phải dựng một source hoàn chỉnh mới từ problem và solution; không yêu cầu, đọc, kế thừa hay chèn vào source hình đề.",
-  "- Nếu aiMode=EDIT_CURRENT, sửa currentSolutionLatexSource theo adminInstructions nhưng vẫn phải đối chiếu lại toàn bộ với solution rồi problem. Nếu aiMode=REGENERATE, dựng mới toàn bộ từ solution và problem.",
+  "- Nếu aiMode=EDIT_CURRENT, sửa currentSolutionLatexSource theo adminInstructions nhưng source cuối vẫn phải nhất quán với cả solution và problem theo quan hệ ưu tiên nêu trên. Nếu aiMode=REGENERATE, dựng mới toàn bộ từ solution và problem.",
   "- adminInstructions chỉ chỉnh cách thể hiện; cấm thêm dữ kiện, đổi lời giải hoặc ghi đè policy hình.",
   "- Mô hình phải đúng chuyên môn bằng chính phép dựng; mọi quan hệ, số đo, nhãn và ký hiệu phải nhất quán, gắn đúng đối tượng và không tạo cách hiểu sai hoặc mơ hồ.",
-  "- Chỉ dùng tập đối tượng và quan hệ tối thiểu đủ để theo dõi mạch giải. Trước khi trả kết quả, tự đối chiếu toàn bộ hình với solution rồi problem; cấm thiếu/thừa nét, nối sai, gắn sai nhãn hoặc thể hiện sai quan hệ.",
+  "- Chỉ dùng tập đối tượng và quan hệ tối thiểu đủ để theo dõi mạch giải; cấm thiếu/thừa nét, nối sai, gắn sai nhãn hoặc thể hiện quan hệ trái với solution và problem.",
   "- Không dùng ảnh, file, URL, raw SVG, shell escape, input/include hoặc directlua.",
 ].join("\n");
 
@@ -109,6 +118,7 @@ function resolveSubjectName(
     GENERAL_QUIZ_FIGURE_SPATIAL_LABEL_POLICY,
     GENERAL_QUIZ_VISUAL_COMPLETENESS_POLICY,
     resolveGeneralQuizVisualCompletenessMode(mode),
+    resolveGeneralQuizFinalSemanticCheck(mode),
   ]
     .join("\n\n")
     .replaceAll("__SUBJECT_NAME__", subject.name);
@@ -166,7 +176,6 @@ const GENERAL_QUIZ_REFINEMENT_SYSTEM_PROMPT = [
   "",
   "### ĐÁNH GIÁ MỞ",
   "- Danh sách lỗi trên chỉ là ví dụ, không phải danh sách đóng. Nếu hình sai chuyên môn theo dữ kiện, thiếu/thừa phần tử, sai topology, vô lý, mơ hồ hoặc khó đọc thì bắt buộc sửa theo authority; tuyệt đối không phát minh dữ kiện hay quy ước môn học.",
-  "- Trước khi trả kết quả, tự đối chiếu toàn bộ source cuối với figurePlan và ảnh candidate. Giữ phần đang đúng khi hợp lý nhưng không ưu tiên bảo toàn source hơn tính đúng.",
   "",
 ];
 
@@ -174,7 +183,7 @@ function resolveGeneralRefinementAuthority(mode: "QUESTION" | "SOLUTION") {
   if (mode === "QUESTION") {
     return "hình đề; problem trong figurePlan là nguồn dữ kiện duy nhất";
   }
-  return "hình lời giải độc lập; solution là nguồn ưu tiên cao nhất, sau đó mới đến problem";
+  return "hình lời giải độc lập; dùng cả solution và problem, trong đó solution là nguồn ưu tiên cao nhất";
 }
 
 function resolveGeneralRefinementInputReferences(_mode: "QUESTION" | "SOLUTION") {

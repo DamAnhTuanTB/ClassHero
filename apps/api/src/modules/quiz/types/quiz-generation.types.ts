@@ -3,13 +3,12 @@ import { Difficulty, QuestionType } from "@prisma/client";
 import { z } from "zod";
 
 export const QUIZ_PROMPT_VERSIONS = {
-  MATH: "quiz-math-v85-independent-solution-figure",
-  PHYSICS: "quiz-physics-v80-independent-solution-figure",
-  CHEMISTRY: "quiz-chemistry-v80-independent-solution-figure",
-  GENERAL: "quiz-general-v80-independent-solution-figure",
+  MATH: "quiz-math-v89-semantic-review-only",
+  PHYSICS: "quiz-physics-v84-semantic-review-only",
+  CHEMISTRY: "quiz-chemistry-v84-semantic-review-only",
+  GENERAL: "quiz-general-v84-semantic-review-only",
 } as const;
-export const QUIZ_SCHEMA_VERSION =
-  "quiz-pdf-figure-schema-v37-independent-solution-figure";
+export const QUIZ_SCHEMA_VERSION = "quiz-pdf-figure-schema-v38-compact-descriptions";
 export const QUIZ_MAX_OUTPUT_TOKENS = 12_000;
 export const QUIZ_MIN_OUTPUT_TOKENS = 1_000;
 export const QUIZ_MAX_CONFIGURED_OUTPUT_TOKENS = 32_000;
@@ -60,13 +59,6 @@ export const QUIZ_LOGICAL_DERIVATION_POLICY = [
   "Counterexample hợp lệ: hai phương trình độc lập của một hệ, hai phép gán cho hai đại lượng khác nhau hoặc một phép tính một bước không phải bị ép thành chuỗi. Trước khi trả output, kiểm tra từng cặp bước liên tiếp: phải xác định được phép biến đổi, quan hệ tương đương/suy ra và điều kiện bảo toàn tập nghiệm; nếu không, phải viết lại mạch lời giải.",
 ].join(" ");
 
-export const QUIZ_LATEX_ENVIRONMENT_BALANCE_POLICY = [
-  "QUY TẮC CỨNG VỀ MÔI TRƯỜNG LATEX: trong mọi khối công thức display `$$...$$`, mỗi lệnh `\\begin{X}` bắt buộc có đúng lệnh `\\end{X}` tương ứng, đóng theo thứ tự lồng ngược và nằm trước dấu `$$` kết thúc khối.",
-  "Tuyệt đối không kết thúc khối ngay sau nội dung của `aligned`, `split`, `cases`, `array`, `matrix` hoặc môi trường khác khi chưa viết lệnh `\\end{...}` tương ứng. Ví dụ SAI: `$$\\begin{aligned}A&=B\\\\&=C.$$`; ví dụ ĐÚNG: `$$\\begin{aligned}A&=B\\\\&=C.\\end{aligned}$$`.",
-  "Trước khi trả JSON, phải tự quét từng field có LaTeX và sửa mọi cặp `\\begin{...}`/`\\end{...}` bị thiếu, thừa hoặc sai thứ tự; đồng thời bảo đảm mỗi dấu mở `$$` có đúng một dấu đóng `$$`.",
-  "Với công thức inline, bắt buộc mở và đóng bằng cùng dấu `$`; không dùng backtick thay cho dấu `$` đóng. Ví dụ SAI: `$E``, ví dụ ĐÚNG: `$E$`.",
-].join(" ");
-
 export const QUIZ_FUNCTIONAL_PUNCTUATION_AND_INFERENCE_LAYOUT_POLICY = [
   "Bảo toàn dấu câu và ký hiệu có chức năng của nguồn; tự bổ sung dấu câu còn thiếu khi ngữ pháp và quan hệ trình bày xác định rõ. Câu dẫn mở danh sách, hệ, bảng hoặc công thức display ở dòng sau phải kết thúc bằng dấu `:`; dùng dấu `,`, `;` và `.` đúng quan hệ câu, không để chuỗi `..` mà phải chọn `.` hoặc `...` theo nghĩa.",
   "Các cụm `Ta có`, `Do đó`, `Suy ra`, `Vì vậy` khi làm câu dẫn trực tiếp cho công thức display hoặc danh sách ở dòng sau phải có dấu `:`; khi nội dung tiếp tục cùng dòng thì dùng dấu câu theo đúng ngữ pháp, không máy móc thêm dấu hai chấm.",
@@ -95,15 +87,9 @@ export const QUIZ_ORIGINAL_FORMULA_STEP_POLICY =
   "Khi lời giải dùng một định lý, tính chất, định luật hoặc công thức để tính toán, phải viết công thức gốc trước, sau đó biến đổi công thức, rồi mới thay số. Câu văn nêu nội dung định lý hoặc công thức không thay thế cho bước viết công thức. Dạng đúng theo mẫu tổng quát là `p+q=s`, tiếp theo `q=s-p`, rồi mới thay các giá trị đã biết. Nếu công thức gốc đã có sẵn đại lượng cần tìm ở một vế thì viết công thức đó rồi thay số, không thêm phép biến đổi thừa. Câu thuần lý thuyết không có phép tính không bị ép viết công thức.";
 
 export const QUIZ_HINT_QUALITY_POLICY = [
-  "Gợi ý ngắn nhưng phải tự đủ nghĩa và cung cấp ít nhất một cầu nối suy luận cụ thể từ dữ kiện hoặc yêu cầu của chính câu hỏi đến khái niệm, quan hệ, quy tắc hoặc thao tác đầu tiên cần dùng.",
-  "Gợi ý phải giúp học sinh hiểu vì sao hướng đó phù hợp với cấu hình, điều kiện hoặc đại lượng đang hỏi; không chỉ nhắc lại một công thức, định nghĩa hay sự thật rời rạc mà không nối nó với bài cụ thể.",
-  "Dùng thuật ngữ và tên quan hệ chuyên môn rõ ràng. Không dùng các động từ mơ hồ như `ghép`, `nối`, `kết hợp` thay cho việc nêu chính xác hai đối tượng có quan hệ gì và cần lập hay kiểm tra hệ thức nào; chỉ dùng các động từ này khi thao tác ghép/nối/kết hợp chính là thao tác chuyên môn đang được hỏi và đối tượng thao tác đã rõ.",
-  "`hint` được phép và nên dùng công thức LaTeX khi công thức giúp thể hiện quan hệ rõ hơn văn xuôi. Dùng `$...$` cho công thức inline và `$$...$$` cho công thức trọng tâm ở dòng riêng; mọi lệnh LaTeX như `\\frac`, `\\sqrt`, `\\alpha` phải giữ đúng dấu `\\`. Được nêu quan hệ hay công thức cần dùng, nhưng không thay hết dữ kiện để tính ra kết quả cuối.",
-  "Trình bày theo đơn vị suy luận, không dồn nhiều bước thành một khối văn xuôi. Nếu chỉ cần một cầu nối thì dùng một đoạn ngắn, có thể kèm công thức. Nếu cần từ hai bước trở lên, mỗi bước phải bắt đầu ở dòng riêng và có thể dùng danh sách đánh số; công thức display phải nằm trên dòng riêng với dòng trống phía trước và sau.",
-  "Không dùng câu chung chung như `Dùng công thức phù hợp`, `Thực hiện phép tính`, `Xét định nghĩa`, `Làm tương tự` hoặc cách diễn đạt tương đương. Không tiết lộ kết quả cuối, ID phương án, giá trị đúng/sai hoặc trình bày trọn vẹn lời giải.",
-  "Ví dụ không hợp lệ theo mẫu tổng quát: viết `Hãy ghép đại lượng này với đại lượng kia rồi tính`, hoặc chỉ nêu một hệ thức đúng mà không cho biết hệ thức đó liên quan thế nào đến yêu cầu của câu hỏi.",
-  "Counterexample hợp lệ theo mẫu tổng quát: nêu rõ từ điều kiện của đề mà hai đối tượng có quan hệ chuyên môn nào; viết hệ thức LaTeX biểu diễn quan hệ đó ở dòng phù hợp; sau đó chỉ dẫn bước tiếp theo mà chưa tính ra đáp án.",
-  "Không ép số câu hoặc số ký tự cố định; độ dài phải tương xứng với số mắt xích cần định hướng của câu hỏi.",
+  "Gợi ý phải ngắn, tự đủ nghĩa và nêu ít nhất một cầu nối cụ thể từ dữ kiện hoặc yêu cầu đến khái niệm, quan hệ, quy tắc hay thao tác đầu tiên.",
+  "Giải thích vì sao hướng đó phù hợp; dùng đúng thuật ngữ, tránh chỉ dẫn chung chung như `Dùng công thức phù hợp`, `Thực hiện phép tính`, `Xét định nghĩa`, `Làm tương tự`, và không dùng động từ mơ hồ khi chưa nêu rõ đối tượng hoặc quan hệ.",
+  "Có thể dùng LaTeX để nêu quan hệ cần dùng nhưng không thay hết dữ kiện, tiết lộ kết quả, dữ liệu chấm điểm hay toàn bộ lời giải. Một cầu nối dùng một đoạn; từ hai bước trở lên, mỗi bước bắt đầu ở dòng riêng. Độ dài tương xứng với số mắt xích cần định hướng.",
 ].join(" ");
 
 export const QUIZ_FIGURE_SELECTION_POLICY = [
@@ -114,13 +100,9 @@ export const QUIZ_FIGURE_SELECTION_POLICY = [
 ].join(" ");
 
 export const QUIZ_SCHOOLBOOK_SOLUTION_STYLE_POLICY = [
-  "Lời giải Quiz bắt đầu trực tiếp và thực hiện đủ các bước cần cho chính câu đang giải: nêu công thức hoặc căn cứ, thay dữ kiện, viết phép biến đổi hay suy luận trung gian, rồi kết luận. Không viết kiểu gợi ý `thay vào công thức`, `làm tương tự`, `suy ra ngay` mà bỏ qua thao tác.",
-  "Nếu PDF nguồn có phương pháp hoặc cách ký hiệu phù hợp với dạng bài mới, dùng đó làm chuẩn về thứ tự lập luận, cấu trúc công thức và mức xuống dòng; không chép lại bài/lời giải nguồn, không đổi sang phương pháp xa lạ và không chuyển biểu thức thành đoạn văn dài.",
-  "Với câu cần tính toán hoặc biến đổi, công thức, chuỗi biến đổi và ký hiệu toán học phải là phần trình bày chính; văn xuôi chỉ nêu căn cứ hoặc nối các bước. Với câu nhận định lý thuyết không cần phép tính, dùng lập luận ngắn, trực tiếp theo đúng khái niệm hoặc quy tắc liên quan nhưng vẫn phải tách đoạn theo từng đơn vị lập luận.",
-  "Trong mọi `solution` và `statementSolutions[].solution`, phải tách tường minh theo đơn vị lập luận, không phụ thuộc lời giải có tính toán, biến đổi hay chỉ dùng văn xuôi, chứng minh hoặc giải thích. Khi có từ hai đơn vị lập luận trở lên, mỗi đơn vị — như nêu căn cứ, rút ra hệ quả trung gian, thực hiện phép tính/biến đổi hoặc kết luận — phải bắt đầu trong một đoạn riêng, giữa hai đoạn có đúng một dòng trống. Nếu câu dẫn đứng ngay trước khối display thì kết thúc bằng dấu `:`. Không nhét nhiều mắt xích suy luận hoặc toàn bộ phép tính nhiều bước vào một đoạn văn; yêu cầu gọn chỉ cho phép bỏ diễn giải lặp lại, không cho phép gộp hoặc văn xuôi hóa các bước.",
-  "Không nhét toàn bộ phép tính nhiều bước vào giữa một đoạn văn.",
-  "Counterexample hợp lệ: nếu lời giải chỉ có đúng một đơn vị lập luận ngắn thì giữ trong một đoạn; không bẻ từng câu, từng công thức ngắn hoặc chỉ riêng từ nối thành các đoạn vụn. Khi `Vì`, `Nên`, `Do đó` hoặc `Suy ra` mở đầu một đoạn mới, từ nối phải đi cùng nội dung của đoạn đó. Các giả thiết liên tiếp cùng phục vụ một suy luận được giữ trong cùng một đoạn.",
-  "Ranh giới đoạn phải hợp lý về logic và trình bày: chỉ bắt đầu đoạn mới khi vai trò suy luận chuyển từ căn cứ sang hệ quả trung gian, phép tính/biến đổi tiếp theo hoặc kết luận. Không xuống đoạn chỉ vì câu dài, sau mỗi câu, sau mỗi công thức inline hay ngay trước mỗi từ nối. Hai đơn vị lập luận tách biệt phải được phân cách trong giá trị chuỗi bằng `\\n\\n`.",
+  "Lời giải bắt đầu trực tiếp: nêu căn cứ hoặc công thức, biến đổi hay suy luận trung gian, thay dữ kiện và kết luận; không bỏ thao tác bằng `thay vào công thức`, `làm tương tự` hoặc `suy ra ngay`.",
+  "Ưu tiên phương pháp và ký hiệu phù hợp từ PDF nhưng không sao chép. Bài tính lấy công thức làm chính, văn xuôi chỉ nối bước; bài lý thuyết lập luận ngắn, trực tiếp.",
+  "Mỗi đơn vị lập luận ở một đoạn, cách nhau `\\n\\n`; câu dẫn trước display kết thúc bằng `:`; một đơn vị ngắn không bị bẻ vụn.",
   QUIZ_CONCLUSION_PARAGRAPH_POLICY,
   QUIZ_SUBPART_LINEBREAK_POLICY,
 ].join(" ");
@@ -154,7 +136,7 @@ const difficultySchema = z
 
 const quizExplanationProblemField = learnerFacingText(
   4_000,
-  "Phần nội dung chính của câu hỏi phải nêu đủ đối tượng, ký hiệu, dữ kiện và yêu cầu chuyên môn nếu dạng câu cần, để học sinh trả lời được mà không cần xem hình minh họa. Không thêm nhãn hoặc câu dẫn chỉ nhắc lại thao tác đã được `questionType` thể hiện.",
+  "Đề bài tự đủ nghĩa, nêu đủ đối tượng, ký hiệu, dữ kiện và yêu cầu; không cần xem hình và không lặp nhãn thao tác đã có trong `questionType`.",
 );
 const quizExplanationBaseShape = {
   problem: quizExplanationProblemField,
@@ -165,10 +147,10 @@ const quizSolutionFieldSchema = text(10_000).describe(
 );
 
 const QUIZ_HINT_FIELD_DESCRIPTION =
-  "Gợi ý cho đúng câu hỏi hiện tại: nêu cầu nối hoặc thao tác khởi đầu hữu ích nhưng không tiết lộ kết quả, dữ liệu chấm điểm hay toàn bộ lời giải; tuân thủ quy tắc gợi ý trong system prompt.";
+  "Gợi ý một cầu nối hoặc thao tác khởi đầu hữu ích, không lộ kết quả, dữ liệu chấm điểm hay toàn bộ lời giải; tuân thủ system prompt.";
 
 const QUIZ_STATEMENT_SOLUTION_ITEM_POLICY =
-  "Lời giải độc lập cho đúng một câu con: nêu đủ dữ kiện, công thức, phép tính, phép biến đổi hoặc lập luận cần thiết; không gộp câu khác và không lặp nhãn ở đầu field. Kết thúc bằng một đoạn riêng như `Vậy câu a) đúng.` hoặc `Vậy câu b) sai.`, có đúng một dòng trống phía trước; không viết `mệnh đề 1`/`mệnh đề 2` hay S1/S2.";
+  "Lời giải độc lập cho đúng một câu con, không gộp câu khác hoặc lặp nhãn. Kết luận đúng/sai ở đoạn riêng theo ID chữ thường; không dùng `mệnh đề 1` hay S1/S2.";
 
 const standardQuizExplanationContentShape = {
   ...quizExplanationBaseShape,
@@ -266,7 +248,7 @@ const numericAnswerSchema = z
   .max(100)
   .regex(generatedCanonicalNumericAnswerPattern)
   .describe(
-    "Đúng một đáp án số chuẩn. Chỉ dùng một trong ba dạng: số nguyên; phân số tối giản `p/q` có mẫu dương cho kết quả hữu tỉ không nguyên; hoặc số thập phân dùng dấu `.` và đúng một chữ số sau dấu thập phân cho kết quả vô tỉ đã được yêu cầu làm tròn. Không dùng dấu `,`, ký hiệu khoa học, LaTeX, ký hiệu vô tỉ, đơn vị, câu văn, xuống dòng hoặc nhiều phương án.",
+    "Một đáp án số chuẩn: số nguyên, phân số tối giản `p/q` có mẫu dương, hoặc số thập phân dùng dấu `.` với đúng một chữ số khi đề yêu cầu làm tròn. Không kèm đơn vị, LaTeX, câu văn hay nhiều phương án.",
   );
 
 const quizNoFigureDecisionSchema = z
@@ -288,7 +270,7 @@ export const quizFigureDecisionSchema = z
     solutionFigure: z
       .boolean()
       .describe(
-        "Đặt true khi và chỉ khi solution thực sự dùng thêm ít nhất một đối tượng hoặc quan hệ có thể vẽ so với problem; đặt false nếu solution không thêm cấu trúc trực quan, kể cả khi có thay số, biến đổi đại số, tính toán, đáp số hoặc kết luận mới.",
+        "True chỉ khi solution dùng thêm đối tượng hoặc quan hệ có thể vẽ so với problem; false nếu chỉ thay số, biến đổi, tính toán hoặc kết luận.",
       ),
   })
   .strict()
@@ -467,7 +449,7 @@ export const generatedQuizSourceCoverageAuditSchema = z
     sourceHasAssessableRealWorldApplication: z
       .boolean()
       .describe(
-        "Đặt true chỉ khi PDF nguồn có ít nhất một họ bài ứng dụng thực tế mà cách giải ngắn nhất bắt buộc dùng ít nhất một trọng tâm của lesson hiện tại; đặt false nếu bài thực tế trong nguồn vẫn giải nguyên vẹn chỉ bằng kiến thức đã học trước đó. Không được đặt false chỉ vì cần sáng tạo bối cảnh mới hoặc tránh trùng bài nguồn.",
+        "True khi PDF có họ bài thực tế bắt buộc dùng trọng tâm lesson; false nếu chỉ cần kiến thức đã học trước đó. Không đặt false chỉ để né việc tạo bối cảnh mới.",
       ),
     sourceApplicationFamily: z
       .string()
@@ -476,7 +458,7 @@ export const generatedQuizSourceCoverageAuditSchema = z
       .max(500)
       .nullable()
       .describe(
-        "Nếu nguồn có bài ứng dụng phù hợp, mô tả ngắn họ bài, trọng tâm của lesson hiện tại bắt buộc phải dùng và vai trò mô hình hóa nhận diện từ nguồn mà không chép đề; nếu không có thì null.",
+        "Mô tả ngắn họ bài thực tế, trọng tâm lesson bắt buộc và vai trò mô hình hóa, không chép đề; null nếu không có.",
       ),
     realWorldQuestions: z
       .array(
@@ -496,7 +478,7 @@ export const generatedQuizSourceCoverageAuditSchema = z
               .min(1)
               .max(500)
               .describe(
-                "Bối cảnh hoạt động, nhu cầu hoặc quyết định thực tế mới của câu; không lặp bối cảnh đặc thù trong nguồn.",
+                "Bối cảnh thực tế mới của câu, không lặp bối cảnh đặc thù trong nguồn.",
               ),
             modelingRole: z
               .string()
@@ -504,14 +486,14 @@ export const generatedQuizSourceCoverageAuditSchema = z
               .min(1)
               .max(500)
               .describe(
-                "Giải thích ngắn thông tin thực tế tham gia thế nào vào việc lập mô hình và vì sao phải dùng trọng tâm của lesson hiện tại để giải; một vật thể chỉ kèm số đo hoặc một công thức kiến thức cũ không đủ.",
+                "Nêu ngắn vai trò mô hình hóa của thông tin thực tế và vì sao phải dùng trọng tâm lesson.",
               ),
           })
           .strict(),
       )
       .max(50)
       .describe(
-        "Các câu thực tế mới trong output. Mảng phải có ít nhất một phần tử khi nguồn có họ bài ứng dụng phù hợp và phải rỗng khi nguồn không có.",
+        "Các câu thực tế mới; có ít nhất một phần tử khi nguồn có họ bài phù hợp, ngược lại phải rỗng.",
       ),
   })
   .strict();

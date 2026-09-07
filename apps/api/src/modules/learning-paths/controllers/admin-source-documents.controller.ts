@@ -93,9 +93,7 @@ export class AdminSourceDocumentsController {
     return this.sourceDocumentsService.validateSearchablePdf(sourceDocumentId, dto);
   }
 
-  @Get(
-    "admin/source-documents/:sourceDocumentId/searchable-pdf/validation/:validationId",
-  )
+  @Get("admin/source-documents/:sourceDocumentId/searchable-pdf/validation/:validationId")
   @ApiOperation({ summary: "Get a searchable PDF equivalence report" })
   getSearchablePdfValidation(
     @Param("sourceDocumentId") sourceDocumentId: string,
@@ -159,10 +157,10 @@ export class AdminSourceDocumentsController {
     );
   }
 
-  @Get("admin/source-documents/:sourceDocumentId/ocr-html")
-  @ApiOperation({ summary: "Get rendered HTML from Mathpix OCR output" })
-  getOcrHtml(@Param("sourceDocumentId") sourceDocumentId: string) {
-    return this.sourceDocumentsService.getOcrHtml(sourceDocumentId);
+  @Get("admin/source-documents/:sourceDocumentId/ocr-preview-content")
+  @ApiOperation({ summary: "Get provider-native content for the OCR preview" })
+  getOcrPreviewContent(@Param("sourceDocumentId") sourceDocumentId: string) {
+    return this.sourceDocumentsService.getOcrPreviewContent(sourceDocumentId);
   }
 
   @Patch(

@@ -98,7 +98,12 @@ export interface AdminAiPanelJob {
 }
 
 export interface AdminAiGenerationPanelData {
-  lesson: { id: string; title: string; targetGrade: number | null };
+  lesson: {
+    id: string;
+    title: string;
+    subjectKey: "MATH" | "PHYSICS" | "CHEMISTRY" | "GENERAL";
+    targetGrade: number | null;
+  };
   readiness: {
     summaryReady: boolean;
     generationReady: boolean;
@@ -145,6 +150,8 @@ export type AdminSummaryGenerationPayload = {
   styleInstructions?: string;
   length: AdminSummaryLength;
   targetWordCount?: number;
+  standardExerciseCount: number;
+  realWorldExerciseCount: number;
   extraInstructions?: string;
   systemInstructions?: string;
   userPrompt?: string;
@@ -536,9 +543,11 @@ export interface AdminStemFigureSourceReferenceImage {
 export type AdminStemFigureReferenceImageMode =
   "SOURCE_CROP_ONLY" | "CURRENT_ONLY" | "NONE";
 
-export interface AdminStemFigureCreateAiInput {
-  figure: AdminStemFigure;
+export type AdminStemFigureAiTargetMode = "QUESTION" | "SOLUTION";
+
+interface AdminStemFigureCreateAiOptions {
   referenceImageMode: AdminStemFigureReferenceImageMode;
+  targetMode?: AdminStemFigureAiTargetMode | null;
   adminInstructions: string | null;
   model?: string | null;
   temperature?: number | null;
@@ -546,6 +555,20 @@ export interface AdminStemFigureCreateAiInput {
   systemPrompt?: string | null;
   userPrompt?: string | null;
 }
+
+export type AdminStemFigureCreateAiInput = AdminStemFigureCreateAiOptions &
+  (
+    | {
+        figure: AdminStemFigure;
+        blockPath?: never;
+        figureIndex?: never;
+      }
+    | {
+        figure?: never;
+        blockPath: string;
+        figureIndex?: number;
+      }
+  );
 
 export interface AdminStemFigureCreateAiPreview {
   referenceImageMode: AdminStemFigureReferenceImageMode;

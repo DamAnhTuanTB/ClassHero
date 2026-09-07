@@ -172,6 +172,7 @@ export class OpenAiProvider implements AiProvider {
   async generateStructured<TOutput>(
     input: AiStructuredInput,
     schema: AiOutputSchema<TOutput>,
+    validationSchema: AiOutputSchema<TOutput> = schema,
   ): Promise<AiStructuredOutput<TOutput>> {
     assertAiOutputName(input.outputName);
     const startedAt = Date.now();
@@ -180,6 +181,7 @@ export class OpenAiProvider implements AiProvider {
       schema,
       input.outputName,
       input.schemaReferenceStrategy,
+      validationSchema,
     );
     const structuredTextFormat = structuredTextFormatResolution.format;
     const preparedInput = await this.prepareResponseInput(input);
@@ -229,7 +231,7 @@ export class OpenAiProvider implements AiProvider {
         throw failure;
       }
 
-      const data = parseAiStructuredOutput(schema, response.output_parsed);
+      const data = parseAiStructuredOutput(validationSchema, response.output_parsed);
       const usage = toTokenUsage(response.usage);
       if (usage?.promptTokens !== undefined) {
         const cachedTokens = usage.cachedInputTokens ?? 0;

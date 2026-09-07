@@ -107,15 +107,10 @@ export function buildQuizFigureRefinementInput(input: {
     reasoningEffort: "medium",
     maxTokens: 12_000,
     outputName: "quiz_figure_refinement",
-    promptVersion: `quiz-figure-${input.subject.key.toLowerCase()}-${mode.toLowerCase()}-refinement-comprehensive-${
-      input.subject.key === "PHYSICS"
-        ? "v24-admin-instructions"
-        : input.subject.key === "MATH"
-          ? "v34-admin-instructions"
-          : input.subject.key === "CHEMISTRY"
-            ? "v23-admin-instructions"
-            : "v23-admin-instructions"
-    }`,
+    promptVersion: `quiz-figure-${input.subject.key.toLowerCase()}-${mode.toLowerCase()}-refinement-comprehensive-${resolveQuizFigureRefinementPromptVersion(
+      input.subject,
+      mode,
+    )}`,
     schemaVersion: "quiz-figure-refinement-schema-v3-independent-solution",
     schemaReferenceStrategy: "auto",
     promptCache: {
@@ -207,19 +202,30 @@ function resolveQuizFigurePromptVersion(
 ) {
   const version =
     subject.key === "MATH"
-      ? mode === "question"
-        ? "v61-independent-midpoint-marker-auto-repair"
-        : "v61-independent-midpoint-marker-auto-repair"
+      ? "v66-independent-single-semantic-check"
       : subject.key === "PHYSICS"
-        ? mode === "question"
-          ? "v48-independent-no-narrative-callouts"
-          : "v48-independent-no-narrative-callouts"
+        ? "v50-independent-single-semantic-check"
         : subject.key === "CHEMISTRY"
-          ? mode === "question"
-            ? "v47-independent-no-narrative-callouts"
-            : "v47-independent-no-narrative-callouts"
-          : mode === "question"
-            ? "v47-independent-no-narrative-callouts"
-            : "v47-independent-no-narrative-callouts";
+          ? "v49-independent-single-semantic-check"
+          : "v49-independent-single-semantic-check";
   return `quiz-figure-${subject.key.toLowerCase()}-${mode}-${version}`;
+}
+
+function resolveQuizFigureRefinementPromptVersion(
+  subject: QuizSubjectSnapshot,
+  mode: "QUESTION" | "SOLUTION",
+) {
+  if (mode === "SOLUTION") {
+    return subject.key === "MATH"
+      ? "v39-single-semantic-check"
+      : subject.key === "PHYSICS"
+        ? "v26-single-semantic-check"
+        : "v25-single-semantic-check";
+  }
+
+  return subject.key === "MATH"
+    ? "v39-single-semantic-check"
+    : subject.key === "PHYSICS"
+      ? "v26-single-semantic-check"
+      : "v25-single-semantic-check";
 }

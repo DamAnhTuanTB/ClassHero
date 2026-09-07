@@ -2,6 +2,7 @@ import type {
   AiFeature,
   PriceRate,
   ProviderCatalogItem,
+  ProviderUsageOperation,
   UsageEvent,
 } from "@/features/admin/ai-settings/types/provider-operations-types";
 
@@ -37,12 +38,50 @@ const usagePurposeLabelsByResourceType: Record<string, string> = {
   STEM_FIGURE: "Tạo hình minh họa",
 };
 
+const usageOperationLabels: Record<ProviderUsageOperation, string> = {
+  SUMMARY_GENERATION: "Sinh kiến thức",
+  QUIZ_GENERATION: "Tạo bộ Quiz",
+  FLASHCARD_GENERATION: "Tạo bộ Flashcard",
+  TEST_GENERATION: "Tạo bài kiểm tra",
+  EXPLANATION_GENERATION: "Tạo lời giải AI",
+  CHAT_RESPONSE_GENERATION: "Trả lời chat AI",
+  EMBEDDING_GENERATION: "Tạo embedding",
+  DOCUMENT_EXTRACTION: "Trích xuất tài liệu",
+  DIAGRAM_GENERATION: "Tạo ảnh mới",
+  QUIZ_SOLUTION_REFINEMENT: "Tinh chỉnh lời giải",
+  QUIZ_SOLUTION_REGENERATION: "Tạo lại lời giải",
+  SUMMARY_FIGURE_GENERATION: "Tạo ảnh mới",
+  SUMMARY_QUESTION_FIGURE_GENERATION: "Tạo ảnh đề bài",
+  SUMMARY_SOLUTION_FIGURE_GENERATION: "Tạo ảnh lời giải",
+  SUMMARY_FIGURE_EDITING: "Chỉnh sửa ảnh",
+  SUMMARY_FIGURE_REPAIR: "Sửa lỗi ảnh",
+  QUIZ_QUESTION_FIGURE_GENERATION: "Tạo ảnh đề Quiz",
+  QUIZ_QUESTION_FIGURE_EDITING: "Chỉnh sửa ảnh đề Quiz",
+  QUIZ_QUESTION_FIGURE_REFINEMENT: "Tinh chỉnh ảnh đề Quiz",
+  QUIZ_SOLUTION_FIGURE_GENERATION: "Tạo ảnh lời giải Quiz",
+  QUIZ_SOLUTION_FIGURE_EDITING: "Chỉnh sửa ảnh lời giải Quiz",
+  QUIZ_SOLUTION_FIGURE_REFINEMENT: "Tinh chỉnh ảnh lời giải Quiz",
+};
+
+const reasoningEffortLabels: Record<string, string> = {
+  none: "Không",
+  minimal: "Tối thiểu",
+  low: "Thấp",
+  medium: "Trung bình",
+  high: "Cao",
+  xhigh: "Rất cao",
+  max: "Tối đa",
+};
+
 export function formatCacheStatus(value: string | null) {
   if (!value) return null;
   return value.toUpperCase() === "HIT" ? "Đã dùng kết quả có sẵn" : "Xử lý mới";
 }
 
 export function formatUsagePurpose(event: UsageEvent) {
+  if (event.operation) {
+    return usageOperationLabels[event.operation];
+  }
   const resourceType = event.backgroundJob?.resourceType;
   if (resourceType && usagePurposeLabelsByResourceType[resourceType]) {
     return usagePurposeLabelsByResourceType[resourceType];
@@ -59,6 +98,28 @@ export function formatUsagePurpose(event: UsageEvent) {
       : aiFeatureLabels[event.feature];
   }
   return event.category === "OCR_SERVICE" ? "Xử lý tài liệu" : "Gọi mô hình AI";
+}
+
+export function formatUsageDuration(value: number | null, status?: UsageEvent["status"]) {
+  if (value === null) {
+    return status === "RUNNING" ? "Đang xử lý" : "Chưa ghi nhận";
+  }
+  if (value < 1_000) return `${formatNumber(value)} ms`;
+  if (value < 60_000) {
+    return `${new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 }).format(value / 1_000)} giây`;
+  }
+  const totalSeconds = Math.round(value / 1_000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return seconds === 0 ? `${minutes} phút` : `${minutes} phút ${seconds} giây`;
+}
+
+export function formatReasoningEffort(event: UsageEvent) {
+  if (event.category !== "AI_MODEL") return "Không áp dụng";
+  if (event.reasoningEffort) {
+    return reasoningEffortLabels[event.reasoningEffort] ?? event.reasoningEffort;
+  }
+  return event.operation ? "Mặc định model" : "Chưa ghi nhận";
 }
 
 export function formatVnd(value: number) {

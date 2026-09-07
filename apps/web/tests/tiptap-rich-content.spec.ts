@@ -1,6 +1,11 @@
 import { expect, test } from "@playwright/test";
 
-import { createMathTextTiptapDocument } from "@/lib/tiptap-rich-content";
+import {
+  createMathMarkdownTiptapDocument,
+  createMathTextTiptapDocument,
+  normalizeLessonSummaryAnglesInTiptapDocument,
+  serializeTiptapDocumentToMathMarkdown,
+} from "@/lib/tiptap-rich-content";
 
 test.describe("math text to Tiptap conversion", () => {
   test("repairs a high-confidence missing inline closer before tokenization", () => {
@@ -133,5 +138,117 @@ test.describe("math text to Tiptap conversion", () => {
         ],
       },
     );
+  });
+
+  test("converts complete Markdown strong spans without consuming literal markers", () => {
+    expect(
+      createMathMarkdownTiptapDocument(
+        String.raw`**b)** Dùng $MB=9$ cm nên mệnh đề sai.`,
+      ),
+    ).toEqual({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "b)", marks: [{ type: "bold" }] },
+            { type: "text", text: " Dùng " },
+            { type: "inlineMath", attrs: { latex: "MB=9" } },
+            { type: "text", text: " cm nên mệnh đề sai." },
+          ],
+        },
+      ],
+    });
+
+    expect(createMathMarkdownTiptapDocument("Giữ nguyên **dấu chưa đóng")).toEqual({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Giữ nguyên **dấu chưa đóng" }],
+        },
+      ],
+    });
+  });
+
+  test("serializes rich text marks and formulas back to Mathpix Markdown", () => {
+    expect(
+      serializeTiptapDocumentToMathMarkdown({
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              { type: "text", text: "b)", marks: [{ type: "bold" }] },
+              { type: "text", text: " Dùng " },
+              { type: "inlineMath", attrs: { latex: "MB=9" } },
+              { type: "text", text: " cm." },
+            ],
+          },
+          { type: "blockMath", attrs: { latex: "S=\\frac{25\\pi}{2}" } },
+        ],
+      }),
+    ).toBe("**b)** Dùng $MB=9$ cm.\n\n$$\nS=\\frac{25\\pi}{2}\n$$");
+  });
+
+  test("serializes lists without flattening separate items", () => {
+    expect(
+      serializeTiptapDocumentToMathMarkdown({
+        type: "doc",
+        content: [
+          {
+            type: "bulletList",
+            content: [
+              {
+                type: "listItem",
+                content: [
+                  { type: "paragraph", content: [{ type: "text", text: "Ý 1" }] },
+                ],
+              },
+              {
+                type: "listItem",
+                content: [
+                  { type: "paragraph", content: [{ type: "text", text: "Ý 2" }] },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+    ).toBe("- Ý 1\n- Ý 2");
+  });
+
+  test("normalizes three-point angles already stored in Tiptap math nodes", () => {
+    expect(
+      normalizeLessonSummaryAnglesInTiptapDocument({
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              { type: "text", text: "Ta có " },
+              {
+                type: "inlineMath",
+                attrs: { latex: String.raw`\angle DAB=70^\circ` },
+              },
+            ],
+          },
+        ],
+      }),
+    ).toEqual({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "Ta có " },
+            {
+              type: "inlineMath",
+              attrs: { latex: String.raw`\widehat{DAB}=70^\circ` },
+            },
+          ],
+        },
+      ],
+    });
   });
 });

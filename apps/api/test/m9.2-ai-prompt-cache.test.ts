@@ -69,6 +69,12 @@ describe("M9.2 OpenAI prompt cache routing", () => {
     expect(keyFor(createRequest({ systemPrompt: "UPDATED CONTRACT" }))).not.toBe(
       baseline,
     );
+    expect(keyFor(createRequest({ promptVersion: "summary-prompt-v2" }))).not.toBe(
+      baseline,
+    );
+    expect(keyFor(createRequest({ schemaVersion: "summary-schema-v2" }))).not.toBe(
+      baseline,
+    );
     expect(keyFor(createRequest({ schemaReferenceStrategy: "ref" }))).not.toBe(baseline);
     expect(keyFor(request, "gpt-5.4-2026-03-05")).not.toBe(baseline);
   });

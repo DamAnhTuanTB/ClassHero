@@ -61,6 +61,46 @@ describe("TikZ midpoint-marker auto-repair", () => {
     });
   });
 
+  it("moves top-level PGF math macro declarations into the drawing root", () => {
+    const source = String.raw`\pgfmathsetmacro{\h}{6*sqrt(5)}
+\pgfmathtruncatemacro{\count}{4}
+\begin{tikzpicture}[scale=0.34]
+  \draw (0,0)--(0,\h);
+  \node at (1,1) {\count};
+\end{tikzpicture}`;
+    const result = autoRepairTikzLocalHeaderPlacement(source);
+    const rootIndex = result.source.indexOf(String.raw`\begin{tikzpicture}`);
+
+    expect(result.changes).toEqual([
+      { kind: "LOCAL_MACRO_MOVED_INTO_ROOT", command: "pgfmathsetmacro" },
+      { kind: "LOCAL_MACRO_MOVED_INTO_ROOT", command: "pgfmathtruncatemacro" },
+    ]);
+    expect(result.source.indexOf(String.raw`\pgfmathsetmacro`)).toBeGreaterThan(
+      rootIndex,
+    );
+    expect(result.source.indexOf(String.raw`\pgfmathtruncatemacro`)).toBeGreaterThan(
+      rootIndex,
+    );
+    expect(validateTexSourcePolicy(result.source, undefined, "MATH")).toEqual([]);
+    expect(autoRepairTikzLocalHeaderPlacement(result.source)).toEqual({
+      source: result.source,
+      changes: [],
+    });
+  });
+
+  it("does not move commented or nested PGF math macro declarations", () => {
+    const source = String.raw`% \pgfmathsetmacro{\ignored}{1}
+\tikzset{setup/.code={\pgfmathsetmacro{\nested}{2}}}
+\begin{tikzpicture}
+  \draw (0,0)--(1,0);
+\end{tikzpicture}`;
+
+    expect(autoRepairTikzLocalHeaderPlacement(source)).toEqual({
+      source,
+      changes: [],
+    });
+  });
+
   it("replaces midpoint bundles with compact paired half-segment markers", () => {
     const result = autoRepairTikzMidpointMarkerBundles({
       source: reportedMidpointBundleSource,

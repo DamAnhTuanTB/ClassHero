@@ -30,6 +30,13 @@ hai flow này hỗ trợ hình.
   sang TEXT khi đã có hai route snapshot.
 - Token limit, reservation, fallback, usage và audit được áp dụng/ghi nhận theo
   đúng phase đang gọi.
+- Preview và runtime phải chuyển nguyên giá trị `reasoningEffort` và
+  `maxOutputTokens` đã cấu hình cho đúng cặp `(feature, purpose)` xuống provider.
+  Default cục bộ chỉ được dùng khi route hoặc trường tương ứng thật sự không có;
+  service/worker không được âm thầm cap, nâng hoặc ghi đè cấu hình đã chọn. Nếu
+  cần một hard limit an toàn cấp provider/hệ thống, limit đó phải là contract
+  riêng được tài liệu hóa và hiển thị cho admin, đồng thời preview phải phản ánh
+  đúng effective request sẽ chạy.
 
 ## Consequences
 

@@ -22,6 +22,40 @@ export function isAiReasoningEffort(value: unknown): value is AiReasoningEffort 
   return AI_REASONING_EFFORT_LEVELS.some((level) => level === value);
 }
 
+export function normalizeAiReasoningEffortLevels(
+  values: readonly unknown[],
+): AiReasoningEffort[] {
+  const supportedLevels = new Set(values.filter(isAiReasoningEffort));
+  return AI_REASONING_EFFORT_LEVELS.filter((level) => supportedLevels.has(level));
+}
+
+export const PROVIDER_USAGE_OPERATIONS = [
+  "SUMMARY_GENERATION",
+  "QUIZ_GENERATION",
+  "FLASHCARD_GENERATION",
+  "TEST_GENERATION",
+  "EXPLANATION_GENERATION",
+  "CHAT_RESPONSE_GENERATION",
+  "EMBEDDING_GENERATION",
+  "DOCUMENT_EXTRACTION",
+  "DIAGRAM_GENERATION",
+  "QUIZ_SOLUTION_REFINEMENT",
+  "QUIZ_SOLUTION_REGENERATION",
+  "SUMMARY_FIGURE_GENERATION",
+  "SUMMARY_QUESTION_FIGURE_GENERATION",
+  "SUMMARY_SOLUTION_FIGURE_GENERATION",
+  "SUMMARY_FIGURE_EDITING",
+  "SUMMARY_FIGURE_REPAIR",
+  "QUIZ_QUESTION_FIGURE_GENERATION",
+  "QUIZ_QUESTION_FIGURE_EDITING",
+  "QUIZ_QUESTION_FIGURE_REFINEMENT",
+  "QUIZ_SOLUTION_FIGURE_GENERATION",
+  "QUIZ_SOLUTION_FIGURE_EDITING",
+  "QUIZ_SOLUTION_FIGURE_REFINEMENT",
+] as const;
+
+export type ProviderUsageOperation = (typeof PROVIDER_USAGE_OPERATIONS)[number];
+
 export const STEM_FIGURE_SUBJECT_KEYS = [
   "MATH",
   "PHYSICS",

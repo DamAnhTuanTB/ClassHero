@@ -108,8 +108,14 @@ function createFixture() {
       },
     ],
     applicationExercises: {
-      standardExercise: exampleBlock("STANDARD_EXERCISE"),
-      realWorldExercise: exampleBlock("REAL_WORLD_EXERCISE"),
+      standardExercises: [
+        exampleBlock("STANDARD_EXERCISE"),
+        exampleBlock("STANDARD_EXERCISE"),
+      ],
+      realWorldExercises: [
+        exampleBlock("REAL_WORLD_EXERCISE"),
+        exampleBlock("REAL_WORLD_EXERCISE"),
+      ],
     },
   });
   const mapped = mapLessonSummaryProviderOutput({
@@ -138,7 +144,7 @@ function exampleBlock(
   exampleKind: "ILLUSTRATION" | "STANDARD_EXERCISE" | "REAL_WORLD_EXERCISE",
 ) {
   return {
-    type: "example",
+    type: exampleKind === "ILLUSTRATION" ? "example" : "exercise",
     exampleKind,
     problem: "Đề bài.",
     solution: "Lời giải.",

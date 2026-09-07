@@ -22,6 +22,20 @@ import type {
   AdminStemFigureDiagnosticBatch,
 } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
 import { getStemFigureDraftDisplayPercent } from "@/lib/stem-figure-display";
+import {
+  addStemFigureCircleCenterLabel,
+  createStemFigureQuickAngle,
+  type StemFigureMidpointAction,
+  type StemFigureQuickAngleInput,
+  type StemFigureQuickAngleRemovalInput,
+  type StemFigureQuickCircleCenterInput,
+  type StemFigureQuickMidpointInput,
+  type StemFigureQuickSegmentInput,
+  type StemFigureSegmentAction,
+  removeStemFigureQuickAngle,
+  updateStemFigureMidpoint,
+  updateStemFigureSegment,
+} from "@/lib/stem-figure-geometry-actions";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import {
   applyStemFigureQuickAction,
@@ -37,12 +51,14 @@ export function AdminStemFigureEditorDialog({
   figure,
   isOpen,
   lessonId,
+  onCancel,
   onClose,
   mode = "edit",
 }: {
   figure: AdminStemFigure;
   isOpen: boolean;
   lessonId: string;
+  onCancel?: (latestFigure: AdminStemFigure) => void;
   onClose: () => void;
   mode?: "edit" | "create";
 }) {
@@ -94,15 +110,21 @@ export function AdminStemFigureEditorDialog({
     compileIssues.length > 0;
 
   function requestClose() {
-    closeNow();
+    if (pending) return;
+    closeNow("cancel");
   }
 
-  function closeNow() {
+  function closeNow(reason: "cancel" | "commit" = "commit") {
+    const latestFigure = resolveLatestDraftFigure(figure, result);
     compileMutation.reset();
     applyMutation.reset();
     setFocusLine(null);
     setRequestIssues([]);
     setResult(null);
+    if (reason === "cancel" && onCancel) {
+      onCancel(latestFigure);
+      return;
+    }
     onClose();
   }
 
@@ -171,6 +193,137 @@ export function AdminStemFigureEditorDialog({
       return;
     }
     setQuickHistory((history) => [...history.slice(-9), previousSource]);
+  }
+
+  async function addQuickAngle(input: StemFigureQuickAngleInput) {
+    const previousSource = source;
+    const transformed = createStemFigureQuickAngle(previousSource, input);
+    if (transformed.issue) {
+      toast.warning(transformed.issue.message);
+      return false;
+    }
+    setSource(transformed.source);
+    invalidateCompiledDraft();
+    const segmentMessage =
+      transformed.addedSegments.length > 0
+        ? `, tự nối ${transformed.addedSegments.join(", ")}`
+        : "";
+    const compiled = await compileDraft(
+      transformed.source,
+      `Đã ${transformed.replacedExisting ? "cập nhật" : "thêm"} ∠${transformed.canonicalAngle} = ${transformed.degrees}°${segmentMessage} và cập nhật hình xem trước.`,
+    );
+    if (compiled?.status !== "DRAFT_READY") {
+      setSource(previousSource);
+      invalidateCompiledDraft();
+      toast.warning("Góc mới không tạo được hình hợp lệ nên đã được hoàn tác.");
+      return false;
+    }
+    setQuickHistory((history) => [...history.slice(-9), previousSource]);
+    return true;
+  }
+
+  async function addQuickCircleCenter(input: StemFigureQuickCircleCenterInput) {
+    const previousSource = source;
+    const transformed = addStemFigureCircleCenterLabel(previousSource, input);
+    if (transformed.issue) {
+      toast.warning(transformed.issue.message);
+      return false;
+    }
+    setSource(transformed.source);
+    invalidateCompiledDraft();
+    const compiled = await compileDraft(
+      transformed.source,
+      transformed.replacedCenterName
+        ? `Đã đổi tên tâm ${transformed.replacedCenterName} thành ${transformed.centerName} và cập nhật hình xem trước.`
+        : `Đã thêm tên ${transformed.centerName} cho tâm đường tròn và cập nhật hình xem trước.`,
+    );
+    if (compiled?.status !== "DRAFT_READY") {
+      setSource(previousSource);
+      invalidateCompiledDraft();
+      toast.warning("Tên tâm mới không tạo được hình hợp lệ nên đã được hoàn tác.");
+      return false;
+    }
+    setQuickHistory((history) => [...history.slice(-9), previousSource]);
+    return true;
+  }
+
+  async function removeQuickAngle(input: StemFigureQuickAngleRemovalInput) {
+    const previousSource = source;
+    const transformed = removeStemFigureQuickAngle(previousSource, input);
+    if (transformed.issue) {
+      toast.warning(transformed.issue.message);
+      return false;
+    }
+    setSource(transformed.source);
+    invalidateCompiledDraft();
+    const compiled = await compileDraft(
+      transformed.source,
+      `Đã bỏ ∠${transformed.canonicalAngle}, xóa số đo và ký hiệu cung; giữ nguyên hai cạnh.`,
+    );
+    if (compiled?.status !== "DRAFT_READY") {
+      setSource(previousSource);
+      invalidateCompiledDraft();
+      toast.warning("Không bỏ được góc an toàn nên thay đổi đã được hoàn tác.");
+      return false;
+    }
+    setQuickHistory((history) => [...history.slice(-9), previousSource]);
+    return true;
+  }
+
+  async function updateQuickSegment(
+    action: StemFigureSegmentAction,
+    input: StemFigureQuickSegmentInput,
+  ) {
+    const previousSource = source;
+    const transformed = updateStemFigureSegment(previousSource, input, action);
+    if (transformed.issue) {
+      toast.warning(transformed.issue.message);
+      return false;
+    }
+    setSource(transformed.source);
+    invalidateCompiledDraft();
+    const actionLabel = action === "CONNECT" ? "nối" : "bỏ nối";
+    const compiled = await compileDraft(
+      transformed.source,
+      `Đã ${actionLabel} đoạn ${transformed.canonicalSegment} và cập nhật hình xem trước.`,
+    );
+    if (compiled?.status !== "DRAFT_READY") {
+      setSource(previousSource);
+      invalidateCompiledDraft();
+      toast.warning("Thay đổi đoạn thẳng không hợp lệ nên đã được hoàn tác.");
+      return false;
+    }
+    setQuickHistory((history) => [...history.slice(-9), previousSource]);
+    return true;
+  }
+
+  async function updateQuickMidpoint(
+    action: StemFigureMidpointAction,
+    input: StemFigureQuickMidpointInput,
+  ) {
+    const previousSource = source;
+    const transformed = updateStemFigureMidpoint(previousSource, input, action);
+    if (transformed.issue) {
+      toast.warning(transformed.issue.message);
+      return false;
+    }
+    setSource(transformed.source);
+    invalidateCompiledDraft();
+    const successMessage =
+      action === "ADD"
+        ? transformed.replacedMidpointName
+          ? `Đã thay trung điểm ${transformed.replacedMidpointName} bằng ${transformed.midpointName} trên ${transformed.canonicalSegment}; giữ nguyên cạnh và marker bằng nhau.`
+          : `Đã thêm trung điểm ${transformed.midpointName} trên ${transformed.canonicalSegment}${transformed.addedSegment ? `, tự nối ${transformed.canonicalSegment}` : ""} và cập nhật marker bằng nhau.`
+        : `Đã xóa trung điểm ${transformed.midpointName} và marker trên ${transformed.canonicalSegment}; giữ nguyên đoạn thẳng.`;
+    const compiled = await compileDraft(transformed.source, successMessage);
+    if (compiled?.status !== "DRAFT_READY") {
+      setSource(previousSource);
+      invalidateCompiledDraft();
+      toast.warning("Thay đổi trung điểm không hợp lệ nên đã được hoàn tác.");
+      return false;
+    }
+    setQuickHistory((history) => [...history.slice(-9), previousSource]);
+    return true;
   }
 
   async function updateScale(target: StemFigureScaleTarget, percentage: number) {
@@ -336,6 +489,11 @@ export function AdminStemFigureEditorDialog({
               canUndo={quickHistory.length > 0}
               disabled={pending}
               onAction={(action) => void runQuickAction(action)}
+              onQuickAngleAdd={addQuickAngle}
+              onQuickAngleRemove={removeQuickAngle}
+              onQuickCircleCenterAdd={addQuickCircleCenter}
+              onQuickMidpointUpdate={updateQuickMidpoint}
+              onQuickSegmentUpdate={updateQuickSegment}
               onScaleChange={updateScale}
               onTextSlotAdjustmentChange={updateTextSlotAdjustment}
               onTextSlotChange={updateTextSlot}
@@ -426,6 +584,7 @@ export function AdminStemFigureEditorDialog({
           <button
             type="button"
             className="theme-button-neutral min-h-11 rounded-lg px-4 text-sm font-extrabold"
+            disabled={pending}
             onClick={requestClose}
           >
             Hủy
@@ -433,6 +592,7 @@ export function AdminStemFigureEditorDialog({
           <button
             type="button"
             className="theme-button-primary-subtle inline-flex min-h-11 items-center gap-2 rounded-lg px-4 text-sm font-extrabold"
+            data-stem-figure-quick-actions-keep-open
             disabled={pending}
             onClick={() => void compileLatestDraft()}
           >
@@ -463,6 +623,18 @@ function isApplicableDraft(
     typeof draft.sourceVersion === "number" &&
     Boolean(draft.previewSvg)
   );
+}
+
+function resolveLatestDraftFigure(
+  figure: AdminStemFigure,
+  result: AdminStemFigureCompileResult | null,
+): AdminStemFigure {
+  if (!result) return figure;
+  return {
+    ...figure,
+    pendingRevisionId: result.revisionId,
+    sourceVersion: result.sourceVersion ?? figure.sourceVersion,
+  };
 }
 
 type StemFigureCompileIssue = AdminStemFigureDiagnosticBatch["issues"][number];

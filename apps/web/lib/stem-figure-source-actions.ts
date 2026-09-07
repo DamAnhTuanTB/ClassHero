@@ -39,10 +39,14 @@ export const STEM_FIGURE_SCALE_PERCENT_DEFAULT = 100;
 export const STEM_FIGURE_TEXT_OFFSET_MIN = -50;
 export const STEM_FIGURE_TEXT_OFFSET_MAX = 50;
 export const STEM_FIGURE_TEXT_OFFSET_DEFAULT = 0;
+export const STEM_FIGURE_ANGLE_RADIUS_PT_MIN = 4;
+export const STEM_FIGURE_ANGLE_RADIUS_PT_MAX = 50;
+export const STEM_FIGURE_ANGLE_RADIUS_PT_DEFAULT = 14;
 
-export type StemFigureTextAdjustmentTarget = "FONT_SIZE" | "X" | "Y";
+export type StemFigureTextAdjustmentTarget = "ANGLE_RADIUS" | "FONT_SIZE" | "X" | "Y";
 
 export type StemFigureTextAdjustment = {
+  angleRadiusPt?: number;
   fontSizePercentage: number;
   xOffsetPt: number;
   yOffsetPt: number;
@@ -51,8 +55,12 @@ export type StemFigureTextAdjustment = {
 export type StemFigureTextSlotKind =
   "ANNOTATION" | "COMPONENT_LABEL" | "LABEL" | "MEASUREMENT";
 
+export type StemFigureTextSlotDisplayKind =
+  "ANGLE" | "ANNOTATION" | "COMPONENT_LABEL" | "LABEL" | "LENGTH" | "POINT" | "VALUE";
+
 export type StemFigureTextSlot = {
   adjustment: StemFigureTextAdjustment | null;
+  displayKind: StemFigureTextSlotDisplayKind;
   id: string;
   kind: StemFigureTextSlotKind;
   value: string;
@@ -71,6 +79,7 @@ type SourceRange = {
 type TikzNode = {
   content: string;
   contentEnd: number;
+  contentStart: number;
   end: number;
   optionEnd: number | null;
   optionStart: number | null;
@@ -78,8 +87,22 @@ type TikzNode = {
   start: number;
 };
 
+type TikzTextAdjustmentTarget =
+  | {
+      kind: "NODE";
+      node: TikzNode;
+    }
+  | {
+      kind: "PIC";
+      optionEnd: number;
+      optionStart: number;
+      picOptionEnd: number;
+      picOptionStart: number;
+      quoteEnd: number;
+    };
+
 type ParsedTextSlot = StemFigureTextSlot & {
-  adjustmentTarget: TikzNode | null;
+  adjustmentTarget: TikzTextAdjustmentTarget | null;
   deleteRange: SourceRange;
   replacementPrefix: string;
   replacementRange: SourceRange;
@@ -107,6 +130,7 @@ const LENGTH_UNITS = [
 
 const LENGTH_UNIT_PATTERN = new RegExp(`(${LENGTH_UNITS.join("|")})$`, "iu");
 const TEXT_SLOT_ADJUSTMENT_STYLE = "classhero text slot adjustment";
+const TEXT_SLOT_GROUP_SCALE_STYLE = "classhero text slot group scale";
 const TEXT_SLOT_ADJUSTMENT_DEFINITION_PATTERN = new RegExp(
   `^${TEXT_SLOT_ADJUSTMENT_STYLE}/\\.style\\s*=\\s*\\{([\\s\\S]*)\\}$`,
   "u",
@@ -115,6 +139,15 @@ const TEXT_SLOT_ADJUSTMENT_ACTIVATION_PATTERN = new RegExp(
   `^${TEXT_SLOT_ADJUSTMENT_STYLE}$`,
   "u",
 );
+const TEXT_SLOT_GROUP_SCALE_DEFINITION_PATTERN = new RegExp(
+  `^${TEXT_SLOT_GROUP_SCALE_STYLE}/\\.style\\s*=\\s*\\{([\\s\\S]*)\\}$`,
+  "u",
+);
+const TEXT_SLOT_GROUP_SCALE_ACTIVATION_PATTERN = new RegExp(
+  `^${TEXT_SLOT_GROUP_SCALE_STYLE}$`,
+  "u",
+);
+const TIKZ_DEFAULT_ANGLE_ECCENTRICITY = 0.6;
 
 /**
  * Extracts only visible text constructs with syntax boundaries that can be
@@ -124,8 +157,9 @@ const TEXT_SLOT_ADJUSTMENT_ACTIVATION_PATTERN = new RegExp(
 export function extractStemFigureTextSlots(source: string): StemFigureTextSlotExtraction {
   const parsed = parseStemFigureTextSlots(source);
   return {
-    slots: parsed.slots.map(({ adjustment, id, kind, value }) => ({
+    slots: parsed.slots.map(({ adjustment, displayKind, id, kind, value }) => ({
       adjustment,
+      displayKind,
       id,
       kind,
       value,
@@ -152,7 +186,20 @@ export function updateStemFigureTextSlotAdjustment(
   }
 
   const nextAdjustment = { ...slot.adjustment };
-  if (target === "X") {
+  if (target === "ANGLE_RADIUS") {
+    if (nextAdjustment.angleRadiusPt === undefined) {
+      return { changedCount: 0, source };
+    }
+    const normalizedRadius = clampRounded(
+      value,
+      STEM_FIGURE_ANGLE_RADIUS_PT_MIN,
+      STEM_FIGURE_ANGLE_RADIUS_PT_MAX,
+    );
+    if (normalizedRadius === nextAdjustment.angleRadiusPt) {
+      return { changedCount: 0, source };
+    }
+    return writeAnglePicGroupRadius(source, slot.adjustmentTarget, normalizedRadius);
+  } else if (target === "X") {
     nextAdjustment.xOffsetPt = clampRounded(
       value,
       STEM_FIGURE_TEXT_OFFSET_MIN,
@@ -194,6 +241,13 @@ export function updateStemFigureTextSlot(
 
   const normalizedValue = nextValue.trim();
   if (!normalizedValue) {
+    if (slot.kind === "MEASUREMENT") {
+      const angleGroupRanges = findOwningAnglePicGroupRanges(
+        source,
+        slot.replacementRange.start,
+      );
+      if (angleGroupRanges.length > 0) return applyRanges(source, angleGroupRanges);
+    }
     return applyRanges(source, [slot.deleteRange]);
   }
 
@@ -204,6 +258,296 @@ export function updateStemFigureTextSlot(
       value: `${slot.replacementPrefix}${normalizedValue}${slot.replacementSuffix}`,
     },
   ]);
+}
+
+type ParsedAnglePicOperation = {
+  end: number;
+  geometryKey: string;
+  optionEnd: number;
+  optionStart: number;
+  points: [string, string, string];
+  standalone: boolean;
+  start: number;
+};
+
+function findOwningAnglePicGroupRanges(source: string, labelStart: number) {
+  const pics = parseAnglePicOperations(source);
+  const owner = pics.find(
+    (pic) => labelStart > pic.optionStart && labelStart < pic.optionEnd,
+  );
+  if (owner) return findAnglePicGroupRanges(source, pics, owner.geometryKey);
+
+  const node = findAngleMeasurementNodeAt(source, labelStart);
+  if (!node) return [];
+  const geometryKey = resolveAngleGeometryForNode(source, node, pics);
+  if (!geometryKey) return [];
+  return [
+    ...findAnglePicGroupRanges(source, pics, geometryKey),
+    resolveRemovalRange(source, node),
+  ].sort((left, right) => left.start - right.start);
+}
+
+/** Removes an angle's markers and owned label while preserving its rays. */
+export function removeStemFigureAngleMarkerGroup(
+  source: string,
+  points: readonly [string, string, string],
+): StemFigureQuickTransformResult {
+  const pics = parseAnglePicOperations(source);
+  const geometryKey = createAngleGeometryKey(...points);
+  const targetPics = pics.filter((pic) => pic.geometryKey === geometryKey);
+  const markerRanges = findAnglePicGroupRanges(source, pics, geometryKey);
+  const measurementRanges = findAssociatedAngleMeasurementNodeRanges(
+    source,
+    points,
+    targetPics,
+  );
+  const ranges = [...markerRanges, ...measurementRanges].sort(
+    (left, right) => left.start - right.start,
+  );
+  return ranges.length > 0 ? applyRanges(source, ranges) : { changedCount: 0, source };
+}
+
+function findAssociatedAngleMeasurementNodeRanges(
+  source: string,
+  points: readonly [string, string, string],
+  targetPics: ParsedAnglePicOperation[],
+) {
+  const candidates: Array<{ node: TikzNode; range: SourceRange }> = [];
+  let cursor = 0;
+
+  while (cursor < source.length) {
+    if (isCommentStart(source, cursor)) {
+      cursor = nextLineStart(source, cursor);
+      continue;
+    }
+    const standalone = isStandaloneNodeStart(source, cursor);
+    const inline = !standalone && isInlineNodeStart(source, cursor);
+    if (!standalone && !inline) {
+      cursor += 1;
+      continue;
+    }
+    const node = parseTikzNode(source, cursor, standalone);
+    if (!node) {
+      cursor += standalone ? "\\node".length : "node".length;
+      continue;
+    }
+    if (
+      isExplicitAngleMeasurement(node.content) &&
+      isNodeAnchoredToAngle(source, node, points)
+    ) {
+      candidates.push({ node, range: resolveRemovalRange(source, node) });
+    }
+    cursor = node.contentEnd;
+  }
+
+  if (candidates.length === 1) return [candidates[0]!.range];
+  if (candidates.length < 2) return [];
+
+  const adjacent = candidates.filter(({ node }) =>
+    targetPics.some(
+      (pic) =>
+        (node.start >= pic.end && isTikzTrivia(source.slice(pic.end, node.start))) ||
+        (pic.start >= node.end && isTikzTrivia(source.slice(node.end, pic.start))),
+    ),
+  );
+  return adjacent.length === 1 ? [adjacent[0]!.range] : [];
+}
+
+function findAngleMeasurementNodeAt(source: string, position: number) {
+  let cursor = 0;
+  while (cursor < source.length) {
+    if (isCommentStart(source, cursor)) {
+      cursor = nextLineStart(source, cursor);
+      continue;
+    }
+    const standalone = isStandaloneNodeStart(source, cursor);
+    const inline = !standalone && isInlineNodeStart(source, cursor);
+    if (!standalone && !inline) {
+      cursor += 1;
+      continue;
+    }
+    const node = parseTikzNode(source, cursor, standalone);
+    if (!node) {
+      cursor += standalone ? "\\node".length : "node".length;
+      continue;
+    }
+    if (
+      position > node.contentStart &&
+      position < node.contentEnd &&
+      isExplicitAngleMeasurement(node.content)
+    ) {
+      return node;
+    }
+    cursor = node.contentEnd;
+  }
+  return null;
+}
+
+function resolveAngleGeometryForNode(
+  source: string,
+  node: TikzNode,
+  pics: ParsedAnglePicOperation[],
+) {
+  const representatives = [
+    ...new Map(pics.map((pic) => [pic.geometryKey, pic] as const)).values(),
+  ];
+  const candidates = representatives.filter((pic) =>
+    isNodeAnchoredToAngle(source, node, pic.points),
+  );
+  if (candidates.length === 1) return candidates[0]!.geometryKey;
+  if (candidates.length < 2) return null;
+  const adjacent = candidates.filter((candidate) =>
+    pics
+      .filter((pic) => pic.geometryKey === candidate.geometryKey)
+      .some(
+        (pic) =>
+          (node.start >= pic.end && isTikzTrivia(source.slice(pic.end, node.start))) ||
+          (pic.start >= node.end && isTikzTrivia(source.slice(node.end, pic.start))),
+      ),
+  );
+  return adjacent.length === 1 ? adjacent[0]!.geometryKey : null;
+}
+
+function isNodeAnchoredToAngle(
+  source: string,
+  node: TikzNode,
+  points: readonly [string, string, string],
+) {
+  const statementStart =
+    Math.max(
+      source.lastIndexOf(";", node.start - 1),
+      source.lastIndexOf("\n", node.start - 1),
+    ) + 1;
+  const header = source.slice(
+    node.standalone ? node.start : statementStart,
+    node.contentStart,
+  );
+  const placement = node.standalone
+    ? header.slice(Math.max(0, header.toLocaleLowerCase("en").lastIndexOf("at") + 2))
+    : header;
+  const pointPattern = new RegExp(String.raw`\(\s*([A-Za-z][A-Za-z0-9:_-]*)\s*\)`, "gu");
+  const referenced = [
+    ...new Set(
+      [...placement.matchAll(pointPattern)].flatMap((match) =>
+        match[1] ? [match[1].toLocaleLowerCase("en")] : [],
+      ),
+    ),
+  ];
+  const normalizedPoints = points.map((point) => point.toLocaleLowerCase("en"));
+  const [first, vertex, third] = normalizedPoints;
+  if (!vertex || !referenced.includes(vertex)) return false;
+  if (referenced.length === 1) return true;
+  return Boolean(
+    first &&
+    third &&
+    referenced.every((name) => normalizedPoints.includes(name)) &&
+    referenced.includes(first) &&
+    referenced.includes(third),
+  );
+}
+
+function isTikzTrivia(value: string) {
+  return value.replace(/%[^\n]*(?:\n|$)/gu, "").trim().length === 0;
+}
+
+function findAnglePicGroupRanges(
+  source: string,
+  pics: ParsedAnglePicOperation[],
+  geometryKey: string,
+) {
+  return pics
+    .filter((pic) => pic.geometryKey === geometryKey)
+    .map((pic) =>
+      pic.standalone
+        ? resolveCommandRemovalRange(source, pic.start, pic.end)
+        : resolveInlinePicRemovalRange(source, pic.start, pic.end),
+    );
+}
+
+function parseAnglePicOperations(source: string): ParsedAnglePicOperation[] {
+  const pics: ParsedAnglePicOperation[] = [];
+  let cursor = 0;
+
+  while (cursor < source.length) {
+    if (isCommentStart(source, cursor)) {
+      cursor = nextLineStart(source, cursor);
+      continue;
+    }
+    const standalone = isPicCommandStart(source, cursor);
+    const inline = !standalone && isPicPathOperationStart(source, cursor);
+    if (!standalone && !inline) {
+      cursor += 1;
+      continue;
+    }
+
+    const afterToken = skipWhitespaceAndComments(
+      source,
+      cursor + (standalone ? "\\pic".length : "pic".length),
+    );
+    let optionStart = afterToken;
+    let optionEnd = afterToken;
+    if (source[afterToken] === "[") {
+      const parsedOptionEnd = readBalancedGroup(source, afterToken);
+      if (parsedOptionEnd === null) {
+        cursor = afterToken + 1;
+        continue;
+      }
+      optionStart = afterToken;
+      optionEnd = parsedOptionEnd;
+    }
+    const bodyStart = skipWhitespaceAndComments(source, optionEnd);
+    if (source[bodyStart] !== "{") {
+      cursor = optionEnd;
+      continue;
+    }
+    const bodyEnd = readBalancedGroup(source, bodyStart);
+    if (bodyEnd === null) {
+      cursor = bodyStart + 1;
+      continue;
+    }
+    const geometry = parseAnglePicGeometry(source.slice(bodyStart + 1, bodyEnd - 1));
+    if (geometry) {
+      const commandEnd = standalone ? findTikzCommandEnd(source, cursor) : bodyEnd;
+      if (commandEnd !== null) {
+        pics.push({
+          end: commandEnd,
+          geometryKey: createAngleGeometryKey(...geometry),
+          optionEnd,
+          optionStart,
+          points: geometry,
+          standalone,
+          start: cursor,
+        });
+      }
+    }
+    cursor = bodyEnd;
+  }
+  return pics;
+}
+
+function parseAnglePicGeometry(value: string): [string, string, string] | null {
+  const point = String.raw`[A-Za-z][A-Za-z0-9:_-]*`;
+  const match = value.match(
+    new RegExp(
+      String.raw`^\s*angle\s*=\s*(${point})\s*--\s*(${point})\s*--\s*(${point})\s*$`,
+      "u",
+    ),
+  );
+  const first = match?.[1];
+  const vertex = match?.[2];
+  const third = match?.[3];
+  return first && vertex && third ? [first, vertex, third] : null;
+}
+
+function createAngleGeometryKey(first: string, vertex: string, third: string) {
+  const endpoints = [first, third].sort((left, right) => left.localeCompare(right));
+  return `${vertex}\u0000${endpoints.join("\u0001")}`;
+}
+
+function resolveInlinePicRemovalRange(source: string, start: number, end: number) {
+  let normalizedEnd = end;
+  while (/[\t ]/u.test(source[normalizedEnd] ?? "")) normalizedEnd += 1;
+  return { end: normalizedEnd, start };
 }
 
 export function readStemFigureScalePercentage(
@@ -269,7 +613,7 @@ function parseStemFigureTextSlots(source: string): {
       if (node.content.trim()) {
         slots.push(
           createParsedTextSlot({
-            adjustmentTarget: node,
+            adjustmentTarget: { kind: "NODE", node },
             contentEnd,
             contentStart,
             deleteRange: resolveRemovalRange(source, node),
@@ -300,22 +644,38 @@ function parseStemFigureTextSlots(source: string): {
         cursor = optionStart + 1;
         continue;
       }
-      for (const option of splitTopLevelOptionRanges(
+      const optionRanges = splitTopLevelOptionRanges(
         source,
         optionStart + 1,
         optionEnd - 1,
-      )) {
+      );
+      const quotedOptions = optionRanges.flatMap((option) => {
         const quoteStart = skipInlineWhitespace(source, option.start);
-        if (source[quoteStart] !== '"') continue;
+        if (source[quoteStart] !== '"') return [];
         const quoteEnd = findClosingQuote(source, quoteStart + 1, option.end);
+        return [{ option, quoteEnd, quoteStart }];
+      });
+      for (const { option, quoteEnd, quoteStart } of quotedOptions) {
         if (quoteEnd === null) {
           unsupportedCount += 1;
           continue;
         }
         const content = source.slice(quoteStart + 1, quoteEnd);
         if (!content.trim()) continue;
+        const adjustmentTarget: TikzTextAdjustmentTarget = {
+          kind: "PIC",
+          optionEnd: option.end,
+          optionStart: option.start,
+          picOptionEnd: optionEnd,
+          picOptionStart: optionStart,
+          quoteEnd,
+        };
+        const canAdjustTextOnly =
+          quotedOptions.length === 1 &&
+          readPicQuoteSuffix(source, adjustmentTarget) !== null;
         slots.push(
           createParsedTextSlot({
+            adjustmentTarget: canAdjustTextOnly ? adjustmentTarget : null,
             contentEnd: quoteEnd,
             contentStart: quoteStart + 1,
             deleteRange: resolveOptionRemovalRange(
@@ -414,7 +774,7 @@ function createParsedTextSlot({
   kind,
   source,
 }: {
-  adjustmentTarget?: TikzNode | null;
+  adjustmentTarget?: TikzTextAdjustmentTarget | null;
   contentEnd: number;
   contentStart: number;
   deleteRange: SourceRange;
@@ -429,6 +789,10 @@ function createParsedTextSlot({
       : null,
     adjustmentTarget,
     deleteRange,
+    displayKind: classifyTextSlotDisplayKind(
+      source.slice(contentStart, contentEnd),
+      kind,
+    ),
     id: `${idPrefix}:${contentStart}:${contentEnd}`,
     kind,
     replacementPrefix: source.slice(contentStart, wrapper.start),
@@ -440,20 +804,20 @@ function createParsedTextSlot({
 
 function readTextSlotAdjustment(
   source: string,
-  node: TikzNode,
+  target: TikzTextAdjustmentTarget,
 ): StemFigureTextAdjustment {
-  const options = readNodeOptions(source, node);
+  const options = readTextAdjustmentOptions(source, target);
   const definition = options
     .map((option) => option.trim().match(TEXT_SLOT_ADJUSTMENT_DEFINITION_PATTERN))
     .find((match) => match?.[1] !== undefined);
   const adjustmentOptions = splitTopLevelOptions(definition?.[1] ?? "");
-  const baseFont = readBaseNodeFontMetrics(options);
+  const baseFont = readBaseTextFontMetrics(source, target, options);
   const adjustedFont = adjustmentOptions
     .find((option) => /^font\s*=/u.test(option))
     ?.match(ABSOLUTE_FONT_SIZE_PATTERN);
   const adjustedFontSize = Number(adjustedFont?.[1]);
 
-  return {
+  const adjustment: StemFigureTextAdjustment = {
     fontSizePercentage:
       Number.isFinite(adjustedFontSize) && baseFont.size > 0
         ? clampRounded(
@@ -465,13 +829,173 @@ function readTextSlotAdjustment(
     xOffsetPt: readAdjustmentDimension(adjustmentOptions, "xshift"),
     yOffsetPt: readAdjustmentDimension(adjustmentOptions, "yshift"),
   };
+  const angleRadiusPt = readAnglePicGroupRadius(source, target);
+  if (angleRadiusPt !== null) adjustment.angleRadiusPt = angleRadiusPt;
+  return adjustment;
+}
+
+function readAnglePicGroupRadius(
+  source: string,
+  target: TikzTextAdjustmentTarget,
+): number | null {
+  if (target.kind !== "PIC") return null;
+  const geometryKey = readAngleGeometryKeyAfterOptions(source, target.picOptionEnd);
+  if (!geometryKey) return null;
+  const group = parseAnglePicOperations(source).filter(
+    (pic) => pic.geometryKey === geometryKey,
+  );
+  if (group.length === 0) return null;
+  const radii = group.map((pic) => readAnglePicRadiusPt(source, pic));
+  if (radii.some((radius) => radius === null)) return null;
+  return Math.round(Math.min(...(radii as number[])));
+}
+
+function writeAnglePicGroupRadius(
+  source: string,
+  target: TikzTextAdjustmentTarget,
+  radiusPt: number,
+): StemFigureQuickTransformResult {
+  if (target.kind !== "PIC") return { changedCount: 0, source };
+  const geometryKey = readAngleGeometryKeyAfterOptions(source, target.picOptionEnd);
+  if (!geometryKey) return { changedCount: 0, source };
+  const group = parseAnglePicOperations(source).filter(
+    (pic) => pic.geometryKey === geometryKey,
+  );
+  const currentRadii = group.map((pic) => readAnglePicRadiusPt(source, pic));
+  const currentEccentricities = group.map((pic) =>
+    readLabeledAnglePicEccentricity(source, pic),
+  );
+  if (
+    group.length === 0 ||
+    currentRadii.some((radius) => radius === null) ||
+    currentEccentricities.some((eccentricity) => eccentricity === null)
+  ) {
+    return { changedCount: 0, source };
+  }
+  const innerRadius = Math.min(...(currentRadii as number[]));
+  const replacements = group.map((pic, index) => {
+    const currentRadius = currentRadii[index] ?? innerRadius;
+    const nextRadius = radiusPt + currentRadius - innerRadius;
+    const originalOptions =
+      pic.optionStart < pic.optionEnd
+        ? splitTopLevelOptions(source.slice(pic.optionStart + 1, pic.optionEnd - 1))
+        : [];
+    let replaced = false;
+    const nextOptions = originalOptions.map((option) => {
+      if (!/^\s*angle\s+radius\s*=/iu.test(option)) return option;
+      replaced = true;
+      return `angle radius=${formatCompactDecimal(nextRadius)}pt`;
+    });
+    if (!replaced) {
+      nextOptions.push(`angle radius=${formatCompactDecimal(nextRadius)}pt`);
+    }
+    const currentEccentricity = currentEccentricities[index];
+    if (currentEccentricity !== undefined && currentEccentricity !== null) {
+      const nextEccentricity = (currentRadius * currentEccentricity) / nextRadius;
+      let replacedEccentricity = false;
+      const compensatedOptions = nextOptions.map((option) => {
+        if (!/^\s*angle\s+eccentricity\s*=/iu.test(option)) return option;
+        replacedEccentricity = true;
+        return `angle eccentricity=${formatCompactDecimal(nextEccentricity)}`;
+      });
+      if (!replacedEccentricity) {
+        compensatedOptions.push(
+          `angle eccentricity=${formatCompactDecimal(nextEccentricity)}`,
+        );
+      }
+      nextOptions.splice(0, nextOptions.length, ...compensatedOptions);
+    }
+    return {
+      end: pic.optionEnd,
+      start: pic.optionStart,
+      value: `[${nextOptions.join(", ")}]`,
+    };
+  });
+  return applyReplacements(source, replacements);
+}
+
+function readAngleGeometryKeyAfterOptions(source: string, optionEnd: number) {
+  const bodyStart = skipWhitespaceAndComments(source, optionEnd);
+  if (source[bodyStart] !== "{") return null;
+  const bodyEnd = readBalancedGroup(source, bodyStart);
+  if (bodyEnd === null) return null;
+  const geometry = parseAnglePicGeometry(source.slice(bodyStart + 1, bodyEnd - 1));
+  return geometry ? createAngleGeometryKey(...geometry) : null;
+}
+
+function readAnglePicRadiusPt(source: string, pic: ParsedAnglePicOperation) {
+  if (pic.optionStart === pic.optionEnd) return STEM_FIGURE_ANGLE_RADIUS_PT_DEFAULT;
+  const option = splitTopLevelOptions(
+    source.slice(pic.optionStart + 1, pic.optionEnd - 1),
+  ).find((candidate) => /^\s*angle\s+radius\s*=/iu.test(candidate));
+  if (!option) return STEM_FIGURE_ANGLE_RADIUS_PT_DEFAULT;
+  const match = option.match(
+    /^\s*angle\s+radius\s*=\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*(pt|mm|cm|in|bp|pc|dd|cc|sp)?\s*$/iu,
+  );
+  const numericValue = Number(match?.[1]);
+  if (!Number.isFinite(numericValue)) return null;
+  return numericValue * tikzLengthUnitToPt(match?.[2]);
+}
+
+function readLabeledAnglePicEccentricity(
+  source: string,
+  pic: ParsedAnglePicOperation,
+): number | null | undefined {
+  if (pic.optionStart === pic.optionEnd) return undefined;
+  const options = splitTopLevelOptions(
+    source.slice(pic.optionStart + 1, pic.optionEnd - 1),
+  );
+  if (!options.some((option) => option.trimStart().startsWith('"'))) {
+    return undefined;
+  }
+  const eccentricityOption = options.find((option) =>
+    /^\s*angle\s+eccentricity\s*=/iu.test(option),
+  );
+  if (!eccentricityOption) return TIKZ_DEFAULT_ANGLE_ECCENTRICITY;
+  const match = eccentricityOption.match(
+    /^\s*angle\s+eccentricity\s*=\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*$/iu,
+  );
+  const value = Number(match?.[1]);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function tikzLengthUnitToPt(unit?: string) {
+  switch (unit?.toLocaleLowerCase("en")) {
+    case "mm":
+      return 72.27 / 25.4;
+    case "cm":
+      return 72.27 / 2.54;
+    case "in":
+      return 72.27;
+    case "bp":
+      return 72.27 / 72;
+    case "pc":
+      return 12;
+    case "dd":
+      return 1238 / 1157;
+    case "cc":
+      return (12 * 1238) / 1157;
+    case "sp":
+      return 1 / 65536;
+    default:
+      return 1;
+  }
+}
+
+function formatCompactDecimal(value: number) {
+  return Number(value.toFixed(2)).toString();
 }
 
 function writeTextSlotAdjustment(
   source: string,
-  node: TikzNode,
+  target: TikzTextAdjustmentTarget,
   adjustment: StemFigureTextAdjustment,
 ): StemFigureQuickTransformResult {
+  if (target.kind === "PIC") {
+    return writePicTextSlotAdjustment(source, target, adjustment);
+  }
+
+  const { node } = target;
   const originalOptions = readNodeOptions(source, node);
   const preservedOptions = originalOptions.filter((option) => {
     const normalized = option.trim();
@@ -522,6 +1046,110 @@ function writeTextSlotAdjustment(
       value: `[${preservedOptions.join(", ")}]`,
     },
   ]);
+}
+
+function writePicTextSlotAdjustment(
+  source: string,
+  target: Extract<TikzTextAdjustmentTarget, { kind: "PIC" }>,
+  adjustment: StemFigureTextAdjustment,
+): StemFigureQuickTransformResult {
+  const suffix = readPicQuoteSuffix(source, target);
+  if (!suffix) return { changedCount: 0, source };
+
+  const preservedOptions = suffix.options.filter((option) => {
+    const normalized = option.trim();
+    return (
+      !TEXT_SLOT_ADJUSTMENT_DEFINITION_PATTERN.test(normalized) &&
+      !TEXT_SLOT_ADJUSTMENT_ACTIVATION_PATTERN.test(normalized)
+    );
+  });
+  const styleOptions: string[] = [];
+
+  if (adjustment.xOffsetPt !== STEM_FIGURE_TEXT_OFFSET_DEFAULT) {
+    styleOptions.push(`xshift=${formatSignedDimension(adjustment.xOffsetPt)}pt`);
+  }
+  if (adjustment.yOffsetPt !== STEM_FIGURE_TEXT_OFFSET_DEFAULT) {
+    styleOptions.push(`yshift=${formatSignedDimension(adjustment.yOffsetPt)}pt`);
+  }
+  if (adjustment.fontSizePercentage !== STEM_FIGURE_SCALE_PERCENT_DEFAULT) {
+    const baseFont = readBaseTextFontMetrics(source, target, preservedOptions);
+    const ratio = adjustment.fontSizePercentage / 100;
+    styleOptions.push(
+      `font=${createAbsoluteFontSize(baseFont.size * ratio, baseFont.leading * ratio)}`,
+    );
+  }
+
+  if (styleOptions.length > 0) {
+    preservedOptions.push(
+      `${TEXT_SLOT_ADJUSTMENT_STYLE}/.style={${styleOptions.join(", ")}}`,
+      TEXT_SLOT_ADJUSTMENT_STYLE,
+    );
+  }
+
+  const nextSuffix = `${suffix.apostrophe}${
+    preservedOptions.length > 0 ? `{${preservedOptions.join(", ")}}` : ""
+  }`;
+  return applyReplacements(source, [
+    {
+      end: target.optionEnd,
+      start: target.quoteEnd + 1,
+      value: nextSuffix,
+    },
+  ]);
+}
+
+function readTextAdjustmentOptions(source: string, target: TikzTextAdjustmentTarget) {
+  if (target.kind === "NODE") return readNodeOptions(source, target.node);
+  return readPicQuoteSuffix(source, target)?.options ?? [];
+}
+
+function readBaseTextFontMetrics(
+  source: string,
+  target: TikzTextAdjustmentTarget,
+  textOptions: string[],
+) {
+  if (target.kind === "NODE") return readBaseNodeFontMetrics(textOptions);
+
+  const groupScaleDefinition = textOptions
+    .map((option) => option.trim().match(TEXT_SLOT_GROUP_SCALE_DEFINITION_PATTERN))
+    .find((match) => match?.[1] !== undefined);
+  if (groupScaleDefinition?.[1]) {
+    return readBaseNodeFontMetrics(splitTopLevelOptions(groupScaleDefinition[1]));
+  }
+
+  const picOptions = splitTopLevelOptions(
+    source.slice(target.picOptionStart + 1, target.picOptionEnd - 1),
+  );
+  const picTextOptions = picOptions.flatMap((option) => {
+    const match = option.trim().match(/^pic\s+text\s+options\s*=\s*\{([\s\S]*)\}$/u);
+    return match?.[1] ? splitTopLevelOptions(match[1]) : [];
+  });
+  return readBaseNodeFontMetrics([...textOptions, ...picTextOptions, ...picOptions]);
+}
+
+function readPicQuoteSuffix(
+  source: string,
+  target: Extract<TikzTextAdjustmentTarget, { kind: "PIC" }>,
+): { apostrophe: string; options: string[] } | null {
+  let suffix = source.slice(target.quoteEnd + 1, target.optionEnd).trim();
+  let apostrophe = "";
+  if (suffix.startsWith("'")) {
+    apostrophe = "'";
+    suffix = suffix.slice(1).trim();
+  }
+  if (!suffix) return { apostrophe, options: [] };
+
+  if (suffix.startsWith("{")) {
+    const end = readBalancedGroup(suffix, 0);
+    if (end !== suffix.length) return null;
+    return {
+      apostrophe,
+      options: splitTopLevelOptions(suffix.slice(1, -1)),
+    };
+  }
+
+  const options = splitTopLevelOptions(suffix);
+  return options.length === 1 ? { apostrophe, options } : null;
 }
 
 function readNodeOptions(source: string, node: TikzNode) {
@@ -593,6 +1221,30 @@ function classifyTextSlotKind(content: string): StemFigureTextSlotKind {
     return "ANNOTATION";
   }
   return "LABEL";
+}
+
+function classifyTextSlotDisplayKind(
+  content: string,
+  kind: StemFigureTextSlotKind,
+): StemFigureTextSlotDisplayKind {
+  if (kind === "COMPONENT_LABEL") return "COMPONENT_LABEL";
+  if (kind === "ANNOTATION") return "ANNOTATION";
+  if (isExplicitAngleMeasurement(content)) return "ANGLE";
+  if (isExplicitLengthMeasurement(content)) return "LENGTH";
+  if (isExplicitNumericLabel(content)) return "VALUE";
+  return isPointLabel(content) ? "POINT" : "LABEL";
+}
+
+function isPointLabel(content: string) {
+  const normalized = content
+    .trim()
+    .replace(/^\$|\$$/gu, "")
+    .replace(
+      /\\(?:mathrm|textrm|text|mathsf|mathtt|mathbf|mathit)\s*\{([^{}]+)\}/gu,
+      "$1",
+    )
+    .replace(/[{}\s]/gu, "");
+  return /^[A-Z](?:_[A-Za-z0-9]+)?(?:['′]+)?$/u.test(normalized);
 }
 
 /**
@@ -832,72 +1484,19 @@ function setTikzLabelFontScale(
 
   const ratio = targetScale / currentScale;
   const replacements: Array<SourceRange & { value: string }> = [];
-  let cursor = 0;
 
-  while (cursor < source.length) {
-    if (isCommentStart(source, cursor)) {
-      cursor = nextLineStart(source, cursor);
+  for (const slot of parseStemFigureTextSlots(source).slots) {
+    if (!slot.adjustmentTarget || classifyLabelRole(slot.value) !== role) {
       continue;
     }
-
-    const standalone = isStandaloneNodeStart(source, cursor);
-    const inline = !standalone && isInlineNodeStart(source, cursor);
-    if (!standalone && !inline) {
-      cursor += 1;
-      continue;
-    }
-
-    const node = parseTikzNode(source, cursor, standalone);
-    if (!node) {
-      cursor += standalone ? "\\node".length : "node".length;
-      continue;
-    }
-
-    if (classifyLabelRole(node.content) === role) {
-      if (node.optionStart !== null && node.optionEnd !== null) {
-        const originalOptions = splitTopLevelOptions(
-          source.slice(node.optionStart + 1, node.optionEnd - 1),
-        );
-        const adjustmentDefinition = originalOptions.find((option) =>
-          TEXT_SLOT_ADJUSTMENT_DEFINITION_PATTERN.test(option.trim()),
-        );
-        const hasAdjustmentActivation = originalOptions.some((option) =>
-          TEXT_SLOT_ADJUSTMENT_ACTIVATION_PATTERN.test(option.trim()),
-        );
-        const options = adjustmentDefinition
-          ? originalOptions.filter((option) => {
-              const normalized = option.trim();
-              return (
-                !TEXT_SLOT_ADJUSTMENT_DEFINITION_PATTERN.test(normalized) &&
-                !TEXT_SLOT_ADJUSTMENT_ACTIVATION_PATTERN.test(normalized)
-              );
-            })
-          : originalOptions;
-        const fontIndex = options.findIndex((option) => /^font\s*=/iu.test(option));
-        if (fontIndex >= 0) {
-          options[fontIndex] = scaleFontOption(options[fontIndex] ?? "font=", ratio);
-        } else {
-          options.push(`font=${createAbsoluteFontSize(10 * ratio, 12 * ratio)}`);
-        }
-        if (adjustmentDefinition) {
-          options.push(scaleTextSlotAdjustmentFont(adjustmentDefinition, ratio));
-          if (hasAdjustmentActivation) options.push(TEXT_SLOT_ADJUSTMENT_STYLE);
-        }
-        replacements.push({
-          end: node.optionEnd,
-          start: node.optionStart,
-          value: `[${options.join(", ")}]`,
-        });
-      } else {
-        const commandLength = standalone ? "\\node".length : "node".length;
-        replacements.push({
-          end: node.start + commandLength,
-          start: node.start + commandLength,
-          value: `[font=${createAbsoluteFontSize(10 * ratio, 12 * ratio)}]`,
-        });
-      }
-    }
-    cursor = node.contentEnd;
+    const replacement = createTextLabelScaleReplacement(
+      source,
+      slot.adjustmentTarget,
+      ratio,
+      targetScale,
+      currentScale,
+    );
+    if (replacement) replacements.push(replacement);
   }
 
   const transformed = applyReplacements(source, replacements);
@@ -906,6 +1505,142 @@ function setTikzLabelFontScale(
     ...transformed,
     source: writeLabelScaleMarker(transformed.source, role, targetScale),
   };
+}
+
+function createTextLabelScaleReplacement(
+  source: string,
+  target: TikzTextAdjustmentTarget,
+  ratio: number,
+  targetScale: number,
+  currentScale: number,
+): (SourceRange & { value: string }) | null {
+  if (target.kind === "PIC") {
+    const suffix = readPicQuoteSuffix(source, target);
+    if (!suffix) return null;
+    const options = scalePicTextOptions(
+      source,
+      target,
+      suffix.options,
+      targetScale,
+      currentScale,
+    );
+    return {
+      end: target.optionEnd,
+      start: target.quoteEnd + 1,
+      value: `${suffix.apostrophe}${options.length > 0 ? `{${options.join(", ")}}` : ""}`,
+    };
+  }
+
+  const { node } = target;
+  if (node.optionStart === null || node.optionEnd === null) {
+    const commandLength = node.standalone ? "\\node".length : "node".length;
+    return {
+      end: node.start + commandLength,
+      start: node.start + commandLength,
+      value: `[font=${createAbsoluteFontSize(10 * ratio, 12 * ratio)}]`,
+    };
+  }
+
+  const originalOptions = splitTopLevelOptions(
+    source.slice(node.optionStart + 1, node.optionEnd - 1),
+  );
+  const options = scaleNodeTextOptions(
+    originalOptions,
+    ratio,
+    readBaseNodeFontMetrics(originalOptions),
+  );
+  return {
+    end: node.optionEnd,
+    start: node.optionStart,
+    value: `[${options.join(", ")}]`,
+  };
+}
+
+function scaleNodeTextOptions(
+  originalOptions: string[],
+  ratio: number,
+  baseFont: { leading: number; size: number },
+) {
+  const adjustmentDefinition = originalOptions.find((option) =>
+    TEXT_SLOT_ADJUSTMENT_DEFINITION_PATTERN.test(option.trim()),
+  );
+  const hasAdjustmentActivation = originalOptions.some((option) =>
+    TEXT_SLOT_ADJUSTMENT_ACTIVATION_PATTERN.test(option.trim()),
+  );
+  const options = adjustmentDefinition
+    ? originalOptions.filter((option) => {
+        const normalized = option.trim();
+        return (
+          !TEXT_SLOT_ADJUSTMENT_DEFINITION_PATTERN.test(normalized) &&
+          !TEXT_SLOT_ADJUSTMENT_ACTIVATION_PATTERN.test(normalized)
+        );
+      })
+    : [...originalOptions];
+  const fontIndex = options.findIndex((option) => /^font\s*=/iu.test(option));
+  if (fontIndex >= 0) {
+    options[fontIndex] = scaleFontOption(options[fontIndex] ?? "font=", ratio);
+  } else {
+    options.push(
+      `font=${createAbsoluteFontSize(baseFont.size * ratio, baseFont.leading * ratio)}`,
+    );
+  }
+  if (adjustmentDefinition) {
+    options.push(scaleTextSlotAdjustmentFont(adjustmentDefinition, ratio));
+    if (hasAdjustmentActivation) options.push(TEXT_SLOT_ADJUSTMENT_STYLE);
+  }
+  return options;
+}
+
+function scalePicTextOptions(
+  source: string,
+  target: Extract<TikzTextAdjustmentTarget, { kind: "PIC" }>,
+  originalOptions: string[],
+  targetScale: number,
+  currentScale: number,
+) {
+  const adjustmentDefinition = originalOptions.find((option) =>
+    TEXT_SLOT_ADJUSTMENT_DEFINITION_PATTERN.test(option.trim()),
+  );
+  const hasAdjustmentActivation = originalOptions.some((option) =>
+    TEXT_SLOT_ADJUSTMENT_ACTIVATION_PATTERN.test(option.trim()),
+  );
+  const groupScaleDefinition = originalOptions.find((option) =>
+    TEXT_SLOT_GROUP_SCALE_DEFINITION_PATTERN.test(option.trim()),
+  );
+  const options = originalOptions.filter((option) => {
+    const normalized = option.trim();
+    return (
+      !TEXT_SLOT_ADJUSTMENT_DEFINITION_PATTERN.test(normalized) &&
+      !TEXT_SLOT_ADJUSTMENT_ACTIVATION_PATTERN.test(normalized) &&
+      !TEXT_SLOT_GROUP_SCALE_DEFINITION_PATTERN.test(normalized) &&
+      !TEXT_SLOT_GROUP_SCALE_ACTIVATION_PATTERN.test(normalized)
+    );
+  });
+  const ratio = groupScaleDefinition ? targetScale / currentScale : targetScale;
+
+  if (targetScale !== STEM_FIGURE_DISPLAY_SCALE_DEFAULT) {
+    const baseFont = groupScaleDefinition
+      ? readBaseNodeFontMetrics(
+          splitTopLevelOptions(
+            groupScaleDefinition
+              .trim()
+              .match(TEXT_SLOT_GROUP_SCALE_DEFINITION_PATTERN)?.[1] ?? "",
+          ),
+        )
+      : readBaseTextFontMetrics(source, target, options);
+    options.push(
+      `${TEXT_SLOT_GROUP_SCALE_STYLE}/.style={font=${createAbsoluteFontSize(
+        baseFont.size * ratio,
+        baseFont.leading * ratio,
+      )}}`,
+      TEXT_SLOT_GROUP_SCALE_STYLE,
+    );
+  }
+  if (adjustmentDefinition) {
+    options.push(scaleTextSlotAdjustmentFont(adjustmentDefinition, ratio));
+    if (hasAdjustmentActivation) options.push(TEXT_SLOT_ADJUSTMENT_STYLE);
+  }
+  return options;
 }
 
 function scaleTextSlotAdjustmentFont(option: string, ratio: number) {
@@ -1396,6 +2131,7 @@ function parseTikzNode(
       return {
         content: source.slice(cursor + 1, contentEnd - 1),
         contentEnd,
+        contentStart: cursor,
         end,
         optionEnd,
         optionStart,

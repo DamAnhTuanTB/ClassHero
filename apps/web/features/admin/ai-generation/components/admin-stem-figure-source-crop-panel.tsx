@@ -48,16 +48,24 @@ export function AdminStemFigureSourceCropPanel({
       className="theme-dialog-panel mb-4 overflow-hidden rounded-xl border border-sky-200 shadow-lg dark:border-sky-800"
       role="region"
     >
-      <header className="theme-dialog-header flex min-h-16 shrink-0 items-center justify-between gap-4 px-4 sm:px-6">
+      <header className="theme-dialog-header flex min-h-16 shrink-0 items-center justify-between gap-4 px-4 py-3 sm:px-6">
         <div className="flex min-w-0 items-center gap-3">
           <BookOpen
             className="h-5 w-5 shrink-0 text-sky-600 dark:text-sky-300"
             aria-hidden="true"
           />
-          <h2 className="truncate text-lg font-extrabold text-[var(--theme-text-strong)]">
+          <h2 className="text-base font-normal text-[var(--theme-text-strong)]">
             Xem ảnh sách giáo khoa
           </h2>
         </div>
+        <button
+          className="theme-button-neutral min-h-10 shrink-0 whitespace-nowrap rounded-lg px-4 text-sm font-extrabold"
+          disabled={isUsing}
+          onClick={onClose}
+          type="button"
+        >
+          Hủy
+        </button>
       </header>
 
       <div className="p-4 sm:p-6">
@@ -107,17 +115,9 @@ export function AdminStemFigureSourceCropPanel({
         ) : null}
       </div>
 
-      <footer className="theme-dialog-footer flex shrink-0 flex-wrap justify-end gap-2 px-4 py-3 sm:px-6">
+      <footer className="theme-dialog-footer flex shrink-0 justify-end px-4 py-3 sm:px-6">
         <button
-          className="theme-button-neutral min-h-10 rounded-lg px-4 text-sm font-extrabold"
-          disabled={isUsing}
-          onClick={onClose}
-          type="button"
-        >
-          Hủy
-        </button>
-        <button
-          className="theme-button-primary inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-extrabold disabled:cursor-not-allowed disabled:opacity-60"
+          className="theme-button-primary inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 text-sm font-extrabold disabled:cursor-not-allowed disabled:opacity-60"
           disabled={!canUse}
           onClick={() => {
             if (selectedObjectKey) void onUse(selectedObjectKey, enhance);

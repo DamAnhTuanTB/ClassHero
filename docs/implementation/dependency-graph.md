@@ -73,7 +73,7 @@ M14 testing/hardening/deploy
 - `M7.1` lesson page skeleton cần `M6.5` để đọc lesson content.
 - `M8.4` payment UI cần `M8.2` và `M8.3`; notification thật có thể chờ `M10.1`.
 - Thứ tự triển khai cụm AI là
-  `M9.1 -> M9.2 (Summary + TeX/TikZ) -> M9.8 -> M9.17 -> M9.18 -> M9.19 -> M9.20 -> M9.21 -> M9.22 -> M9.23 -> M9.24 -> M9.25 -> M9.4 -> M9.5 -> M9.6 -> M9.7`.
+  `M9.1 -> M9.2 (Summary + TeX/TikZ) -> M9.8 -> M9.17 -> M9.18 -> M9.19 -> M9.20 -> M9.21 -> M9.22 -> M9.23 -> M9.24 -> M9.25 -> M9.26 -> M9.27 -> M9.4 -> M9.5 -> M9.6 -> M9.7`.
 - Provider operations là lát dọc độc lập:
   `M9.9 -> M4.6 -> M9.10 -> M9.11 -> M9.12`; dùng nền `M9.1`, `M4.4` và admin shell. `M9.12` là bước hardening cuối, phải hoàn tất trước khi coi hard-stop là giới hạn tuyệt đối trong production.
   `M9.8` đứng ngay sau `M9.3` để admin kiểm thử generation trên UI và đã Done
@@ -106,6 +106,13 @@ M14 testing/hardening/deploy
   `(QUIZ, TEXT)`, job/usage/budget hiện có và không đổi schema database.
 - `M9.25` phụ thuộc `M9.23` cùng code editor/compile endpoint của `M9.2`, `M9.3`;
   chỉ mở rộng parser/transformer/UI ở web, không thêm backend/provider/cache.
+- `M9.26` phụ thuộc `M9.23`, `M9.25` và named coordinate trong source TikZ;
+  web tự nối đúng cạnh còn thiếu, tạo angle/midpoint/equal-length marker
+  deterministic rồi dùng lại compile/history hiện có, không thêm backend/
+  provider/cache.
+- `M9.27` phụ thuộc Summary Phase 2 `M9.2`, modal `M9.8`, route ảnh `M9.20` và
+  invariant hình lời giải độc lập của `M9.3/ADR-0024`; chỉ adapter invariant sang
+  runtime Summary độc lập, không tạo dependency code từ Summary sang Quiz.
 - `M9.4` và `M9.5` là `UI + API`: mỗi task phải kết thúc bằng flow học sinh bấm
   kiểm thử được, không tách UI sang `M9.8` hoặc một task chưa xác định.
 - `M9.6` AI chat chỉ nên hoàn thiện sau `M4.4`, `M5.2`, `M5.3`, `M9.1` và đi

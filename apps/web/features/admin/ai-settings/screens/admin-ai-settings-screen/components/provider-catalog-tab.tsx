@@ -2,10 +2,12 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
+  AI_REASONING_EFFORT_LEVELS,
+  normalizeAiReasoningEffortLevels,
+} from "@learning-path/shared";
+import {
   BrainCircuit,
   Cpu,
-  ExternalLink,
-  Link2,
   Loader2,
   PencilLine,
   Plus,
@@ -26,7 +28,6 @@ import {
   providerCatalogItemSchema,
   type ProviderPriceVersionFormValues,
   type CreateProviderCatalogItemFormValues,
-  type ProviderCatalogItemFormValues,
 } from "@/features/admin/ai-settings/schemas/provider-price-version-schema";
 import { sanitizeNumericInput } from "@/features/admin/ai-settings/screens/admin-ai-settings-screen/components/numeric-settings-field";
 import type {
@@ -202,6 +203,7 @@ export function ProviderCatalogTab({
             <div className="space-y-4">
               {group.items.map((item) => {
                 const price = item.priceVersions[0];
+                const capabilities = readCatalogCapabilities(item.capabilities);
                 return (
                   <article
                     key={item.id}
@@ -249,25 +251,25 @@ export function ProviderCatalogTab({
                               )}
                             </div>
 
-                            {(item.capabilities && (String((item.capabilities as any).aiConfiguration) === "REASONING_EFFORT" || String((item.capabilities as any).aiConfiguration) === "TEMPERATURE")) ? (
+                            {(capabilities.aiConfiguration === "REASONING_EFFORT" || capabilities.aiConfiguration === "TEMPERATURE") ? (
                               <div className="flex flex-wrap items-center gap-2">
                                 <span className="text-xs font-semibold text-[var(--theme-text-muted)] uppercase tracking-wide min-w-24">
                                   Hỗ trợ thêm:
                                 </span>
-                                {String((item.capabilities as any).aiConfiguration) === "REASONING_EFFORT" && (
+                                {capabilities.aiConfiguration === "REASONING_EFFORT" && (
                                   <div className="flex items-center gap-1.5">
                                     <span className="inline-flex items-center gap-1.5 rounded-md bg-[var(--theme-info-bg)] px-2 py-0.5 text-[13px] font-semibold text-[var(--theme-info-text)] ring-1 ring-inset ring-[var(--theme-info-text)]/20">
                                       <BrainCircuit className="h-3.5 w-3.5" />
                                       Reasoning Effort
                                     </span>
-                                    {Array.isArray((item.capabilities as any).reasoningEffortLevels) && ((item.capabilities as any).reasoningEffortLevels as string[]).length > 0 && (
+                                    {capabilities.reasoningEffortLevels.length > 0 && (
                                       <span className="text-xs text-[var(--theme-text-muted)] font-medium">
-                                        ({((item.capabilities as any).reasoningEffortLevels as string[]).join(", ")})
+                                        ({capabilities.reasoningEffortLevels.join(", ")})
                                       </span>
                                     )}
                                   </div>
                                 )}
-                                {String((item.capabilities as any).aiConfiguration) === "TEMPERATURE" && (
+                                {capabilities.aiConfiguration === "TEMPERATURE" && (
                                   <span className="inline-flex items-center gap-1.5 rounded-md bg-[var(--theme-warning-bg)] px-2 py-0.5 text-[13px] font-semibold text-[var(--theme-warning-text)] ring-1 ring-inset ring-[var(--theme-warning-text)]/20">
                                     <Thermometer className="h-3.5 w-3.5" />
                                     Temperature
@@ -387,7 +389,10 @@ export function ProviderCatalogTab({
           onClose={() => setEditingModelItem(null)}
           onSubmit={async (input) => {
             if (editingModelItem.item) {
-              await onUpdateModel?.(editingModelItem.item.id, input);
+              await onUpdateModel?.(
+                editingModelItem.item.id,
+                input as Parameters<typeof updateProviderCatalogItem>[1],
+              );
             } else {
               await onCreateModel?.(input as Parameters<typeof createProviderCatalogItem>[0]);
             }
@@ -445,7 +450,7 @@ function CatalogItemDialog({
   provider?: string;
   isSaving: boolean;
   onClose: () => void;
-  onSubmit: (input: any) => Promise<void>;
+  onSubmit: (input: unknown) => Promise<void>;
 }) {
   const isEditing = !!item;
   const isOcr = item?.category === "OCR_SERVICE" || provider === "MATHPIX" || item?.provider === "MATHPIX";
@@ -488,13 +493,12 @@ function CatalogItemDialog({
     [isOcr],
   );
 
-  const initialAiConfigRaw = item?.capabilities
-    ? (item.capabilities as any).aiConfiguration
-    : "TEMPERATURE";
+  const initialCapabilities = readCatalogCapabilities(item?.capabilities);
+  const initialAiConfigRaw = initialCapabilities.aiConfiguration ?? "TEMPERATURE";
   const initialAiConfig = initialAiConfigRaw === "NONE" ? "TEMPERATURE" : initialAiConfigRaw;
 
   const initialReasoningEffortLevels = item?.capabilities
-    ? ((item.capabilities as any).reasoningEffortLevels as string[] | undefined)
+    ? initialCapabilities.reasoningEffortLevels
     : undefined;
 
   const form = useForm<CreateProviderCatalogItemFormValues>({
@@ -625,16 +629,16 @@ function CatalogItemDialog({
                       Các mức Reasoning Effort hỗ trợ
                     </label>
                     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                      {["none", "minimal", "low", "medium", "high", "xhigh", "max"].map((level) => (
+                      {AI_REASONING_EFFORT_LEVELS.map((level) => (
                         <label key={level} className="flex items-center gap-2 text-sm font-medium">
                           <input
                             type="checkbox"
                             value={level}
                             checked={reasoningEffortLevels.includes(level)}
                             onChange={(e) => {
-                              const newLevels = e.target.checked
+                              const newLevels = normalizeAiReasoningEffortLevels(e.target.checked
                                 ? [...reasoningEffortLevels, level]
-                                : reasoningEffortLevels.filter((l) => l !== level);
+                                : reasoningEffortLevels.filter((l) => l !== level));
                               form.setValue("reasoningEffortLevels", newLevels, { shouldDirty: true });
                             }}
                             className="h-4 w-4 text-[var(--theme-primary)] rounded border-[var(--theme-border)] focus:ring-[var(--theme-primary)]"
@@ -881,6 +885,30 @@ function PriceVersionDialog({
       </form>
     </EditorDialogShell>
   );
+}
+
+function readCatalogCapabilities(value: unknown): {
+  aiConfiguration?: "TEMPERATURE" | "REASONING_EFFORT" | "NONE";
+  reasoningEffortLevels: ReturnType<typeof normalizeAiReasoningEffortLevels>;
+} {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return { reasoningEffortLevels: [] };
+  }
+
+  const record = value as Record<string, unknown>;
+  const aiConfiguration =
+    record.aiConfiguration === "TEMPERATURE" ||
+    record.aiConfiguration === "REASONING_EFFORT" ||
+    record.aiConfiguration === "NONE"
+      ? record.aiConfiguration
+      : undefined;
+
+  return {
+    aiConfiguration,
+    reasoningEffortLevels: normalizeAiReasoningEffortLevels(
+      Array.isArray(record.reasoningEffortLevels) ? record.reasoningEffortLevels : [],
+    ),
+  };
 }
 
 function formatProviderName(provider: string) {

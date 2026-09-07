@@ -104,12 +104,11 @@ export function serializeStudentLessonSummary(
           figure.id,
           {
             status: "SUCCEEDED" as const,
+            figureIndex: figure.figureIndex,
             altText: figure.currentRevision?.altText ?? "Hình minh họa STEM",
             caption: figure.currentRevision?.caption ?? null,
             assetUrl: stemFigureAssetUrls.get(figure.id) ?? null,
-            displayScale: readStemFigureDisplayScale(
-              figure.currentRevision?.latexSource,
-            ),
+            displayScale: readStemFigureDisplayScale(figure.currentRevision?.latexSource),
           },
         ]),
       ),
@@ -125,6 +124,7 @@ function hydrateStemFigureReferences(
     string,
     {
       status: "SUCCEEDED";
+      figureIndex: number;
       altText: string;
       caption: string | null;
       assetUrl: string | null;
@@ -160,6 +160,7 @@ function hydrateStemFigureReferences(
                   ? {
                       kind: "TEX_FIGURE",
                       figureId: visual.figureId,
+                      figureIndex: figure.figureIndex,
                       status: figure.status,
                       altText: figure.altText,
                       caption: figure.caption,
