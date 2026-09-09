@@ -14,6 +14,7 @@ import { StemFigureMathText } from "@/components/common/content/stem-figure";
 import { AdminAiJsonInputViewer } from "@/features/admin/ai-generation/components/admin-ai-json-input-viewer";
 import { AdminAiPromptContentPreview } from "@/features/admin/ai-generation/components/admin-ai-prompt-content-preview";
 import { AdminAiRequestStatistics } from "@/features/admin/ai-generation/components/admin-ai-request-statistics";
+import { AdminPromptInputBreakdownDialog } from "@/features/admin/ai-generation/components/admin-prompt-input-breakdown-dialog";
 import type {
   AdminAiConfigurationCapability,
   AdminAiModelConfiguration,
@@ -31,6 +32,7 @@ import type {
 import { useAdminQuizFigureMutations } from "@/features/admin/quiz/hooks/use-admin-quiz";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { cn } from "@/lib/utils";
+import { useStableImageUrl } from "@/hooks/use-stable-image-url";
 
 type AiMode = AdminQuizFigureCreateAiInput["mode"];
 type RequestPreviewTab = "system" | "user" | "input";
@@ -112,6 +114,11 @@ export function AdminQuizFigureAiDialog({
       targetMode,
     ],
   );
+
+  const currentImageUrl = useStableImageUrl(
+    providedFigure?.currentRevision?.deliveryFile?.publicUrl
+  );
+
   const resetPreview = previewMutation.reset;
   const [isMounted, setIsMounted] = useState(false);
   const [mode, setMode] = useState<AiMode>("REGENERATE");
@@ -125,6 +132,7 @@ export function AdminQuizFigureAiDialog({
   const [userPromptOverride, setUserPromptOverride] = useState<string | null>(null);
   const [isDataVisible, setIsDataVisible] = useState(false);
   const [requestPreviewTab, setRequestPreviewTab] = useState<RequestPreviewTab>("system");
+  const [isInputBreakdownDialogOpen, setIsInputBreakdownDialogOpen] = useState(false);
   const [promptDisplayMode, setPromptDisplayMode] =
     useState<PromptDisplayMode>("PREVIEW");
   const [previewData, setPreviewData] = useState<AdminQuizFigureCreateAiPreview | null>(
@@ -192,7 +200,8 @@ export function AdminQuizFigureAiDialog({
     setPreviewInputKey(null);
     resetPreview();
     void refreshPreview(emptyPreviewInput("REGENERATE"), false);
-  }, [figure.id, isOpen, refreshPreview, resetPreview]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [figure.id, isOpen, resetPreview]);
   useEffect(() => {
     if (!isOpen) return;
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -383,13 +392,12 @@ export function AdminQuizFigureAiDialog({
                 </label>
               ))}
             </div>
-            {mode === "EDIT_CURRENT" &&
-            providedFigure?.currentRevision?.deliveryFile?.publicUrl ? (
+            {mode === "EDIT_CURRENT" && currentImageUrl ? (
               <div className="mt-3 overflow-hidden rounded-xl border border-[var(--theme-border)] bg-white p-3">
                 <img
-                  alt={providedFigure.currentRevision.altText}
+                  alt={providedFigure!.currentRevision!.altText}
                   className="mx-auto max-h-72 w-full object-contain"
-                  src={providedFigure.currentRevision.deliveryFile.publicUrl}
+                  src={currentImageUrl}
                 />
               </div>
             ) : null}
@@ -500,7 +508,7 @@ export function AdminQuizFigureAiDialog({
                 ) : displayedProviderInput && previewData ? (
                   <>
                     <AdminAiRequestStatistics
-                      details={buildRequestStatistics(previewData)}
+                      details={buildRequestStatistics(previewData, () => setIsInputBreakdownDialogOpen(true))}
                       estimatedCost={previewData.estimatedCost}
                       note="Usage provider sau khi xử lý mới là số thực tế."
                     />
@@ -666,6 +674,14 @@ export function AdminQuizFigureAiDialog({
           </div>
         </footer>
       </section>
+
+      {previewData?.context.tokenBreakdown ? (
+        <AdminPromptInputBreakdownDialog
+          breakdown={previewData.context.tokenBreakdown}
+          isOpen={isInputBreakdownDialogOpen}
+          onClose={() => setIsInputBreakdownDialogOpen(false)}
+        />
+      ) : null}
     </div>,
     document.body,
   );
@@ -864,7 +880,10 @@ function buildReasoningOptions(
   return buildAiReasoningEffortOptions(model?.capabilities?.reasoningEffortLevels);
 }
 
-function buildRequestStatistics(preview: AdminQuizFigureCreateAiPreview) {
+function buildRequestStatistics(
+  preview: AdminQuizFigureCreateAiPreview,
+  onTokenBreakdownClick?: () => void,
+) {
   return [
     {
       label: "Model thực tế",
@@ -884,6 +903,7 @@ function buildRequestStatistics(preview: AdminQuizFigureCreateAiPreview) {
     {
       label: "Text input ước tính",
       value: `${preview.context.textInputTokens.toLocaleString("vi-VN")} token`,
+      onClick: preview.context.tokenBreakdown ? onTokenBreakdownClick : undefined,
     },
     {
       label: "Ảnh input ước tính",

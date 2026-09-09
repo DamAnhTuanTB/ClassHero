@@ -251,6 +251,7 @@ describe("M6.5 student lesson content integration", () => {
           },
           difficulty: Difficulty.EASY,
           reviewStatus: ReviewStatus.APPROVED,
+          publishedAt: new Date(),
           sortOrder: 0,
         },
       }),
@@ -285,6 +286,7 @@ describe("M6.5 student lesson content integration", () => {
         frontJson: documentWithText("Mặt trước"),
         backJson: documentWithText("Mặt sau"),
         reviewStatus: ReviewStatus.APPROVED,
+        publishedAt: new Date(),
         sortOrder: 0,
       },
     });

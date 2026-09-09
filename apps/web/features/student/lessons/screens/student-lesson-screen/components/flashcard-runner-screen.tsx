@@ -5,11 +5,14 @@ import { motion, useReducedMotion } from "framer-motion";
 import {
   ArrowLeft,
   ArrowRight,
+  BookOpen,
   Check,
+  ChevronDown,
   ChevronLeft,
   Flag,
   Heart,
   Loader2,
+  RotateCw,
   TriangleAlert,
   X,
 } from "lucide-react";
@@ -117,7 +120,12 @@ export function FlashcardRunnerScreen({
   const shouldReduceMotion = useReducedMotion();
   const [isExitDialogOpen, setIsExitDialogOpen] = useState(false);
   const [isIncompleteAlertRequested, setIsIncompleteAlertRequested] = useState(false);
+  const [isSolutionVisible, setIsSolutionVisible] = useState(false);
   const [markFeedback, setMarkFeedback] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    setIsSolutionVisible(false);
+  }, [card.id, isBackVisible]);
   const isConfirmedHistoryExitRef = useRef(false);
   const isMountedRef = useRef(true);
   const isRunnerHistoryEntryActiveRef = useRef(false);
@@ -319,15 +327,15 @@ export function FlashcardRunnerScreen({
               className="ml-auto flex shrink-0 items-center gap-2"
               aria-label={`Thống kê Flashcard: ${unknownCount} chưa thuộc, ${knownCount} đã thuộc`}
             >
-              <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-2xl border border-rose-300 bg-white px-3 py-2 text-xs font-black text-rose-700 shadow-[0_3px_0_rgb(254_205_211)] dark:border-rose-400/40 dark:bg-[var(--theme-surface)] dark:text-rose-300 dark:shadow-[0_3px_0_rgb(136_19_55)]">
+              <span className="student-preserve-mobile-shadow inline-flex items-center gap-1.5 whitespace-nowrap rounded-2xl border border-rose-300 bg-white px-3 py-2 text-xs font-black text-rose-700 shadow-[0_3px_0_rgb(254_205_211)] dark:border-rose-400/40 dark:bg-[var(--theme-surface)] dark:text-rose-300 dark:shadow-[0_3px_0_rgb(136_19_55)]">
                 <X className="h-4 w-4" aria-hidden="true" />
                 {unknownCount}
               </span>
-              <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-2xl border border-emerald-400/60 bg-emerald-500 px-3 py-2 text-xs font-black text-white shadow-[0_3px_0_rgb(4_120_87)]">
+              <span className="student-preserve-mobile-shadow inline-flex items-center gap-1.5 whitespace-nowrap rounded-2xl border border-emerald-400/60 bg-emerald-500 px-3 py-2 text-xs font-black text-white shadow-[0_3px_0_rgb(4_120_87)]">
                 <Check className="h-4 w-4" aria-hidden="true" />
                 {knownCount}
               </span>
-              <span className="inline-flex items-center whitespace-nowrap rounded-2xl border border-violet-300 bg-violet-200 px-3 py-2 text-xs font-black text-violet-800 shadow-[0_3px_0_rgb(196_181_253)] dark:border-violet-400/30 dark:bg-violet-500/25 dark:text-violet-200 dark:shadow-[0_3px_0_rgb(76_29_149)]">
+              <span className="student-preserve-mobile-shadow inline-flex items-center whitespace-nowrap rounded-2xl border border-violet-300 bg-violet-200 px-3 py-2 text-xs font-black text-violet-800 shadow-[0_3px_0_rgb(196_181_253)] dark:border-violet-400/30 dark:bg-violet-500/25 dark:text-violet-200 dark:shadow-[0_3px_0_rgb(76_29_149)]">
                 {totalCount} thẻ
               </span>
             </div>
@@ -364,7 +372,7 @@ export function FlashcardRunnerScreen({
             duration: shouldReduceMotion ? 0.08 : 0.36,
             ease: [0.22, 1, 0.36, 1],
           }}
-          className="relative mt-5 min-h-[23rem] overflow-hidden rounded-[1.6rem] border border-violet-100 bg-white p-5 shadow-[0_24px_55px_-42px_rgb(124_58_237_/_65%)] [backface-visibility:hidden] [transform-style:preserve-3d] dark:border-violet-400/20 dark:bg-[var(--theme-surface)] sm:p-8"
+          className="relative mt-5 flex min-h-[23rem] flex-col justify-between overflow-hidden rounded-[1.6rem] border border-violet-100 bg-white p-5 shadow-[0_24px_55px_-42px_rgb(124_58_237_/_65%)] [backface-visibility:hidden] [transform-style:preserve-3d] dark:border-violet-400/20 dark:bg-[var(--theme-surface)] sm:p-8"
         >
           <button
             type="button"
@@ -465,22 +473,87 @@ export function FlashcardRunnerScreen({
             )}
           </button>
 
-          <div className="pointer-events-none relative z-10 flex min-h-[18rem] flex-col items-center justify-center px-3 pb-8 pt-12 text-center">
+          <div className="pointer-events-none relative z-10 flex flex-1 flex-col items-center justify-center px-3 pt-10 pb-2 text-center sm:pt-12">
             <p className="mb-5 text-sm font-black uppercase tracking-[0.17em] text-violet-500 dark:text-violet-300">
               {isBackVisible ? "Mặt sau" : "Mặt trước"}
             </p>
             <TiptapContentView
               content={isBackVisible ? card.backJson : card.frontJson}
-              className="text-2xl font-bold leading-9 text-slate-950 dark:text-[var(--theme-text-strong)] sm:text-3xl sm:leading-10"
+              className={cn(
+                "text-2xl leading-9 text-slate-950 dark:text-[var(--theme-text-strong)] sm:text-3xl sm:leading-10",
+                isBackVisible ? "font-bold" : "font-normal",
+              )}
             />
-            {isBackVisible && card.explanation ? (
-              <div className="mt-6 w-full rounded-2xl bg-violet-50 p-4 text-left dark:bg-violet-500/10">
-                <TiptapContentView content={card.explanation.contentJson} />
+            {isBackVisible && (card.solutionJson || card.solutionFigure?.url) ? (
+              <div className="mt-4 flex w-full flex-col items-center">
+                <button
+                  type="button"
+                  disabled={isInteractionLocked}
+                  aria-expanded={isSolutionVisible}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsSolutionVisible((prev) => !prev);
+                  }}
+                  className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50/90 px-3.5 py-1.5 text-xs font-black text-violet-700 shadow-sm transition hover:bg-violet-100 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 disabled:opacity-50 dark:border-violet-500/30 dark:bg-violet-500/15 dark:text-violet-300 dark:hover:bg-violet-500/25"
+                >
+                  <BookOpen className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>{isSolutionVisible ? "Ẩn lời giải" : "Xem lời giải"}</span>
+                  <ChevronDown
+                    className={cn(
+                      "h-3.5 w-3.5 transition-transform duration-200",
+                      isSolutionVisible && "rotate-180",
+                    )}
+                    aria-hidden="true"
+                  />
+                </button>
+                {isSolutionVisible ? (
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    className="pointer-events-auto mt-4 w-full rounded-2xl bg-violet-50 p-4 text-left dark:bg-violet-500/10"
+                  >
+                    <p className="mb-2 flex items-center gap-1.5 text-xs font-black uppercase tracking-wide text-violet-600 dark:text-violet-300">
+                      <BookOpen className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                      Lời giải
+                    </p>
+                    {card.solutionFigure?.url ? (
+                      <figure className="mx-auto mt-4 overflow-hidden rounded-2xl border border-violet-200 bg-white p-3 dark:border-violet-400/30 dark:bg-[var(--theme-surface)]">
+                        <img
+                          src={card.solutionFigure.url}
+                          alt={card.solutionFigure.altText}
+                          className="mx-auto max-h-[28rem] max-w-full object-contain"
+                        />
+                        {card.solutionFigure.caption ? (
+                          <figcaption className="mt-2 text-center text-sm font-bold text-slate-500 dark:text-[var(--theme-text-muted)]">
+                            {card.solutionFigure.caption}
+                          </figcaption>
+                        ) : null}
+                      </figure>
+                    ) : null}
+                    {card.solutionJson ? (
+                      <TiptapContentView
+                        ariaLabel="Lời giải Flashcard"
+                        content={card.solutionJson}
+                      />
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             ) : null}
-            <p className="absolute inset-x-3 bottom-0 text-base font-black text-slate-500 dark:text-slate-400 sm:text-lg">
-              Lật thẻ
-            </p>
+          </div>
+
+          <div className="relative z-10 mt-6 flex justify-center pb-1">
+            <button
+              type="button"
+              onClick={handleFlip}
+              disabled={isInteractionLocked}
+              className="group/flip inline-flex items-center gap-1.5 rounded-full border border-violet-200/90 bg-white/95 px-3.5 py-1.5 text-xs font-black uppercase tracking-wider text-violet-700 transition-all duration-200 hover:scale-105 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-800 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 disabled:opacity-50 dark:border-violet-400/30 dark:bg-[var(--theme-surface)]/95 dark:text-violet-300 dark:hover:bg-violet-500/15 sm:gap-2 sm:px-4 sm:py-2 sm:text-xs"
+            >
+              <RotateCw
+                className="h-3.5 w-3.5 shrink-0 text-violet-500 transition-transform duration-500 group-hover/flip:rotate-180 dark:text-violet-400"
+                aria-hidden="true"
+              />
+              <span>Lật thẻ</span>
+            </button>
           </div>
         </motion.section>
 

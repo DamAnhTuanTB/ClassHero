@@ -622,6 +622,7 @@ export const quizGenerationJobInputSchema = sourceSnapshotSchema
   .extend({
     targetQuizSetId: z.uuid().nullable().default(null),
     questionCount: z.number().int().min(1).max(50),
+    realWorldQuestionCount: z.number().int().min(0).max(50).optional(),
     difficulty: z.nativeEnum(Difficulty),
     difficultyCounts: difficultyCountsSchema.nullable().default(null),
     questionTypes: z

@@ -178,10 +178,11 @@ Spacing/radius mặc định:
 - Action câu trước/câu tiếp theo thay nội dung ngay trong cùng một card phải giữ
   nguyên tọa độ cuộn của trang. Không focus một control nằm ngoài viewport sau
   click khiến trình duyệt tự cuộn. Keyboard navigation trong tablist vẫn được
-  phép chuyển focus giữa các tab bằng cơ chế riêng, ngoại trừ tab Quiz của màn
-  chi tiết buổi học: khi Quiz đang active, `ArrowLeft`/`ArrowRight` được dành cho
-  câu trước/câu tiếp theo và không đổi sang tab Kiến thức/Flashcard. Shortcut này
-  không bắt sự kiện trong input/editor/dialog hoặc composite control khác.
+  phép chuyển focus giữa các tab bằng cơ chế riêng, ngoại trừ tab Quiz và
+  Flashcard của màn chi tiết buổi học: khi một trong hai tab đang active,
+  `ArrowLeft`/`ArrowRight` được dành cho câu trước/câu tiếp theo hoặc thẻ
+  trước/thẻ tiếp theo và không đổi sang tab nội dung liền kề. Shortcut này không
+  bắt sự kiện trong input/editor/dialog hoặc composite control khác.
 - Editor chỉnh nhẹ ảnh raster dùng icon `WandSparkles` với tooltip/aria-label
   `Chỉnh sửa ảnh`; chỉ hiện khi asset hỗ trợ, không để một nút disabled khó hiểu
   trên ảnh TeX. Modal giữ ba vùng header/content/footer, lazy-load và chỉ có hai

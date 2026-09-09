@@ -36,6 +36,10 @@ import { AiModelRoutingService } from "#api/modules/provider-operations/services
 import { ProviderUsageService } from "#api/modules/provider-operations/services/provider-usage.service";
 import { lockProviderBudgetScopes } from "#api/modules/provider-operations/utils/provider-budget-lock";
 import { getProviderBudgetPeriod } from "#api/modules/provider-operations/utils/provider-budget-period";
+import {
+  formatProviderUsageTargetLabel,
+  parseProviderUsageTargetContext,
+} from "#api/modules/provider-operations/utils/provider-usage-target";
 
 const MANAGED_AI_FEATURES = [
   AiGenerationType.SUMMARY,
@@ -1013,6 +1017,9 @@ export class ProviderOperationsAdminService {
     return {
       items: items.map((item) => ({
         ...item,
+        targetContext: parseProviderUsageTargetContext(item.targetContextJson),
+        targetLabel: formatProviderUsageTargetLabel(item.targetContextJson),
+        targetContextJson: undefined,
         priceVersion: item.priceVersion
           ? {
               ...item.priceVersion,

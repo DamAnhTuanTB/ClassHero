@@ -76,13 +76,11 @@ export function syncStemFigureReferencesInContent(
         seenFigureIds.add(reference.figureId);
         const synchronized = {
           ...reference,
-          status: figure.status,
           ...(figure.figureOrigin ? { figureOrigin: figure.figureOrigin } : {}),
         };
-        if (
-          reference.status !== synchronized.status ||
-          reference.figureOrigin !== synchronized.figureOrigin
-        ) {
+        delete (synchronized as any).status; // Remove legacy status if present
+
+        if (reference.figureOrigin !== synchronized.figureOrigin || "status" in reference) {
           blockChanged = true;
         }
         next.push(synchronized);
@@ -96,7 +94,6 @@ export function syncStemFigureReferencesInContent(
           ...(figure.figureOrigin ? { figureOrigin: figure.figureOrigin } : {}),
           altText: figure.altText,
           caption: figure.caption,
-          status: figure.status,
         });
         seenFigureIds.add(figure.id);
         blockChanged = true;

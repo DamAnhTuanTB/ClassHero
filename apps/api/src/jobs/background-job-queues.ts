@@ -9,6 +9,7 @@ export const backgroundJobQueueNames = {
   [BackgroundJobQueue.ZALO_DELIVERY]: "zalo-delivery",
   [BackgroundJobQueue.DIAGRAM_RENDERING]: "diagram-rendering",
   [BackgroundJobQueue.QUIZ_FIGURE_RENDERING]: "quiz-figure-rendering",
+  [BackgroundJobQueue.FLASHCARD_FIGURE_RENDERING]: "flashcard-figure-rendering",
   [BackgroundJobQueue.PAYMENT_POSTPROCESS]: "payment-postprocess",
   [BackgroundJobQueue.PERSONAL_LEARNING_PATH_CLONE]:
     "personal-learning-path-clone",

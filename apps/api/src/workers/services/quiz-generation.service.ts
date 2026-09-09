@@ -32,6 +32,10 @@ import type {
   ProviderUsageOperation,
 } from "#api/modules/provider-operations/types/provider-operations.types";
 import {
+  buildItemUsageTarget,
+  buildWholeFeatureUsageTarget,
+} from "#api/modules/provider-operations/utils/provider-usage-target";
+import {
   generatedQuizSourceCoverageAuditSchema,
   getGeneratedQuizOutputSchema,
   quizGenerationJobInputSchema,
@@ -346,7 +350,7 @@ export class QuizGenerationService {
       context.inputMeta,
       "quiz solution refinement",
     );
-    await this.assertSolutionSnapshotCurrent(input);
+    const targetContext = await this.assertSolutionSnapshotCurrent(input);
     const questionImageDataUrl =
       input.mode === "REGENERATE" && input.questionFigure
         ? await buildQuizFigureRefinementImageDataUrl(
@@ -380,6 +384,7 @@ export class QuizGenerationService {
                 input.mode === "REFINE"
                   ? "QUIZ_SOLUTION_REFINEMENT"
                   : "QUIZ_SOLUTION_REGENERATION",
+              targetContext,
             }),
             request,
             schema,
@@ -550,6 +555,7 @@ export class QuizGenerationService {
         correctAnswerJson: true,
         hintJson: true,
         sourceMetadataJson: true,
+        sortOrder: true,
         explanation: { select: { contentJson: true } },
         figures: {
           where: { role: "QUESTION", deletedAt: null, status: "SUCCEEDED" },
@@ -578,6 +584,11 @@ export class QuizGenerationService {
         "QUIZ_SOLUTION_REFINEMENT_CONFLICT: Nội dung câu Quiz đã đổi trước khi gọi AI.",
       );
     }
+    return buildItemUsageTarget({
+      kind: "QUIZ_QUESTION",
+      entityId: input.questionId,
+      sortOrder: question.sortOrder,
+    });
   }
 }
 
@@ -860,6 +871,7 @@ function providerContext(
   options?: {
     callSequence?: number;
     operation?: ProviderUsageOperation;
+    targetContext?: ReturnType<typeof buildItemUsageTarget>;
   },
 ) {
   return {
@@ -871,6 +883,9 @@ function providerContext(
       ? {}
       : { callSequence: options.callSequence }),
     ...(options?.operation === undefined ? {} : { operation: options.operation }),
+    targetContext:
+      options?.targetContext ??
+      buildWholeFeatureUsageTarget(context.type, context.aiGenerationId),
     routeSnapshot: context.providerRouteSnapshot,
   };
 }

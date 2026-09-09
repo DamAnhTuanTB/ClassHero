@@ -23,10 +23,28 @@ Domain này phục vụ màn `/admin/ai-settings` và không lưu secret provide
 - Usage event AI snapshot thêm `operation`, `reasoning_effort` và `latency_ms`.
   `operation` là mã mục đích cụ thể của lượt gọi, không suy ngược từ tên model,
   resource type hoặc cấu hình hiện tại. Bản ghi cũ được phép giữ `null`.
+- Usage event AI mới bắt buộc snapshot `target_context_json` trước provider call
+  để biết lượt gọi tác động vào đâu kể cả khi thất bại. JSON có version và các
+  field UI-neutral như `kind`, `entityId`, `itemOrdinal`, `blockKind`,
+  `blockOrdinal`, `figureRole`; không lưu sẵn câu tiếng Việt. Số thứ tự là giá
+  trị tại thời điểm gọi nên không đổi theo reorder/delete về sau.
+- `operation` mô tả hành động, còn `target_context_json` mô tả đích. Contract này
+  áp dụng cho mọi AI attempt gồm sinh nội dung, tạo/tinh chỉnh/chỉnh sửa/sửa lỗi
+  ảnh và refinement; thao tác local không gọi provider không tạo event.
+- Danh sách `operation` được database check constraint bảo vệ và phải luôn đồng
+  bộ với `PROVIDER_USAGE_OPERATIONS` trong shared package. Khi thêm mã mới, tạo
+  migration tiến để thay constraint; không sửa migration đã được deploy.
 - `provider_usage_events` là nguồn chuẩn khi hiển thị tổng số lượt gọi và tổng
   chi phí của một lần sinh. `ai_generations.estimated_cost_vnd` chỉ là projection
   denormalized để truy vấn nhanh/giữ tương thích; UI/API phải aggregate hoặc đối
   chiếu event khi cần số tiền chính xác sau các lượt gọi phase sau.
+- Lượt tạo hình lời giải thủ công của một Flashcard AI phải kế thừa
+  `ai_generation_id` lưu trong metadata card. Figure và usage event cũ bị thiếu
+  liên kết được backfill qua `background_jobs(resource_type, resource_id)` để
+  lịch sử lần sinh không bỏ sót chi phí ảnh đã phát sinh.
+- Migration `M9.32` backfill target context theo generation/job/resource/revision
+  và metadata hiện có. Chỉ ghi ordinal khi quan hệ xác định duy nhất; record
+  không đủ bằng chứng giữ `null` để API hiển thị `Chưa xác định`.
 - AI token tách input, cached input, cache-write input và output. Cột
   `cache_write_input_tokens` lưu số token OpenAI GPT-5.6+ báo đã ghi vào prompt
   cache; cost calculator áp hệ số `1.25x` trên input rate. OCR lưu pages; cache

@@ -25,6 +25,7 @@ import { lessonSummaryOutputSchema } from "#api/modules/ai/types/lesson-summary.
 import { AiOutputValidationError } from "#api/modules/ai/utils/ai-output-validation";
 import type { AiFeatureRoute } from "#api/modules/provider-operations/types/provider-operations.types";
 import { isProviderBudgetError } from "#api/modules/provider-operations/utils/provider-budget-error";
+import { buildSummaryBlockUsageTarget } from "#api/modules/provider-operations/utils/provider-usage-target";
 import { StemFigureArtifactService } from "#api/modules/stem-figures/services/stem-figure-artifact.service";
 import { StemFigureJobService } from "#api/modules/stem-figures/services/stem-figure-job.service";
 import {
@@ -246,6 +247,8 @@ export class StemFigureRenderingProcessor {
     figure: {
       id: string;
       aiGenerationId: string | null;
+      lessonSummaryId: string | null;
+      blockPath: string;
       subjectKey: string;
       subjectName: string;
       subjectSlug: string;
@@ -557,6 +560,7 @@ export class StemFigureRenderingProcessor {
         input.metadata.trigger === "MANUAL_VALIDATOR_RETRY"
           ? "MANUAL_VALIDATOR"
           : "MANUAL_COMPILER";
+      const targetBrief = input.metadata.generationBrief;
       const repaired = await this.repairService.repair({
         figureId: input.figure.id,
         revisionId: input.revision.id,
@@ -569,6 +573,12 @@ export class StemFigureRenderingProcessor {
         diagnosticBatch: batch,
         subject: subjectSnapshot(input.figure),
         routeSnapshot: input.metadata.routeSnapshot,
+        targetContext: buildSummaryBlockUsageTarget({
+          entityId: input.figure.id,
+          blockPath: input.figure.blockPath,
+          blockType: targetBrief?.blockContent.type,
+          targetMode: targetBrief?.targetMode,
+        }),
         onRequestPrepared: (snapshot) =>
           this.appendProviderRequestSnapshot(input.revision.id, snapshot),
       });
@@ -613,6 +623,8 @@ export class StemFigureRenderingProcessor {
       figure: {
         id: string;
         aiGenerationId: string | null;
+        lessonSummaryId: string | null;
+        blockPath: string;
         subjectKey: string;
         subjectName: string;
         subjectSlug: string;
@@ -649,6 +661,7 @@ export class StemFigureRenderingProcessor {
       }),
     ]);
     const repairCount = revision.repairCount + 1;
+    const targetBrief = readJobMetadata(input.durableJob.inputMeta).generationBrief;
     const source = await this.repairService.repair({
       figureId: input.figure.id,
       revisionId: revision.id,
@@ -661,6 +674,12 @@ export class StemFigureRenderingProcessor {
       diagnosticBatch,
       subject: subjectSnapshot(input.figure),
       routeSnapshot: readJobMetadata(input.durableJob.inputMeta).routeSnapshot,
+      targetContext: buildSummaryBlockUsageTarget({
+        entityId: input.figure.id,
+        blockPath: input.figure.blockPath,
+        blockType: targetBrief?.blockContent.type,
+        targetMode: targetBrief?.targetMode,
+      }),
       onRequestPrepared: (snapshot) =>
         this.appendProviderRequestSnapshot(revision.id, snapshot),
     });

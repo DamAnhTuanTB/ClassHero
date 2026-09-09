@@ -114,6 +114,10 @@ AI_SUMMARY_PROMPT_CACHE_RETENTION=in_memory
 AI_QUIZ_SCHEMA_REFERENCE_STRATEGY=ref_v2
 AI_QUIZ_PROMPT_CACHE_KEY_ENABLED=true
 AI_QUIZ_PROMPT_CACHE_RETENTION=in_memory
+AI_FLASHCARD_SCHEMA_REFERENCE_STRATEGY=ref_v2
+AI_FLASHCARD_PROMPT_CACHE_KEY_ENABLED=true
+AI_FLASHCARD_PROMPT_CACHE_RETENTION=in_memory
+AI_FLASHCARD_REQUEST_DRAFT_TTL_SECONDS=3600
 
 # Gemini
 GEMINI_API_KEY=change-me
@@ -360,6 +364,13 @@ Dùng phụ cho:
   Quiz. `AI_QUIZ_PROMPT_CACHE_RETENTION` có cùng `in_memory | 24h` và capability
   guard legacy như Summary; GPT-5.6+ dùng explicit breakpoint TTL `30m`. Prompt
   cache không cache output và không đổi prompt/PDF.
+- `AI_FLASHCARD_SCHEMA_REFERENCE_STRATEGY=ref_v2` khóa schema riêng của Flashcard;
+  request draft và worker cùng kiểm schema hash trước provider call.
+- `AI_FLASHCARD_PROMPT_CACHE_KEY_ENABLED` và
+  `AI_FLASHCARD_PROMPT_CACHE_RETENTION` điều khiển namespace cache Flashcard độc
+  lập, không dùng cache key của Quiz/Test. `AI_FLASHCARD_REQUEST_DRAFT_TTL_SECONDS`
+  đặt thời hạn preview mặc định 3600 giây. Đổi các biến này phải restart API và
+  worker.
 - Log `ai_generations`.
 - `AI_PROVIDER_TIMEOUT_MS` giới hạn các provider request ngắn như embedding.
 - `AI_GENERATION_TIMEOUT_MS` giới hạn riêng request sinh text/structured output dài;

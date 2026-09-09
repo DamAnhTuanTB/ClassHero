@@ -318,6 +318,7 @@ export function AdminQuizGenerationDialog({
     }
   });
   const questionCountField = form.register("questionCount");
+  const realWorldCountField = form.register("realWorldCount");
   const easyCountField = form.register("easyCount");
   const mediumCountField = form.register("mediumCount");
   const hardCountField = form.register("hardCount");
@@ -385,7 +386,7 @@ export function AdminQuizGenerationDialog({
             }
           />
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-3">
             <TextField
               id="ai-quiz-question-count"
               label="Số câu hỏi"
@@ -398,6 +399,18 @@ export function AdminQuizGenerationDialog({
                 questionCountField.onChange,
                 revalidateDifficultyCounts,
               )}
+            />
+            <TextField
+              id="ai-quiz-real-world-count"
+              label="Số câu thực tế"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              icon={null}
+              isOptional
+              optionalLabel="Không bắt buộc"
+              error={form.formState.errors.realWorldCount}
+              {...realWorldCountField}
+              onChange={numericChange(realWorldCountField.onChange)}
             />
             <OptionField
               id="ai-quiz-difficulty"
@@ -906,6 +919,7 @@ function getInitialValues(
             .slice(0, 20)
             .map((document) => document.id),
     questionCount: String(questionCount),
+    realWorldCount: readNumericText(initial?.realWorldQuestionCount),
     difficulty: isDifficulty(initial?.difficulty) ? initial.difficulty : "MIXED",
     easyCount: String(
       readNumber(readRecord(initial?.difficultyCounts).easy, balanced.easy),
@@ -978,6 +992,7 @@ function toPayload(
     ...(values.targetQuizSetId ? { targetQuizSetId: values.targetQuizSetId } : {}),
     documentIds: values.documentIds,
     questionCount: Number(values.questionCount),
+    ...(values.realWorldCount ? { realWorldQuestionCount: Number(values.realWorldCount) } : {}),
     difficulty: values.difficulty,
     ...(values.difficulty === "MIXED"
       ? {

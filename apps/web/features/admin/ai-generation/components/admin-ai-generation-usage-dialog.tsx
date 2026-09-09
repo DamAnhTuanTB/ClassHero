@@ -13,6 +13,7 @@ import {
   formatReasoningEffort,
   formatUsageDuration,
   formatUsagePurpose,
+  formatUsageTarget,
   formatVnd,
   usageStatusLabels,
 } from "@/features/admin/ai-settings/utils/provider-operations-formatters";
@@ -87,15 +88,15 @@ export function AdminAiGenerationUsageDialog({
 
               <div className="overflow-hidden rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)]">
                 <div className="overflow-x-auto">
-                  <table className="min-w-[1180px] text-left text-sm">
+                  <table className="w-full min-w-[1180px] text-left text-sm">
                     <thead className="bg-[var(--theme-surface-soft)] text-xs uppercase text-[var(--theme-text-muted)]">
                       <tr>
                         <th className="px-4 py-3">Dịch vụ / loại tác vụ</th>
                         <th className="px-4 py-3">Mức sử dụng</th>
-                        <th className="px-4 py-3">Reasoning effort</th>
-                        <th className="px-4 py-3">Thời gian phản hồi</th>
-                        <th className="px-4 py-3">Chi phí</th>
-                        <th className="px-4 py-3">Thời điểm</th>
+                        <th className="whitespace-nowrap px-4 py-3">Reasoning effort</th>
+                        <th className="whitespace-nowrap px-4 py-3">Thời gian phản hồi</th>
+                        <th className="whitespace-nowrap px-4 py-3">Chi phí</th>
+                        <th className="whitespace-nowrap px-4 py-3">Thời điểm</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--theme-border)]">
@@ -129,6 +130,11 @@ export function AdminAiGenerationUsageDialog({
                                   ? ` · ${formatCacheStatus(event.cacheStatus)}`
                                   : ""}
                               </p>
+                              {formatUsageTarget(event) ? (
+                                <p className="mt-0.5 text-xs font-semibold text-[var(--theme-text)]">
+                                  {formatUsageTarget(event)}
+                                </p>
+                              ) : null}
                             </td>
                             <td className="px-4 py-3 font-semibold text-[var(--theme-text)]">
                               {event.category === "OCR_SERVICE"

@@ -1,5 +1,9 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import {
+  providerUsageTargetContextSchema,
+  type ProviderUsageTargetContext,
+} from "@learning-path/shared";
+import {
   AiGenerationType,
   AiModelPurpose,
   Prisma,
@@ -42,6 +46,7 @@ type StartUsageInput = {
   feature?: AiGenerationType | null;
   purpose?: AiModelPurpose | null;
   operation?: ProviderUsageOperation | null;
+  targetContext?: ProviderUsageTargetContext | null;
   reasoningEffort?: string | null;
   attempt?: number;
   cacheStatus?: string | null;
@@ -104,6 +109,7 @@ export class ProviderUsageService {
         feature: true,
         purpose: true,
         operation: true,
+        targetContextJson: true,
         reasoningEffort: true,
         attempt: true,
         cacheStatus: true,
@@ -123,6 +129,7 @@ export class ProviderUsageService {
         feature: event.feature,
         purpose: event.purpose,
         operation: event.operation as ProviderUsageOperation | null,
+        targetContext: parseTargetContext(event.targetContextJson),
         reasoningEffort: event.reasoningEffort,
         attempt: event.attempt,
         cacheStatus: event.cacheStatus,
@@ -529,6 +536,9 @@ export class ProviderUsageService {
         feature: input.feature ?? null,
         purpose: input.purpose ?? null,
         operation: input.operation ?? null,
+        targetContextJson: input.targetContext
+          ? (input.targetContext as Prisma.InputJsonValue)
+          : Prisma.JsonNull,
         reasoningEffort: input.reasoningEffort ?? null,
         attempt: Math.max(1, input.attempt ?? 1),
         cacheStatus: input.cacheStatus ?? null,
@@ -537,6 +547,11 @@ export class ProviderUsageService {
       select: { id: true, fxRateVndPerUsd: true },
     });
   }
+}
+
+function parseTargetContext(value: Prisma.JsonValue | null) {
+  const parsed = providerUsageTargetContextSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
 }
 
 function getSafeErrorCode(error: unknown) {

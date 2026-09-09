@@ -24,6 +24,13 @@ const subjectBoundary = [
 ].join("\n");
 const mockSystemPrompt = `SYSTEM PROMPT THỰC TẾ\n\n${mathSubjectProfile}`;
 
+function textDocument(text: string) {
+  return {
+    type: "doc",
+    content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+  };
+}
+
 test.describe("M9.8 admin AI generation panel", () => {
   test.beforeEach(async ({ page }) => {
     await seedAdminSession(page);
@@ -379,6 +386,7 @@ test.describe("M9.8 admin AI generation panel", () => {
     const timestamp = new Date().toISOString();
     await setupAiGenerationMock(page, {
       usageResourceType: "QUIZ_FIGURE",
+      usageTargetLabel: "Quiz · Câu 4 · Hình lời giải",
       quizSets: [
         {
           ...quizSetFixture(quizSetOneId, "Bộ câu hỏi 1", 0),
@@ -426,6 +434,9 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect(usageDialog).toBeVisible();
     await expect(
       usageDialog.getByText("Tạo hình minh họa Quiz · Thành công"),
+    ).toBeVisible();
+    await expect(
+      usageDialog.getByText("Quiz · Câu 4 · Hình lời giải"),
     ).toBeVisible();
     await usageDialog
       .getByRole("button", { name: /Xem chi tiết GPT-5.6 Luna, 66 VNĐ/ })
@@ -1195,26 +1206,56 @@ test.describe("M9.8 admin AI generation panel", () => {
 
   test("validates flashcard/test configuration and sends normalized payloads", async ({
     page,
-  }) => {
+  }, testInfo) => {
     const mock = await setupAiGenerationMock(page);
     await page.goto(`/admin/lessons/${lessonId}`);
 
     await generationCard(page, "Flashcard")
-      .getByRole("button", { name: "Cấu hình" })
+      .getByRole("button", { name: "Tạo mới" })
       .click();
     const flashcardDialog = page.getByRole("dialog", {
       name: "Tạo Flashcard bằng AI",
     });
-    await flashcardDialog.getByLabel("Số thẻ").fill("6abc");
-    await expect(flashcardDialog.getByLabel("Số thẻ")).toHaveValue("6");
+    const flashcardPromptPreview = flashcardDialog.getByTestId("ai-prompt-preview-shell");
+    await expect(flashcardDialog.getByText("Loại câu hỏi")).toHaveCount(0);
+    await expect(flashcardDialog.getByLabel("Trắc nghiệm một đáp án")).toHaveCount(0);
+    await expect(
+      flashcardDialog.getByText("Phase 1 · Model tạo nội dung Flashcard"),
+    ).toBeVisible();
+    await expect(
+      flashcardDialog.getByText("Phase 2 · Model tạo hình Flashcard"),
+    ).toBeVisible();
+    await expect(flashcardPromptPreview.getByText("Model thực tế")).toBeVisible();
+    await expect(
+      flashcardPromptPreview.getByText("Temperature", { exact: true }),
+    ).toBeVisible();
+    await expect(flashcardPromptPreview.getByText("Text input ước tính")).toBeVisible();
+    await expect(flashcardPromptPreview.getByText("Tổng input ước tính")).toBeVisible();
+    await flashcardPromptPreview.getByRole("button", { name: /Xem chi tiết/ }).click();
+    const inputBreakdownDialog = page.getByRole("dialog", {
+      name: "Chi tiết token input ước tính",
+    });
+    await expect(inputBreakdownDialog).toBeVisible();
+    await expect(
+      inputBreakdownDialog.getByText("Nội dung tài liệu dạng text"),
+    ).toBeVisible();
+    await inputBreakdownDialog.getByRole("button", { name: "Đóng" }).last().click();
+    await flashcardDialog.getByLabel("Số thẻ ghi nhớ").fill("6abc");
+    await expect(flashcardDialog.getByLabel("Số thẻ ghi nhớ")).toHaveValue("6");
     await flashcardDialog.getByLabel("Mức độ").click();
     await flashcardDialog.getByRole("option", { name: "Khó" }).click();
+    await page.screenshot({
+      path: `../../.codex/artifacts/m9-28-flashcard/flashcard-modal-${testInfo.project.name}.png`,
+      fullPage: true,
+    });
     await flashcardDialog.getByRole("button", { name: "Bắt đầu tạo" }).click();
     await expect
       .poll(() => mock.payloads.FLASHCARD)
-      .toEqual({
+      .toMatchObject({
         cardCount: 6,
         difficulty: "HARD",
+        documentIds: [documentId],
+        style: "student_friendly",
       });
 
     await generationCard(page, "Test").getByRole("button", { name: "Cấu hình" }).click();
@@ -1241,6 +1282,189 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect(page.getByRole("tab", { name: /Test AI/ })).toBeVisible();
     await expectNoHorizontalOverflow(page);
     await expectNoFrameworkOverlay(page);
+  });
+
+  test("keeps Flashcard management at Quiz parity without question-type rows", async ({
+    page,
+  }, testInfo) => {
+    const flashcardSetId = "66666666-6666-4666-8666-666666666661";
+    const pendingCardId = "66666666-6666-4666-8666-666666666671";
+    const approvedCardId = "66666666-6666-4666-8666-666666666672";
+    const mock = await setupAiGenerationMock(page, {
+      flashcardSets: [
+        {
+          id: flashcardSetId,
+          lessonId,
+          title: "Bộ flashcard 1",
+          difficulty: "MIXED",
+          source: "AI",
+          reviewStatus: "NEEDS_REVIEW",
+          cardCount: 2,
+          pendingReviewCardCount: 1,
+          unpublishedApprovedCardCount: 0,
+          aiGenerations: [
+            {
+              id: "generation-flashcard-parity",
+              createdAt: new Date().toISOString(),
+              finishedAt: new Date().toISOString(),
+              inputMetaJson: {},
+              model: "gpt-4.1-mini",
+              startedAt: new Date().toISOString(),
+              status: "SUCCEEDED",
+              totalCostVnd: 2_027,
+              usageEventCount: 2,
+            },
+          ],
+          sortOrder: 0,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ],
+      flashcards: [
+        flashcardFixture(pendingCardId, flashcardSetId, {
+          difficulty: "EASY",
+          frontJson: {
+            type: "doc",
+            content: [
+              {
+                type: "paragraph",
+                content: [{ type: "text", text: "Định lý Pythagore phát biểu thế nào?" }],
+              },
+              {
+                type: "image",
+                attrs: {
+                  alt: "Tam giác vuông",
+                  src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='50'%3E%3Cpath d='M5 45L5 5L75 45Z' fill='none' stroke='%230369a1' stroke-width='3'/%3E%3C/svg%3E",
+                },
+              },
+            ],
+          },
+          reviewStatus: "NEEDS_REVIEW",
+          sourceMetadataJson: { aiGenerationId: "generation-flashcard-parity" },
+        }),
+        flashcardFixture(approvedCardId, flashcardSetId, {
+          difficulty: "HARD",
+          frontJson: textDocument("Điều kiện để một tứ giác nội tiếp là gì?"),
+          reviewStatus: "APPROVED",
+          figures: [
+            {
+              id: "flashcard-solution-figure-ready",
+              role: "SOLUTION",
+              status: "SUCCEEDED",
+              lastErrorCode: null,
+              lastErrorMessage: null,
+              currentRevision: {
+                id: "flashcard-solution-figure-revision-ready",
+                sourceKind: "AI_TEX",
+                latexSource:
+                  "\\begin{tikzpicture}\\draw (0,0) circle (1);\\end{tikzpicture}",
+                altText: "Minh họa tứ giác nội tiếp",
+                caption: null,
+                deliveryFile: {
+                  id: "flashcard-solution-figure-file-ready",
+                  publicUrl:
+                    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='80'%3E%3Ccircle cx='60' cy='40' r='34' fill='none' stroke='%230369a1' stroke-width='3'/%3E%3Cpath d='M34 22L84 20L91 56L42 66Z' fill='none' stroke='%230f172a' stroke-width='2'/%3E%3C/svg%3E",
+                },
+              },
+            },
+          ],
+          sourceMetadataJson: {
+            aiGenerationId: "generation-flashcard-parity",
+            requiresSolutionFigure: true,
+            sourcePacketPageNumbers: [29],
+          },
+        }),
+      ],
+    });
+
+    await page.goto(`/admin/lessons/${lessonId}`);
+    await page.getByRole("tab", { name: "Flashcard", exact: true }).click();
+
+    await expect(page.getByText("Tổng chi phí: 2.027 VNĐ")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Tổng 2 ảnh" })).toBeVisible();
+    await expect(page.getByText("Thẻ ghi nhớ", { exact: true })).toHaveCount(2);
+    for (const quizType of [
+      "Trắc nghiệm",
+      "Đúng/Sai 1 mệnh đề",
+      "Đúng/Sai nhiều mệnh đề",
+      "Nhập đáp án",
+    ]) {
+      await expect(page.getByText(quizType, { exact: true })).toHaveCount(0);
+    }
+    await expect(page.getByText("Định lý Pythagore phát biểu thế nào?")).toBeVisible();
+    await expect(page.getByText("Điều kiện để một tứ giác nội tiếp là gì?")).toHaveCount(
+      0,
+    );
+    await page.getByRole("tab", { name: /Xem thẻ 1, mức độ Khó/ }).click();
+    await expect(
+      page.getByText("Điều kiện để một tứ giác nội tiếp là gì?"),
+    ).toBeVisible();
+    await expect(page.getByAltText("Minh họa tứ giác nội tiếp")).toBeVisible();
+    await expect(page.getByText("Lời giải", { exact: true })).toBeVisible();
+
+    await page.getByRole("button", { name: "Chỉ xem JSON" }).click();
+    await expect(page.getByRole("region", { name: "JSON flashcard 1" })).toContainText(
+      "sourcePacketPageNumbers",
+    );
+    await page.getByRole("button", { name: "Song song" }).click();
+    await expect(page.getByRole("region", { name: "JSON flashcard 1" })).toBeVisible();
+    await expect(page.getByText("Mặt trước", { exact: true })).toBeVisible();
+
+    await page.getByRole("button", { name: "Tạo ảnh cho flashcard 1" }).click();
+    await expect(
+      page.getByRole("menuitem", { name: "Tạo ảnh cho lời giải" }),
+    ).toBeVisible();
+    await expect(page.getByRole("menuitem")).toHaveCount(1);
+    await page.getByRole("menuitem", { name: "Tạo ảnh cho lời giải" }).click();
+    const solutionDialog = page.getByRole("dialog", { name: "Tạo ảnh cho lời giải" });
+    await expect(solutionDialog).toBeVisible();
+    await expect(solutionDialog.getByText("1. Cách tạo hình")).toBeVisible();
+    await expect(solutionDialog.getByText("Tạo mới lại", { exact: true })).toBeVisible();
+    await expect(
+      solutionDialog.getByText("Chỉnh sửa hình hiện tại", { exact: true }),
+    ).toBeVisible();
+    await solutionDialog.getByText("Chỉnh sửa hình hiện tại", { exact: true }).click();
+    await expect(solutionDialog.getByText("2. Cấu hình AI")).toBeVisible();
+    await expect(solutionDialog.getByLabel("3. Yêu cầu cho hình mới")).toBeVisible();
+    await solutionDialog.getByRole("button", { name: "Xem dữ liệu" }).click();
+    await expect(solutionDialog.getByText("4. Thống kê và dữ liệu gửi đi")).toBeVisible();
+    await expect(
+      solutionDialog.getByRole("tab", { name: "Quy tắc hệ thống" }),
+    ).toBeVisible();
+    await expect(
+      solutionDialog.getByRole("tab", { name: "Câu lệnh người dùng" }),
+    ).toBeVisible();
+    await expect(
+      solutionDialog.getByRole("tab", { name: "Dữ liệu gửi đi" }),
+    ).toBeVisible();
+    await solutionDialog.getByRole("tab", { name: "Dữ liệu gửi đi" }).click();
+    await solutionDialog.getByRole("button", { name: "Xổ toàn bộ" }).click();
+    await expect(solutionDialog).toContainText("currentSolutionLatexSource");
+    await solutionDialog.screenshot({
+      path: `../../.codex/artifacts/m9-28-flashcard/flashcard-solution-figure-dialog-${testInfo.project.name}.png`,
+    });
+    await solutionDialog.getByRole("button", { name: "Chỉnh sửa hình" }).click();
+    await expect
+      .poll(() => mock.flashcardFigureCreatePayloads.at(-1)?.mode)
+      .toBe("EDIT_CURRENT");
+
+    await page.screenshot({
+      fullPage: true,
+      path: `../../.codex/artifacts/m9-28-flashcard/flashcard-management-${testInfo.project.name}.png`,
+    });
+
+    await page.getByRole("button", { name: "Duyệt tất cả" }).click();
+    await expect.poll(() => mock.flashcardBulkReviewSetIds).toEqual([flashcardSetId]);
+    await page.getByRole("button", { name: "Lưu", exact: true }).click();
+    await expect.poll(() => mock.flashcardSetReviewPayloads.at(-1)?.action).toBe("SAVE");
+    await page.getByRole("button", { name: "Phát hành", exact: true }).click();
+    await expect
+      .poll(() => mock.flashcardSetReviewPayloads.at(-1)?.action)
+      .toBe("PUBLISH");
+    await page.getByRole("button", { name: "Thu hồi phát hành" }).click();
+    await expect
+      .poll(() => mock.flashcardSetReviewPayloads.at(-1)?.action)
+      .toBe("WITHDRAW");
   });
 
   test("configures a summary and shows the exact system, user and full input prompts", async ({
@@ -3672,6 +3896,30 @@ function quizQuestionFixture(
   };
 }
 
+function flashcardFixture(
+  id: string,
+  flashcardSetId: string,
+  overrides: Record<string, unknown> = {},
+) {
+  return {
+    id,
+    flashcardSetId,
+    lessonId,
+    frontJson: textDocument("Mặt trước Flashcard"),
+    backJson: textDocument("Mặt sau Flashcard"),
+    solutionJson: textDocument("Lời giải chi tiết Flashcard"),
+    difficulty: "MEDIUM",
+    reviewStatus: "APPROVED",
+    figures: [],
+    publishedAt: null,
+    sourceMetadataJson: null,
+    sortOrder: 0,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    ...overrides,
+  };
+}
+
 async function setupAiGenerationMock(
   page: Page,
   options: {
@@ -3691,9 +3939,12 @@ async function setupAiGenerationMock(
     quizQuestions?: Array<Record<string, unknown>>;
     quizSets?: Array<Record<string, unknown>>;
     quizSetsAfterFirstRequest?: Array<Record<string, unknown>>;
+    flashcardSets?: Array<Record<string, unknown>>;
+    flashcards?: Array<Record<string, unknown>>;
     stemFigures?: Array<Record<string, unknown>>;
     summaryFiguresAfterGeneration?: Array<Record<string, unknown>>;
     usageResourceType?: "QUIZ_FIGURE" | "STEM_FIGURE";
+    usageTargetLabel?: string;
   } = {},
 ) {
   const payloads: Partial<Record<"SUMMARY" | "QUIZ" | "FLASHCARD" | "TEST", unknown>> =
@@ -3709,6 +3960,13 @@ async function setupAiGenerationMock(
     reviewStatus: string;
   }> = [];
   const quizBulkReviewSetIds: string[] = [];
+  const flashcardBulkReviewSetIds: string[] = [];
+  const flashcardSetReviewPayloads: Array<{
+    action?: string;
+    reviewStatus: string;
+  }> = [];
+  const flashcardFigurePreviewPayloads: Array<Record<string, unknown>> = [];
+  const flashcardFigureCreatePayloads: Array<Record<string, unknown>> = [];
   const solutionRefinementPayloads: Array<Record<string, unknown>> = [];
   const solutionRefinementPreviewPayloads: Array<Record<string, unknown>> = [];
   const figureActions = {
@@ -3755,11 +4013,12 @@ async function setupAiGenerationMock(
   }
   const sets: Record<"QUIZ" | "FLASHCARD" | "TEST", Array<Record<string, unknown>>> = {
     QUIZ: structuredClone(options.quizSets ?? []),
-    FLASHCARD: [],
+    FLASHCARD: structuredClone(options.flashcardSets ?? []),
     TEST: [],
   };
   const state: {
     figures: Array<Record<string, unknown>>;
+    flashcards: Array<Record<string, unknown>>;
     quizQuestions: Array<Record<string, unknown>>;
     summary: {
       contentJson: unknown;
@@ -3774,6 +4033,7 @@ async function setupAiGenerationMock(
     } | null;
   } = {
     figures: structuredClone(options.stemFigures ?? []),
+    flashcards: structuredClone(options.flashcards ?? []),
     quizQuestions: structuredClone(options.quizQuestions ?? []),
     summary: options.initialSummaryContent
       ? {
@@ -3851,6 +4111,7 @@ async function setupAiGenerationMock(
                 queue: "DIAGRAM_RENDERING",
                 resourceType: options.usageResourceType ?? "STEM_FIGURE",
               },
+              targetLabel: options.usageTargetLabel ?? "Ví dụ 1 · Hình minh họa",
               aiGeneration: {
                 id: aiGenerationId,
                 type: "SUMMARY",
@@ -4347,7 +4608,8 @@ async function setupAiGenerationMock(
     if (
       method === "POST" &&
       (pathname === `/admin/lessons/${lessonId}/summary/prompt-preview` ||
-        pathname === `/admin/lessons/${lessonId}/quiz-sets/prompt-preview`)
+        pathname === `/admin/lessons/${lessonId}/quiz-sets/prompt-preview` ||
+        pathname === `/admin/lessons/${lessonId}/flashcard-sets/prompt-preview`)
     ) {
       const body = request.postDataJSON() as Record<string, unknown>;
       promptPreviewPayloads.push(body);
@@ -4359,6 +4621,8 @@ async function setupAiGenerationMock(
         : [`USER PROMPT ${JSON.stringify(body)}`, subjectBoundary].join("\n\n");
       const isSummaryPreview =
         pathname === `/admin/lessons/${lessonId}/summary/prompt-preview`;
+      const isFlashcardPreview =
+        pathname === `/admin/lessons/${lessonId}/flashcard-sets/prompt-preview`;
       if (options.promptPreviewDelayMs) {
         await new Promise((resolve) => setTimeout(resolve, options.promptPreviewDelayMs));
       }
@@ -4394,7 +4658,7 @@ async function setupAiGenerationMock(
           inputPrompt: `${userPrompt}\n<context_chunks>\nNỘI DUNG CHUNK THỰC TẾ\n</context_chunks>`,
           openAiFileUploadRequest: {
             purpose: "user_data",
-            file: `<File name="${isSummaryPreview ? "lesson-source.pdf" : "quiz-source.pdf"}" type="application/pdf" size=2048; <binary data omitted from preview>>`,
+            file: `<File name="${isSummaryPreview ? "lesson-source.pdf" : isFlashcardPreview ? "flashcard-source.pdf" : "quiz-source.pdf"}" type="application/pdf" size=2048; <binary data omitted from preview>>`,
           },
           openAiRequest: {
             model: body.model ?? "gpt-4.1-mini",
@@ -4433,17 +4697,19 @@ async function setupAiGenerationMock(
           context: {
             lessonTitle: "Số hữu tỉ",
             documentCount: 1,
-            chunkCount: 12,
-            estimatedTokens: 1_250,
+            chunkCount: isFlashcardPreview ? 0 : 12,
+            estimatedTokens: isFlashcardPreview ? 2_250 : 1_250,
             textInputTokens: 1_250,
-            pdfInputTokens: 0,
-            contextTokens: 1_000,
-            maxContextTokens: 12_000,
+            pdfInputTokens: isFlashcardPreview ? 1_000 : 0,
+            contextTokens: isFlashcardPreview ? 0 : 1_000,
+            maxContextTokens: isFlashcardPreview ? null : 12_000,
             ...(!isSummaryPreview
               ? {
                   schemaTokens: 250,
                   packet: {
-                    filename: "quiz-source.pdf",
+                    filename: isFlashcardPreview
+                      ? "flashcard-source.pdf"
+                      : "quiz-source.pdf",
                     sizeBytes: 2_048,
                     pageCount: 1,
                     packetHash: "b".repeat(64),
@@ -4470,7 +4736,19 @@ async function setupAiGenerationMock(
                       ],
                     },
                   },
-                  chunks: [],
+                  chunks: isFlashcardPreview
+                    ? [
+                        {
+                          id: "44444444-4444-4444-8444-444444444445",
+                          documentId,
+                          documentTitle: "Giáo trình Toán 7",
+                          chunkIndex: 0,
+                          tokenCount: 1_000,
+                          pageRange: { pageStart: 5, pageEnd: 9 },
+                          content: "NỘI DUNG CHUNK THỰC TẾ",
+                        },
+                      ]
+                    : [],
                 }
               : {}),
           },
@@ -4591,7 +4869,165 @@ async function setupAiGenerationMock(
       });
     }
     if (method === "GET" && /^\/admin\/flashcard-sets\/[^/]+\/cards$/.test(pathname)) {
-      return fulfillJson(route, 200, { data: [] });
+      const setId = pathname.split("/")[3] ?? "";
+      return fulfillJson(route, 200, {
+        data: state.flashcards.filter((card) => card.flashcardSetId === setId),
+      });
+    }
+    const flashcardFigurePreviewMatch = pathname.match(
+      /^\/admin\/flashcards\/([^/]+)\/figures\/create-ai\/preview$/,
+    );
+    if (method === "POST" && flashcardFigurePreviewMatch) {
+      const body = request.postDataJSON() as Record<string, unknown> & {
+        mode?: "REGENERATE" | "EDIT_CURRENT";
+      };
+      flashcardFigurePreviewPayloads.push(body);
+      const userPrompt = JSON.stringify({
+        role: "SOLUTION",
+        aiMode: body.mode ?? "REGENERATE",
+        front: "Điều kiện để một tứ giác nội tiếp là gì?",
+        solution:
+          "Theo định nghĩa, một tứ giác nội tiếp khi cả bốn đỉnh cùng thuộc một đường tròn.",
+        ...(body.mode === "EDIT_CURRENT"
+          ? {
+              currentSolutionLatexSource:
+                "\\begin{tikzpicture}\\draw (0,0) circle (1);\\end{tikzpicture}",
+            }
+          : {}),
+        sourcePacketPageNumbers: [29],
+      });
+      return fulfillJson(route, 200, {
+        data: {
+          requestHash: "f".repeat(64),
+          role: "SOLUTION",
+          mode: body.mode ?? "REGENERATE",
+          adminInstructions: body.adminInstructions ?? null,
+          providerInput: {
+            model: "gpt-5.6-luna",
+            instructions: body.systemPrompt ?? "Quy tắc tạo hình lời giải Flashcard",
+            input: [
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "input_text",
+                    text: body.userPrompt ?? userPrompt,
+                  },
+                ],
+              },
+            ],
+            text: {
+              format: {
+                type: "json_schema",
+                name: "flashcard_solution_figure",
+                strict: true,
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["latexSource"],
+                  properties: { latexSource: { type: "string" } },
+                },
+              },
+            },
+            max_output_tokens: 12_000,
+          },
+          configuration: {
+            isDefaultConfigured: true,
+            resolvedProvider: "OPENAI",
+            resolvedModel: "gpt-5.6-luna",
+            temperature: null,
+            reasoningEffort: "high",
+            maxOutputTokens: 12_000,
+            modelOptions: [
+              {
+                provider: "OPENAI",
+                model: "gpt-5.6-luna",
+                available: true,
+                capabilities: {
+                  aiConfiguration: "REASONING_EFFORT",
+                  reasoningEffortLevels: ["low", "medium", "high"],
+                },
+              },
+            ],
+          },
+          systemPrompt: body.systemPrompt ?? "Quy tắc tạo hình lời giải Flashcard",
+          userPrompt: body.userPrompt ?? userPrompt,
+          context: {
+            textInputTokens: 1_000,
+            imageInputTokens: 0,
+            estimatedTokens: 1_000,
+            tokenBreakdown: {
+              systemInstructionsTokens: 200,
+              userPromptTokens: 200,
+              contextTokens: 0,
+              schemaTokens: 600,
+              textInputTokens: 1_000,
+              pdfInputTokens: 0,
+              estimatedTokens: 1_000,
+            },
+          },
+          estimatedCost: {
+            available: true,
+            inputUpperBoundUsd: 0.002,
+            inputUpperBoundVnd: 50,
+            outputUpperBoundUsd: 0.02,
+            outputUpperBoundVnd: 500,
+            upperBoundUsd: 0.022,
+            upperBoundVnd: 550,
+            fxRateVndPerUsd: 25_000,
+          },
+        },
+      });
+    }
+    const flashcardFigureCreateMatch = pathname.match(
+      /^\/admin\/flashcards\/([^/]+)\/figures\/create-ai$/,
+    );
+    if (method === "POST" && flashcardFigureCreateMatch) {
+      const body = request.postDataJSON() as Record<string, unknown>;
+      flashcardFigureCreatePayloads.push(body);
+      return fulfillJson(route, 202, {
+        data: {
+          jobId: "job-flashcard-solution-figure",
+          figureId: "flashcard-solution-figure",
+          revisionId: "flashcard-solution-figure-revision",
+          role: "SOLUTION",
+          mode: body.mode ?? "REGENERATE",
+          status: "QUEUED",
+        },
+      });
+    }
+    const flashcardBulkReviewMatch = pathname.match(
+      /^\/admin\/flashcard-sets\/([^/]+)\/cards\/review-all-ai$/,
+    );
+    if (method === "POST" && flashcardBulkReviewMatch) {
+      const setId = flashcardBulkReviewMatch[1] ?? "";
+      flashcardBulkReviewSetIds.push(setId);
+      let approvedCardCount = 0;
+      state.flashcards = state.flashcards.map((card) => {
+        if (
+          card.flashcardSetId !== setId ||
+          card.reviewStatus !== "NEEDS_REVIEW" ||
+          !(card.sourceMetadataJson as { aiGenerationId?: unknown } | null)
+            ?.aiGenerationId
+        ) {
+          return card;
+        }
+        approvedCardCount += 1;
+        return { ...card, publishedAt: null, reviewStatus: "APPROVED" };
+      });
+      sets.FLASHCARD = sets.FLASHCARD.map((set) =>
+        set.id === setId
+          ? {
+              ...set,
+              pendingReviewCardCount: 0,
+              unpublishedApprovedCardCount:
+                Number(set.unpublishedApprovedCardCount ?? 0) + approvedCardCount,
+            }
+          : set,
+      );
+      return fulfillJson(route, 201, {
+        data: { approvedCardCount, pendingReviewCardCount: 0 },
+      });
     }
     const quizBulkReviewMatch = pathname.match(
       /^\/admin\/quiz-sets\/([^/]+)\/questions\/review-all-ai$/,
@@ -4658,6 +5094,36 @@ async function setupAiGenerationMock(
       });
       return fulfillJson(route, 201, {
         data: sets.QUIZ.find((set) => set.id === setId),
+      });
+    }
+    const flashcardSetReviewMatch = pathname.match(
+      /^\/admin\/flashcard-sets\/([^/]+)\/review$/,
+    );
+    if (method === "POST" && flashcardSetReviewMatch) {
+      const setId = flashcardSetReviewMatch[1] ?? "";
+      const body = request.postDataJSON() as {
+        action?: string;
+        reviewStatus: string;
+      };
+      flashcardSetReviewPayloads.push(body);
+      sets.FLASHCARD = sets.FLASHCARD.map((set) => {
+        if (set.id !== setId) return set;
+        return {
+          ...set,
+          reviewStatus:
+            body.action === "PUBLISH"
+              ? "APPROVED"
+              : body.action === "WITHDRAW"
+                ? "HIDDEN"
+                : set.reviewStatus,
+          unpublishedApprovedCardCount:
+            body.action === "SAVE" || body.action === "PUBLISH"
+              ? 0
+              : set.unpublishedApprovedCardCount,
+        };
+      });
+      return fulfillJson(route, 201, {
+        data: sets.FLASHCARD.find((set) => set.id === setId),
       });
     }
     if (
@@ -4934,6 +5400,10 @@ async function setupAiGenerationMock(
     quizReviewPayloads,
     quizBulkReviewSetIds,
     quizSetReviewPayloads,
+    flashcardBulkReviewSetIds,
+    flashcardSetReviewPayloads,
+    flashcardFigurePreviewPayloads,
+    flashcardFigureCreatePayloads,
     solutionRefinementPayloads,
     solutionRefinementPreviewPayloads,
     get summary() {
@@ -5132,8 +5602,10 @@ function panelData(
         embeddingReady: true,
         canUseForSummary: true,
         canUseForQuiz: true,
+        canUseForFlashcard: true,
         unavailableReason: null,
         quizUnavailableReason: null,
+        flashcardUnavailableReason: null,
       },
       {
         id: processingDocumentId,
@@ -5145,8 +5617,10 @@ function panelData(
         embeddingReady: false,
         canUseForSummary: false,
         canUseForQuiz: false,
+        canUseForFlashcard: false,
         unavailableReason: "Đang xử lý",
         quizUnavailableReason: "Đang xử lý",
+        flashcardUnavailableReason: "Đang xử lý",
       },
       {
         id: supplementalDocumentId,
@@ -5158,8 +5632,10 @@ function panelData(
         embeddingReady: true,
         canUseForSummary: true,
         canUseForQuiz: true,
+        canUseForFlashcard: true,
         unavailableReason: null,
         quizUnavailableReason: null,
+        flashcardUnavailableReason: null,
       },
     ],
     summaryConfiguration: {
@@ -5251,6 +5727,50 @@ function panelData(
           available: true,
           capabilities: { aiConfiguration: "TEMPERATURE" },
         },
+        {
+          provider: "OPENAI",
+          model: "gpt-5.6-luna",
+          available: true,
+          capabilities: {
+            aiConfiguration: "REASONING_EFFORT",
+            reasoningEffortLevels: ["low", "medium", "xhigh"],
+          },
+        },
+      ],
+    },
+    flashcardConfiguration: {
+      isDefaultConfigured: true,
+      resolvedProvider: "OPENAI",
+      resolvedModel: "gpt-4.1-mini",
+      temperature: 0.2,
+      reasoningEffort: null,
+      maxOutputTokens: 8_000,
+      modelOptions: [
+        {
+          provider: "OPENAI",
+          model: "gpt-4.1-mini",
+          available: true,
+          capabilities: { aiConfiguration: "TEMPERATURE" },
+        },
+        {
+          provider: "OPENAI",
+          model: "gpt-5.6-luna",
+          available: true,
+          capabilities: {
+            aiConfiguration: "REASONING_EFFORT",
+            reasoningEffortLevels: ["low", "medium", "xhigh"],
+          },
+        },
+      ],
+    },
+    flashcardFigureConfiguration: {
+      isDefaultConfigured: true,
+      resolvedProvider: "OPENAI",
+      resolvedModel: "gpt-5.6-luna",
+      temperature: null,
+      reasoningEffort: "xhigh",
+      maxOutputTokens: 20_000,
+      modelOptions: [
         {
           provider: "OPENAI",
           model: "gpt-5.6-luna",

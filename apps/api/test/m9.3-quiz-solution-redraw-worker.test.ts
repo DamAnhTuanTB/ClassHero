@@ -143,7 +143,7 @@ describe("M9.3 independent Quiz solution figure worker", () => {
     const providerCall = provider.generateStructured.mock.calls[0];
     expect(providerCall?.[0]).toEqual(expect.objectContaining({ feature: "QUIZ" }));
     expect(providerCall?.[1]).toEqual(
-      expect.objectContaining({ outputName: "quiz_solution_figure" }),
+      expect.objectContaining({ outputName: "solution_figure" }),
     );
     expect(providerCall?.[1]?.systemPrompt).toBe("CUSTOM FIGURE PROMPT");
     expect(providerCall?.[1]?.systemPrompt).not.toContain("QUY CHUẨN HÌNH TOÀN HỆ THỐNG");

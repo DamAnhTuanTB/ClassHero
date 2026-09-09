@@ -2,15 +2,18 @@
 
 import type { KeyboardEvent } from "react";
 import type { AdminFlashcardSet } from "@/features/admin/flashcards/api/admin-flashcards-api";
+import type { FlashcardSetCounts } from "@/features/admin/flashcards/screens/admin-flashcards-tab/components/flashcard-set-panel";
 import { useRevealActiveHorizontalItem } from "@/lib/use-reveal-active-horizontal-item";
 import { cn } from "@/lib/utils";
 
 export function FlashcardSetTabs({
   activeSetId,
+  countsBySetId,
   sets,
   onSelect,
 }: {
   activeSetId: string;
+  countsBySetId: Record<string, FlashcardSetCounts | undefined>;
   sets: AdminFlashcardSet[];
   onSelect: (setId: string) => void;
 }) {
@@ -54,6 +57,10 @@ export function FlashcardSetTabs({
     >
       {sets.map((set, setIndex) => {
         const isActive = set.id === activeSetId;
+        const loadedCounts = countsBySetId[set.id];
+        const approvedCount = loadedCounts?.approved;
+        const pendingCount =
+          loadedCounts?.pending ?? set.pendingReviewCardCount ?? 0;
         return (
           <button
             key={set.id}
@@ -66,22 +73,28 @@ export function FlashcardSetTabs({
             onClick={() => onSelect(set.id)}
             onKeyDown={(event) => handleKeyDown(event, setIndex)}
             className={cn(
-              "relative inline-flex min-h-12 shrink-0 items-center gap-2 whitespace-nowrap rounded-t-xl border border-b-0 px-4 text-sm font-extrabold transition",
+              "relative inline-flex min-h-16 shrink-0 flex-col items-start justify-center gap-1 whitespace-nowrap rounded-t-xl border border-b-0 px-4 text-sm font-extrabold transition",
               isActive
                 ? "border-[var(--theme-primary)] bg-[var(--theme-bg)] text-[var(--theme-primary)]"
                 : "border-transparent text-[var(--theme-text-muted)] hover:bg-[var(--theme-surface-soft)] hover:text-[var(--theme-text-strong)]",
             )}
           >
-            {set.title}
-            <span
-              className={cn(
-                "min-w-6 rounded-full px-2 py-0.5 text-center text-xs font-extrabold",
-                isActive
-                  ? "bg-[var(--theme-primary)] text-white dark:text-[var(--theme-primary-foreground)]"
-                  : "bg-[var(--theme-primary-subtle)] text-[var(--theme-primary)]",
+            <span>{set.title}</span>
+            <span className="flex items-center gap-1.5 text-[10px] font-black leading-none">
+              {approvedCount === undefined ? (
+                <span className="rounded-full bg-[var(--theme-primary-subtle)] px-2 py-1 text-[var(--theme-primary)]">
+                  {set.cardCount} thẻ
+                </span>
+              ) : (
+                <span className="rounded-full bg-emerald-100 px-2 py-1 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                  {approvedCount} đã duyệt
+                </span>
               )}
-            >
-              {set.cardCount}
+              {pendingCount > 0 ? (
+                <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                  {pendingCount} chờ duyệt
+                </span>
+              ) : null}
             </span>
             {isActive ? (
               <span className="absolute inset-x-0 -bottom-px h-0.5 bg-[var(--theme-primary)]" />

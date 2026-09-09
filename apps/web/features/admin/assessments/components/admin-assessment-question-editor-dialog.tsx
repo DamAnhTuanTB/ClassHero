@@ -219,7 +219,7 @@ export function AdminAssessmentQuestionEditorDialog({
     form.reset(question ? toFormValues(question) : createEmptyDefaults());
     setDraftFigureFiles({});
     setDeletedFigureRoles([]);
-  }, [form, isOpen, question]);
+  }, [form, isOpen, question?.id]);
 
   const selectQuizFigureFile = (role: AdminQuizFigureRole, file: File) => {
     setDraftFigureFiles((current) => ({ ...current, [role]: file }));

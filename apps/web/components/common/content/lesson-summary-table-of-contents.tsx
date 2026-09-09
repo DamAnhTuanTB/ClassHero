@@ -2,8 +2,8 @@
 
 import { BookOpen, ListTree, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
-
 import { StemFigureMathText } from "@/components/common/content/stem-figure";
+import { cn } from "@/lib/utils";
 
 export const LESSON_SUMMARY_OBJECTIVES_ANCHOR_ID = "lesson-summary-objectives";
 
@@ -24,11 +24,21 @@ export function LessonSummaryTableOfContents({
   desktopBorderless = false,
   hasObjectives,
   sections,
+  customItems,
+  title = "Mục lục",
+  buttonClassName,
+  onSectionClick,
+  onCustomItemClick,
 }: {
   accentTrigger?: boolean;
   desktopBorderless?: boolean;
   hasObjectives: boolean;
-  sections: Array<{ displayHeading: string; order: number }>;
+  sections?: Array<{ displayHeading: string; order: number }>;
+  customItems?: Array<{ title: string; anchorId: string; order?: number }>;
+  title?: string;
+  buttonClassName?: string;
+  onSectionClick?: (anchorId: string) => void;
+  onCustomItemClick?: (anchorId: string) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const popoverId = useId();
@@ -73,27 +83,28 @@ export function LessonSummaryTableOfContents({
         aria-controls={popoverId}
         aria-expanded={isOpen}
         aria-label={isOpen ? "Đóng mục lục" : "Mở mục lục"}
-        className={`flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-xl border px-3 text-sm font-extrabold shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-primary)] ${
+        className={cn(
+          "group flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-[11px] text-[13px] font-black transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500",
           isOpen || accentTrigger
-            ? "border-[var(--theme-primary)] bg-[var(--theme-primary-soft)] text-[var(--theme-primary)]"
-            : "border-[var(--theme-border)] bg-[var(--theme-surface)] text-[var(--theme-text-muted)]"
-        } ${
-          accentTrigger
-            ? "hover:border-sky-400 hover:bg-sky-200 hover:text-sky-700 dark:hover:border-sky-600 dark:hover:bg-sky-800/70 dark:hover:text-sky-200"
-            : "hover:border-[var(--theme-primary)] hover:bg-[var(--theme-primary-soft)] hover:text-[var(--theme-primary)]"
-        } ${desktopBorderless ? "lg:border-transparent" : ""}`}
+            ? "bg-amber-100 text-amber-800 dark:bg-amber-500/25 dark:text-amber-200"
+            : "bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50 dark:hover:text-amber-300",
+          buttonClassName
+        )}
         onClick={() => setIsOpen((open) => !open)}
         title="Mục lục"
         type="button"
       >
-        <ListTree className="h-5 w-5" aria-hidden="true" />
-        <span>Mục lục</span>
+        <ListTree
+          className="h-3.5 w-3.5 shrink-0 transition-transform group-hover:scale-110"
+          aria-hidden="true"
+        />
+        <span className="hidden md:inline">{title}</span>
       </button>
 
       {isOpen ? (
         <div
           id={popoverId}
-          aria-label="Mục lục bài học"
+          aria-label={title}
           className={`absolute top-full z-50 mt-2 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl bg-[var(--theme-surface)] shadow-xl ${
             accentTrigger
               ? "right-0 border-2 border-sky-300 dark:border-sky-700"
@@ -109,7 +120,7 @@ export function LessonSummaryTableOfContents({
             }`}
           >
             <p className="text-sm font-extrabold text-[var(--theme-text-strong)]">
-              Mục lục bài học
+              {title}
             </p>
             {accentTrigger ? (
               <button
@@ -130,51 +141,118 @@ export function LessonSummaryTableOfContents({
             aria-label="Đi đến phần trong bài học"
             className="max-h-[min(60vh,28rem)] space-y-1 overflow-y-auto p-2"
           >
+            {hasObjectives || (sections && sections.length > 0) ? (
+              <div className="mb-1 px-3 text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                Lý thuyết
+              </div>
+            ) : null}
+
             {hasObjectives ? (
               <button
-                className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-bold text-[var(--theme-text)] transition hover:bg-[var(--theme-primary-soft)] hover:text-[var(--theme-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-primary)]"
-                onClick={() => scrollToAnchor(LESSON_SUMMARY_OBJECTIVES_ANCHOR_ID)}
+                className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-bold text-[var(--theme-text)] transition hover:bg-[var(--theme-primary-soft)] hover:text-[var(--theme-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-primary)]"
+                onClick={() => {
+                  setIsOpen(false);
+                  if (onSectionClick) onSectionClick(LESSON_SUMMARY_OBJECTIVES_ANCHOR_ID);
+                  else scrollToAnchor(LESSON_SUMMARY_OBJECTIVES_ANCHOR_ID);
+                }}
+                title="Mục tiêu học tập"
                 type="button"
               >
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--theme-primary-soft)] text-[var(--theme-primary)]">
-                  <BookOpen className="h-[18px] w-[18px]" aria-hidden="true" />
+                <span
+                  className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg text-sm font-black ${
+                    accentTrigger
+                      ? "bg-rose-500 text-white"
+                      : "bg-[var(--theme-primary-soft)] text-[var(--theme-primary)]"
+                  }`}
+                >
+                  <ListTree className="h-4 w-4" />
                 </span>
                 <span>Mục tiêu học tập</span>
               </button>
             ) : null}
 
-            {sections.map((section, index) => {
-              const accentClass =
-                SECTION_ACCENT_CLASSES[index % SECTION_ACCENT_CLASSES.length] ??
-                SECTION_ACCENT_CLASSES[0];
-
-              return (
-                <button
-                  key={`${section.order}-${index}`}
-                  className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-bold text-[var(--theme-text)] transition hover:bg-[var(--theme-primary-soft)] hover:text-[var(--theme-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-primary)]"
-                  onClick={() => scrollToAnchor(getLessonSummarySectionAnchorId(index))}
-                  title={section.displayHeading}
-                  type="button"
-                >
-                  <span
-                    className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg text-sm font-black ${
-                      accentTrigger
-                        ? accentClass
-                        : "bg-[var(--theme-primary-soft)] text-[var(--theme-primary)]"
-                    }`}
+            {sections && sections.length > 0 && (
+              sections.map((section, index) => {
+                const accentClass =
+                  SECTION_ACCENT_CLASSES[index % SECTION_ACCENT_CLASSES.length] ??
+                  SECTION_ACCENT_CLASSES[0];
+                const anchorId = getLessonSummarySectionAnchorId(index);
+                return (
+                  <button
+                    key={`${section.order}-${index}`}
+                    className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-bold text-[var(--theme-text)] transition hover:bg-[var(--theme-primary-soft)] hover:text-[var(--theme-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-primary)]"
+                    onClick={() => {
+                      setIsOpen(false);
+                      if (onSectionClick) onSectionClick(anchorId);
+                      else scrollToAnchor(anchorId);
+                    }}
+                    title={section.displayHeading}
+                    type="button"
                   >
-                    {section.order || index + 1}
-                  </span>
-                  <span className="min-w-0 whitespace-normal break-words leading-5">
-                    <StemFigureMathText
-                      displayMathAsInline
-                      inheritMathWeight
-                      value={section.displayHeading}
-                    />
-                  </span>
-                </button>
-              );
-            })}
+                    <span
+                      className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg text-sm font-black ${
+                        accentTrigger
+                          ? accentClass
+                          : "bg-[var(--theme-primary-soft)] text-[var(--theme-primary)]"
+                      }`}
+                    >
+                      {section.order || index + 1}
+                    </span>
+                    <span className="min-w-0 whitespace-normal break-words leading-5">
+                      <StemFigureMathText
+                        displayMathAsInline
+                        inheritMathWeight
+                        value={section.displayHeading}
+                      />
+                    </span>
+                  </button>
+                );
+              })
+            )}
+
+            {customItems && customItems.length > 0 && (
+              <>
+                <div className="mb-1 mt-3 px-3 text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                  Bài tập
+                </div>
+                {customItems.map((item, index) => {
+                  const accentClass =
+                    SECTION_ACCENT_CLASSES[index % SECTION_ACCENT_CLASSES.length] ??
+                    SECTION_ACCENT_CLASSES[0];
+
+                  return (
+                    <button
+                      key={`${item.order}-${index}`}
+                      className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-bold text-[var(--theme-text)] transition hover:bg-[var(--theme-primary-soft)] hover:text-[var(--theme-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-primary)]"
+                      onClick={() => {
+                        setIsOpen(false);
+                        if (onCustomItemClick) onCustomItemClick(item.anchorId);
+                        else scrollToAnchor(item.anchorId);
+                      }}
+                      title={item.title}
+                      type="button"
+                    >
+                      <span
+                        className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg text-sm font-black ${
+                          accentTrigger
+                            ? accentClass
+                            : "bg-[var(--theme-primary-soft)] text-[var(--theme-primary)]"
+                        }`}
+                      >
+                        {item.order || index + 1}
+                      </span>
+                      <span className="min-w-0 whitespace-normal break-words leading-5">
+                        <StemFigureMathText
+                          displayMathAsInline
+                          inheritMathWeight
+                          value={item.title}
+                        />
+                      </span>
+                    </button>
+                  );
+                })}
+              </>
+            )}
           </nav>
         </div>
       ) : null}

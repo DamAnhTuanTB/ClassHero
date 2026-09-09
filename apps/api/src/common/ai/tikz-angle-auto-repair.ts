@@ -58,7 +58,7 @@ const SAFE_ANGLE_PIC_OPTION_PATTERNS = [
   ANGLE_LINE_CAP_TOKEN_PATTERN,
   /^opacity\s*=.*$/iu,
   /^(?:thin|semithick|thick|very\s+thick|ultra\s+thick)$/iu,
-  /^"[\s\S]*"$/u,
+  /^"[\s\S]*"(?:\s*\{[^}]*\})?$/u,
   ANGLE_MARKER_STYLE_TOKEN_PATTERN,
 ] as const;
 
@@ -304,7 +304,7 @@ export function autoRepairDistinctAngleMeasureMarkerGroups(input: {
     const last = match[8];
     const options = match[2] ?? "";
     if (index === undefined || !first || !vertex || !last) return [];
-    const measure = resolveAnglePicMeasure(measures, { first, vertex, last });
+    const measure = resolveAnglePicMeasure(measures, { first, vertex, last, options });
     if (!measure) return [];
     const optionTokens = splitTikzOptions(options);
     if (
@@ -376,36 +376,30 @@ export function autoRepairDistinctAngleMeasureMarkerGroups(input: {
       group.length > MAX_CONCENTRIC_ANGLE_ARCS ||
       labelPics.length > 1 ||
       constructionSignatures.length !== 1 ||
-      ((markerCount > 1 || group.length > 1) &&
-        (radii.some((radius) => radius === null) || radiusUnits.length !== 1)) ||
-      (markerCount > 1 &&
-        group.some((pic) =>
-          pic.optionTokens.some((token) => /^fill(?:\s*=.*)?$/iu.test(token)),
-        ))
+      ((markerCount > 1 || group.length > 1) && radiusUnits.length > 1)
     ) {
       return { source: input.source, changes: [] };
     }
 
     const template = labelPics[0] ?? firstPic;
+    const defaultRadius = { value: 0.5, unit: "cm" as const };
+    const radiusTemplate = radii.find((radius) => radius !== null) ?? defaultRadius;
     const baseRadius = radii.every((radius) => radius !== null)
       ? Math.min(...radii.map((radius) => radius.value))
-      : null;
-    const radiusTemplate = radii.find((radius) => radius !== null) ?? null;
+      : defaultRadius.value;
     const baseOptions = normalizeSolidAngleMarkerOptions(template.optionTokens);
     const indent = readLineIndent(input.source, firstPic.index);
     const renderedPics = Array.from({ length: markerCount }, (_, index) => {
+      const reversedIndex = markerCount - 1 - index;
       const optionTokens =
-        index === markerCount - 1
+        reversedIndex === markerCount - 1
           ? baseOptions
-          : baseOptions.filter((token) => !isAngleLabelOption(token));
-      const nextOptions =
-        radiusTemplate && baseRadius !== null
-          ? replaceAngleRadius(
-              optionTokens,
-              radiusTemplate,
-              baseRadius + index * ANGLE_RADIUS_INCREMENT_BY_UNIT[radiusTemplate.unit],
-            )
-          : optionTokens;
+          : baseOptions.filter((token) => !isAngleLabelOption(token) && !/^fill(?:\s*=.*)?$/iu.test(token));
+      const nextOptions = replaceAngleRadius(
+        optionTokens,
+        radiusTemplate,
+        baseRadius + reversedIndex * ANGLE_RADIUS_INCREMENT_BY_UNIT[radiusTemplate.unit],
+      );
       return `${firstPic.beforeOptions}[${nextOptions.join(", ")}]${firstPic.afterOptions}${firstPic.terminator}`;
     }).join(`\n${indent}`);
     changes.push({
@@ -445,20 +439,27 @@ function parseAllExplicitAngleMeasures(authorityText: string) {
   const measures: ExplicitAngleMeasure[] = [];
   const patterns = [
     new RegExp(
-      String.raw`\\+widehat\s*\{\s*([A-Za-z]{1,3})\s*\}\s*=\s*([^$"\r\n]{1,120}?)\s*(?:\^\s*\{?\s*\\+circ\s*\}?|°)`,
+      String.raw`\\+widehat\s*\{\s*([A-Za-z]{1,3})\s*\}\s*(?:bằng|là|=)\s*([^$"\r\n]{1,120}?)\s*(?:\^\s*\{?\s*\\+circ\s*\}?|°|độ)`,
       "giu",
     ),
     new RegExp(
-      String.raw`\\+angle\s*(?:\{\s*)?([A-Za-z]{3})(?:\s*\})?\s*=\s*([^$"\r\n]{1,120}?)\s*(?:\^\s*\{?\s*\\+circ\s*\}?|°)`,
-      "giu",
-    ),
-    /∠\s*([A-Za-z]{3})\s*=\s*([^$"\r\n]{1,120}?)\s*°/giu,
-    new RegExp(
-      String.raw`\\+widehat\s*\{\s*([A-Za-z]{1,3})\s*\}\s*=\s*([^$"\r\n]{1,120}?)(?=\s*(?:\$|"))`,
+      String.raw`\\+angle\s*(?:\{\s*)?([A-Za-z]{1,3})(?:\s*\})?\s*(?:bằng|là|=)\s*([^$"\r\n]{1,120}?)\s*(?:\^\s*\{?\s*\\+circ\s*\}?|°|độ)`,
       "giu",
     ),
     new RegExp(
-      String.raw`\\+angle\s*(?:\{\s*)?([A-Za-z]{3})(?:\s*\})?\s*=\s*([^$"\r\n]{1,120}?)(?=\s*(?:\$|"))`,
+      String.raw`∠\s*([A-Za-z]{1,3})\s*(?:bằng|là|=)\s*([^$"\r\n]{1,120}?)\s*(?:\^\s*\{?\s*\\+circ\s*\}?|°|độ)`,
+      "giu",
+    ),
+    new RegExp(
+      String.raw`\b(?:góc|angle)\s+(?:tại\s+)?([A-Za-z]{1,3})\s*(?:bằng|là|=)\s*\$?([^$"\r\n]{1,120}?)\$?\s*(?:\^\s*\{?\s*\\+circ\s*\}?|°|độ)`,
+      "giu",
+    ),
+    new RegExp(
+      String.raw`\\+widehat\s*\{\s*([A-Za-z]{1,3})\s*\}\s*(?:bằng|là|=)\s*([^$"\r\n]{1,120}?)(?=\s*(?:\$|"))`,
+      "giu",
+    ),
+    new RegExp(
+      String.raw`\\+angle\s*(?:\{\s*)?([A-Za-z]{1,3})(?:\s*\})?\s*(?:bằng|là|=)\s*([^$"\r\n]{1,120}?)(?=\s*(?:\$|"))`,
       "giu",
     ),
   ];
@@ -543,7 +544,7 @@ function readAngleNotation(notation: string | undefined) {
 
 function resolveAnglePicMeasure(
   measures: ExplicitAngleMeasure[],
-  pic: { first: string; vertex: string; last: string },
+  pic: { first: string; vertex: string; last: string; options?: string },
 ) {
   const candidates = measures.filter((measure) => measure.vertex === pic.vertex);
   const endpointMatches = candidates.filter(
@@ -555,8 +556,18 @@ function resolveAnglePicMeasure(
   );
   const matchedKeys = unique(endpointMatches.map((measure) => measure.key));
   if (matchedKeys.length === 1) return endpointMatches[0]!;
+
   const candidateKeys = unique(candidates.map((measure) => measure.key));
-  return candidateKeys.length === 1 ? (candidates[0] ?? null) : null;
+  if (candidateKeys.length === 1) return candidates[0] ?? null;
+
+  if (pic.options) {
+    const textMatches = candidates.filter((measure) =>
+      pic.options!.includes(measure.display.toString()),
+    );
+    if (textMatches.length === 1) return textMatches[0] ?? null;
+  }
+
+  return null;
 }
 
 function splitTikzOptions(value: string) {

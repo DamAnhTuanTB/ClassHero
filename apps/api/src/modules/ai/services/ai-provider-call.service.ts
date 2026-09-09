@@ -3,6 +3,7 @@ import {
   AI_REASONING_EFFORT_LEVELS,
   isAiReasoningEffort,
   type AiReasoningEffort,
+  type ProviderUsageTargetContext,
 } from "@learning-path/shared";
 import {
   AiProviderName,
@@ -73,6 +74,15 @@ export type ResolvedAiStructuredRequestTrace = {
     textInputTokens: number;
     imageInputTokens: number;
     estimatedTokens: number;
+    tokenBreakdown?: {
+      systemInstructionsTokens: number;
+      userPromptTokens: number;
+      contextTokens: number;
+      schemaTokens: number;
+      textInputTokens: number;
+      pdfInputTokens: number;
+      estimatedTokens: number;
+    };
   };
 };
 
@@ -96,6 +106,7 @@ type RoutedAiCallContext = {
   attempt?: number;
   callSequence?: number;
   operation?: ProviderUsageOperation;
+  targetContext: ProviderUsageTargetContext;
   routeSnapshot?: AiFeatureRoute;
   idempotencyKey?: string;
   /** Disable provider failover for flows whose retry contract permits compiler repair only. */
@@ -270,6 +281,7 @@ export class AiProviderCallService {
             (route.purpose === "IMAGE"
               ? "DIAGRAM_GENERATION"
               : defaultContentOperation(context.feature)),
+          targetContext: context.targetContext,
           reasoningEffort: resolvedInput.reasoningEffort ?? null,
           attempt: context.attempt,
         },
@@ -468,6 +480,15 @@ function buildResolvedRequestTrace<TOutput>(input: {
       textInputTokens: inputTokenEstimate.textInputTokens,
       imageInputTokens,
       estimatedTokens: inputTokenEstimate.estimatedTokens,
+      tokenBreakdown: {
+        systemInstructionsTokens: Math.max(1, Math.ceil(input.input.systemPrompt.length / 4)),
+        userPromptTokens: Math.max(1, Math.ceil(input.input.userPrompt.length / 4)),
+        contextTokens: 0,
+        schemaTokens: inputTokenEstimate.schemaTokens,
+        textInputTokens: inputTokenEstimate.textInputTokens,
+        pdfInputTokens: 0,
+        estimatedTokens: inputTokenEstimate.estimatedTokens + imageInputTokens,
+      },
     },
   };
 }

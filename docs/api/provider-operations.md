@@ -49,6 +49,15 @@ price-version API không nhận hai field này.
   provider attempt. `operation` dùng taxonomy mục đích cụ thể (sinh từng loại
   nội dung, tạo/chỉnh sửa/tinh chỉnh/sửa lỗi hình, tinh chỉnh/tạo lại lời giải),
   không dùng một nhãn hình minh họa chung. Event cũ có thể trả `null`.
+- Mỗi AI item trả thêm `targetContext` có schema versioned và `targetLabel` ngắn.
+  `operation` mô tả hành động, `targetLabel` mô tả đích cụ thể, ví dụ `Ví dụ 2 ·
+  Hình lời giải`, `Quiz · Câu 4 · Hình đề`, `Flashcard · Thẻ 2 · Hình lời giải`
+  hoặc `Quiz · Cả bộ`. API không trả raw UUID trong label; event cũ không xác
+  định chắc chắn trả `targetContext=null`, `targetLabel="Chưa xác định"`.
+- Target context phải được truyền vào provider gateway trước attempt cho mọi
+  nhánh create/refine/edit/repair và được giữ trên cả `SUCCEEDED` lẫn `FAILED`.
+  Formatter dùng chung cho màn Chi phí & sử dụng và các modal theo generation;
+  không để từng frontend tự suy nhãn từ `resourceType`.
 - `GET /usage/events` trả thêm `summary.totalCostVnd` và `summary.totalCalls` cho
   toàn bộ tập kết quả đã lọc, độc lập với trang hiện tại. Filter UUID
   `aiGenerationId` trả toàn bộ lượt gọi thuộc đúng lần sinh và không áp dụng cửa

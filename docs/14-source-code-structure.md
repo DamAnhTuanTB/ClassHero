@@ -166,11 +166,14 @@ Rules:
   giữa nhiều flow; nguồn dữ kiện, prompt/schema, mapper và lifecycle riêng của
   Summary, Quiz hoặc domain khác vẫn phải thuộc module sở hữu.
 - Policy chuyên môn Toán, Vật lý, Hóa học không được đặt trong `common/ai` hoặc
-  dùng policy của một môn làm core cho môn khác. Summary/StemFigure và Quiz phải
-  tự sở hữu các file system prompt hoàn chỉnh theo môn. Không dùng chung bất kỳ
-  prompt prose hoặc prompt fragment nào giữa các môn, kể cả role, output contract,
-  safety instruction hay helper ghép section; chỉ hạ tầng code ngoài prompt như
-  provider, queue, schema, validator, accounting và persistence được dùng chung.
+  dùng policy của một môn làm core cho môn khác. Mỗi task core hình đề/hình lời
+  giải phải sở hữu system prompt hoàn chỉnh theo từng môn. Không dùng chung prompt
+  prose hoặc fragment giữa các môn. Question Figure Core được phép dùng chung
+  giữa Summary/Quiz cho role `QUESTION` problem-only theo ADR-0028; Solution
+  Figure Core được phép dùng chung giữa Summary/Quiz/Flashcard cho role
+  `SOLUTION` theo ADR-0027. Prompt source-redraw, repair và refinement khác
+  contract vẫn do domain sở hữu; hạ tầng provider, queue, schema, validator,
+  accounting và persistence tiếp tục được dùng chung khi trung lập.
 - Domain có thể wrap helper common để chọn message/mã lỗi nghiệp vụ, nhưng không tự dựng body lỗi HTTP thủ công nhiều nơi.
 - Core Sinh kiến thức là private boundary: mọi file/schema/helper/service/worker
   có tên `lesson-summary-*` chỉ được Summary và StemFigure thuộc Summary import.

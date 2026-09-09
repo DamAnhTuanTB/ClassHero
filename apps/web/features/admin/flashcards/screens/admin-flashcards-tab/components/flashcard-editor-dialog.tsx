@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Layers, Loader2, Save } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Controller, useForm, type Resolver } from "react-hook-form";
 import { toast } from "sonner";
 import { EditorDialogShell } from "@/components/admin/courses/editor-dialog-shell";
@@ -13,6 +13,7 @@ import type {
   AdminFlashcardPayload,
 } from "@/features/admin/flashcards/api/admin-flashcards-api";
 import { useAdminFlashcardMutations } from "@/features/admin/flashcards/hooks/use-admin-flashcards";
+import { FlashcardSolutionFigureUploadField } from "@/features/admin/flashcards/screens/admin-flashcards-tab/components/flashcard-solution-figure-upload-field";
 import {
   flashcardFormSchema,
   type FlashcardFormValues,
@@ -43,8 +44,20 @@ export function FlashcardEditorDialog({
   setId: string;
   onClose: () => void;
 }) {
-  const { createCard, updateCard } = useAdminFlashcardMutations(setId, lessonId);
-  const isSaving = createCard.isPending || updateCard.isPending;
+  const {
+    createCard,
+    deleteSolutionFigure,
+    updateCard,
+    uploadSolutionFigure,
+  } = useAdminFlashcardMutations(setId, lessonId);
+  const [draftSolutionFigureFile, setDraftSolutionFigureFile] = useState<File>();
+  const [isSolutionFigureMarkedForDeletion, setIsSolutionFigureMarkedForDeletion] =
+    useState(false);
+  const isSaving =
+    createCard.isPending ||
+    updateCard.isPending ||
+    uploadSolutionFigure.isPending ||
+    deleteSolutionFigure.isPending;
   const form = useForm<FlashcardFormValues>({
     resolver: zodResolver(flashcardFormSchema) as Resolver<FlashcardFormValues>,
     mode: "onChange",
@@ -59,29 +72,58 @@ export function FlashcardEditorDialog({
         ? {
             frontJson: card.frontJson,
             backJson: card.backJson,
-            explanationJson: card.explanation?.contentJson ?? createEmptyTiptapDocument(),
+            solutionJson: card.solutionJson ?? createEmptyTiptapDocument(),
             difficulty: card.difficulty,
           }
         : createDefaults(),
     );
+    setDraftSolutionFigureFile(undefined);
+    setIsSolutionFigureMarkedForDeletion(false);
   }, [card, form, isOpen]);
 
   const submit = form.handleSubmit(async (values) => {
     const payload: AdminFlashcardPayload = {
       frontJson: values.frontJson,
       backJson: values.backJson,
-      explanationJson: hasTiptapDocumentContent(values.explanationJson)
-        ? values.explanationJson
+      solutionJson: hasTiptapDocumentContent(values.solutionJson)
+        ? values.solutionJson
         : null,
       difficulty: values.difficulty,
     };
     try {
-      if (card) {
-        await updateCard.mutateAsync({ flashcardId: card.id, payload });
-        toast.success("Đã cập nhật flashcard");
-      } else {
-        await createCard.mutateAsync(payload);
-        toast.success("Đã thêm flashcard");
+      const savedCard = card
+        ? await updateCard.mutateAsync({ flashcardId: card.id, payload })
+        : await createCard.mutateAsync(payload);
+      const currentSolutionFigure = card?.figures?.find(
+        (figure) => figure.role === "SOLUTION",
+      );
+
+      let imageUpdateFailed = false;
+      try {
+        if (isSolutionFigureMarkedForDeletion && currentSolutionFigure) {
+          await deleteSolutionFigure.mutateAsync({
+            flashcardId: savedCard.id,
+            figureId: currentSolutionFigure.id,
+          });
+        }
+        if (draftSolutionFigureFile) {
+          await uploadSolutionFigure.mutateAsync({
+            flashcardId: savedCard.id,
+            file: draftSolutionFigureFile,
+            altText: "Hình minh họa lời giải Flashcard",
+          });
+        }
+      } catch (imageError) {
+        imageUpdateFailed = true;
+        toast.warning(
+          getUserFacingErrorMessage(
+            imageError,
+            "Đã lưu flashcard nhưng chưa cập nhật được hình lời giải. Bạn có thể thử lại.",
+          ),
+        );
+      }
+      if (!imageUpdateFailed) {
+        toast.success(card ? "Đã cập nhật flashcard" : "Đã thêm flashcard");
       }
       onClose();
     } catch (error) {
@@ -154,7 +196,7 @@ export function FlashcardEditorDialog({
                     value={field.value}
                     onChange={field.onChange}
                     onBlur={field.onBlur}
-                    placeholder="Nhập đáp án hoặc nội dung giải thích..."
+                    placeholder="Nhập câu trả lời trực tiếp, ngắn gọn và chính xác..."
                     error={fieldState.error?.message}
                   />
                 )}
@@ -162,23 +204,39 @@ export function FlashcardEditorDialog({
             </div>
           </div>
           <div>
-            <FieldLabel id="flashcard-explanation" label="Lời giải chi tiết" isOptional />
+            <FieldLabel id="flashcard-solution" label="Lời giải chi tiết" isOptional />
             <div className="mt-2">
               <Controller
                 control={form.control}
-                name="explanationJson"
+                name="solutionJson"
                 render={({ field }) => (
                   <QuizRichContentEditor
                     ariaLabel="Lời giải chi tiết"
                     value={field.value}
                     onChange={field.onChange}
                     onBlur={field.onBlur}
-                    placeholder="Giải thích cách suy luận; có thể chèn công thức, ảnh, danh sách và định dạng..."
+                    placeholder="Diễn giải đầy đủ cho câu hỏi ở mặt trước: căn cứ, lập luận, công thức, điều kiện áp dụng và kết luận khi cần..."
                   />
                 )}
               />
             </div>
           </div>
+          <FlashcardSolutionFigureUploadField
+            deleted={isSolutionFigureMarkedForDeletion}
+            disabled={isSaving}
+            figure={card?.figures?.find((figure) => figure.role === "SOLUTION")}
+            isDeleting={deleteSolutionFigure.isPending}
+            isUploading={uploadSolutionFigure.isPending}
+            selectedFile={draftSolutionFigureFile}
+            onDelete={() => {
+              setDraftSolutionFigureFile(undefined);
+              setIsSolutionFigureMarkedForDeletion(true);
+            }}
+            onFileSelect={(file) => {
+              setDraftSolutionFigureFile(file);
+              setIsSolutionFigureMarkedForDeletion(false);
+            }}
+          />
         </div>
         <footer className="theme-dialog-footer grid shrink-0 grid-cols-2 gap-2 p-3 sm:flex sm:justify-end sm:p-4">
           <button
@@ -211,7 +269,7 @@ function createDefaults(): FlashcardFormValues {
   return {
     frontJson: createEmptyTiptapDocument(),
     backJson: createEmptyTiptapDocument(),
-    explanationJson: createEmptyTiptapDocument(),
+    solutionJson: createEmptyTiptapDocument(),
     difficulty: "MEDIUM",
   };
 }

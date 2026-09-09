@@ -8,6 +8,7 @@ import type { AdminQuizFigure } from "@/features/admin/quiz/api/admin-quiz-api";
 import { AdminQuizFigureActionFrame } from "@/features/admin/quiz/components/admin-quiz-figure-action-frame";
 import { getStemFigureDisplayPercent } from "@/lib/stem-figure-display";
 import { cn } from "@/lib/utils";
+import { useStableImageUrl } from "@/hooks/use-stable-image-url";
 
 const PROCESSING_STATUSES = new Set<AdminQuizFigure["status"]>([
   "QUEUED",
@@ -26,7 +27,7 @@ export function AdminQuizFigurePreview({
   role: "QUESTION" | "SOLUTION";
   setId: string;
 }) {
-  const imageUrl = figure.currentRevision?.deliveryFile?.publicUrl;
+  const imageUrl = useStableImageUrl(figure.currentRevision?.deliveryFile?.publicUrl);
   const roleLabel = role === "QUESTION" ? "Hình đề" : "Hình lời giải";
   const isProcessing = PROCESSING_STATUSES.has(figure.status);
   const displayPercent = getStemFigureDisplayPercent(

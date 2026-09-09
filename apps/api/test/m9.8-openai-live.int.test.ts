@@ -161,7 +161,7 @@ describe.skipIf(!runLiveTest)("M9.8 OpenAI live UI coverage matrix", () => {
       expect(output.data.cards.every((card) => card.difficulty === difficulty)).toBe(
         true,
       );
-      expect(output.data.cards.every((card) => card.sourceChunkIds.length > 0)).toBe(
+      expect(output.data.cards.every((card) => card.sourcePacketPageNumbers.length > 0)).toBe(
         true,
       );
       record(usage, output, `flashcard-${difficulty}`);

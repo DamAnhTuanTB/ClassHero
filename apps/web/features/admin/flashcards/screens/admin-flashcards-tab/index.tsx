@@ -16,7 +16,10 @@ import {
   useAdminFlashcardSetMutations,
   useAdminFlashcardSets,
 } from "@/features/admin/flashcards/hooks/use-admin-flashcards";
-import { FlashcardSetPanel } from "@/features/admin/flashcards/screens/admin-flashcards-tab/components/flashcard-set-panel";
+import {
+  FlashcardSetPanel,
+  type FlashcardSetCounts,
+} from "@/features/admin/flashcards/screens/admin-flashcards-tab/components/flashcard-set-panel";
 import { FlashcardSetTabs } from "@/features/admin/flashcards/screens/admin-flashcards-tab/components/flashcard-set-tabs";
 import { getQueryRenderState } from "@/lib/query-render-state";
 import { useStableTabPanelHeight } from "@/lib/use-stable-tab-panel-height";
@@ -41,9 +44,11 @@ type DeleteTarget =
 
 export function AdminFlashcardsTab({
   lessonId,
+  onSelectedSetIdChange,
   preferredSetId,
 }: {
   lessonId: string;
+  onSelectedSetIdChange?: (setId: string | undefined) => void;
   preferredSetId?: string;
 }) {
   const setsQuery = useAdminFlashcardSets(lessonId);
@@ -59,6 +64,9 @@ export function AdminFlashcardsTab({
     AdminFlashcard | null | undefined
   >(undefined);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
+  const [countsBySetId, setCountsBySetId] = useState<
+    Record<string, FlashcardSetCounts | undefined>
+  >({});
   const {
     minHeight: flashcardSetPanelMinHeight,
     panelRef: flashcardSetPanelRef,
@@ -87,6 +95,10 @@ export function AdminFlashcardsTab({
   }, [handleSelectSet, selectedSetId, sets]);
 
   useEffect(() => {
+    onSelectedSetIdChange?.(selectedSetId || undefined);
+  }, [onSelectedSetIdChange, selectedSetId]);
+
+  useEffect(() => {
     if (
       !preferredSetId ||
       appliedPreferredSetIdRef.current === preferredSetId ||
@@ -103,6 +115,22 @@ export function AdminFlashcardsTab({
     [selectedSetId, sets],
   );
   const { deleteCard } = useAdminFlashcardMutations(selectedSetId, lessonId);
+  const handleCountsChange = useCallback(
+    (setId: string, counts: FlashcardSetCounts) => {
+      setCountsBySetId((current) => {
+        const previous = current[setId];
+        if (
+          previous?.approved === counts.approved &&
+          previous.pending === counts.pending &&
+          previous.total === counts.total
+        ) {
+          return current;
+        }
+        return { ...current, [setId]: counts };
+      });
+    },
+    [],
+  );
 
   if (queryRenderState === "loading") {
     return <FlashcardSetsSkeleton />;
@@ -167,6 +195,7 @@ export function AdminFlashcardsTab({
         <>
           <FlashcardSetTabs
             activeSetId={selectedSetId}
+            countsBySetId={countsBySetId}
             sets={sets}
             onSelect={handleSelectSet}
           />
@@ -176,6 +205,7 @@ export function AdminFlashcardsTab({
               panelRef={flashcardSetPanelRef}
               set={activeSet}
               onAddCard={() => setCardEditorTarget(null)}
+              onCountsChange={handleCountsChange}
               onDeleteCard={(card) =>
                 setDeleteTarget({
                   type: "card",

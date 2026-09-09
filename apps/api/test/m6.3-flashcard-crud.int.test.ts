@@ -2,6 +2,9 @@ import { randomUUID } from "node:crypto";
 import { Test, type TestingModule } from "@nestjs/testing";
 import {
   Difficulty,
+  FilePurpose,
+  FileStatus,
+  FileVisibility,
   PublishStatus,
   ReviewStatus,
   UserRole,
@@ -10,6 +13,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AppModule } from "#api/app.module";
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import { FlashcardsService } from "#api/modules/flashcards/services/flashcards.service";
+import { FlashcardFiguresService } from "#api/modules/flashcards/services/flashcard-figures.service";
 import type { FlashcardRequestContext } from "#api/modules/flashcards/types/flashcard.types";
 import { createTestCourseCatalogRelation } from "./helpers/course-catalog-fixture";
 
@@ -17,6 +21,7 @@ describe("M6.3 flashcard CRUD integration", () => {
   let moduleRef: TestingModule;
   let prisma: PrismaService;
   let service: FlashcardsService;
+  let figures: FlashcardFiguresService;
   let actorUserId = "";
   let studentUserId = "";
   let enrollmentId = "";
@@ -26,6 +31,7 @@ describe("M6.3 flashcard CRUD integration", () => {
   let primarySetId = "";
   let hiddenSetId = "";
   let cardId = "";
+  let figureFileId = "";
 
   const context: FlashcardRequestContext = {
     ipAddress: "127.0.0.1",
@@ -37,6 +43,7 @@ describe("M6.3 flashcard CRUD integration", () => {
     moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     prisma = moduleRef.get(PrismaService);
     service = moduleRef.get(FlashcardsService);
+    figures = moduleRef.get(FlashcardFiguresService);
 
     const actor = await prisma.user.create({
       data: {
@@ -99,6 +106,7 @@ describe("M6.3 flashcard CRUD integration", () => {
     if (prisma) {
       await prisma.auditLog.deleteMany({ where: { actorUserId } });
       await prisma.flashcard.deleteMany({ where: { lessonId } });
+      await prisma.file.deleteMany({ where: { id: figureFileId } });
       await prisma.flashcardSet.deleteMany({ where: { lessonId } });
       await prisma.enrollment.deleteMany({ where: { id: enrollmentId } });
       await prisma.lesson.deleteMany({ where: { id: lessonId } });
@@ -158,7 +166,7 @@ describe("M6.3 flashcard CRUD integration", () => {
             },
           ],
         },
-        explanationJson: documentWithText(
+        solutionJson: documentWithText(
           "Áp dụng định lý cho ba cạnh của tam giác vuông.",
         ),
       },
@@ -176,41 +184,58 @@ describe("M6.3 flashcard CRUD integration", () => {
       actorUserId,
       {
         difficulty: Difficulty.HARD,
-        explanationJson: documentWithText(
+        solutionJson: documentWithText(
           "Bình phương cạnh huyền bằng tổng bình phương hai cạnh góc vuông.",
         ),
       },
       context,
     );
     expect(updated.difficulty).toBe(Difficulty.HARD);
-    expect(updated.explanation?.contentJson).toEqual(
+    expect(updated.solutionJson).toEqual(
       documentWithText(
         "Bình phương cạnh huyền bằng tổng bình phương hai cạnh góc vuông.",
       ),
     );
-    expect(updated.explanationId).toBeTruthy();
-
     const cleared = await service.updateCard(
       cardId,
       actorUserId,
-      { explanationJson: null },
+      { solutionJson: null },
       context,
     );
-    expect(cleared.explanation).toBeNull();
+    expect(cleared.solutionJson).toBeNull();
 
     const restored = await service.updateCard(
       cardId,
       actorUserId,
       {
-        explanationJson: documentWithText(
+        solutionJson: documentWithText(
           "Dùng quan hệ giữa cạnh huyền và hai cạnh góc vuông.",
         ),
       },
       context,
     );
-    expect(restored.explanation?.contentJson).toEqual(
+    expect(restored.solutionJson).toEqual(
       documentWithText("Dùng quan hệ giữa cạnh huyền và hai cạnh góc vuông."),
     );
+    expect(restored.publishedAt).toBeNull();
+
+    const beforePublish = await service.listStudentSetsByLesson(
+      lessonId,
+      studentUserId,
+    );
+    expect(beforePublish[0]?.flashcards).toHaveLength(0);
+
+    await service.reviewSet(
+      primarySetId,
+      actorUserId,
+      { action: "PUBLISH", reviewStatus: ReviewStatus.APPROVED },
+      context,
+    );
+    const publishedCard = await prisma.flashcard.findUniqueOrThrow({
+      where: { id: cardId },
+      select: { publishedAt: true },
+    });
+    expect(publishedCard.publishedAt).toBeInstanceOf(Date);
 
     const set = (await service.listAdminSetsByLesson(lessonId)).find(
       (item) => item.id === primarySetId,
@@ -224,7 +249,53 @@ describe("M6.3 flashcard CRUD integration", () => {
     expect(sets[0]?.id).toBe(primarySetId);
     expect(sets[0]?.flashcards).toHaveLength(1);
     expect(sets[0]?.flashcards[0]?.backJson).toBeDefined();
-    expect(sets[0]?.flashcards[0]?.explanation?.contentJson).toBeDefined();
+    expect(sets[0]?.flashcards[0]?.solutionJson).toBeDefined();
+  });
+
+  it("attaches, replaces and removes an admin-uploaded solution figure", async () => {
+    const uploadedFile = await prisma.file.create({
+      data: {
+        purpose: FilePurpose.QUESTION_IMAGE,
+        bucket: "test-bucket",
+        objectKey: `test/flashcard-solution-${suffix}.png`,
+        originalName: "flashcard-solution.png",
+        mimeType: "image/png",
+        sizeBytes: BigInt(128),
+        visibility: FileVisibility.PUBLIC,
+        status: FileStatus.UPLOADED,
+        uploadedById: actorUserId,
+        publicUrl: "https://example.com/flashcard-solution.png",
+      },
+    });
+    figureFileId = uploadedFile.id;
+
+    const attached = await figures.attachAdminUpload({
+      flashcardId: cardId,
+      fileId: uploadedFile.id,
+      altText: "Sơ đồ minh họa lời giải định lý Pythagore",
+      actorUserId,
+    });
+    expect(attached.role).toBe("SOLUTION");
+    expect(attached.status).toBe("SUCCEEDED");
+    expect(attached.currentRevision?.sourceKind).toBe("ADMIN_UPLOAD");
+    expect(attached.currentRevision?.deliveryFile?.id).toBe(uploadedFile.id);
+    expect(
+      (await prisma.file.findUniqueOrThrow({ where: { id: uploadedFile.id } })).status,
+    ).toBe(FileStatus.READY);
+
+    await figures.delete(cardId, attached.id);
+    expect((await service.listCardsBySet(primarySetId))[0]?.figures).toEqual([]);
+
+    const restored = await figures.attachAdminUpload({
+      flashcardId: cardId,
+      fileId: uploadedFile.id,
+      altText: "Hình lời giải thay thế",
+      actorUserId,
+    });
+    expect(restored.currentRevision?.sourceKind).toBe("ADMIN_UPLOAD");
+    expect(restored.currentRevision?.deliveryFile?.publicUrl).toBe(
+      "https://example.com/flashcard-solution.png",
+    );
   });
 
   it("rejects student reads without an active enrollment", async () => {

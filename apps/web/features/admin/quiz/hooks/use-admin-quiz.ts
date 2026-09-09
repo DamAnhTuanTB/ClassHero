@@ -183,7 +183,7 @@ export function useAdminQuizQuestions(
   useEffect(() => {
     if (!query.dataUpdatedAt) return;
 
-    if (hasActiveFigureJobs || wasPollingFigureJobsRef.current) {
+    if (hasActiveFigureJobs !== wasPollingFigureJobsRef.current) {
       void queryClient.invalidateQueries({
         queryKey: adminQuizQueryKeys.sets(lessonId),
       });

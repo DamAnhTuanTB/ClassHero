@@ -30,6 +30,7 @@ import type {
   AdminAiGenerationType,
   AdminAiPanelJob,
 } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
+import { useAdminFlashcardSets } from "@/features/admin/flashcards/hooks/use-admin-flashcards";
 import { useAdminQuizSets } from "@/features/admin/quiz/hooks/use-admin-quiz";
 import {
   getUserFacingErrorMessage,
@@ -53,6 +54,14 @@ const AdminQuizGenerationDialog = dynamic(
   { ssr: false },
 );
 
+const AdminFlashcardGenerationDialog = dynamic(
+  () =>
+    import("@/features/admin/flashcards/screens/admin-flashcards-tab/components/admin-flashcard-generation-dialog").then(
+      (module) => module.AdminFlashcardGenerationDialog,
+    ),
+  { ssr: false },
+);
+
 const cards = [
   {
     type: "SUMMARY",
@@ -69,7 +78,7 @@ const cards = [
   {
     type: "FLASHCARD",
     label: "Flashcard",
-    description: "Tạo thẻ ghi nhớ kèm giải thích và nguồn tham chiếu.",
+    description: "Tạo thẻ ghi nhớ có đáp án trực tiếp, lời giải chi tiết và nguồn tham chiếu.",
     icon: Layers3,
   },
   {
@@ -82,46 +91,51 @@ const cards = [
 
 export function AdminAiGenerationPanel({
   lessonId,
+  flashcardTargetSetId,
   quizTargetSetId,
   onOpenResult,
   onRequestedGenerationHandled,
   requestedGeneration,
 }: {
   lessonId: string;
+  flashcardTargetSetId?: string;
   quizTargetSetId?: string;
   onOpenResult: (type: AdminAiGenerationType, resourceId: string | null) => void;
   onRequestedGenerationHandled: () => void;
   requestedGeneration: AdminAiGenerationDialogRequest | null;
 }) {
   const panelQuery = useAdminAiGenerationPanel(lessonId);
+  const flashcardSetsQuery = useAdminFlashcardSets(lessonId);
   const quizSetsQuery = useAdminQuizSets(lessonId);
   const generateMutation = useGenerateAdminLessonContent(lessonId);
   const [dialogRequest, setDialogRequest] =
     useState<AdminAiGenerationDialogRequest | null>(null);
-  const [isRefreshingQuizSets, setIsRefreshingQuizSets] = useState(false);
+  const [refreshingSetType, setRefreshingSetType] = useState<"QUIZ" | "FLASHCARD" | null>(null);
 
   async function handleOpenGenerationDialog(type: AdminAiGenerationType) {
-    if (type !== "QUIZ") {
+    if (type !== "QUIZ" && type !== "FLASHCARD") {
       setDialogRequest({ type, mode: "CREATE" });
       return;
     }
-    if (isRefreshingQuizSets) return;
+    if (refreshingSetType) return;
 
-    setIsRefreshingQuizSets(true);
+    setRefreshingSetType(type);
     try {
-      const result = await quizSetsQuery.refetch();
+      const result = await (type === "QUIZ"
+        ? quizSetsQuery.refetch()
+        : flashcardSetsQuery.refetch());
       if (result.isError) {
         toast.error(
           getUserFacingErrorMessage(
             result.error,
-            "Chưa tải được danh sách bộ Quiz. Vui lòng thử lại.",
+            `Chưa tải được danh sách bộ ${type === "QUIZ" ? "Quiz" : "Flashcard"}. Vui lòng thử lại.`,
           ),
         );
         return;
       }
       setDialogRequest({ type, mode: "CREATE" });
     } finally {
-      setIsRefreshingQuizSets(false);
+      setRefreshingSetType(null);
     }
   }
 
@@ -206,7 +220,7 @@ export function AdminAiGenerationPanel({
               key={card.type}
               {...card}
               isActive={isActive}
-              isPreparing={card.type === "QUIZ" && isRefreshingQuizSets}
+              isPreparing={card.type === refreshingSetType}
               isReady={isReady}
               job={job}
               onGenerate={() => void handleOpenGenerationDialog(card.type)}
@@ -255,6 +269,38 @@ export function AdminAiGenerationPanel({
                   getUserFacingErrorMessage(
                     error,
                     "Chưa thể bắt đầu tạo Quiz. Vui lòng thử lại.",
+                  ),
+                );
+              }
+            }}
+          />
+        ) : dialogRequest.type === "FLASHCARD" ? (
+          <AdminFlashcardGenerationDialog
+            key={`FLASHCARD-${dialogRequest.mode}`}
+            documents={panel.documents}
+            initialGenerationConfiguration={
+              dialogRequest.mode === "EDIT"
+                ? panel.jobs.FLASHCARD?.inputMetaJson
+                : null
+            }
+            initialModelConfiguration={panel.flashcardConfiguration}
+            initialFigureModelConfiguration={panel.flashcardFigureConfiguration}
+            isOpen
+            isSubmitting={generateMutation.isPending}
+            lessonId={lessonId}
+            flashcardSets={flashcardSetsQuery.data ?? []}
+            flashcardTargetSetId={flashcardTargetSetId}
+            onClose={() => !generateMutation.isPending && setDialogRequest(null)}
+            onSubmit={async (payload) => {
+              try {
+                await generateMutation.mutateAsync(payload);
+                toast.success("Hệ thống đã tiếp nhận yêu cầu tạo Flashcard");
+                setDialogRequest(null);
+              } catch (error) {
+                toast.error(
+                  getUserFacingErrorMessage(
+                    error,
+                    "Chưa thể bắt đầu tạo Flashcard. Vui lòng thử lại.",
                   ),
                 );
               }
@@ -354,17 +400,28 @@ function GenerationCard({
       {hasSucceededContent ? (
         <button
           type="button"
-          onClick={type === "SUMMARY" || type === "QUIZ" ? onGenerate : onOpen}
-          className="theme-button-primary-subtle mt-4 inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-extrabold"
+          onClick={
+            type === "SUMMARY" || type === "QUIZ" || type === "FLASHCARD"
+              ? onGenerate
+              : onOpen
+          }
+          className={cn(
+            "mt-4 inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-extrabold",
+            type === "SUMMARY" || type === "QUIZ" || type === "FLASHCARD"
+              ? "theme-button-primary"
+              : "theme-button-primary-subtle"
+          )}
         >
           {type === "SUMMARY" ? (
             <Sparkles className="h-4 w-4" aria-hidden="true" />
-          ) : type === "QUIZ" ? (
+          ) : type === "QUIZ" || type === "FLASHCARD" ? (
             <Sparkles className="h-4 w-4" aria-hidden="true" />
           ) : (
             <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
           )}
-          {type === "SUMMARY" || type === "QUIZ" ? "Tạo mới" : "Mở để duyệt"}
+          {type === "SUMMARY" || type === "QUIZ" || type === "FLASHCARD"
+            ? "Tạo mới"
+            : "Mở để duyệt"}
         </button>
       ) : (
         <button
@@ -381,12 +438,12 @@ function GenerationCard({
             <Sparkles className="h-4 w-4" aria-hidden="true" />
           )}
           {isPreparing ? (
-            "Đang tải bộ Quiz"
+            type === "FLASHCARD" ? "Đang tải bộ Flashcard" : "Đang tải bộ Quiz"
           ) : isActive ? (
             <JobTimer createdAt={job!.createdAt} prefix="Đang xử lý (" suffix=")" />
           ) : job?.status === "FAILED" ? (
             "Thử lại"
-          ) : type === "QUIZ" || type === "SUMMARY" ? (
+          ) : type === "QUIZ" || type === "SUMMARY" || type === "FLASHCARD" ? (
             "Tạo mới"
           ) : (
             "Cấu hình"

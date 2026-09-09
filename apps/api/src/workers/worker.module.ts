@@ -24,10 +24,21 @@ import { LessonContentGenerationService } from "#api/workers/services/lesson-con
 import { QuizGenerationContextService } from "#api/modules/quiz/services/quiz-generation-context.service";
 import { QuizSourcePacketService } from "#api/modules/quiz/services/quiz-source-packet.service";
 import { QuizGenerationService } from "#api/workers/services/quiz-generation.service";
+import { FlashcardGenerationContextService } from "#api/modules/flashcards/services/flashcard-generation-context.service";
+import { FlashcardSourcePacketService } from "#api/modules/flashcards/services/flashcard-source-packet.service";
+import { FlashcardGenerationService } from "#api/workers/services/flashcard-generation.service";
+import { FlashcardFigureArtifactService } from "#api/modules/flashcards/services/flashcard-figure-artifact.service";
+import { FlashcardTexRendererClientService } from "#api/modules/flashcards/services/flashcard-tex-renderer-client.service";
+import { FlashcardFigureRenderingProcessor } from "#api/workers/processors/flashcard-figure-rendering.processor";
+import { FlashcardFigureRenderingWorkerService } from "#api/workers/services/flashcard-figure-rendering-worker.service";
 import { QuizFiguresModule } from "#api/modules/quiz-figures/quiz-figures.module";
 import { QuizFigureRenderingProcessor } from "#api/workers/processors/quiz-figure-rendering.processor";
 import { QuizFigureRenderingWorkerService } from "#api/workers/services/quiz-figure-rendering-worker.service";
 import { ProviderOperationsModule } from "#api/modules/provider-operations/provider-operations.module";
+import { JobsModule } from "#api/modules/jobs/jobs.module";
+import { FlashcardFigureRequestService } from "#api/modules/flashcards/services/flashcard-figure-request.service";
+import { FlashcardFigureJobService } from "#api/modules/flashcards/services/flashcard-figure-job.service";
+import { FlashcardFiguresService } from "#api/modules/flashcards/services/flashcard-figures.service";
 import { StemFiguresModule } from "#api/modules/stem-figures/stem-figures.module";
 import { StemFigureRenderingProcessor } from "#api/workers/processors/stem-figure-rendering.processor";
 import { StemFigureRenderingWorkerService } from "#api/workers/services/stem-figure-rendering-worker.service";
@@ -37,6 +48,7 @@ import { StemFigureRenderingWorkerService } from "#api/workers/services/stem-fig
     ConfigModule.forRoot(BACKEND_CONFIG_MODULE_OPTIONS),
     PrismaModule,
     ProviderOperationsModule,
+    JobsModule,
     AiModule,
     FilesModule,
     StemFiguresModule,
@@ -63,6 +75,16 @@ import { StemFigureRenderingWorkerService } from "#api/workers/services/stem-fig
     QuizGenerationContextService,
     QuizSourcePacketService,
     QuizGenerationService,
+    FlashcardGenerationContextService,
+    FlashcardSourcePacketService,
+    FlashcardGenerationService,
+    FlashcardFigureRequestService,
+    FlashcardFigureJobService,
+    FlashcardFiguresService,
+    FlashcardFigureArtifactService,
+    FlashcardTexRendererClientService,
+    FlashcardFigureRenderingProcessor,
+    FlashcardFigureRenderingWorkerService,
     StemFigureRenderingProcessor,
     StemFigureRenderingWorkerService,
     QuizFigureRenderingProcessor,

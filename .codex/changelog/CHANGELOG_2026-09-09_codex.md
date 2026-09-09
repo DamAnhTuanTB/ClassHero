@@ -1,0 +1,1 @@
+- 2026-09-09: Hoàn thiện pipeline AI độc lập cho Flashcard/Quiz và Summary, bổ sung quản trị hình lời giải, upload ảnh đề bài/lời giải, đồng bộ figure lifecycle, provider usage, nội dung học và các migration, test, UI, tài liệu liên quan; đồng thời dọn các script debug/test tạm ở thư mục gốc.

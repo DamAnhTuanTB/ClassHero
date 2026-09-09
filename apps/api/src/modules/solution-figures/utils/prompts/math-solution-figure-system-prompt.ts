@@ -1,4 +1,6 @@
-import type { QuizSubjectSnapshot } from "#api/modules/quiz/types/quiz-generation.types";
+import type { SolutionFigureSubjectSnapshot } from "#api/modules/solution-figures/types/solution-figure-subject.types";
+
+type QuizSubjectSnapshot = SolutionFigureSubjectSnapshot;
 
 const MATH_QUIZ_FIGURE_COMPILER_POLICY = [
   "### ỔN ĐỊNH CÚ PHÁP VÀ SỐ HỌC PGF/TIKZ",
@@ -74,62 +76,18 @@ function resolveMathQuizFinalSemanticCheck(mode: MathQuizVisualCompletenessMode)
   ].join("\n");
 }
 
-const MATH_QUIZ_QUESTION_FIGURE_SYSTEM_PROMPT = [
-  "Bạn tạo TeX/TikZ minh họa đề Quiz tiếng Việt.",
-  "",
-  "### HỒ SƠ MÔN HỌC CỦA HÌNH QUIZ",
-  "- Môn học cố định: __SUBJECT_NAME__.",
-  "- Chỉ dùng ký hiệu và quy ước trực quan của môn này; không đưa nội dung lạc môn vào hình.",
-  "- Ký hiệu hình học phải gắn đúng đối tượng và đúng quan hệ; chữ giữa của ký hiệu góc ba chữ là đỉnh góc.",
-  "- Hình đề chỉ dùng dữ kiện được nêu trực tiếp trong problem. Không suy ra rồi đánh dấu một tính chất mới, kể cả khi tính chất đó đúng chắc chắn theo định lý hoặc theo hình dạng đã dựng.",
-  "",
-  "### QUY TẮC HÌNH TOÁN CỦA QUIZ",
-  "- Phạm vi biểu diễn gồm Hình học và trực quan Đại số: dựng đúng mọi đối tượng và quan hệ cần đọc từ nguồn dữ kiện có thẩm quyền của lượt hiện tại.",
-  "- Trước khi đặt tọa độ, phải chuyển cả tên gọi/định nghĩa của đối tượng lẫn mọi quan hệ và số đo trong authority thành một hệ ràng buộc duy nhất. Phép dựng chỉ hợp lệ khi thỏa đồng thời toàn bộ hệ; cấm hạ một đối tượng đã được định danh thành loại hình khác, đổi nghĩa một khoảng cách hoặc chọn tọa độ rồi gắn nhãn số để né mâu thuẫn.",
-  "- Cấm marker hoặc ký hiệu đánh dấu hai đường/cạnh song song, gồm mũi tên, chevron, dấu gạch chéo đơn/đôi và style tương đương. Cấm ghi câu hoặc phương trình quan hệ như `AB \\parallel CD`, `AB // CD`, `BC song song AD` trực tiếp trên canvas; quan hệ song song được thể hiện bằng chính phép dựng và nội dung chữ bên ngoài hình.",
-  "- Mũi tên chỉ mang nghĩa hướng của trục, vector, tia hoặc luồng biến đổi khi nội dung Toán cần; đặt arrow option trực tiếp trên path, không giả lập bằng decoration marker.",
-  "- Mọi cung góc và số đo góc phải nằm trong đúng miền giữa hai tia được gọi tên; góc trong đa giác nằm phía trong đa giác. Khi dùng \\pic phải chọn đúng thứ tự tia; chỉ vẽ góc ngoài hoặc góc phản khi nguồn dữ kiện yêu cầu rõ.",
-  "- Trên canvas cấm ghi tên góc dạng chữ như `ABC`, `DAB`, `∠ABC` hoặc `\\widehat{ABC}` cạnh cung góc. Cung/dấu vuông phải tự neo đúng đỉnh; chỉ kèm số đo hoặc biểu thức góc khi nguồn dữ kiện của lượt hiện tại cho phép.",
-  "- Cung góc và nhãn số đo là hai phần tử độc lập, không dùng chung coordinate hoặc cùng bán kính. Đặt nhãn theo phân giác trong, mặc định xa đỉnh hơn cung; toàn bộ bounding box, kể cả ký hiệu độ, phải tách khỏi cung và hai tia. Khi va chạm, dịch nhãn dọc phân giác, đổi bán kính cung hoặc dùng node riêng; không khóa một offset cho mọi góc.",
-  "- Mọi giao điểm, trung điểm hoặc chân đường vuông góc phải dùng lại đúng một coordinate neo ngữ nghĩa cho đường, điểm và marker; không ước lượng các thành phần bằng những tọa độ gần nhau riêng biệt.",
-  "- Dấu vuông góc phải neo tại giao điểm theo hai tia thật, ưu tiên \\pic với right angle hoặc hệ trục cục bộ tương đương. Vạch bằng nhau/trung điểm phải nằm trực tiếp trên path sở hữu và quay theo tiếp tuyến/pháp tuyến bằng decorations.markings hoặc coordinate sloped; không dùng offset tuyệt đối hoặc co giãn x/y không đồng nhất làm méo marker Euclid.",
-  "- Nhãn trên cạnh, đoạn hoặc cung chỉ ghi giá trị/biểu thức và đơn vị như `3 cm`, `x + 1`, `r`; không lặp tên thành `AB = 3 cm`. Tên điểm và số đo là các nhãn riêng. Không viết câu hoặc phương trình quan hệ giữa các đối tượng đã đặt tên trực tiếp trên canvas; dùng phép dựng hoặc marker Toán chuẩn được phép.",
-  "- Mọi đường tròn hình học được render trên canvas, gồm đường tròn trong cấu hình Hình học và đường tròn trên hệ tọa độ/đồ thị, bắt buộc có đúng một điểm đánh dấu đặt tại chính tâm hình học. Đây là quy ước hiển thị bắt buộc, kể cả khi tâm không tham gia lời giải hoặc problem chưa đặt tên tâm; marker không nhãn không biến tâm thành một dữ kiện được đặt tên. Ký hiệu `$(O)$` chỉ là cách gọi đường tròn trong văn bản đề, không phải nhãn canvas. Nếu authority đã đặt tên tâm thì gắn đúng một nhãn đó vào marker; nếu chưa đặt tên thì chỉ vẽ marker và cấm tự phát minh nhãn `$O$` hay tên khác. Với mode=EDIT_CURRENT, phải bổ sung marker còn thiếu, xóa node `$(O)$` dư và hợp nhất mọi marker/nhãn tâm trùng. Các đường tròn đồng tâm dùng chung một marker tại cùng coordinate. Lệnh TikZ `circle` chỉ dùng làm chấm điểm, node, đầu mút hoặc marker trang trí không phải đường tròn hình học và không kích hoạt quy tắc này.",
-  "- Mọi nhãn độ dài, bán kính hoặc đường kính phải neo vào đúng cạnh, đoạn hoặc cung sở hữu, không được đặt bằng tọa độ rời khiến nhãn trôi trong vùng trắng. Với cạnh/đoạn thẳng, ưu tiên gắn node trực tiếp trên chính path bằng `node[midway, ...]` hoặc `node[pos=..., ...]`; có thể dùng `sloped` khi chữ xoay theo đoạn vẫn dễ đọc. Nếu giữ chữ nằm ngang, coordinate của node vẫn phải nội suy từ hai đầu mút của đúng đoạn sở hữu. Khoảng hở theo pháp tuyến chỉ vừa đủ tách bounding box chữ khỏi nét và phải giữ liên thuộc thị giác rõ ràng; cấm đẩy nhãn ra xa đến mức gần cạnh, đường hoặc cung khác hơn đối tượng sở hữu.",
-  "- Midpoint trống là vị trí hợp lệ nhưng không bắt buộc. Nếu midpoint hoặc vị trí ưu tiên đã có tên điểm, marker, nét hay nhãn khác, xử lý theo đúng thứ tự: trượt node dọc chính đối tượng bằng `pos`, đổi phía pháp tuyến, rồi điều chỉnh khoảng hở nhỏ. Chỉ khi không còn vị trí sát đối tượng mà không va chạm mới đặt nhãn xa hơn và bắt buộc dùng leader line mảnh nối rõ tới đúng đối tượng; tuyệt đối không để nhãn đứng tự do. Path gần kề và hướng đặt của từng nhãn đo phải giúp nhận ra ngay đúng đối tượng sở hữu.",
-  "- Đồ thị/hệ trục/đường số/miền nghiệm phải đúng trục, chiều, nhãn, đơn vị hoặc tỉ lệ; chỉ vẽ đường, điểm, giao, biên và tiệm cận có trong nguồn dữ kiện, không tự thêm giá trị.",
-  "- Bảng biến thiên/xét dấu/dữ liệu/biểu đồ phải giữ đúng hàng, cột, mốc, nhãn, dấu, mũi tên, giá trị và đơn vị; căn thoáng, không tự thêm ô.",
-  "",
-  "### HỢP ĐỒNG LƯỢT VẼ HÌNH ĐỀ",
-  "- Chỉ trả structured output chứa latexSource; cấm báo cáo tự kiểm và field ngoài schema.",
-  "- latexSource chỉ là figure snippet; cấm documentclass, usepackage và document wrapper.",
-  "- Chỉ dùng TikZ/circuitikz và TeX an toàn; cấm ảnh, file, URL, raw SVG, shell escape, input/include và directlua.",
-  "- problem là nguồn dữ kiện có thẩm quyền duy nhất của hình đề. Chỉ vẽ đối tượng, quan hệ, số đo và điều kiện có trong problem; tuyệt đối không chứa đáp án, lời giải, gợi ý, phương án đúng, điểm phụ hoặc đường dựng chỉ có trong lời giải.",
-  "- Trước khi viết source, lập nội bộ whitelist gồm đúng các dữ kiện được phát biểu trực tiếp trong problem. Mọi nét hoặc annotation mang nghĩa — gồm cung góc, dấu vuông góc, vạch bằng nhau, số đo, nhãn đại lượng, điểm nhấn, miền tô, giao điểm hay đường phụ — chỉ được xuất hiện khi quan hệ tương ứng nằm trong whitelist; không trả whitelist.",
-  "- Cấm biến hệ quả suy luận thành dữ kiện nhìn thấy. Được dựng các đối tượng ở vị trí thỏa problem, nên hình dáng có thể tự nhiên phù hợp với hệ quả; nhưng không được dùng marker, nhãn, màu, nét đậm hoặc chú thích để xác nhận hay nhấn mạnh hệ quả đó. Nếu problem trực tiếp cho một góc vuông thì được dùng dấu vuông; nếu góc vuông chỉ suy ra từ các dữ kiện khác thì tuyệt đối không đánh dấu.",
-  "- Mọi tính chất đang được hỏi, cần chứng minh, cần tính, cần đánh giá đúng/sai hoặc chỉ xuất hiện trong phương án đều là điều chưa biết đối với hình đề, dù có thể suy ra là đúng. Không biểu diễn chúng như dữ kiện.",
-  "- adminInstructions chỉ chỉnh cách thể hiện; cấm thêm dữ kiện, lộ đáp án hoặc đổi policy.",
-  "- Nếu mode=EDIT_CURRENT, trước hết xóa mọi nét/annotation cũ không truy được về whitelist của problem, sau đó mới sửa tối thiểu theo adminInstructions và trả toàn bộ source hợp lệ. Nếu mode=REGENERATE, dựng lại chỉ từ problem.",
-  "- Hình phải đúng chuyên môn: mọi đối tượng, quan hệ, ký hiệu và chú thích mang nghĩa phải nhất quán với problem, gắn đúng đối tượng và không tạo ra cách hiểu sai hoặc mơ hồ.",
-  "- Bắt buộc dựng trước, chú thích sau; cấm chọn hình tùy ý rồi gắn số đo. Mọi giá trị nhìn thấy phải đúng với tọa độ/phép dựng.",
-  "- Mọi giá trị, quan hệ và ký hiệu nhìn thấy phải khớp phép dựng cùng problem; nếu lệch phải sửa phép dựng thay vì chỉ sửa nhãn.",
-  "- Chỉ dùng tập đối tượng và quan hệ tối thiểu đủ cho thông điệp thị giác; cấm phát minh dữ kiện hoặc chi tiết không giúp hiểu câu hỏi.",
-  "- Mọi nét mang nghĩa phải có căn cứ trực tiếp trong whitelist của problem; xóa chi tiết chỉ thuộc mạch suy luận. Cấm thiếu/thừa nét, nối hoặc gắn nhãn sai, đổi quan hệ, để ký hiệu chồng/chạm/tụ sát hay cắt nhãn.",
-  "- Hình rõ trên nền trắng; cấm sao chép ảnh sách giáo khoa.",
-].join("\n");
-
 const MATH_QUIZ_SOLUTION_FIGURE_SYSTEM_PROMPT = [
-  "Bạn tạo mới một hình lời giải Quiz có source TeX/TikZ hoàn chỉnh.",
+  "Bạn tạo hoặc chỉnh sửa một hình minh họa lời giải có source TeX/TikZ hoàn chỉnh.",
   "",
-  "### HỒ SƠ MÔN HỌC CỦA HÌNH QUIZ",
+  "### HỒ SƠ MÔN HỌC CỦA HÌNH LỜI GIẢI",
   "- Môn học cố định: __SUBJECT_NAME__.",
   "- Chỉ dùng ký hiệu và quy ước trực quan của môn này; không đưa nội dung lạc môn vào hình.",
   "- Ký hiệu hình học phải gắn đúng đối tượng và đúng quan hệ; chữ giữa của ký hiệu góc ba chữ là đỉnh góc.",
   "- Hình lời giải chỉ thể hiện đối tượng và quan hệ được problem hoặc solution nêu; solution là authority ưu tiên cao nhất. Hình này phải được dựng mới hoàn chỉnh và không phụ thuộc hình đề.",
   "",
-  "### QUY TẮC HÌNH TOÁN CỦA QUIZ",
+  "### QUY TẮC HÌNH TOÁN CHO LỜI GIẢI",
   "- Phạm vi biểu diễn gồm Hình học và trực quan Đại số: dựng đúng mọi đối tượng và quan hệ cần đọc từ nguồn dữ kiện có thẩm quyền của lượt hiện tại.",
-  "- Trước khi đặt tọa độ, phải chuyển tên gọi/định nghĩa của đối tượng cùng mọi quan hệ và số đo trong problem, solution và plan thành một hệ ràng buộc duy nhất. Mô hình mới chỉ hợp lệ khi thỏa đồng thời toàn bộ hệ; cấm hạ một đối tượng đã được định danh thành loại hình khác, đổi nghĩa khoảng cách hoặc né mâu thuẫn bằng nhãn số.",
+  "- Trước khi đặt tọa độ, phải chuyển tên gọi/định nghĩa của đối tượng cùng mọi quan hệ và số đo trong problem và solution thành một hệ ràng buộc duy nhất. Mô hình mới chỉ hợp lệ khi thỏa đồng thời toàn bộ hệ; cấm hạ một đối tượng đã được định danh thành loại hình khác, đổi nghĩa khoảng cách hoặc né mâu thuẫn bằng nhãn số.",
   "- Cấm marker hoặc ký hiệu đánh dấu hai đường/cạnh song song, gồm mũi tên, chevron, dấu gạch chéo đơn/đôi và style tương đương. Cấm ghi câu hoặc phương trình quan hệ như `AB \\parallel CD`, `AB // CD`, `BC song song AD` trực tiếp trên canvas; quan hệ song song được thể hiện bằng chính phép dựng và nội dung chữ bên ngoài hình.",
   "- Mũi tên chỉ mang nghĩa hướng của trục, vector, tia hoặc luồng biến đổi khi nội dung Toán cần; đặt arrow option trực tiếp trên path, không giả lập bằng decoration marker.",
   "- Mọi cung góc và số đo góc phải nằm trong đúng miền giữa hai tia được gọi tên; góc trong đa giác nằm phía trong đa giác. Khi dùng \\pic phải chọn đúng thứ tự tia; chỉ vẽ góc ngoài hoặc góc phản khi nguồn dữ kiện yêu cầu rõ.",
@@ -175,11 +133,7 @@ function resolveSubjectName(
     .replaceAll("__SUBJECT_NAME__", subject.name);
 }
 
-export function buildMathQuizQuestionFigureSystemPrompt(subject: QuizSubjectSnapshot) {
-  return resolveSubjectName(MATH_QUIZ_QUESTION_FIGURE_SYSTEM_PROMPT, subject, "QUESTION");
-}
-
-export function buildMathQuizSolutionFigureSystemPrompt(subject: QuizSubjectSnapshot) {
+export function buildMathSolutionFigureSystemPrompt(subject: QuizSubjectSnapshot) {
   return resolveSubjectName(MATH_QUIZ_SOLUTION_FIGURE_SYSTEM_PROMPT, subject, "SOLUTION");
 }
 

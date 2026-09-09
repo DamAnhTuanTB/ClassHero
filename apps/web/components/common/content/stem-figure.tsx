@@ -4,6 +4,7 @@ import { AlertTriangle, Clock3, LoaderCircle } from "lucide-react";
 import { normalizeMathTextLatexCommands, tokenizeMathText } from "@learning-path/shared";
 import katex from "katex";
 import type { ReactNode } from "react";
+import { useStableImageUrl } from "@/hooks/use-stable-image-url";
 import "katex/contrib/mhchem";
 import "katex/dist/katex.min.css";
 import "@/components/common/content/math-content-typography.css";
@@ -36,7 +37,8 @@ export function StemFigure({
   displaySize?: "default" | "textbook-source";
   footer?: ReactNode;
 }) {
-  const imageUrl = visual.assetUrl || toSvgDataUrl(visual.previewSvg);
+  const stableAssetUrl = useStableImageUrl(visual.assetUrl);
+  const imageUrl = stableAssetUrl || toSvgDataUrl(visual.previewSvg);
   const displayPercent = getStemFigureDisplayPercent(visual.displayScale);
   if (!imageUrl) {
     const failed = visual.status === "FAILED";

@@ -375,6 +375,12 @@ Các bước chung:
    thức. Worker append các câu vào bộ Quiz đang mở và danh sách câu bên dưới;
    không tạo một bộ/tab mới cho từng lượt AI. Flashcard/Test vẫn lưu theo set
    tương ứng của chúng.
+   Với Flashcard, worker dùng schema/prompt/mapper riêng, trả `front`, `back`,
+   `solution` và đúng một boolean `requiresSolutionFigure`. Khi boolean này là
+   `true`, worker enqueue tối đa một job role `SOLUTION`; hình dùng authority
+   `solution > front` và không nhận `back` làm nguồn thay thế cho lời giải.
+   Menu admin chỉ có `Tạo ảnh cho lời giải`; modal hỗ trợ tạo mới và chỉ hiện
+   `Chỉnh sửa hình hiện tại` khi current revision là AI_TEX có source hợp lệ.
 9. Sau khi một lượt Quiz hoàn tất, card AI vẫn giữ CTA `Tạo Quiz`; bấm lại mở
    modal cấu hình để append thêm một lượt câu mới vào bộ đang chọn. Trong tab
    Quiz, admin chọn câu bằng thanh số thứ tự và chỉ câu đang chọn được render

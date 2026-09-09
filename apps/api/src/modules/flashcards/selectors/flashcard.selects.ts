@@ -29,15 +29,38 @@ export const adminFlashcardSelect = {
   lessonId: true,
   frontJson: true,
   backJson: true,
+  solutionJson: true,
   sourceMetadataJson: true,
   difficulty: true,
   reviewStatus: true,
+  publishedAt: true,
   sortOrder: true,
-  explanationId: true,
-  explanation: {
+  figures: {
+    where: { deletedAt: null, role: "SOLUTION" },
+    orderBy: { role: "asc" },
     select: {
       id: true,
-      contentJson: true,
+      role: true,
+      status: true,
+      lastErrorCode: true,
+      lastErrorMessage: true,
+      currentRevision: {
+        select: {
+          id: true,
+          sourceKind: true,
+          latexSource: true,
+          altText: true,
+          caption: true,
+          deliveryFile: {
+            select: {
+              id: true,
+              objectKey: true,
+              publicUrl: true,
+              visibility: true,
+            },
+          },
+        },
+      },
     },
   },
   createdAt: true,
@@ -56,18 +79,40 @@ export const studentFlashcardSetSelect = {
     where: {
       deletedAt: null,
       reviewStatus: "APPROVED",
+      publishedAt: { not: null },
     },
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     select: {
       id: true,
       frontJson: true,
       backJson: true,
+      solutionJson: true,
       difficulty: true,
       sortOrder: true,
-      explanation: {
+      figures: {
+        where: {
+          deletedAt: null,
+          role: "SOLUTION",
+          status: "SUCCEEDED",
+        },
+        orderBy: { role: "asc" },
         select: {
-          contentJson: true,
-          reviewStatus: true,
+          role: true,
+          currentRevision: {
+            select: {
+              altText: true,
+              caption: true,
+              deliveryFile: {
+                select: {
+                  id: true,
+                  mimeType: true,
+                  objectKey: true,
+                  publicUrl: true,
+                  visibility: true,
+                },
+              },
+            },
+          },
         },
       },
     },

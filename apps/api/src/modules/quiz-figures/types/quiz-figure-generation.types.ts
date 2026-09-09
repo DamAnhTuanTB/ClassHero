@@ -1,11 +1,16 @@
 import { z } from "zod";
 
 import type { AiStructuredInput } from "#api/modules/ai/types/ai-text.types";
+import {
+  buildQuestionFigureStructuredInput,
+  generatedQuestionFigureSchema,
+} from "#api/modules/question-figures/types/question-figure-generation.types";
 import type { QuizSubjectSnapshot } from "#api/modules/quiz/types/quiz-generation.types";
 import {
-  buildQuizFigureRefinementSystemPrompt,
-  buildQuizFigureSystemPrompt,
-} from "#api/modules/quiz-figures/utils/prompts/quiz-figure-system-prompt-resolver";
+  buildSolutionFigureStructuredInput,
+  generatedSolutionFigureSchema,
+} from "#api/modules/solution-figures/types/solution-figure-generation.types";
+import { buildQuizFigureRefinementSystemPrompt } from "#api/modules/quiz-figures/utils/prompts/quiz-figure-system-prompt-resolver";
 
 export const QUIZ_FIGURE_SCHEMA_VERSION =
   "quiz-figure-schema-v7-independent-solution-source";
@@ -27,17 +32,9 @@ export const quizFigureLatexSourceSchema = z
     "latexSource phải chứa một root tikzpicture hoặc circuitikz.",
   );
 
-export const generatedQuizQuestionFigureSchema = z
-  .object({
-    latexSource: quizFigureLatexSourceSchema,
-  })
-  .strict();
+export const generatedQuizQuestionFigureSchema = generatedQuestionFigureSchema;
 
-export const generatedQuizSolutionFigureSchema = z
-  .object({
-    latexSource: quizFigureLatexSourceSchema,
-  })
-  .strict();
+export const generatedQuizSolutionFigureSchema = generatedSolutionFigureSchema;
 
 export const generatedQuizFigureRefinementSchema = z
   .object({
@@ -129,33 +126,14 @@ export function buildQuestionFigureInput(input: {
   mode?: "REGENERATE" | "EDIT_CURRENT";
   currentLatexSource?: string | null;
 }): AiStructuredInput {
-  return {
-    systemPrompt: buildQuizFigureSystemPrompt(input.subject, "QUESTION"),
-    userPrompt: JSON.stringify({
-      role: "QUESTION",
-      mode: input.mode ?? "REGENERATE",
-      ...(input.targetGrade == null ? {} : { targetGrade: input.targetGrade }),
-      problem: input.plan.problem,
-      ...(input.mode === "EDIT_CURRENT" && input.currentLatexSource?.trim()
-        ? { currentLatexSource: input.currentLatexSource.trim() }
-        : {}),
-      ...(input.adminInstructions?.trim()
-        ? { adminInstructions: input.adminInstructions.trim() }
-        : {}),
-    }),
-    temperature: 0.1,
-    reasoningEffort: "medium",
-    maxTokens: 12_000,
-    outputName: "quiz_question_figure",
-    promptVersion: resolveQuizFigurePromptVersion(input.subject, "question"),
-    schemaVersion: QUIZ_FIGURE_SCHEMA_VERSION,
-    schemaReferenceStrategy: "auto",
-    promptCache: {
-      namespace: "quiz-figure-question",
-      keyEnabled: true,
-      retention: "in_memory",
-    },
-  };
+  return buildQuestionFigureStructuredInput({
+    subject: input.subject,
+    problem: input.plan.problem,
+    targetGrade: input.targetGrade,
+    adminInstructions: input.adminInstructions,
+    mode: input.mode,
+    currentQuestionLatexSource: input.currentLatexSource,
+  });
 }
 
 export function buildSolutionFigureInput(input: {
@@ -166,49 +144,15 @@ export function buildSolutionFigureInput(input: {
   mode?: "REGENERATE" | "EDIT_CURRENT";
   currentSolutionLatexSource?: string | null;
 }): AiStructuredInput {
-  return {
-    systemPrompt: buildQuizFigureSystemPrompt(input.subject, "SOLUTION"),
-    userPrompt: JSON.stringify({
-      role: "SOLUTION",
-      aiMode: input.mode ?? "REGENERATE",
-      ...(input.targetGrade == null ? {} : { targetGrade: input.targetGrade }),
-      problem: input.plan.problem,
-      solution: input.plan.solution,
-      ...(input.mode === "EDIT_CURRENT" && input.currentSolutionLatexSource?.trim()
-        ? { currentSolutionLatexSource: input.currentSolutionLatexSource.trim() }
-        : {}),
-      ...(input.adminInstructions?.trim()
-        ? { adminInstructions: input.adminInstructions.trim() }
-        : {}),
-    }),
-    temperature: 0.1,
-    reasoningEffort: "medium",
-    maxTokens: 12_000,
-    outputName: "quiz_solution_figure",
-    promptVersion: resolveQuizFigurePromptVersion(input.subject, "solution"),
-    schemaVersion: QUIZ_FIGURE_SCHEMA_VERSION,
-    schemaReferenceStrategy: "auto",
-    promptCache: {
-      namespace: "quiz-figure-solution",
-      keyEnabled: true,
-      retention: "in_memory",
-    },
-  };
-}
-
-function resolveQuizFigurePromptVersion(
-  subject: QuizSubjectSnapshot,
-  mode: "question" | "solution",
-) {
-  const version =
-    subject.key === "MATH"
-      ? "v66-independent-single-semantic-check"
-      : subject.key === "PHYSICS"
-        ? "v50-independent-single-semantic-check"
-        : subject.key === "CHEMISTRY"
-          ? "v49-independent-single-semantic-check"
-          : "v49-independent-single-semantic-check";
-  return `quiz-figure-${subject.key.toLowerCase()}-${mode}-${version}`;
+  return buildSolutionFigureStructuredInput({
+    subject: input.subject,
+    problem: input.plan.problem,
+    solution: input.plan.solution,
+    targetGrade: input.targetGrade,
+    adminInstructions: input.adminInstructions,
+    mode: input.mode,
+    currentSolutionLatexSource: input.currentSolutionLatexSource,
+  });
 }
 
 function resolveQuizFigureRefinementPromptVersion(

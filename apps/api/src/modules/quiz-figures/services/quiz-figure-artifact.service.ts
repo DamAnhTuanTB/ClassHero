@@ -9,6 +9,7 @@ import {
   QuizFigureStatus,
 } from "@prisma/client";
 
+import { badRequestException } from "#api/common/errors/api-exception";
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import type { EnvConfig } from "#api/config/env.validation";
 import { ObjectStorageService } from "#api/modules/files/services/object-storage.service";
@@ -112,14 +113,28 @@ export class QuizFigureArtifactService {
         where: { id: input.figureId, deletedAt: null },
         select: { id: true, currentRevisionId: true },
       });
-      const file = await tx.file.findFirstOrThrow({
+      const file = await tx.file.findFirst({
         where: {
           id: input.fileId,
-          status: FileStatus.READY,
+          purpose: FilePurpose.QUESTION_IMAGE,
+          status: { in: [FileStatus.UPLOADED, FileStatus.READY] },
           mimeType: { startsWith: "image/" },
+          deletedAt: null,
         },
-        select: { id: true },
+        select: { id: true, status: true },
       });
+      if (!file) {
+        throw badRequestException(
+          "QUIZ_FIGURE_FILE_NOT_READY",
+          "File hình Quiz không hợp lệ hoặc chưa sẵn sàng.",
+        );
+      }
+      if (file.status === FileStatus.UPLOADED) {
+        await tx.file.update({
+          where: { id: file.id },
+          data: { status: FileStatus.READY },
+        });
+      }
       const latest = await tx.quizFigureRevision.findFirst({
         where: { quizFigureId: figure.id },
         orderBy: { sourceVersion: "desc" },

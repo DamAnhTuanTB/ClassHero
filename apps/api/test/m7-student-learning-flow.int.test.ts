@@ -162,6 +162,7 @@ describe("M7 student learning flow integration", () => {
         frontJson: documentWithText("2 + 2"),
         backJson: documentWithText("4"),
         reviewStatus: ReviewStatus.APPROVED,
+        publishedAt: new Date(),
       },
     });
     flashcardId = flashcard.id;

@@ -75,6 +75,8 @@ export class LessonAiGenerationPanelService {
       summaryFigureRoute,
       quizRoute,
       quizFigureRoute,
+      flashcardRoute,
+      flashcardFigureRoute,
       activeModels,
       ...generations
     ] =
@@ -129,6 +131,8 @@ export class LessonAiGenerationPanelService {
       this.modelRouting.resolve(AiGenerationType.SUMMARY, AiModelPurpose.IMAGE),
       this.modelRouting.resolve(AiGenerationType.QUIZ, AiModelPurpose.TEXT),
       this.modelRouting.resolve(AiGenerationType.QUIZ, AiModelPurpose.IMAGE),
+      this.modelRouting.resolve(AiGenerationType.FLASHCARD, AiModelPurpose.TEXT),
+      this.modelRouting.resolve(AiGenerationType.FLASHCARD, AiModelPurpose.IMAGE),
       this.modelRouting.getAllActiveModels(),
       ...PANEL_GENERATION_TYPES.map((type) =>
         this.prisma.aiGeneration.findFirst({
@@ -178,6 +182,14 @@ export class LessonAiGenerationPanelService {
         getQuizDocumentUnavailableReason(document) ??
         getQuizPacketDocumentUnavailableReason(document);
       const canUseForQuiz = quizUnavailableReason === null;
+      const flashcardUnavailableReason = getFlashcardDocumentUnavailableReason({
+        status: document.status,
+        chunkCount: document.chunkCount,
+        embeddingReady:
+          document.embeddingProvider === AiProviderName.OPENAI &&
+          document.embeddingModel === embeddingConfig.model &&
+          document.embeddingDimensions === embeddingConfig.dimensions,
+      });
       return {
         id: document.id,
         title: document.title?.trim() || document.file.originalName,
@@ -191,9 +203,11 @@ export class LessonAiGenerationPanelService {
         ),
         canUseForSummary,
         canUseForQuiz,
+        canUseForFlashcard: flashcardUnavailableReason === null,
         unavailableReason:
           getSummaryDocumentUnavailableReason(document) ?? packetUnavailableReason,
         quizUnavailableReason,
+        flashcardUnavailableReason,
         embeddingReady:
           document.embeddingProvider === AiProviderName.OPENAI &&
           document.embeddingModel === embeddingConfig.model &&
@@ -234,6 +248,14 @@ export class LessonAiGenerationPanelService {
     const resolvedQuizFigureCandidate =
       quizFigureRoute.candidates.find((candidate) => candidate.available) ??
       quizFigureRoute.candidates[0] ??
+      null;
+    const resolvedFlashcardCandidate =
+      flashcardRoute.candidates.find((candidate) => candidate.available) ??
+      flashcardRoute.candidates[0] ??
+      null;
+    const resolvedFlashcardFigureCandidate =
+      flashcardFigureRoute.candidates.find((candidate) => candidate.available) ??
+      flashcardFigureRoute.candidates[0] ??
       null;
 
     return {
@@ -323,6 +345,34 @@ export class LessonAiGenerationPanelService {
           capabilities: candidate.capabilitiesJson,
         })),
       },
+      flashcardConfiguration: {
+        isDefaultConfigured: flashcardRoute.hasConfiguration,
+        resolvedProvider: resolvedFlashcardCandidate?.provider ?? null,
+        resolvedModel: resolvedFlashcardCandidate?.model ?? null,
+        temperature: flashcardRoute.temperature,
+        reasoningEffort: flashcardRoute.reasoningEffort,
+        maxOutputTokens: flashcardRoute.maxOutputTokens,
+        modelOptions: activeModels.map((candidate) => ({
+          provider: candidate.provider,
+          model: candidate.model,
+          available: candidate.available,
+          capabilities: candidate.capabilitiesJson,
+        })),
+      },
+      flashcardFigureConfiguration: {
+        isDefaultConfigured: flashcardFigureRoute.hasConfiguration,
+        resolvedProvider: resolvedFlashcardFigureCandidate?.provider ?? null,
+        resolvedModel: resolvedFlashcardFigureCandidate?.model ?? null,
+        temperature: flashcardFigureRoute.temperature,
+        reasoningEffort: flashcardFigureRoute.reasoningEffort,
+        maxOutputTokens: flashcardFigureRoute.maxOutputTokens,
+        modelOptions: activeModels.map((candidate) => ({
+          provider: candidate.provider,
+          model: candidate.model,
+          available: candidate.available,
+          capabilities: candidate.capabilitiesJson,
+        })),
+      },
       jobs: Object.fromEntries(
         PANEL_GENERATION_TYPES.map((type) => [
           type,
@@ -384,6 +434,19 @@ function getQuizDocumentUnavailableReason(document: {
   if (document.status === DocumentStatus.UPLOADED) return "Đang chờ xử lý Quiz";
   if (document.status === DocumentStatus.PROCESSING) return "Đang xử lý Quiz";
   if (document.status === DocumentStatus.FAILED) return "Xử lý Quiz thất bại";
+  return null;
+}
+
+function getFlashcardDocumentUnavailableReason(document: {
+  status: DocumentStatus;
+  chunkCount: number;
+  embeddingReady: boolean;
+}) {
+  if (document.status === DocumentStatus.UPLOADED) return "Đang chờ xử lý Flashcard";
+  if (document.status === DocumentStatus.PROCESSING) return "Đang xử lý Flashcard";
+  if (document.status === DocumentStatus.FAILED) return "Xử lý Flashcard thất bại";
+  if (document.chunkCount <= 0) return "Tài liệu chưa có nội dung để tạo Flashcard";
+  if (!document.embeddingReady) return "Embedding chưa sẵn sàng cho Flashcard";
   return null;
 }
 

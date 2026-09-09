@@ -21,8 +21,19 @@ export class CreateFlashcardSetDto implements CreateFlashcardSetInput {
 
 export class UpdateFlashcardSetDto extends PartialType(CreateFlashcardSetDto) {}
 
+export enum FlashcardSetReviewActionDto {
+  SAVE = "SAVE",
+  PUBLISH = "PUBLISH",
+  WITHDRAW = "WITHDRAW",
+}
+
 export class ReviewFlashcardSetDto implements ReviewFlashcardSetInput {
   @ApiProperty({ enum: ReviewStatus, example: ReviewStatus.APPROVED })
   @IsEnum(ReviewStatus)
   reviewStatus!: ReviewStatus;
+
+  @ApiPropertyOptional({ enum: FlashcardSetReviewActionDto })
+  @IsOptional()
+  @IsEnum(FlashcardSetReviewActionDto)
+  action?: ReviewFlashcardSetInput["action"];
 }

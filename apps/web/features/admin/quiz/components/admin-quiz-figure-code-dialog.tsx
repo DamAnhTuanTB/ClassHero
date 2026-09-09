@@ -14,6 +14,8 @@ import { StemFigureCodeEditor } from "@/features/admin/ai-generation/components/
 import type { AdminQuizFigure } from "@/features/admin/quiz/api/admin-quiz-api";
 import { useAdminQuizFigureMutations } from "@/features/admin/quiz/hooks/use-admin-quiz";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
+import { cn } from "@/lib/utils";
+import { useStableImageUrl } from "@/hooks/use-stable-image-url";
 import { getStemFigureDraftDisplayPercent } from "@/lib/stem-figure-display";
 import {
   addStemFigureCircleCenterLabel,
@@ -86,10 +88,12 @@ export function AdminQuizFigureCodeDialog({
   const previewDisplayPercent = getStemFigureDraftDisplayPercent(
     readStemFigureDisplayScale(source) ?? 1,
   );
+
+  const stablePublicUrl = useStableImageUrl(figure.currentRevision?.deliveryFile?.publicUrl);
   const previewUrl = result
     ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(result.previewSvg)}`
     : mode === "edit"
-      ? figure.currentRevision?.deliveryFile?.publicUrl
+      ? stablePublicUrl
       : null;
 
   async function compile(

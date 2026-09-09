@@ -44,8 +44,10 @@ export interface AdminAiPanelDocument {
   embeddingReady: boolean;
   canUseForSummary: boolean;
   canUseForQuiz: boolean;
+  canUseForFlashcard: boolean;
   unavailableReason: string | null;
   quizUnavailableReason: string | null;
+  flashcardUnavailableReason: string | null;
 }
 
 export interface AdminAiModelConfiguration {
@@ -118,6 +120,8 @@ export interface AdminAiGenerationPanelData {
   summaryFigureConfiguration: AdminAiModelConfiguration;
   quizConfiguration: AdminAiModelConfiguration;
   quizFigureConfiguration: AdminAiModelConfiguration;
+  flashcardConfiguration: AdminAiModelConfiguration;
+  flashcardFigureConfiguration: AdminAiModelConfiguration;
   jobs: Record<AdminAiGenerationType, AdminAiPanelJob | null>;
 }
 
@@ -172,6 +176,7 @@ export type AdminQuizGenerationPayload = {
   targetQuizSetId?: string;
   documentIds: string[];
   questionCount: number;
+  realWorldQuestionCount?: number;
   difficulty: AdminAiDifficulty;
   difficultyCounts?: { easy: number; medium: number; hard: number };
   questionTypes: AdminAiQuestionType[];
@@ -192,14 +197,35 @@ export type AdminQuizGenerationPayload = {
   requestHash?: string;
 };
 
+export type AdminFlashcardGenerationPayload = {
+  type: "FLASHCARD";
+  targetFlashcardSetId?: string;
+  documentIds: string[];
+  cardCount: number;
+  realWorldCardCount?: number;
+  difficulty: AdminAiDifficulty;
+  difficultyCounts?: { easy: number; medium: number; hard: number };
+  style: AdminSummaryStyle;
+  styleInstructions?: string;
+  extraInstructions?: string;
+  systemInstructions?: string;
+  userPrompt?: string;
+  model?: string;
+  temperature?: number;
+  reasoningEffort?: AiReasoningEffort;
+  maxOutputTokens?: number;
+  figureModel?: string;
+  figureTemperature?: number;
+  figureReasoningEffort?: AiReasoningEffort;
+  figureMaxOutputTokens?: number;
+  requestDraftId?: string;
+  requestHash?: string;
+};
+
 export type AdminAiGenerationPayload =
   | AdminSummaryGenerationPayload
   | AdminQuizGenerationPayload
-  | {
-      type: "FLASHCARD";
-      cardCount: number;
-      difficulty: AdminAiDifficulty;
-    }
+  | AdminFlashcardGenerationPayload
   | {
       type: "TEST";
       questionCount: number;
@@ -360,6 +386,28 @@ export interface AdminQuizPromptPreview {
     upperBoundVnd: number | null;
     fxRateVndPerUsd: number;
   };
+}
+
+export interface AdminFlashcardPromptPreview {
+  requestDraftId: string;
+  requestHash: string;
+  expiresAt: string;
+  promptVersion: string;
+  schemaVersion: string;
+  systemPrompt: string;
+  userPrompt: string;
+  inputPrompt: string;
+  openAiFileUploadRequest: AdminQuizPromptPreview["openAiFileUploadRequest"];
+  openAiRequest: AdminLessonSummaryPromptPreview["openAiRequest"];
+  context: Omit<AdminLessonSummaryPromptPreview["context"], "packet"> & {
+    packet: NonNullable<AdminLessonSummaryPromptPreview["context"]["packet"]>;
+    chunks: [];
+  };
+  configuration: AdminAiModelConfiguration & {
+    targetFlashcardSet?: { id: string; title: string } | null;
+    selectedModel?: string | null;
+  };
+  estimatedCost: AdminLessonSummaryPromptPreview["estimatedCost"];
 }
 
 export type AdminLessonSummaryReviewStatus =
@@ -588,6 +636,15 @@ export interface AdminStemFigureCreateAiPreview {
     textInputTokens: number;
     imageInputTokens: number;
     estimatedTokens: number;
+    tokenBreakdown?: {
+      systemInstructionsTokens: number;
+      userPromptTokens: number;
+      contextTokens: number;
+      schemaTokens: number;
+      textInputTokens: number;
+      pdfInputTokens: number;
+      estimatedTokens: number;
+    };
   };
   estimatedCost: {
     available: boolean;

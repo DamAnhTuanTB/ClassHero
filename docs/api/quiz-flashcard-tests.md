@@ -24,7 +24,6 @@ Behavior:
 - Admin dùng tổng `totalCostVnd` của các lần sinh để hiển thị chi phí cấp bộ.
   Khi chọn một lần sinh, chi tiết từng lượt gọi tiếp tục lazy-load qua API usage
   theo `aiGenerationId` và giữ phân trang hiện có.
-
 #### `POST /admin/lessons/:lessonId/quiz-sets`
 
 Role: `ADMIN`.
@@ -913,6 +912,13 @@ Behavior:
 
 - Trả các bộ chưa bị xóa mềm theo `sortOrder`, rồi `createdAt` tăng dần.
 - `cardCount` phản ánh số flashcard chưa bị xóa mềm.
+- Mỗi set kèm `pendingReviewCardCount`, `unpublishedApprovedCardCount` và
+  `aiGenerations`; từng generation có số usage event và tổng chi phí VNĐ để UI
+  hiển thị tổng chi phí/lịch sử độc lập với Quiz.
+- Lượt tạo/tạo lại hình lời giải thủ công của Flashcard AI kế thừa
+  `aiGenerationId` từ metadata của card. Vì vậy usage operation
+  `FLASHCARD_SOLUTION_FIGURE_GENERATION` được tính vào đúng lần sinh, tổng chi
+  phí cấp bộ và modal chi tiết giống lượt tạo hình tự động.
 
 #### `POST /admin/lessons/:lessonId/flashcard-sets`
 
@@ -949,8 +955,18 @@ Body:
 
 ```json
 {
+  "requestDraftId": "uuid",
+  "requestHash": "sha256",
+  "targetFlashcardSetId": "uuid",
+  "documentIds": ["uuid"],
   "cardCount": 20,
-  "difficulty": "MEDIUM"
+  "difficulty": "MIXED",
+  "difficultyCounts": { "easy": 10, "medium": 6, "hard": 4 },
+  "style": "student_friendly",
+  "model": "gpt-5.6-luna",
+  "maxOutputTokens": 12000,
+  "figureModel": "gpt-5.6-luna",
+  "figureMaxOutputTokens": 4000
 }
 ```
 
@@ -958,8 +974,69 @@ Response: `202 Accepted` với `jobId`.
 
 Behavior:
 
-- Flashcard AI sinh `front`, `back`, `explanation`, difficulty và provenance;
+- Flashcard AI sinh `front`, `back`, `solution`, difficulty và provenance;
   không sinh/ghi `hintJson` legacy.
+- `front` là câu hỏi, `back` là đáp án trực tiếp, còn `solution` là phần diễn giải
+  đầy đủ cho chính câu hỏi đó. Mọi thẻ phải neo vào kiến thức hoặc công thức có
+  trong PDF nguồn; tình huống thực tế chỉ hợp lệ khi thật sự cần kiến thức neo.
+- Bắt buộc dùng immutable draft từ endpoint preview. Nếu lesson đã có bộ,
+  `targetFlashcardSetId` phải là bộ còn tồn tại trong đúng lesson; output được
+  append vào bộ đó. Chỉ tự tạo `Bộ flashcard 1` khi lesson chưa có bộ nào.
+- Lượt tạo nội dung trả một cờ `requiresSolutionFigure`; sau khi lưu card, backend
+  chỉ enqueue một job hình lời giải khi cờ này bằng `true`.
+
+#### `POST /admin/lessons/:lessonId/flashcard-sets/prompt-preview`
+
+Role: `ADMIN`.
+
+Body dùng cùng cấu hình như generate nhưng chưa cần `requestDraftId`/`requestHash`.
+
+Behavior:
+
+- Ghép đúng lesson documents/khoảng trang thành packet PDF xác định, dựng
+  prompt/schema/request có `input_file` PDF trực tiếp, ước tính token và chi phí;
+  không gọi embedding hoặc text/image provider.
+- Trả `requestDraftId`, `requestHash`, prompt, OpenAI request preview, source
+  context, model resolution và estimated cost để generate xác nhận đúng snapshot.
+
+#### `POST /admin/flashcards/:flashcardId/figures/create-ai/preview`
+
+Role: `ADMIN`. Body gồm `mode=REGENERATE|EDIT_CURRENT` (mặc định
+`REGENERATE`), model/temperature/reasoning effort, yêu cầu admin và prompt
+override. Endpoint dựng đúng request tạo hình lời giải, token/cost estimate và
+không gọi provider. `EDIT_CURRENT` bị từ chối nếu chưa có current revision
+`AI_TEX` thành công với source hợp lệ.
+
+#### `POST /admin/flashcards/:flashcardId/figures/create-ai`
+
+Role: `ADMIN`. Body giống preview. Response `202 Accepted` gồm `jobId`,
+`figureId`, `revisionId`, `role=SOLUTION`, `mode`, `status`. Backend tạo/phục hồi
+logical figure theo `(flashcardId, SOLUTION)`, tạo revision mới và enqueue queue
+`FLASHCARD_FIGURE_RENDERING`. Preview, submit và worker dùng cùng request builder
+với authority `solution > front`; `back` không được gửi tới model tạo hình.
+
+Response danh sách Flashcard của admin và học sinh phải hydrate URL truy cập của
+current delivery asset. Nếu storage local/R2 chưa có `FILE_PUBLIC_BASE_URL`, API
+trả signed URL ngắn hạn trong `currentRevision.deliveryFile.publicUrl`; card và
+modal chỉnh sửa không được hiển thị trạng thái `SUCCEEDED` nhưng để trống ảnh chỉ
+vì cột `File.publicUrl` là `null`.
+
+#### `POST /admin/flashcards/:flashcardId/figures/admin-upload`
+
+Role: `ADMIN`. Body gồm `fileId`, `altText`, `caption?`.
+
+- Gắn một file ảnh đã upload với purpose `QUESTION_IMAGE` vào resource Flashcard
+  duy nhất role `SOLUTION`.
+- Backend tạo hoặc phục hồi logical figure `(flashcardId, SOLUTION)`, tạo revision
+  `ADMIN_UPLOAD` thành công và promote ngay; không gọi provider hoặc worker. Upload
+  mới thay current revision nhưng không xóa lịch sử revision cũ.
+
+#### `DELETE /admin/flashcards/:flashcardId/figures/:figureId`
+
+Role: `ADMIN`.
+
+- Chỉ xóa mềm resource role `SOLUTION` thuộc đúng Flashcard. File vật lý giữ
+  lifecycle độc lập; upload sau đó có thể phục hồi resource và tạo revision mới.
 
 #### `PATCH /admin/flashcard-sets/:setId`
 
@@ -977,7 +1054,22 @@ Behavior: soft delete và ghi audit log.
 
 Role: `ADMIN`.
 
-Behavior: cập nhật `reviewStatus` và ghi audit log.
+Body:
+
+```json
+{
+  "reviewStatus": "APPROVED",
+  "action": "PUBLISH"
+}
+```
+
+Behavior:
+
+- `action` nhận `SAVE | PUBLISH | WITHDRAW`; fallback từ `reviewStatus` chỉ giữ
+  tương thích client cũ.
+- `SAVE` gắn các card `APPROVED` chưa phát hành vào mốc phát hành gần nhất;
+  `PUBLISH` yêu cầu ít nhất một card đã duyệt, công khai set và gắn mốc phát
+  hành; `WITHDRAW` ẩn set. Mọi action ghi audit log.
 
 ### 11.2. Admin flashcard item-level CRUD
 
@@ -991,7 +1083,7 @@ Body:
 {
   "frontJson": {},
   "backJson": {},
-  "explanationJson": {},
+  "solutionJson": {},
   "difficulty": "MEDIUM",
   "sortOrder": 1
 }
@@ -1001,11 +1093,10 @@ Rules:
 
 - `frontJson` và `backJson` là Tiptap JSON có nội dung; công thức, ảnh có
   `alt`/`src` và bảng được tính là nội dung cấu trúc hợp lệ.
-- `explanationJson` optional và có thể gửi `null`; form quản trị không còn ô
-  gợi ý.
-- Lời giải chi tiết thủ công được lưu trong `ai_explanations` với
-  `targetType=FLASHCARD`, `source=ADMIN`, `reviewStatus=APPROVED` và trả về qua
-  relation `explanation`.
+- `solutionJson` optional và có thể gửi `null`; đây là lời giải chi tiết cho câu
+  hỏi ở `frontJson`, còn `backJson` chỉ là đáp án trực tiếp.
+- `solutionJson` được lưu trực tiếp trên Flashcard và trả về cùng card; không tạo
+  hoặc nối bản ghi `ai_explanations`.
 - Difficulty của từng card chỉ nhận `EASY`, `MEDIUM`, `HARD`; server tự gán
   `sortOrder` tiếp theo nếu client không gửi.
 - Tạo card tăng `flashcard_sets.card_count` trong cùng transaction và ghi audit
@@ -1018,10 +1109,24 @@ Role: `ADMIN`.
 Behavior:
 
 - Cập nhật flashcard.
-- Nếu front/back thay đổi mà request không gửi `explanationJson`, mark lời giải
-  hiện tại stale. Gửi `explanationJson` sẽ tạo/cập nhật lời giải; gửi `null`
-  hoặc document rỗng sẽ gỡ lời giải.
+- `solutionJson` được cập nhật độc lập; gửi `null` hoặc document rỗng sẽ gỡ lời
+  giải chi tiết. Mọi sửa card đều thu hồi mốc phát hành của card đó.
 - Ghi audit log.
+
+#### `POST /admin/flashcards/:flashcardId/review`
+
+Role: `ADMIN`.
+
+Behavior: duyệt/ẩn riêng một Flashcard AI và ghi audit log; không tự cascade sang
+card khác trong bộ. `solutionJson` dùng chung review status của card.
+
+#### `POST /admin/flashcard-sets/:setId/cards/review-all-ai`
+
+Role: `ADMIN`.
+
+Behavior: duyệt toàn bộ card `NEEDS_REVIEW` có provenance AI trong đúng set,
+đồng bộ explanation, giữ `publishedAt=null`, trả số đã duyệt/số còn chờ và ghi
+audit log. Endpoint không tự lưu hoặc phát hành.
 
 #### `DELETE /admin/flashcards/:flashcardId`
 
@@ -1042,9 +1147,15 @@ Behavior:
 
 - Yêu cầu lesson đã publish và student có enrollment active còn hạn cho khóa
   gốc/bản cá nhân hiệu lực, hoặc lesson bật trial.
-- Chỉ trả set/card chưa xóa, set/card `APPROVED` và set không phải reserve.
+- Chỉ trả set/card chưa xóa, set/card `APPROVED`, card có `publishedAt` và set
+  không phải reserve.
 - Response chứa front/back/difficulty, lời giải đã `APPROVED`,
   `progress`/`isFavorite` theo student và summary đã review/known/unknown.
+- Mỗi card chỉ có thể kèm `solutionFigure` khi current revision role `SOLUTION`
+  đã `SUCCEEDED`. Asset được chuẩn hóa thành `role`, `altText`, `caption`,
+  `fileId`, `mimeType`, `url`; `url` là public URL hoặc signed URL ngắn hạn khi
+  storage chưa cấu hình public base URL. Client render asset này trong phần lời
+  giải chi tiết, không đọc cấu trúc revision/File nội bộ.
 
 #### `GET /student/lessons/:lessonId/flashcard-history`
 

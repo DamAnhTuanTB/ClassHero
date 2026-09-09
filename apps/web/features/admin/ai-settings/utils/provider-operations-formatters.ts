@@ -35,6 +35,7 @@ export const usageStatusLabels: Record<UsageEvent["status"], string> = {
 
 const usagePurposeLabelsByResourceType: Record<string, string> = {
   QUIZ_FIGURE: "Tạo hình minh họa Quiz",
+  FLASHCARD_FIGURE: "Tạo hình minh họa Flashcard",
   STEM_FIGURE: "Tạo hình minh họa",
 };
 
@@ -61,6 +62,7 @@ const usageOperationLabels: Record<ProviderUsageOperation, string> = {
   QUIZ_SOLUTION_FIGURE_GENERATION: "Tạo ảnh lời giải Quiz",
   QUIZ_SOLUTION_FIGURE_EDITING: "Chỉnh sửa ảnh lời giải Quiz",
   QUIZ_SOLUTION_FIGURE_REFINEMENT: "Tinh chỉnh ảnh lời giải Quiz",
+  FLASHCARD_SOLUTION_FIGURE_GENERATION: "Tạo ảnh lời giải Flashcard",
 };
 
 const reasoningEffortLabels: Record<string, string> = {
@@ -98,6 +100,11 @@ export function formatUsagePurpose(event: UsageEvent) {
       : aiFeatureLabels[event.feature];
   }
   return event.category === "OCR_SERVICE" ? "Xử lý tài liệu" : "Gọi mô hình AI";
+}
+
+export function formatUsageTarget(event: UsageEvent) {
+  if (event.category !== "AI_MODEL") return null;
+  return event.targetLabel?.trim() || "Chưa xác định";
 }
 
 export function formatUsageDuration(value: number | null, status?: UsageEvent["status"]) {

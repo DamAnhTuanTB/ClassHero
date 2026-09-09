@@ -72,6 +72,13 @@ export class GenerateQuizDto {
   @Max(50)
   questionCount!: number;
 
+  @ApiPropertyOptional({ minimum: 0, maximum: 50, example: 5 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(50)
+  realWorldQuestionCount?: number;
+
   @ApiProperty({ enum: Difficulty, example: Difficulty.MEDIUM })
   @IsEnum(Difficulty)
   difficulty!: Difficulty;

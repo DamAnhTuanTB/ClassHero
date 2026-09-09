@@ -624,7 +624,7 @@ thức`). Không dùng ba bullet dài liền nhau vì preview khó nhận ra ran
   phù hợp, model phải ưu tiên mạch giải và ký hiệu của nguồn. Mỗi câu phải liên
   quan trực tiếp đến nội dung lesson; các kiến thức đã được học trước đó được phép hỗ trợ câu
   hỏi và lời giải.
-- Nội dung có công thức của Quiz/Test và mặt sau/lời giải thích của Flashcard
+- Nội dung có công thức của Quiz/Test và `back`/`solution` của Flashcard
   được khuyến khích dùng ký hiệu để ngắn gọn, nhưng phải ưu tiên theo thứ tự:
   ký hiệu của nguồn, ký hiệu chuẩn gắn với công thức/quy ước của đúng môn, rồi
   mới đến ký hiệu thông dụng do model tự đặt. Mọi ký hiệu mới do nội dung hiện
@@ -695,12 +695,38 @@ thức`). Không dùng ba bullet dài liền nhau vì preview khó nhận ra ran
   khớp ngữ pháp lệnh; renderer dùng cùng quy tắc cho math node lịch sử để tránh
   fallback đỏ hoặc lộ delimiter mà không ghi đè dữ liệu cũ.
 - Với Toán, có thể biến đổi số liệu, ngữ cảnh, cách hỏi và mức độ nhận thức, nhưng vẫn giữ đúng kỹ năng của page range buổi học.
-- Flashcard/Test có thể lưu source chunk/page metadata ở mức item để truy vết nội bộ. Quiz là bài tập mới do AI biên soạn nên không yêu cầu provider trả và không lưu `sourceChunkIds`, `sources` hoặc `sourceHash` trong từng câu; tài liệu nguồn chỉ làm context ở lúc sinh.
+- Flashcard lưu `sourcePacketPageNumbers` trỏ vào packet PDF trực tiếp của đúng
+  lượt sinh; Test có thể lưu source chunk/page metadata ở mức item để truy vết
+  nội bộ. Quiz là bài tập mới do AI biên soạn nên không yêu cầu provider trả và
+  không lưu `sourceChunkIds`, `sources` hoặc `sourceHash` trong từng câu; tài liệu
+  nguồn chỉ làm context ở lúc sinh.
+- Contract Flashcard Phase 1 gồm `front`, `back`, `solution`, difficulty,
+  source-page references và hai quyết định hình. `front` là câu hỏi; `back` là
+  đáp án trực tiếp; `solution` trả lời đầy đủ trực tiếp cho đúng câu hỏi ở
+  `front` theo cùng phong cách lời giải Quiz, không phải nội dung bổ trợ rời rạc
+  và không phải phần diễn giải lại `back`. `back` chỉ dùng để đối chiếu kết quả
+  cuối của lời giải.
+- Mọi thẻ phải neo vào định nghĩa/khái niệm, tính chất, định lý/hệ quả, quy tắc,
+  công thức, điều kiện áp dụng, ý nghĩa ký hiệu, chú ý hoặc nhận xét có trong PDF
+  nguồn. Tình huống thực tế được phép khi kiến thức neo là thiết yếu để trả lời;
+  context trang trí và bài tính nhiều bước không phải Flashcard hợp lệ.
+- Với công thức, `back` nêu biểu thức trực tiếp; `solution` giải thích ký hiệu,
+  điều kiện áp dụng, đơn vị/quy ước theo môn khi liên quan. Câu định nghĩa đơn
+  giản không bị ép kéo dài; “đầy đủ” nghĩa là đủ giải thích câu hỏi, không phải
+  viết thành bài luận.
+- `solution` Flashcard dùng cùng các invariant trình bày của Quiz: chỉ có thân
+  lời giải; đủ mắt xích; ưu tiên cách trình bày của PDF và đúng khối lớp; mỗi đơn
+  vị lập luận là một đoạn, cách nhau `\n\n`; kết luận cuối là đoạn riêng; công
+  thức gốc đứng trước biến đổi và thay số; chuỗi từ hai dấu bằng cấp ngoài cùng
+  dùng display `aligned`/`split`; ký hiệu mới được giới thiệu trước lần dùng đầu.
+  Flashcard giữ prompt/schema/mapper riêng và chỉ tái sử dụng các invariant nội
+  dung này, không import orchestration hoặc contract loại câu của Quiz.
 - UI cho học sinh không cần hiển thị source page cho quiz/test mặc định. Source page hữu ích hơn cho admin review, debug AI generation, report sai câu và chat Q&A theo tài liệu.
 - Quiz chống lấy lại bài tập/ví dụ bằng system prompt và user prompt. Không chạy
   similarity gate hậu kỳ trên Quiz; admin review là lớp kiểm duyệt nội dung.
-  Flashcard/Test có `sourceChunkIds` thì các ID đó phải thuộc đúng tập chunks đã
-  đưa vào lần generate.
+  Flashcard có `sourcePacketPageNumbers` thì mọi số trang phải thuộc đúng packet
+  PDF đã đính trực tiếp; Test có `sourceChunkIds` thì các ID đó phải thuộc đúng
+  tập chunks đã đưa vào lần generate.
 
 ### 5.0.1. Boundary figure của Quiz và Test
 
@@ -1441,6 +1467,10 @@ một profile môn thuộc chính Quiz; không hard-code prompt Toán cho khóa 
 Hóa. Không subject nào của Quiz trả bảng giả thiết–kết luận; prompt override
 không được xóa subject boundary.
 
+Ngoại lệ có chủ ý là đúng tác vụ tạo hình lời giải: Quiz gọi Solution Figure
+Core theo ADR-0027, còn plan/context, API, operation usage, job, revision và asset
+vẫn do Quiz sở hữu.
+
 Hạ tầng provider, queue/lifecycle, model routing và usage/budget là
 trung lập nên được phép dùng chung. Hard cutover không đọc legacy `exampleBlock`
 và không có fallback về core Summary.
@@ -1923,6 +1953,12 @@ Validation:
 - Phase 1 không trả `solutionFigurePlan`. Worker chỉ snapshot `problem` và
   `solution` vào input role `SOLUTION` để Phase 2 tự tạo hình hoàn chỉnh theo
   authority đã khóa.
+- Phase 2 của hình đề ở Summary và Quiz dùng chung Question Figure Core: một
+  builder `problem`-only, schema `{ latexSource }`, mode
+  `REGENERATE | EDIT_CURRENT`, subject-isolated system prompt, prompt version và
+  cache namespace. Adapter từng feature vẫn sở hữu API/queue/persistence và chỉ
+  ánh xạ dữ liệu domain sang contract chung. Core không nhận ảnh input và không
+  dùng source hiện tại ở mode `REGENERATE`.
 - Phase 2 của hình đề chỉ nhận `problem` làm nguồn nội dung; không gửi
   solution, answer, options, statements hoặc văn bản mô tả hiển thị dưới hình.
   Phase 1 cũng không sinh loại metadata này. Trước khi sinh source, model
@@ -1941,8 +1977,10 @@ Validation:
   Hình lời giải luôn trả toàn bộ `latexSource` mới và không yêu cầu, đọc hoặc gửi
   source hình đề. Admin có thể thay figure bằng file upload riêng.
 - Summary figure tự thiết kế từ `GENERATE_FROM_BLOCK` áp dụng cùng invariant
-  provenance theo từng subject, với `blockContent` và phần bổ sung chuyên môn
-  hợp lệ của `adminInstructions` làm authority. Các mode bám ảnh/source exact
+  provenance theo từng subject. Riêng target `QUESTION` của block Ví dụ/Bài tập
+  dùng Question Figure Core và chỉ lấy `problem`; các block/mode Summary còn lại
+  dùng `blockContent` cùng phần bổ sung chuyên môn hợp lệ của
+  `adminInstructions` làm authority. Các mode bám ảnh/source exact
   tiếp tục bảo toàn nhãn quan sát được ngoài phạm vi delta; repair kỹ thuật không
   được tự thiết kế lại nội dung. Thay đổi này chỉ ở prompt và prompt version;
   không đổi JSON Schema, source policy, persistence hoặc renderer.
@@ -1952,12 +1990,14 @@ Validation:
   output phải là một hình lời giải hoàn chỉnh không phụ thuộc hình đề, ảnh SGK
   hoặc source khác. Nhánh này áp dụng cả worker tự động và modal admin `Tạo mới
 bằng AI` khi `referenceImageMode=NONE`. Nó phải bám đầy đủ invariant nghiệp vụ
-  của Quiz `SOLUTION` nhưng được triển khai độc lập trong prompt/runtime Summary,
-  không import prompt prose hay builder Quiz. `TEXTBOOK_SOURCE`, current-source
-  edit và các loại block khác giữ nguyên mode, projection và authority cũ.
+  của role `SOLUTION` qua Solution Figure Core dùng chung với Quiz và Flashcard.
+  Adapter Summary chỉ ánh xạ block sang `problem + solution`; `TEXTBOOK_SOURCE`,
+  hình đề, technical repair và các loại block khác giữ nguyên prompt, projection
+  và authority riêng.
 - Manual authoring của cùng block nhận target tường minh `QUESTION | SOLUTION`.
-  `QUESTION` khóa projection ở `problem`, chọn `GENERATE_FROM_BLOCK` và không gửi
-  `solution`/`answer`; `SOLUTION` chọn `GENERATE_SOLUTION_FROM_BLOCK`, gửi
+  `QUESTION` khóa projection ở `problem`, chọn `GENERATE_FROM_BLOCK`, gọi
+  Question Figure Core và không gửi `solution`/`answer`; `SOLUTION` chọn
+  `GENERATE_SOLUTION_FROM_BLOCK`, gửi
   `solution > problem` và loại `answer`. `referenceImageMode=NONE` tạo mới lại;
   khi đúng slot đã có source TikZ hiện hành, `CURRENT_ONLY` được phép đi cùng
   target để sửa tối thiểu source đó mà không yêu cầu ảnh SGK. Cả hai mode giữ ánh
@@ -2175,20 +2215,26 @@ bằng AI` khi `referenceImageMode=NONE`. Nó phải bám đầy đủ invariant
   sửa tối thiểu/diagnostics không đổi nhãn ngoài phạm vi. Compiler tiếp tục sở
   hữu font family và cấu hình toàn cục; local node font size là style trình bày
   hợp lệ, không phải quyền thay `\setmainfont`.
-- Toán, Vật lý và Hóa học sở hữu ba system prompt độc lập trong cả Sinh kiến
-  thức và Quiz. Không có `global visual policy` chứa quy tắc chuyên môn, không
-  lấy policy Toán làm core rồi nối thêm vài dòng Lý/Hóa, và không import prompt
-  hình giữa Summary/StemFigure với Quiz. Mỗi domain tự sở hữu policy Toán, Lý,
-  Hóa hoàn chỉnh của mình; `GENERAL` là fallback riêng và tuyệt đối không mặc
-  định kế thừa một trong ba môn.
-- Phần được phép dùng chung chỉ là hạ tầng code nằm ngoài nội dung system prompt:
-  provider/queue/routing, structured-output schema, TeX safety/allowlist,
-  accounting và persistence. Không có prompt fragment dùng chung, kể cả role,
-  output contract, safety prose hoặc helper ghép section; nội dung giống nhau vẫn
-  được sao chép đầy đủ vào file prompt của từng môn. Quy tắc về cung góc, dấu
+- Toán, Vật lý, Hóa học và `GENERAL` vẫn sở hữu system prompt hoàn chỉnh độc lập
+  theo môn. Không có `global visual policy` trộn vocabulary chuyên môn và không
+  lấy policy Toán làm core rồi nối thêm vài dòng Lý/Hóa.
+- Riêng role tạo hình lời giải tương đương của Summary, Quiz và Flashcard dùng
+  chung Solution Figure Core: một prompt cho mỗi môn, một schema
+  `{ latexSource }`, một builder `problem + solution`, hai mode
+  `REGENERATE | EDIT_CURRENT`, một prompt version và cache namespace. Đây là
+  chia sẻ theo tác vụ giữa feature, không phải chia sẻ prose giữa các môn.
+  Provider/queue/routing, operation accounting và persistence vẫn do adapter
+  từng domain sở hữu. Quy tắc về cung góc, dấu
   vuông, vạch bằng nhau, hình học/
   đại số thuộc Toán; vector/lực/mạch/quang học thuộc Lý; liên kết/hóa trị/phản ứng/
   dụng cụ thuộc Hóa. Quy tắc của môn nào chỉ xuất hiện trong system prompt môn đó.
+- Riêng role tạo hình đề tương đương của Summary và Quiz dùng chung Question
+  Figure Core: một prompt cho mỗi môn, một schema `{ latexSource }`, một builder
+  chỉ nhận `problem`, hai mode `REGENERATE | EDIT_CURRENT`, một prompt version và
+  cache namespace. Đây cũng là chia sẻ theo tác vụ giữa feature, không phải chia
+  sẻ prose giữa các môn. Summary source-crop/source-redraw, Summary block tổng
+  quát và technical repair vẫn dùng contract StemFigure riêng; Quiz refinement
+  đa phương thức vẫn dùng contract QuizFigure riêng.
 - Trong prompt figure Toán, vạch bằng nhau phải được phân theo nhóm quan hệ từ
   authority của đúng mode: cùng nhóm dùng cùng kiểu/số vạch, hai nhóm độc lập dùng
   marker khác nhau trừ khi authority hợp nhất chúng. Không gộp nhóm chỉ vì đều là
@@ -2237,9 +2283,15 @@ bằng AI` khi `referenceImageMode=NONE`. Nó phải bám đầy đủ invariant
   style không phân tích chắc chắn, source do admin nhập và mode Summary có
   source/ảnh baseline làm authority.
 - Prompt Sinh kiến thức Phase 1, Quiz Phase 1 và mọi prompt figure Phase 2 phải có
-  version chứa `subjectKey`; prompt figure còn chứa mode/role. Cache, request
-  draft, preview, retry và snapshot không được dùng một version chung để trao đổi
-  request giữa môn hoặc giữa role `QUESTION` và `SOLUTION`.
+  version chứa `subjectKey`. Riêng role `SOLUTION` của ba feature dùng chung
+  version `solution-figure-<subject>-v1-shared`, schema
+  `solution-figure-schema-v1` và namespace `solution-figure`; không dùng chung
+  cache giữa các môn hoặc với role `QUESTION`. Riêng role `QUESTION` của Summary
+  và Quiz dùng version `question-figure-<subject>-v1-shared`, schema
+  `question-figure-schema-v1` và namespace `question-figure`; không dùng chung
+  cache giữa các môn hoặc với role `SOLUTION`. Cả hai lần chuyển core dùng chung
+  là `NEW_STABLE_PREFIX_WARMUP`: prefix cũ không được giả là cache hit, còn dữ
+  liệu động tiếp tục nằm sau stable breakpoint để tái sử dụng sau warm-up.
 - Quy tắc chống lộ đáp án chỉ thuộc hợp đồng lượt vẽ hình đề, không được truyền
   sang hình lời giải. Phase 1 chỉ trả hai boolean `requiresQuestionFigure` và
   `solutionFigure`. Phase 2 hình đề lấy `problem` làm authority duy nhất; Phase 2
@@ -2271,8 +2323,13 @@ Input:
 ```json
 {
   "lessonId": "uuid",
+  "targetFlashcardSetId": "uuid",
+  "documentIds": ["uuid"],
   "cardCount": 20,
-  "difficulty": "MEDIUM"
+  "realWorldCardCount": 4,
+  "difficulty": "MIXED",
+  "difficultyCounts": { "easy": 10, "medium": 6, "hard": 4 },
+  "style": "student_friendly"
 }
 ```
 
@@ -2285,13 +2342,59 @@ Output schema:
     {
       "front": "string",
       "back": "string",
-      "hint": "string",
-      "explanation": "string",
-      "difficulty": "MEDIUM"
+      "solution": "string",
+      "difficulty": "MEDIUM",
+      "sourcePacketPageNumbers": [1],
+      "requiresSolutionFigure": true
     }
   ]
 }
 ```
+
+Rules:
+
+- Flashcard Phase 1 có system prompt hoàn chỉnh và version riêng cho từng môn
+  `MATH`, `PHYSICS`, `CHEMISTRY`, `GENERAL`. Mỗi prompt được trình bày theo bảy
+  phần: vai trò/phạm vi môn; nội dung thẻ; vai trò field; nội dung và trình bày
+  `solution`; kiểm chứng chuyên môn; lựa chọn hình minh họa; nguồn và structured
+  output.
+  Dispatcher chỉ chọn prompt, không nối thêm prose dùng chung giữa các môn.
+- Nội dung gửi model không dùng tên giai đoạn nội bộ như `Phase 1` hoặc `Phase 2`
+  để đặt tên nhiệm vụ. Prompt phải nói trực tiếp model cần tạo hoặc quyết định gì;
+  tên phase chỉ dùng trong code, log, tài liệu kỹ thuật và giao diện cấu hình khi
+  cần phân biệt hai lượt xử lý.
+- System prompt là owner của các invariant ổn định: neo nguồn, vai trò
+  `front/back/solution`, chất lượng lời giải, kiểm chứng theo môn, figure decision
+  và output contract. Provider schema chỉ mô tả ngắn ý nghĩa từng field, không
+  lặp toàn bộ quy tắc trình bày.
+- User prompt chỉ chứa dữ liệu thay đổi theo lượt sinh: bài học, môn, khối lớp,
+  số thẻ, độ khó/phân bổ, số thẻ thực tế, cách trình bày, yêu cầu bổ sung và danh
+  sách mặt trước đã có. Danh sách đã có nằm trong block JSONL có delimiter và
+  được ghi rõ là dữ liệu tham chiếu, không phải chỉ dẫn.
+- `front` là câu hỏi trực tiếp hoặc câu hỏi đặt trong tình huống thực tế, nhưng
+  luôn kiểm tra đúng một đơn vị kiến thức của PDF nguồn. `back` là câu trả lời
+  trực tiếp, ngắn gọn. `solution` là lời giải đầy đủ được xây từ `front` và nguồn,
+  không lấy `back` làm tiền đề để diễn giải lại.
+- Custom system prompt tiếp tục thay thế nguyên văn default system prompt. Custom
+  user prompt thay phần nhiệm vụ mặc định; danh sách mặt trước đã có vẫn được nối
+  sau dưới dạng dữ liệu tham chiếu chống trùng, cùng hành vi với Quiz.
+- AI tạo nội dung chỉ quyết định một nhu cầu hình bằng
+  `requiresSolutionFigure`. `true` chỉ khi một hình riêng giúp theo dõi đối tượng,
+  quan hệ, phép dựng, đồ thị, thí nghiệm hoặc mô hình trực quan mà `solution`
+  thực sự dùng; câu hỏi thuần định nghĩa, công thức, biến đổi ký hiệu hoặc phép
+  tính không cần hình phải trả `false`.
+- Lượt tạo hình Flashcard chỉ có role `SOLUTION`, nhận `solution` làm authority
+  cao nhất và `front` làm bối cảnh; không nhận `back`, ảnh hoặc source mặt
+  trước/mặt sau. `REGENERATE` dựng source mới; `EDIT_CURRENT` chỉ hợp lệ khi
+  current asset là `AI_TEX` có source và vẫn phải kiểm lại theo `solution > front`.
+- Lượt hình lời giải ánh xạ `front -> problem` rồi dùng cùng Solution Figure Core
+  với Summary và Quiz. System prompt vẫn chọn độc lập theo `MATH`, `PHYSICS`,
+  `CHEMISTRY`, `GENERAL`; Flashcard không dùng `back` và chỉ giữ orchestration,
+  queue, persistence, revision và asset riêng.
+- Contract `flashcard_v5_clear_prompt_contract` và prompt version
+  `flashcard_<subject>_v6_natural_figure_wording` tạo stable prefix mới. Cache impact
+  là `NEW_STABLE_PREFIX_WARMUP`; PDF, manifest, cấu hình lượt sinh và dữ liệu
+  chống trùng vẫn nằm sau explicit breakpoint.
 
 ### 5.4. Test generation
 
@@ -2401,11 +2504,9 @@ AI output
 ```txt
 AI output
   -> validate schema
-  -> create flashcard_sets
-  -> create flashcards
-  -> if card.explanation exists:
-       create ai_explanations target_type FLASHCARD
-       update flashcards.explanation_id
+  -> resolve/create target flashcard_set
+  -> create flashcards with front_json + back_json + solution_json
+  -> keep source page provenance and Phase 1 figure decisions on the card
 ```
 
 ### 6.4. Test
@@ -2483,15 +2584,17 @@ Khi student/admin yêu cầu explanation:
 1. Load target hiện tại.
 2. Tính `target_content_hash` từ nội dung target:
    - quiz/test question: `question_json`, `options_json`, `correct_answer_json`, `hint_json`, `grading_config_json`.
-   - flashcard: `front_json`, `back_json`.
 3. Tính `source_context_hash` từ tài liệu/context nguồn được dùng, tối thiểu dựa trên `lesson_documents.content_hash` và chunk ids.
 4. Nếu explanation tồn tại và hash khớp, dùng cache.
 5. Nếu không khớp, coi cache là stale và enqueue `AI_GENERATE_EXPLANATION`.
 
-Khi admin sửa câu hỏi/flashcard/test question:
+Khi admin sửa quiz/test question:
 
 - Service phải set `ai_explanations.stale_at = now()` hoặc xóa `explanation_id` ở target.
 - MVP ưu tiên set stale để còn trace.
+
+Flashcard không dùng explanation cache cho lời giải được sinh cùng thẻ;
+`solution_json` thuộc trực tiếp Flashcard và được duyệt/phát hành cùng card.
 
 Khi tài liệu nguồn đổi:
 

@@ -1,7 +1,7 @@
 # ADR-0022: System prompt AI độc lập theo môn
 
 - Date: 2026-08-25
-- Status: Accepted
+- Status: Superseded in part by ADR-0027
 
 ## Context
 
@@ -18,8 +18,11 @@ output/safety contract giống hệt nhau cũng phải được viết đầy đ
 
 - Sinh kiến thức và Quiz mỗi domain tự sở hữu ba system prompt hoàn chỉnh cho
   `MATH`, `PHYSICS`, `CHEMISTRY`; `GENERAL` là fallback riêng.
-- Summary/StemFigure không import prompt hình của Quiz và ngược lại.
-- Chỉ chia sẻ hạ tầng code nằm ngoài prompt như provider, queue, structured-output
+- Summary/StemFigure và Quiz không import prompt domain của nhau. Role
+  `SOLUTION` của Summary/Quiz/Flashcard dùng chung Solution Figure Core theo
+  ADR-0027; role `QUESTION` problem-only của Summary/Quiz dùng chung Question
+  Figure Core theo ADR-0028.
+- Ngoài hai task core được ADR-0027/ADR-0028 chốt, chỉ chia sẻ hạ tầng code nằm ngoài prompt như provider, queue, structured-output
   schema, TeX safety/allowlist, accounting và persistence. Không chia sẻ prompt
   prose, prompt constant, common policy hoặc helper ghép section giữa các môn.
 - Mỗi subject module tự xử lý các mode của chính nó. Dispatcher chỉ chọn môn và

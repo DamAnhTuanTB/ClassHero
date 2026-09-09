@@ -66,7 +66,7 @@ describe("M9.22 Quiz figure AI authoring", () => {
           }),
           textFormat: {
             type: "json_schema",
-            name: "quiz_solution_figure",
+            name: "solution_figure",
             strict: true,
             schema: { type: "object", additionalProperties: false },
           },

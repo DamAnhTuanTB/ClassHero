@@ -50,7 +50,7 @@ const tabItems: Array<{
 }> = [
   {
     id: "lesson",
-    label: "Bài học",
+    label: "Kiến thức",
     icon: BookOpen,
     nodeClassName:
       "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-700 dark:bg-amber-950/60 dark:text-amber-300",
@@ -300,17 +300,21 @@ export function StudentLessonScreen({
             >
               {lesson.learningPath.title}
             </Link>
-            <ChevronRight
-              className="h-5 w-5 shrink-0 text-sky-400 dark:text-sky-600"
-              aria-hidden="true"
-            />
-            <span className="min-w-0 truncate text-[#058760] dark:text-emerald-300">
-              {lesson.chapter.title}
-            </span>
-            <ChevronRight
-              className="h-5 w-5 shrink-0 text-emerald-400 dark:text-emerald-600"
-              aria-hidden="true"
-            />
+            {lesson.chapter && (
+              <>
+                <ChevronRight
+                  className="h-5 w-5 shrink-0 text-sky-400 dark:text-sky-600"
+                  aria-hidden="true"
+                />
+                <span className="min-w-0 truncate text-[#058760] dark:text-emerald-300">
+                  {lesson.chapter.title}
+                </span>
+                <ChevronRight
+                  className="h-5 w-5 shrink-0 text-emerald-400 dark:text-emerald-600"
+                  aria-hidden="true"
+                />
+              </>
+            )}
           </nav>
 
           <h1 className="mt-3 text-xl font-black leading-tight text-slate-950 dark:text-[var(--theme-text-strong)] sm:text-3xl">

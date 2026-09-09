@@ -66,6 +66,7 @@ export function AdminBlockImageActions({
   const deleteMutation = useDeleteAdminStemFigure(lessonId);
   const replaceMutation = useReplaceAdminStemFigure(lessonId);
   const inputRef = useRef<HTMLInputElement>(null);
+  const uploadFigureIndexRef = useRef<number | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const transientTargetIdRef = useRef<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -118,7 +119,21 @@ export function AdminBlockImageActions({
     closeTimerRef.current = setTimeout(() => setIsOpen(false), 160);
   }
 
-  async function resolveTarget() {
+  async function resolveTarget(figureIndex?: number) {
+    if (figureIndex !== undefined) {
+      const figure = figures.find((item) => item.figureIndex === figureIndex);
+      if (figure) return figure;
+      try {
+        const ensured = await ensureMutation.mutateAsync({ blockPath, figureIndex });
+        transientTargetIdRef.current = ensured.id;
+        return ensured;
+      } catch (error) {
+        toast.error(
+          getUserFacingErrorMessage(error, "Chưa chuẩn bị được hình cho khối này."),
+        );
+        return null;
+      }
+    }
     if (selected) return selected;
     if (needsSelection) {
       toast.info("Hãy chọn hình cần thao tác.");
@@ -161,6 +176,12 @@ export function AdminBlockImageActions({
     setAiTargetMode(nextTargetMode);
     setDialog("ai");
     setIsOpen(false);
+  }
+
+  function openUpload(figureIndex: number | null) {
+    uploadFigureIndexRef.current = figureIndex;
+    setIsOpen(false);
+    inputRef.current?.click();
   }
 
   function commitTransientTarget(figure: AdminStemFigure) {
@@ -289,15 +310,29 @@ export function AdminBlockImageActions({
               label="Tạo mới bằng mã code"
               onClick={() => void openDialog("code")}
             />
-            <BlockMenuItem
-              disabled={busy || needsSelection}
-              icon={ImageUp}
-              label="Tải ảnh lên"
-              onClick={() => {
-                setIsOpen(false);
-                inputRef.current?.click();
-              }}
-            />
+            {isProblemBlock ? (
+              <>
+                <BlockMenuItem
+                  disabled={busy}
+                  icon={ImageUp}
+                  label="Tải ảnh đề bài"
+                  onClick={() => openUpload(0)}
+                />
+                <BlockMenuItem
+                  disabled={busy}
+                  icon={ImageUp}
+                  label="Tải ảnh lời giải"
+                  onClick={() => openUpload(1)}
+                />
+              </>
+            ) : (
+              <BlockMenuItem
+                disabled={busy || needsSelection}
+                icon={ImageUp}
+                label="Tải ảnh lên"
+                onClick={() => openUpload(null)}
+              />
+            )}
             {hasTextbookSource ? (
               <BlockMenuItem
                 disabled={
@@ -323,9 +358,11 @@ export function AdminBlockImageActions({
         onChange={(event) => {
           const file = event.target.files?.[0];
           event.currentTarget.value = "";
+          const uploadFigureIndex = uploadFigureIndexRef.current;
+          uploadFigureIndexRef.current = null;
           if (!file) return;
           void (async () => {
-            const figure = await resolveTarget();
+            const figure = await resolveTarget(uploadFigureIndex ?? undefined);
             if (!figure) return;
             try {
               await replaceMutation.mutateAsync({ figure, file });
@@ -409,7 +446,7 @@ function BlockMenuItem({
 }) {
   return (
     <button
-      className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-sm font-bold text-[var(--theme-text-strong)] transition hover:bg-[var(--theme-surface-soft)] disabled:cursor-not-allowed disabled:opacity-45"
+      className="flex min-h-10 w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-sm font-bold text-[var(--theme-text-strong)] transition hover:bg-[var(--theme-surface-soft)] disabled:cursor-not-allowed disabled:opacity-45"
       disabled={disabled}
       onClick={onClick}
       role="menuitem"
@@ -417,7 +454,7 @@ function BlockMenuItem({
       type="button"
     >
       <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-      {label}
+      <span className="whitespace-nowrap">{label}</span>
     </button>
   );
 }

@@ -1231,6 +1231,45 @@ test("skipped multi-statement Quiz keeps statement cards neutral", async ({ page
   await expectNoFrameworkOverlay(page);
 });
 
+test("flashcard reveals its detailed solution only after showing the back", async ({
+  page,
+}) => {
+  await setupStudentLearningApiMock(page, { testReady: false, testPasses: false });
+  await page.goto(`/student/lessons/${lessonId}?tab=flashcard`);
+  await page.getByRole("button", { name: "Bắt đầu" }).click();
+
+  await expect(page.getByRole("heading", { name: "Thẻ 1", exact: true })).toBeVisible();
+  await expect(page.getByText("Lời giải", { exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Lật thẻ xem mặt sau" }).click();
+  await expect(page.getByText("Mặt sau", { exact: true })).toBeVisible();
+  await expect(page.getByText("Lời giải", { exact: true })).toHaveCount(0);
+  const solutionToggle = page.getByRole("button", { name: "Xem lời giải" });
+  await expect(solutionToggle).toBeVisible();
+  await solutionToggle.click();
+  await expect(page.getByText("Lời giải", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Theo phép cộng số tự nhiên, 2 cộng 2 bằng 4."),
+  ).toBeVisible();
+  await expect(page.getByLabel("Lời giải Flashcard").locator(".katex-display")).toHaveCSS(
+    "text-align",
+    "center",
+  );
+  await expect(
+    page.getByRole("img", { name: "Hình minh họa lời giải Flashcard" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Lời giải", { exact: true }).locator("..").locator("figure"),
+  ).toBeVisible();
+  expect(
+    await page
+      .getByText("Lời giải", { exact: true })
+      .locator("..")
+      .locator(":scope > *")
+      .evaluateAll((elements) => elements.map((element) => element.tagName)),
+  ).toEqual(["P", "FIGURE", "DIV"]);
+  await expectNoFrameworkOverlay(page);
+});
+
 test("flashcard uses the lesson entry panel, fullscreen runner, and fullscreen result", async ({
   page,
 }) => {
@@ -4126,7 +4165,18 @@ function flashcardPayload(
       id,
       frontJson: documentWithText(index === 0 ? "2 + 2" : `Câu hỏi thẻ ${index + 1}`),
       backJson: documentWithText(index === 0 ? "4" : `Đáp án thẻ ${index + 1}`),
-      explanation: null,
+      solutionJson: index === 0 ? documentWithFlashcardSolution() : null,
+      solutionFigure:
+        index === 0
+          ? {
+              role: "SOLUTION",
+              altText: "Hình minh họa lời giải Flashcard",
+              caption: "Sơ đồ cho lời giải thẻ học",
+              fileId: "flashcard-solution-figure-file",
+              mimeType: "image/svg+xml",
+              url: scaledFigureDataUrl("#7c3aed"),
+            }
+          : null,
       isFavorite: favoriteIds.has(id),
       progress:
         isKnown === undefined
@@ -4170,7 +4220,8 @@ function flashcardPayload(
           id: "flashcard-m7-new",
           frontJson: documentWithText("3 + 3"),
           backJson: documentWithText("6"),
-          explanation: null,
+          solutionJson: null,
+          solutionFigure: null,
           isFavorite: favoriteIds.has("flashcard-m7-new"),
           progress: null,
         },
@@ -4301,6 +4352,19 @@ function documentWithText(text: string) {
         type: "paragraph",
         content: [{ type: "text", text }],
       },
+    ],
+  };
+}
+
+function documentWithFlashcardSolution() {
+  return {
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [{ type: "text", text: "Theo phép cộng số tự nhiên, 2 cộng 2 bằng 4." }],
+      },
+      { type: "blockMath", attrs: { latex: "2+2=4" } },
     ],
   };
 }

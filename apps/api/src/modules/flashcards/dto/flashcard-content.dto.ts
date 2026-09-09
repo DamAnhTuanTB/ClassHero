@@ -19,7 +19,7 @@ export class CreateFlashcardDto implements CreateFlashcardInput {
   })
   @IsOptional()
   @IsTiptapJson()
-  explanationJson?: Record<string, unknown> | null;
+  solutionJson?: Record<string, unknown> | null;
 
   @ApiPropertyOptional({ enum: Difficulty, example: Difficulty.MEDIUM })
   @IsOptional()

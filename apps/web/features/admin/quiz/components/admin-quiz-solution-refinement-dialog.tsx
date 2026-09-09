@@ -126,7 +126,8 @@ export function AdminQuizSolutionRefinementDialog({
     setPreviewTab("user");
     resetPreview();
     void refreshPreview({ adminInstructions: "" }, false);
-  }, [form, isOpen, refreshPreview, resetPreview]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, resetPreview]);
 
   useEffect(() => {
     const job = jobQuery.data;

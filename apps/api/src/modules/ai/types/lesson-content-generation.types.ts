@@ -127,26 +127,6 @@ export const generatedQuestionSchema = z.union([
   generatedNonMathTestQuestionSchema,
 ]);
 
-export const generatedFlashcardOutputSchema = z
-  .object({
-    title: text(180),
-    cards: z
-      .array(
-        z
-          .object({
-            difficulty: difficultySchema,
-            front: text(1_500),
-            back: text(2_500),
-            explanation: text(3_000),
-            sourceChunkIds: sourceChunkIdsSchema,
-          })
-          .strict(),
-      )
-      .min(1)
-      .max(60),
-  })
-  .strict();
-
 const sourceSnapshotSchema = z
   .object({
     documentIds: z.array(z.uuid()).min(1).max(50),
@@ -155,13 +135,6 @@ const sourceSnapshotSchema = z
     subjectKey: lessonSummarySubjectKeySchema,
     subjectName: z.string().trim().min(1).max(120),
     subjectSlug: z.string().trim().min(1).max(140),
-  })
-  .strict();
-
-export const flashcardGenerationJobInputSchema = sourceSnapshotSchema
-  .extend({
-    cardCount: z.number().int().min(1).max(60),
-    difficulty: z.nativeEnum(Difficulty),
   })
   .strict();
 
@@ -181,9 +154,5 @@ export const testGenerationJobInputSchema = sourceSnapshotSchema
   .strict();
 
 export type GeneratedQuestion = z.infer<typeof generatedQuestionSchema>;
-export type GeneratedFlashcardOutput = z.infer<typeof generatedFlashcardOutputSchema>;
 export type GeneratedTestOutput = z.infer<typeof generatedTestOutputSchema>;
-export type FlashcardGenerationJobInput = z.infer<
-  typeof flashcardGenerationJobInputSchema
->;
 export type TestGenerationJobInput = z.infer<typeof testGenerationJobInputSchema>;

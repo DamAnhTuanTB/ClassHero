@@ -8,6 +8,7 @@ import {
   getAdminLessonSummary,
   previewAdminLessonSummaryPrompt,
   previewAdminQuizPrompt,
+  previewAdminFlashcardPrompt,
   upsertAdminLessonSummary,
   updateAdminLessonSummaryPhaseOneBlocks,
   deleteAdminLessonSummary,
@@ -33,6 +34,7 @@ import type {
   AdminLessonSummaryReviewStatus,
   AdminSummaryGenerationPayload,
   AdminQuizGenerationPayload,
+  AdminFlashcardGenerationPayload,
   AdminStemFigure,
   AdminStemFigureCreateAiInput,
   AdminStemFigureRasterEditInput,
@@ -360,6 +362,18 @@ export function usePreviewAdminQuizPrompt(lessonId: string) {
   return useMutation({
     mutationFn: (payload: AdminQuizGenerationPayload) =>
       previewAdminQuizPrompt(lessonId, payload, session?.accessToken ?? ""),
+  });
+}
+
+export function usePreviewAdminFlashcardPrompt(lessonId: string) {
+  const session = useAuthSessionStore((state) => state.session);
+  return useMutation({
+    mutationFn: (payload: AdminFlashcardGenerationPayload) =>
+      previewAdminFlashcardPrompt(
+        lessonId,
+        payload,
+        session?.accessToken ?? "",
+      ),
   });
 }
 

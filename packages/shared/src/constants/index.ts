@@ -1,6 +1,4 @@
-import stemFigureToolboxManifestJson from "./stem-figure-toolbox-manifest.json" with {
-  type: "json",
-};
+import stemFigureToolboxManifestJson from "./stem-figure-toolbox-manifest.json" with { type: "json" };
 
 export const APP_NAME = "learning-path-mvp";
 
@@ -52,6 +50,7 @@ export const PROVIDER_USAGE_OPERATIONS = [
   "QUIZ_SOLUTION_FIGURE_GENERATION",
   "QUIZ_SOLUTION_FIGURE_EDITING",
   "QUIZ_SOLUTION_FIGURE_REFINEMENT",
+  "FLASHCARD_SOLUTION_FIGURE_GENERATION",
 ] as const;
 
 export type ProviderUsageOperation = (typeof PROVIDER_USAGE_OPERATIONS)[number];

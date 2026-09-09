@@ -88,7 +88,7 @@ export type StudentLesson = {
     id: string;
     title: string;
     orderIndex: number;
-  };
+  } | null;
   learningPath: {
     id: string;
     slug: string;
@@ -237,11 +237,21 @@ export type StudentFlashcardSet = {
   progress: FlashcardProgressSummary;
 };
 
+export type FlashcardSolutionFigureAsset = {
+  role: "SOLUTION";
+  altText: string;
+  caption: string | null;
+  fileId: string;
+  mimeType: string;
+  url: string | null;
+};
+
 export type StudentFlashcard = {
   id: string;
   frontJson: TiptapTextDocument;
   backJson: TiptapTextDocument;
-  explanation: { contentJson: TiptapTextDocument } | null;
+  solutionJson: TiptapTextDocument | null;
+  solutionFigure?: FlashcardSolutionFigureAsset | null;
   isFavorite: boolean;
   progress: {
     isKnown: boolean;

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
-import { AiGenerationType, Difficulty, QuestionType } from "@prisma/client";
+import { AiGenerationType, QuestionType } from "@prisma/client";
 
 import { badRequestException, notFoundException } from "#api/common/errors/api-exception";
 import { AiGenerationJobService } from "#api/modules/ai/services/ai-generation-job.service";
@@ -21,17 +21,6 @@ export class LessonContentGenerationJobService {
     @Inject(LessonContentGenerationContextService)
     private readonly context: LessonContentGenerationContextService,
   ) {}
-
-  queueFlashcards(
-    lessonId: string,
-    actorUserId: string,
-    input: {
-      cardCount: number;
-      difficulty: Difficulty;
-    },
-  ) {
-    return this.queue(AiGenerationType.FLASHCARD, lessonId, actorUserId, input);
-  }
 
   queueTest(
     lessonId: string,

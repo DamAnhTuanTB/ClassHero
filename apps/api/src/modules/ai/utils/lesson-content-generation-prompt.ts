@@ -11,12 +11,12 @@ export const LESSON_CONTENT_COMMON_SYSTEM_PROMPT = [
   "Không chép nguyên văn bài tập, ví dụ hay câu dài từ nguồn; phải tự diễn đạt và tạo tình huống mới.",
   "Mỗi câu Test phải có đề, lời giải và đáp án dạng chữ tự đủ dữ kiện.",
   "example.problem không được viết 'xem hình bên', 'quan sát hình' hoặc phụ thuộc hình ảnh.",
-  "Mỗi `example.problem` của Test và câu hỏi ở `front` của Flashcard phải chỉ có một cách hiểu chuyên môn: đại từ hoặc cụm chỉ quan hệ phải có đúng một đối tượng tham chiếu, các dữ kiện không được mâu thuẫn và không được trộn các quan hệ thuộc hai tình huống khác nhau. Nếu hai cách hiểu làm thay đổi đáp án thì phải viết lại; không vì vậy kéo dài câu đã rõ hoặc thêm chi tiết không tham gia câu trả lời.",
+  "Mỗi `example.problem` của Test phải chỉ có một cách hiểu chuyên môn: đại từ hoặc cụm chỉ quan hệ phải có đúng một đối tượng tham chiếu, các dữ kiện không được mâu thuẫn và không được trộn các quan hệ thuộc hai tình huống khác nhau. Nếu hai cách hiểu làm thay đổi đáp án thì phải viết lại; không vì vậy kéo dài câu đã rõ hoặc thêm chi tiết không tham gia câu trả lời.",
   "Đáp án đánh giá và example.answer/solution phải nhất quán tuyệt đối.",
   "Pipeline Test hiện không sinh hình; không trả TeX/TikZ, diagramSpec, SVG, HTML, script hay URL ảnh.",
   "Mọi quy tắc chuyên môn phải lấy từ đúng hồ sơ môn học của khóa hiện tại.",
-  "Trong `example.problem`/`example.solution` của Test và `back`/`explanation` của Flashcard, ưu tiên ký hiệu đã dùng trong nguồn; nếu nguồn không quy định thì dùng ký hiệu chuẩn gắn với công thức hoặc quy ước thông dụng của đúng môn. Mỗi ký hiệu mới do nội dung hiện tại tạo ra và chưa được ràng buộc trong đề, mặt trước hoặc ngữ cảnh trực tiếp phải được giới thiệu đúng một lần trước lần dùng đầu tiên, nêu rõ đại lượng/đối tượng và đơn vị hay chỉ số phân biệt khi cần; sau đó giữ nguyên một ý nghĩa xuyên suốt.",
-  "Không định nghĩa lại ký hiệu đã được đề hoặc mặt trước giới thiệu rõ, hằng số/toán tử/đơn vị chuẩn phù hợp khối lớp, tên điểm/đối tượng đã nêu hay công thức hóa học chuẩn. Mặt trước Flashcard được phép hỏi chính ý nghĩa của một ký hiệu; khi đó không tiết lộ định nghĩa ở mặt trước mà trả lời ở `back`, còn `explanation` chỉ phải khai báo các ký hiệu phụ mới của nó. Counterexample hợp lệ: một lời giải không tạo ký hiệu phụ thì trình bày trực tiếp bằng tên đại lượng, không bị ép đặt biến.",
+  "Trong `example.problem`/`example.solution` của Test, ưu tiên ký hiệu đã dùng trong nguồn; nếu nguồn không quy định thì dùng ký hiệu chuẩn gắn với công thức hoặc quy ước thông dụng của đúng môn. Mỗi ký hiệu mới do nội dung hiện tại tạo ra và chưa được ràng buộc trong đề hoặc ngữ cảnh trực tiếp phải được giới thiệu đúng một lần trước lần dùng đầu tiên, nêu rõ đại lượng/đối tượng và đơn vị hay chỉ số phân biệt khi cần; sau đó giữ nguyên một ý nghĩa xuyên suốt.",
+  "Không định nghĩa lại ký hiệu đã được đề giới thiệu rõ, hằng số/toán tử/đơn vị chuẩn phù hợp khối lớp, tên điểm/đối tượng đã nêu hay công thức hóa học chuẩn. Counterexample hợp lệ: một lời giải không tạo ký hiệu phụ thì trình bày trực tiếp bằng tên đại lượng, không bị ép đặt biến.",
   "Giữ LaTeX khi cần và trả đúng structured output, không thêm field ngoài schema.",
 ].join(" ");
 
@@ -24,22 +24,6 @@ export function resolveLessonContentPromptVersion(
   subjectKey: LessonSummarySubjectSnapshot["key"],
 ) {
   return LESSON_CONTENT_PROMPT_VERSIONS[subjectKey];
-}
-
-export function buildFlashcardPrompt(input: {
-  lessonTitle: string;
-  cardCount: number;
-  difficulty: string;
-  subject: LessonSummarySubjectSnapshot;
-}) {
-  const lines = [
-    `Tạo một bộ flashcard cho buổi học “${input.lessonTitle}”.`,
-    `Số thẻ chính xác: ${input.cardCount}. Độ khó: ${input.difficulty}.`,
-    "Mỗi flashcard phải dẫn ít nhất một sourceChunkIds đúng ID context đã cung cấp.",
-    "Mặt trước là câu hỏi/khái niệm ngắn; mặt sau là câu trả lời rõ ràng; explanation bổ sung lý do hoặc ngữ cảnh học tập.",
-    "Không tạo trường hint.",
-  ];
-  return appendSubjectBoundary(lines.join("\n"), input.subject);
 }
 
 export function buildTestPrompt(input: {

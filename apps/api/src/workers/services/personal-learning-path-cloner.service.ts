@@ -46,9 +46,6 @@ const cloneLessonInclude = {
       flashcards: {
         where: { deletedAt: null },
         orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-        include: {
-          explanation: true,
-        },
       },
     },
   },
@@ -291,17 +288,6 @@ export class PersonalLearningPathClonerService {
                 source: question.explanation,
                 targetId: getMappedId(quizQuestionIdMap, question.id),
                 lessonId: getMappedId(lessonIdMap, question.lessonId),
-              }),
-            ]
-          : [],
-      ),
-      ...flashcards.flatMap((flashcard) =>
-        flashcard.explanation
-          ? [
-              buildExplanationClone({
-                source: flashcard.explanation,
-                targetId: getMappedId(flashcardIdMap, flashcard.id),
-                lessonId: getMappedId(lessonIdMap, flashcard.lessonId),
               }),
             ]
           : [],
@@ -605,9 +591,8 @@ export class PersonalLearningPathClonerService {
         lessonId: getMappedId(lessonIdMap, flashcard.lessonId),
         frontJson: requiredJson(flashcard.frontJson),
         backJson: requiredJson(flashcard.backJson),
+        solutionJson: nullableJson(flashcard.solutionJson),
         hintJson: nullableJson(flashcard.hintJson),
-        explanationId:
-          explanationIdByTargetId.get(getMappedId(flashcardIdMap, flashcard.id)) ?? null,
         difficulty: flashcard.difficulty,
         reviewStatus: flashcard.reviewStatus,
         sortOrder: flashcard.sortOrder,

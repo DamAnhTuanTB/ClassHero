@@ -36,6 +36,7 @@ import {
   type FigureReferenceSnapshot,
 } from "#api/modules/stem-figures/services/figure-reference-resolver.service";
 import type { AiFeatureRoute } from "#api/modules/provider-operations/types/provider-operations.types";
+import { buildWholeFeatureUsageTarget } from "#api/modules/provider-operations/utils/provider-usage-target";
 import { buildStemFigureGenerationBrief } from "#api/modules/stem-figures/utils/stem-figure-generation-brief";
 import { compareStemFigurePositions } from "#api/modules/stem-figures/utils/stem-figure-position";
 import { StoredFileCleanupService } from "#api/modules/files/services/stored-file-cleanup.service";
@@ -170,6 +171,10 @@ export class LessonSummaryGenerationService {
               attempt: context.attempt,
               callSequence: 1,
               operation: "SUMMARY_GENERATION",
+              targetContext: buildWholeFeatureUsageTarget(
+                AiGenerationType.SUMMARY,
+                context.aiGenerationId,
+              ),
               routeSnapshot: normalizeSummaryRouteSnapshot(context.providerRouteSnapshot),
             },
             structuredInput,

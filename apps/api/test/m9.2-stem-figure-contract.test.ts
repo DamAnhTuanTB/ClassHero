@@ -47,12 +47,16 @@ import {
 } from "#api/modules/ai/utils/openai-response-request";
 import { resolveCourseSubject } from "#api/modules/ai/utils/lesson-summary-subject";
 import { reconcileLessonSummaryReviewIssues } from "#api/modules/learning-paths/utils/lesson-summary-review";
+import { buildQuestionFigureStructuredInput } from "#api/modules/question-figures/types/question-figure-generation.types";
 import {
-  buildFlashcardPrompt,
   buildLessonContentSystemPrompt,
   buildTestPrompt,
   resolveLessonContentPromptVersion,
 } from "#api/modules/ai/utils/lesson-content-generation-prompt";
+import {
+  buildFlashcardSystemPrompt,
+  buildFlashcardUserPrompt,
+} from "#api/modules/flashcards/utils/flashcard-generation-prompt";
 import {
   StemFigureRepairService,
   toStemFigureProviderDiagnosticBatch,
@@ -2068,29 +2072,38 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
         String(request.userPrompt).split("\n\n").at(-1)!,
       ) as Record<string, unknown>;
       expect(request.inputImages).toHaveLength(expectedInputImageCount);
-      expect(providerBrief).toEqual({
-        targetGrade: 12,
-        blockContent: {
-          type: "example",
-          problem: "Vẽ hình minh họa.",
-          ...(mode === "NONE"
-            ? { solution: "Dùng quan hệ đã cho để kiểm tra hình." }
-            : {}),
-        },
-        reference: expectedReference,
-        ...(currentLatexSource ? { currentLatexSource } : {}),
-        ...(adminInstructions ? { adminInstructions } : {}),
-      });
+      expect(providerBrief).toEqual(
+        mode === "NONE"
+          ? {
+              role: "SOLUTION",
+              aiMode: "REGENERATE",
+              targetGrade: 12,
+              problem: "Vẽ hình minh họa.",
+              solution: "Dùng quan hệ đã cho để kiểm tra hình.",
+            }
+          : {
+              targetGrade: 12,
+              blockContent: {
+                type: "example",
+                problem: "Vẽ hình minh họa.",
+              },
+              reference: expectedReference,
+              ...(currentLatexSource ? { currentLatexSource } : {}),
+              ...(adminInstructions ? { adminInstructions } : {}),
+            },
+      );
       expect(providerBrief).not.toHaveProperty("lessonTitle");
       expect(providerBrief).not.toHaveProperty("sectionHeading");
       expect(providerBrief).not.toHaveProperty("sourceEvidence");
       expect(providerBrief).not.toHaveProperty("essentialElements");
       expect(providerBrief).not.toHaveProperty("pairedTheory");
       if (!adminInstructions) {
-        const providerPrompts = `${request.systemPrompt}\n${request.userPrompt}`;
-        expect(providerPrompts).not.toContain("adminInstructions");
-        expect(providerPrompts).not.toContain("yêu cầu sửa đổi/bổ sung");
-        expect(providerPrompts).not.toContain("delta");
+        expect(request.userPrompt).not.toContain("adminInstructions");
+        if (mode !== "NONE") {
+          const providerPrompts = `${request.systemPrompt}\n${request.userPrompt}`;
+          expect(providerPrompts).not.toContain("yêu cầu sửa đổi/bổ sung");
+          expect(providerPrompts).not.toContain("delta");
+        }
       }
     },
   );
@@ -2797,11 +2810,11 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     });
 
     const request = generateStructured.mock.calls[0]?.[1];
-    expect(request.promptVersion).toContain("edit-current-source");
+    expect(request.promptVersion).toBe("solution-figure-math-v1-shared");
     expect(request.inputImages).toEqual([]);
-    expect(request.userPrompt).toContain("Không có ảnh reference");
-    expect(request.userPrompt).toContain("currentLatexSource");
-    expect(request.systemPrompt).toContain("ảnh reference, nếu có");
+    expect(request.userPrompt).toContain('"aiMode":"EDIT_CURRENT"');
+    expect(request.userPrompt).toContain("currentSolutionLatexSource");
+    expect(request.systemPrompt).toContain("hoàn toàn độc lập với hình đề");
   });
 
   it("caps a same-label textbook figure at four usable crops in deterministic order", () => {
@@ -3572,20 +3585,18 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     });
 
     const request = generateStructured.mock.calls[0]?.[1];
-    expect(request.userPrompt).toContain(
-      '"blockContent":{"type":"example","problem":"Tính khoảng cách từ M tới mặt phẳng P.","solution":"Thay số vào công thức và rút gọn."}',
-    );
+    expect(JSON.parse(request.userPrompt)).toMatchObject({
+      role: "SOLUTION",
+      aiMode: "REGENERATE",
+      problem: "Tính khoảng cách từ M tới mặt phẳng P.",
+      solution: "Thay số vào công thức và rút gọn.",
+    });
     expect(request.userPrompt).not.toContain("answer");
     expect(request.systemPrompt).toContain("solution là nguồn có độ ưu tiên cao nhất");
-    expect(request.systemPrompt).toContain("problem chỉ bổ sung bối cảnh");
+    expect(request.systemPrompt).toContain("problem bổ sung cấu hình và dữ kiện ban đầu");
     expect(request.systemPrompt).not.toContain("solution rồi problem");
-    expect(request.systemPrompt).toContain("ngôn ngữ minh họa sách giáo khoa");
-    expect(request.systemPrompt).toContain(
-      "Không chép nguyên đề bài, lý thuyết, phép tính trung gian hoặc kết luận lên hình",
-    );
-    expect(request.promptVersion).toBe(
-      "stem-figure-math-generate-solution-from-block-v90-single-semantic-check",
-    );
+    expect(request.systemPrompt).toContain("QUY TẮC HÌNH TOÁN CHO LỜI GIẢI");
+    expect(request.promptVersion).toBe("solution-figure-math-v1-shared");
     expect(request.inputImages).toEqual([]);
   });
 
@@ -3618,15 +3629,36 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     });
 
     const request = generateStructured.mock.calls[0]?.[1];
-    expect(request.promptVersion).toBe(
-      "stem-figure-math-generate-from-block-v90-single-semantic-check",
-    );
-    expect(request.userPrompt).toContain(
-      '"blockContent":{"type":"example","problem":"Cho tam giác ABC vuông tại A."}',
-    );
+    const sharedRequest = buildQuestionFigureStructuredInput({
+      subject: { key: "MATH", name: "Toán", slug: "toan" },
+      problem: "Cho tam giác ABC vuông tại A.",
+      targetGrade: 12,
+    });
+    expect(request.promptVersion).toBe("question-figure-math-v1-shared");
+    expect(request.schemaVersion).toBe("question-figure-schema-v1");
+    expect(request.promptCache).toEqual({
+      namespace: "question-figure",
+      keyEnabled: true,
+      retention: "in_memory",
+    });
+    expect(request.systemPrompt).toBe(sharedRequest.systemPrompt);
+    expect(JSON.parse(request.userPrompt)).toEqual({
+      role: "QUESTION",
+      aiMode: "REGENERATE",
+      targetGrade: 12,
+      problem: "Cho tam giác ABC vuông tại A.",
+    });
+    expect(request.userPrompt).not.toContain("blockContent");
     expect(request.userPrompt).not.toContain("solution");
+    expect(request.userPrompt).not.toContain("answer");
     expect(request.systemPrompt).not.toContain(
       "solution là nguồn có độ ưu tiên cao nhất",
+    );
+    expect(request.systemPrompt).toContain(
+      "problem là nguồn dữ kiện có thẩm quyền duy nhất",
+    );
+    expect(request.systemPrompt).toContain(
+      "Cấm biến hệ quả suy luận thành dữ kiện nhìn thấy",
     );
     expect(request.inputImages).toEqual([]);
   });
@@ -4886,11 +4918,19 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     "isolates Flashcard and Test prompts to $subject.name",
     ({ subject, expected, forbidden, proofPolicy }) => {
       const systemPrompt = buildLessonContentSystemPrompt(subject);
-      const flashcardPrompt = buildFlashcardPrompt({
+      const flashcardSystemPrompt = buildFlashcardSystemPrompt({ subject });
+      const flashcardPrompt = buildFlashcardUserPrompt({
         lessonTitle: "Bài học theo môn",
-        cardCount: 2,
-        difficulty: Difficulty.MEDIUM,
         subject,
+        targetGrade: 9,
+        configuration: {
+          cardCount: 2,
+          difficulty: Difficulty.MEDIUM,
+          difficultyCounts: null,
+          styleInstructions: "Dễ hiểu",
+          extraInstructions: "",
+        },
+        existingFronts: [],
       });
       const testPrompt = buildTestPrompt({
         lessonTitle: "Bài học theo môn",
@@ -4901,16 +4941,23 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
         targetGrade: 9,
         subject,
       });
-      const serializedInput = [systemPrompt, flashcardPrompt, testPrompt].join("\n");
+      const serializedInput = [
+        systemPrompt,
+        flashcardSystemPrompt,
+        flashcardPrompt,
+        testPrompt,
+      ].join("\n");
       expect(testPrompt).toContain("phân bổ chính xác TRUE_FALSE=1");
       expect(serializedInput).toContain(expected);
       expect(serializedInput).toContain(subject.name);
       expect(serializedInput).toContain(
         "giới thiệu đúng một lần trước lần dùng đầu tiên",
       );
-      expect(serializedInput).toContain(
-        "Mặt trước Flashcard được phép hỏi chính ý nghĩa của một ký hiệu",
-      );
+      expect(flashcardSystemPrompt).toContain("`front` là một câu hỏi ngắn, rõ ràng");
+      expect(flashcardSystemPrompt).toContain("`back` là câu trả lời trực tiếp");
+      expect(flashcardSystemPrompt).toContain("`solution`");
+      expect(flashcardPrompt).toContain("### NHIỆM VỤ TẠO FLASHCARD");
+      expect(flashcardPrompt).not.toContain("VAI TRÒ CỦA CÁC FIELD");
       expect(systemPrompt).toContain("phải chỉ có một cách hiểu chuyên môn");
       expect(systemPrompt).toContain("các dữ kiện không được mâu thuẫn");
       expect(systemPrompt).toContain("không vì vậy kéo dài câu đã rõ");
@@ -4956,7 +5003,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     },
   );
 
-  it("keeps the Math rectangle terminology in the stable Flashcard/Test prefix", () => {
+  it("keeps the Math rectangle terminology in the stable Test prefix", () => {
     const subject = { key: "MATH" as const, name: "Toán", slug: "toan" };
     const firstSystemPrompt = buildLessonContentSystemPrompt(subject);
     const secondSystemPrompt = buildLessonContentSystemPrompt(subject);

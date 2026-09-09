@@ -5,6 +5,7 @@ import {
   formatReasoningEffort,
   formatUsageDuration,
   formatUsagePurpose,
+  formatUsageTarget,
 } from "@/features/admin/ai-settings/utils/provider-operations-formatters";
 
 test("formats the snapshotted AI operation, reasoning effort, and latency", () => {
@@ -34,4 +35,18 @@ test("keeps a safe fallback for legacy usage events", () => {
 
   expect(formatUsagePurpose(event)).toBe("Tạo hình minh họa");
   expect(formatReasoningEffort(event)).toBe("Chưa ghi nhận");
+});
+
+test("shows the concise target label returned by the API", () => {
+  const event = {
+    category: "AI_MODEL",
+    provider: "OPENAI",
+  } as UsageEvent;
+  expect(
+    formatUsageTarget({
+      ...event,
+      targetLabel: "Flashcard · Thẻ 2 · Hình lời giải",
+    }),
+  ).toBe("Flashcard · Thẻ 2 · Hình lời giải");
+  expect(formatUsageTarget(event)).toBe("Chưa xác định");
 });

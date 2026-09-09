@@ -44,11 +44,15 @@ export function LessonContentTabs({
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    const isQuizQuestionShortcut =
+    const isActiveContentItemShortcut =
       (event.key === "ArrowLeft" || event.key === "ArrowRight") &&
       event.target instanceof Element &&
-      Boolean(event.target.closest("[data-quiz-question-shortcut]"));
-    if (isQuizQuestionShortcut) {
+      Boolean(
+        event.target.closest(
+          "[data-quiz-question-shortcut], [data-flashcard-card-shortcut]",
+        ),
+      );
+    if (isActiveContentItemShortcut) {
       return;
     }
 
@@ -94,6 +98,9 @@ export function LessonContentTabs({
               aria-controls={panelId}
               data-quiz-question-shortcut={
                 isActive && tab.key === "quiz" ? "true" : undefined
+              }
+              data-flashcard-card-shortcut={
+                isActive && tab.key === "flashcard" ? "true" : undefined
               }
               tabIndex={isActive ? 0 : -1}
               onClick={() => onChange(tab.key)}

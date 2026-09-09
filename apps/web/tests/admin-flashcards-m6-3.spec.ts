@@ -128,6 +128,68 @@ test("admin creates a flashcard set and card from lesson detail", async ({ page 
   await expectNoFrameworkOverlay(page);
 });
 
+test("admin Flashcard solution centers display math with the shared learning rhythm", async ({
+  page,
+}) => {
+  await seedAdminSession(page);
+  await setupFlashcardApiMock(page);
+
+  await page.goto(`/admin/lessons/${lessonId}`);
+  await page.getByRole("tab", { name: "Flashcard" }).click();
+
+  const solution = page.getByLabel("Lời giải Flashcard");
+  const displayMath = solution.locator(".katex-display");
+  await expect(displayMath).toBeVisible();
+  await expect(displayMath).toHaveCSS("text-align", "center");
+
+  const rhythm = await solution.evaluate((element) => {
+    const children = Array.from(element.children) as HTMLElement[];
+    return {
+      firstGap: children[1]!.getBoundingClientRect().top - children[0]!.getBoundingClientRect().bottom,
+      secondGap:
+        children[2]!.getBoundingClientRect().top - children[1]!.getBoundingClientRect().bottom,
+      displayMarginBottom: getComputedStyle(
+        element.querySelector<HTMLElement>(".katex-display")!,
+      ).marginBottom,
+      displayMarginTop: getComputedStyle(
+        element.querySelector<HTMLElement>(".katex-display")!,
+      ).marginTop,
+    };
+  });
+  expect(rhythm.firstGap).toBeCloseTo(9.6, 1);
+  expect(rhythm.secondGap).toBeCloseTo(9.6, 1);
+  expect(rhythm.displayMarginBottom).toBe("0px");
+  expect(rhythm.displayMarginTop).toBe("0px");
+  await expectNoFrameworkOverlay(page);
+});
+
+test("admin Flashcard arrow shortcuts change cards without leaving the Flashcard tab", async ({
+  page,
+}) => {
+  await seedAdminSession(page);
+  await setupFlashcardApiMock(page, { withMultipleCards: true });
+
+  await page.goto(`/admin/lessons/${lessonId}`);
+  const flashcardContentTab = page.getByRole("tab", {
+    name: "Flashcard",
+    exact: true,
+  });
+  const testContentTab = page.getByRole("tab", { name: "Test", exact: true });
+  await flashcardContentTab.click();
+
+  const firstCardTab = page.getByRole("tab", { name: /^Xem thẻ 1,/ });
+  const secondCardTab = page.getByRole("tab", { name: /^Xem thẻ 2,/ });
+  await expect(firstCardTab).toHaveAttribute("aria-selected", "true");
+
+  await page.keyboard.press("ArrowRight");
+  await expect(flashcardContentTab).toHaveAttribute("aria-selected", "true");
+  await expect(testContentTab).toHaveAttribute("aria-selected", "false");
+  await expect(secondCardTab).toHaveAttribute("aria-selected", "true");
+
+  await page.keyboard.press("ArrowLeft");
+  await expect(firstCardTab).toHaveAttribute("aria-selected", "true");
+});
+
 test("admin edits the selected quiz set from its panel", async ({ page }) => {
   await seedAdminSession(page);
   await setupFlashcardApiMock(page);
@@ -889,7 +951,7 @@ async function seedAdminSession(page: Page) {
 
 async function setupFlashcardApiMock(
   page: Page,
-  options: { withMathQuestion?: boolean } = {},
+  options: { withMathQuestion?: boolean; withMultipleCards?: boolean } = {},
 ) {
   const quizQuestions = options.withMathQuestion
     ? [
@@ -935,7 +997,7 @@ async function setupFlashcardApiMock(
       source: "ADMIN",
       reviewStatus: "APPROVED",
       isReserve: false,
-      cardCount: 1,
+      cardCount: options.withMultipleCards ? 2 : 1,
       sortOrder: 0,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -951,17 +1013,30 @@ async function setupFlashcardApiMock(
           lessonId,
           frontJson: tiptapDocument("Định lý Pythagore"),
           backJson: tiptapDocument("a² + b² = c²"),
-          explanation: {
-            id: "explanation-pythagore",
-            contentJson: tiptapDocument("Áp dụng định lý cho ba cạnh của tam giác vuông"),
-          },
+          solutionJson: tiptapSolutionDocument(),
           difficulty: "MEDIUM",
           reviewStatus: "APPROVED",
           sortOrder: 0,
-          explanationId: null,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         },
+        ...(options.withMultipleCards
+          ? [
+              {
+                id: "card-trigonometry",
+                flashcardSetId: "set-foundation",
+                lessonId,
+                frontJson: tiptapDocument("Hệ thức lượng trong tam giác vuông"),
+                backJson: tiptapDocument("Liên hệ cạnh và đường cao"),
+                solutionJson: tiptapDocument("Áp dụng hệ thức lượng phù hợp"),
+                difficulty: "HARD",
+                reviewStatus: "APPROVED",
+                sortOrder: 1,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              },
+            ]
+          : []),
       ],
     ],
   ]);
@@ -1110,24 +1185,14 @@ async function setupFlashcardApiMock(
         backJson: Record<string, unknown>;
         difficulty: string;
         frontJson: Record<string, unknown>;
-        explanationJson: Record<string, unknown> | null;
+        solutionJson: Record<string, unknown> | null;
       };
       const cards = cardsBySet.get(setId) ?? [];
-      const { explanationJson, ...cardContent } = body;
       const card = {
         id: `card-${setId}-${cards.length + 1}`,
         flashcardSetId: setId,
         lessonId,
-        ...cardContent,
-        explanation:
-          explanationJson === null
-            ? null
-            : {
-                id: `explanation-${setId}-${cards.length + 1}`,
-                contentJson: explanationJson,
-              },
-        explanationId:
-          explanationJson === null ? null : `explanation-${setId}-${cards.length + 1}`,
+        ...body,
         reviewStatus: "APPROVED",
         sortOrder: cards.length,
         createdAt: new Date().toISOString(),
@@ -1153,6 +1218,28 @@ function tiptapDocument(text: string) {
       {
         type: "paragraph",
         content: [{ type: "text", text }],
+      },
+    ],
+  };
+}
+
+function tiptapSolutionDocument() {
+  return {
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [
+          { type: "text", text: "Áp dụng định lý cho ba cạnh của tam giác vuông:" },
+        ],
+      },
+      {
+        type: "blockMath",
+        attrs: { latex: "a^2+b^2=c^2" },
+      },
+      {
+        type: "paragraph",
+        content: [{ type: "text", text: "Từ đó suy ra độ dài cạnh cần tìm." }],
       },
     ],
   };

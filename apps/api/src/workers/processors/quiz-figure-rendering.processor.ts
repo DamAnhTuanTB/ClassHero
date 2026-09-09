@@ -45,13 +45,15 @@ import {
 import { buildQuizFigureRefinementImageDataUrl } from "#api/modules/quiz-figures/utils/quiz-figure-refinement-image";
 import {
   assertQuizFigureLatexSource,
-  autoRepairQuizFigureLatexSource,
+  autoRepairQuizQuestionFigureLatexSource,
+  autoRepairQuizSolutionFigureLatexSource,
   sanitizeQuizFigureSvg,
 } from "#api/modules/quiz-figures/utils/quiz-figure-source-policy";
 import type {
   AiFeatureRoute,
   ProviderUsageOperation,
 } from "#api/modules/provider-operations/types/provider-operations.types";
+import { buildItemUsageTarget } from "#api/modules/provider-operations/utils/provider-usage-target";
 import type { QuizSubjectSnapshot } from "#api/modules/quiz/types/quiz-generation.types";
 
 const durableJobSelect = {
@@ -128,6 +130,7 @@ export class QuizFigureRenderingProcessor {
           role: true,
           aiGenerationId: true,
           quizQuestionId: true,
+          quizQuestion: { select: { sortOrder: true } },
           planJson: true,
           subjectKey: true,
           subjectName: true,
@@ -183,7 +186,11 @@ export class QuizFigureRenderingProcessor {
             systemPrompt,
             userPrompt,
           });
-      const autoRepair = autoRepairQuizFigureLatexSource({
+      const autoRepair = (
+        plan.role === "QUESTION"
+          ? autoRepairQuizQuestionFigureLatexSource
+          : autoRepairQuizSolutionFigureLatexSource
+      )({
         source: persistedSource ?? generatedSource!,
         subjectKey: subject.key,
         authorityText: JSON.stringify({
@@ -391,6 +398,7 @@ export class QuizFigureRenderingProcessor {
       role: QuizFigureRole;
       aiGenerationId: string | null;
       quizQuestionId: string;
+      quizQuestion?: { sortOrder: number };
       pendingRevision: { id: string; sourceVersion: number } | null;
       currentRevision: {
         latexSource: string | null;
@@ -417,6 +425,12 @@ export class QuizFigureRenderingProcessor {
       attempt: input.attempt,
       callSequence: 1,
       operation: resolveQuizFigureUsageOperation(input),
+      targetContext: buildItemUsageTarget({
+        kind: "QUIZ_QUESTION",
+        entityId: input.figure.quizQuestionId,
+        sortOrder: input.figure.quizQuestion?.sortOrder ?? 0,
+        figureRole: input.figure.role,
+      }),
       routeSnapshot: input.routeSnapshot,
       allowProviderFallback: false,
       onResolvedRequest: (request: ResolvedAiStructuredRequestTrace) =>
@@ -634,9 +648,7 @@ function resolveQuizFigureUsageOperation(input: {
       : "QUIZ_SOLUTION_FIGURE_REFINEMENT";
   }
   if (input.aiMode === "EDIT_CURRENT") {
-    return isQuestion
-      ? "QUIZ_QUESTION_FIGURE_EDITING"
-      : "QUIZ_SOLUTION_FIGURE_EDITING";
+    return isQuestion ? "QUIZ_QUESTION_FIGURE_EDITING" : "QUIZ_SOLUTION_FIGURE_EDITING";
   }
   return isQuestion
     ? "QUIZ_QUESTION_FIGURE_GENERATION"

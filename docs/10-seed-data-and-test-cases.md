@@ -340,6 +340,12 @@ ASSUMPTION: Seed dev có thể tạo document_chunks không embedding để test
 - Student mark known/unknown.
 - Progress unique theo student + flashcard.
 - Student khác không thấy progress.
+- Output AI thiếu/thừa `requiresSolutionFigure` bị strict schema reject.
+- `requiresSolutionFigure=false` không enqueue job hình;
+  `requiresSolutionFigure=true` chỉ enqueue một role `SOLUTION`.
+- Modal chỉ hiện `Chỉnh sửa hình hiện tại` khi current revision là `AI_TEX` có
+  source hợp lệ; request edit phải gửi `currentSolutionLatexSource` và dùng cùng
+  builder/worker với request tạo mới.
 
 ### 9.7. Test
 

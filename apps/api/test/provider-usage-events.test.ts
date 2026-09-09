@@ -21,6 +21,15 @@ describe("ProviderOperationsAdminService usage events", () => {
         provider: "OPENAI",
         feature: AiGenerationType.SUMMARY,
         operation: "SUMMARY_FIGURE_EDITING",
+        targetContextJson: {
+          version: 1,
+          kind: "SUMMARY_BLOCK",
+          entityId: "11111111-1111-4111-8111-111111111111",
+          sectionOrdinal: 1,
+          blockOrdinal: 2,
+          blockKind: "EXAMPLE",
+          figureRole: "SOLUTION",
+        },
         reasoningEffort: "high",
         status: ProviderUsageStatus.SUCCEEDED,
         latencyMs: 12_450,
@@ -74,6 +83,11 @@ describe("ProviderOperationsAdminService usage events", () => {
     expect(result.items[0]).toMatchObject({
       costVnd: 179,
       operation: "SUMMARY_FIGURE_EDITING",
+      targetLabel: "Ví dụ 2 · Hình lời giải",
+      targetContext: {
+        kind: "SUMMARY_BLOCK",
+        blockOrdinal: 2,
+      },
       reasoningEffort: "high",
       latencyMs: 12_450,
       backgroundJob: { resourceType: "STEM_FIGURE" },

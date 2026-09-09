@@ -3,6 +3,8 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { buildLessonSummarySubjectSystemPrompt } from "#api/modules/ai/utils/lesson-summary-prompt";
+import { buildQuestionFigureStructuredInput } from "#api/modules/question-figures/types/question-figure-generation.types";
+import { buildQuestionFigureSystemPrompt } from "#api/modules/question-figures/utils/prompts/question-figure-system-prompt-resolver";
 import {
   buildQuizFigureRefinementSystemPrompt,
   buildQuizFigureSystemPrompt,
@@ -24,8 +26,12 @@ const promptRoots = [
     suffix: "quiz-system-prompt.ts",
   },
   {
-    root: "src/modules/quiz-figures/utils/prompts",
-    suffix: "quiz-figure-system-prompt.ts",
+    root: "src/modules/question-figures/utils/prompts",
+    suffix: "question-figure-system-prompt.ts",
+  },
+  {
+    root: "src/modules/solution-figures/utils/prompts",
+    suffix: "solution-figure-system-prompt.ts",
   },
   {
     root: "src/modules/ai/utils/prompts/lesson-summary",
@@ -212,7 +218,9 @@ describe("subject-owned AI system prompt architecture", () => {
   it("keeps dispatchers free of system-prompt prose and runtime prompt concatenation", () => {
     for (const path of [
       "src/modules/quiz/utils/prompts/quiz-system-prompt-resolver.ts",
+      "src/modules/question-figures/utils/prompts/question-figure-system-prompt-resolver.ts",
       "src/modules/quiz-figures/utils/prompts/quiz-figure-system-prompt-resolver.ts",
+      "src/modules/solution-figures/utils/prompts/solution-figure-system-prompt-resolver.ts",
       "src/modules/ai/utils/prompts/lesson-summary/lesson-summary-system-prompt-resolver.ts",
       "src/modules/stem-figures/utils/prompts/stem-figure-system-prompt-resolver.ts",
     ]) {
@@ -256,6 +264,42 @@ describe("subject-owned AI system prompt architecture", () => {
       expect(solution).toContain("hoàn toàn độc lập với hình đề");
       expect(question).not.toContain("requiredModeledObjects");
       expect(solution).not.toContain("requiredModeledObjects");
+    }
+  });
+
+  it("uses one problem-only Question Figure Core for Summary and Quiz adapters", () => {
+    for (const subject of subjects) {
+      const problem = `Đề bài cần vẽ của ${subject.name}.`;
+      const directPrompt = buildQuestionFigureSystemPrompt(subject);
+      const coreInput = buildQuestionFigureStructuredInput({
+        subject,
+        problem,
+        targetGrade: 8,
+      });
+      const quizInput = buildQuizFigureSystemPrompt(
+        subject as QuizSubjectSnapshot,
+        "QUESTION",
+      );
+
+      expect(coreInput.systemPrompt).toBe(directPrompt);
+      expect(quizInput).toBe(directPrompt);
+      expect(coreInput.promptVersion).toBe(
+        `question-figure-${subject.key.toLowerCase()}-v1-shared`,
+      );
+      expect(coreInput.schemaVersion).toBe("question-figure-schema-v1");
+      expect(coreInput.promptCache).toEqual({
+        namespace: "question-figure",
+        keyEnabled: true,
+        retention: "in_memory",
+      });
+      expect(JSON.parse(coreInput.userPrompt)).toEqual({
+        role: "QUESTION",
+        aiMode: "REGENERATE",
+        targetGrade: 8,
+        problem,
+      });
+      expect(coreInput.userPrompt).not.toMatch(/solution|answer|hint|option/iu);
+      expect(coreInput.inputImages).toEqual([]);
     }
   });
 
@@ -607,7 +651,14 @@ describe("subject-owned AI system prompt architecture", () => {
     const quizSource = readFileSync(
       resolve(
         process.cwd(),
-        "src/modules/quiz-figures/utils/prompts/math-quiz-figure-system-prompt.ts",
+        "src/modules/solution-figures/utils/prompts/math-solution-figure-system-prompt.ts",
+      ),
+      "utf8",
+    );
+    const questionSource = readFileSync(
+      resolve(
+        process.cwd(),
+        "src/modules/question-figures/utils/prompts/math-question-figure-system-prompt.ts",
       ),
       "utf8",
     );
@@ -620,8 +671,11 @@ describe("subject-owned AI system prompt architecture", () => {
     );
 
     expect(quizSource.match(/Lệnh TikZ `circle` chỉ dùng làm chấm điểm/gu)).toHaveLength(
-      2,
+      1,
     );
+    expect(
+      questionSource.match(/Lệnh TikZ `circle` chỉ dùng làm chấm điểm/gu),
+    ).toHaveLength(1);
     expect(stemSource.match(/Lệnh TikZ `circle` chỉ dùng làm chấm điểm/gu)).toHaveLength(
       7,
     );

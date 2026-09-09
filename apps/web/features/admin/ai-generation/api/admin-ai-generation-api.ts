@@ -11,6 +11,8 @@ import type {
   AdminSummaryGenerationPayload,
   AdminQuizGenerationPayload,
   AdminQuizPromptPreview,
+  AdminFlashcardGenerationPayload,
+  AdminFlashcardPromptPreview,
   AdminStemFigure,
   AdminStemFigureCreateAiInput,
   AdminStemFigureCreateAiPreview,
@@ -23,6 +25,7 @@ import type { LessonSummaryPhaseOneLayoutOperation } from "@/features/admin/ai-g
 
 const LESSON_SUMMARY_PROMPT_PREVIEW_TIMEOUT_MS = 120_000;
 const QUIZ_PROMPT_PREVIEW_TIMEOUT_MS = 120_000;
+const FLASHCARD_PROMPT_PREVIEW_TIMEOUT_MS = 120_000;
 
 export function getAdminAiGenerationPanel(lessonId: string, token: string) {
   return apiRequest<AdminAiGenerationPanelData>(
@@ -85,6 +88,23 @@ export function previewAdminQuizPrompt(
       body,
       token,
       timeoutMs: QUIZ_PROMPT_PREVIEW_TIMEOUT_MS,
+    },
+  );
+}
+
+export function previewAdminFlashcardPrompt(
+  lessonId: string,
+  payload: AdminFlashcardGenerationPayload,
+  token: string,
+) {
+  const { type: _type, ...body } = payload;
+  return apiRequest<AdminFlashcardPromptPreview>(
+    `/admin/lessons/${lessonId}/flashcard-sets/prompt-preview`,
+    {
+      method: "POST",
+      body,
+      token,
+      timeoutMs: FLASHCARD_PROMPT_PREVIEW_TIMEOUT_MS,
     },
   );
 }

@@ -21,7 +21,7 @@ export const flashcardFormSchema = z.object({
     hasTiptapDocumentContent,
     "Nhập nội dung mặt sau",
   ),
-  explanationJson: tiptapTextDocumentSchema,
+  solutionJson: tiptapTextDocumentSchema,
   difficulty: z.enum(["EASY", "MEDIUM", "HARD"]),
 });
 

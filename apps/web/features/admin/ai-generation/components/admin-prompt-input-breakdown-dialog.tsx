@@ -76,7 +76,7 @@ export function AdminPromptInputBreakdownDialog({
     <AnimatePresence>
       {isOpen ? (
         <motion.div
-          className="theme-dialog-overlay fixed inset-0 z-[90] flex items-center justify-center px-4 py-4 backdrop-blur-sm sm:py-6"
+          className="theme-dialog-overlay fixed inset-0 z-[110] flex items-center justify-center px-4 py-4 backdrop-blur-sm sm:py-6"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}

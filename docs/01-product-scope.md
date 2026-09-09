@@ -48,9 +48,10 @@ MVP tập trung vào việc giúp:
 - Khi admin sinh kiến thức, số bài tập vận dụng chuẩn và số bài ứng dụng thực tế
   được cấu hình độc lập, mặc định `2` cho mỗi nhóm. Đây là số lượng mục tiêu của
   Phase 1; nếu AI trả thiếu hoặc thừa, các bài hợp lệ vẫn được lưu và hiển thị.
-- Sinh kiến thức và Quiz dùng system prompt chuyên môn độc lập cho Toán, Vật lý
-  và Hóa học; không lấy quy tắc của một môn làm core cho môn khác. Chỉ hạ tầng
-  kỹ thuật trung lập được phép dùng chung giữa các môn/domain.
+- System prompt vẫn độc lập theo Toán, Vật lý, Hóa học và fallback `GENERAL`;
+  không lấy quy tắc của một môn làm core cho môn khác. Riêng thao tác tạo hình
+  lời giải tương đương của Sinh kiến thức, Quiz và Flashcard dùng chung Solution
+  Figure Core; API, queue, dữ liệu và lifecycle của từng domain vẫn độc lập.
 - Admin quản lý hai route model độc lập theo từng tính năng `SUMMARY`, `QUIZ`,
   `FLASHCARD`, `TEST` trong tab `Thiết lập mặc định`: `Phase 1 - tạo text` và
   `Phase 2 - tạo ảnh`. Mỗi route có model chính/dự phòng, capability setting và
@@ -198,7 +199,7 @@ Admin có quyền:
   liệu, hệ thống dựng một hình lời giải hoàn chỉnh từ `solution > problem`, không
   phụ thuộc hình đề hay ảnh nguồn. Khi admin mở menu ảnh trên một khối chưa có
   figure, action `Tạo mới bằng AI` được thay bằng hai action độc lập `Tạo hình cho
-  đề bài` và `Tạo hình cho lời giải`: hình đề chỉ dùng `problem`, hình lời giải
+đề bài` và `Tạo hình cho lời giải`: hình đề chỉ dùng `problem`, hình lời giải
   dùng `solution > problem`; hai hình lần lượt sở hữu slot `0` và `1`. Nếu khối đã
   có hình đề được dựng từ ảnh SGK, menu giữ action vẽ lại hình hiện tại và thêm
   `Tạo hình cho lời giải` không gửi/kế thừa ảnh SGK. Summary giữ prompt/runtime
@@ -497,6 +498,12 @@ Phần mở rộng `M15` được triển khai sau luồng học sinh cốt lõi
 
 - Một buổi học có thể có nhiều bộ flashcard.
 - Flashcard có thể do admin tạo hoặc AI tạo.
+- Mỗi thẻ AI có `front` là câu hỏi, `back` là câu trả lời trực tiếp và
+  `solution` là lời giải chi tiết cho chính câu hỏi ở `front` theo phong cách
+  lời giải Quiz.
+- Flashcard chỉ có một loại hình AI: hình minh họa cho `solution`. Lượt tạo nội
+  dung trả một quyết định `requiresSolutionFigure`; không tạo asset riêng cho
+  mặt trước hoặc mặt sau.
 - Panel Flashcard trong lesson dùng cùng mô hình vào bài như Quiz: `Bắt đầu`
   khi student chưa từng mở runner của lượt hiện tại, `Tiếp tục học` ngay khi
   lượt đã từng được mở dù chưa đánh dấu thẻ nào và `Xem lại` khi đã hoàn thành.

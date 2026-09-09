@@ -35,6 +35,7 @@ export function buildQuizPrompt(input: {
   styleInstructions?: string;
   extraInstructions?: string;
   subject: QuizSubjectSnapshot;
+  realWorldQuestionCount?: number | null;
   existingQuestionReferences?: string[];
 }) {
   const resolvedStyleInstruction = (
@@ -52,6 +53,11 @@ export function buildQuizPrompt(input: {
       ? `- Độ khó: ${input.difficulty}; phân bổ chính xác EASY/MEDIUM/HARD là ${input.difficultyCounts.easy}/${input.difficultyCounts.medium}/${input.difficultyCounts.hard}.`
       : `- Độ khó: ${input.difficulty}; mỗi câu phải có nhãn difficulty đúng yêu cầu.`,
     `- Loại câu hỏi: chỉ dùng ${input.questionTypes.join(", ")}; phân bổ chính xác ${formatQuestionTypeDistribution(input.questionCount, input.questionTypes)}.`,
+    ...(typeof input.realWorldQuestionCount === "number"
+      ? [
+          `- Số câu hỏi ứng dụng thực tế: Bắt buộc tạo đúng ${input.realWorldQuestionCount} câu. Kể cả khi PDF nguồn không có, bắt buộc phải tự sáng tạo bối cảnh thực tế cho đủ số lượng. Khi sáng tạo các câu ứng dụng thực tế mới, phải phân bổ trên các trọng tâm và dạng bài khác nhau của lesson. Khi so sánh, bỏ qua bối cảnh, vật thể, số liệu, đơn vị, ký hiệu và cách diễn đạt; nếu hai bài vẫn dùng cùng kiến thức trọng tâm theo cùng chuỗi bước hoặc công thức chính thì là trùng dạng và chưa đạt, yêu cầu thay bài khác.`,
+        ]
+      : []),
     ...(input.extraInstructions
       ? [`- Yêu cầu bổ sung của admin: ${input.extraInstructions}`]
       : []),

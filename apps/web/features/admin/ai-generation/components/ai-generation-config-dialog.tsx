@@ -1302,8 +1302,10 @@ function toPayload(
   if (values.type === "FLASHCARD") {
     return {
       type: values.type,
+      documentIds: values.documentIds,
       cardCount: Number(values.count),
       difficulty: values.difficulty,
+      style: values.style,
     };
   }
   return {

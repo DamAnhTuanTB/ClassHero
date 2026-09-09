@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import {
   STEM_FIGURE_MAX_SOURCE_CHARACTERS,
   stemFigureLatexSourceSchema,
+  type ProviderUsageTargetContext,
   type StemFigureDiagnosticBatch,
 } from "@learning-path/shared";
 import { AiGenerationType } from "@prisma/client";
@@ -15,9 +16,22 @@ import type {
   AiFeatureRoute,
   ProviderUsageOperation,
 } from "#api/modules/provider-operations/types/provider-operations.types";
+import { buildSummaryBlockUsageTarget } from "#api/modules/provider-operations/utils/provider-usage-target";
+import {
+  buildQuestionFigureStructuredInput,
+  generatedQuestionFigureSchema,
+  QUESTION_FIGURE_SCHEMA_VERSION,
+} from "#api/modules/question-figures/types/question-figure-generation.types";
+import { autoRepairQuestionFigureLatexSource } from "#api/modules/question-figures/utils/question-figure-source-policy";
 import type { StemFigureGenerationBrief } from "#api/modules/stem-figures/types/stem-figure-generation.types";
 import { buildStemFigureSystemPrompt } from "#api/modules/stem-figures/utils/prompts/stem-figure-system-prompt-resolver";
 import { autoRepairStemFigureLatexSource } from "#api/modules/stem-figures/utils/tex-source-policy";
+import {
+  buildSolutionFigureStructuredInput,
+  generatedSolutionFigureSchema,
+  SOLUTION_FIGURE_SCHEMA_VERSION,
+} from "#api/modules/solution-figures/types/solution-figure-generation.types";
+import { autoRepairSolutionFigureLatexSource } from "#api/modules/solution-figures/utils/solution-figure-source-policy";
 import type { AiInputImage } from "#api/modules/ai/types/ai-text.types";
 import {
   buildOpenAiStructuredResponseRequest,
@@ -159,7 +173,7 @@ export class StemFigureRepairService {
         routeSnapshot: input.routeSnapshot,
       },
       structuredInput,
-      generatedStemFigureSchema,
+      resolveCreateOutputSchema(structuredInput),
     );
     const previewRequest = {
       ...structuredInput,
@@ -169,9 +183,12 @@ export class StemFigureRepairService {
       temperature: trace.temperature ?? undefined,
       reasoningEffort: trace.reasoningEffort ?? undefined,
       maxTokens: trace.maxOutputTokens ?? undefined,
-      inputImages: referenceAssets.map((asset) => ({
-        imageUrl: `data:${asset.mimeType};base64,${OPENAI_PREVIEW_BINARY_DATA}`,
-        detail: "high" as const,
+      inputImages: (structuredInput.inputImages ?? []).map((image) => ({
+        ...image,
+        imageUrl: image.imageUrl.replace(
+          /;base64,[^,]*$/u,
+          `;base64,${OPENAI_PREVIEW_BINARY_DATA}`,
+        ),
       })),
     };
     return {
@@ -223,6 +240,7 @@ export class StemFigureRepairService {
     diagnosticBatch: StemFigureDiagnosticBatch;
     subject: LessonSummarySubjectSnapshot;
     routeSnapshot?: AiFeatureRoute;
+    targetContext: ProviderUsageTargetContext;
     onRequestPrepared?: (snapshot: StemFigureProviderRequestSnapshot) => Promise<void>;
   }) {
     this.assertRepairPayloadFits({
@@ -266,6 +284,7 @@ export class StemFigureRepairService {
         attempt: input.jobAttempt,
         callSequence,
         operation: "SUMMARY_FIGURE_REPAIR",
+        targetContext: input.targetContext,
         allowProviderFallback: false,
         routeSnapshot: input.routeSnapshot,
         idempotencyKey,
@@ -347,6 +366,12 @@ export class StemFigureRepairService {
         attempt: input.jobAttempt,
         callSequence: 1,
         operation: resolveSummaryFigureUsageOperation(input.brief),
+        targetContext: buildSummaryBlockUsageTarget({
+          entityId: input.figureId,
+          blockPath: input.brief.blockPath,
+          blockType: input.brief.blockContent.type,
+          targetMode: input.brief.targetMode,
+        }),
         allowProviderFallback: false,
         routeSnapshot: input.routeSnapshot,
         idempotencyKey,
@@ -377,7 +402,7 @@ export class StemFigureRepairService {
           : undefined,
       },
       structuredInput,
-      generatedStemFigureSchema,
+      resolveCreateOutputSchema(structuredInput),
     );
     const source = output.data.latexSource.trim();
     const promptMode = resolveStemFigureCreatePromptMode({
@@ -388,17 +413,33 @@ export class StemFigureRepairService {
       blockType: input.brief.blockContent.type,
       targetMode: input.brief.targetMode,
     });
-    const autoRepair = autoRepairStemFigureLatexSource({
-      source,
-      subjectKey: input.subject.key,
-      mode: promptMode,
-      authorityText: JSON.stringify({
-        blockContent: input.brief.blockContent,
-        ...(input.brief.adminInstructions?.trim()
-          ? { adminInstructions: input.brief.adminInstructions.trim() }
-          : {}),
-      }),
+    const authorityText = JSON.stringify({
+      ...(structuredInput.schemaVersion === QUESTION_FIGURE_SCHEMA_VERSION
+        ? { problem: readProviderBriefText(input.brief.blockContent, "problem") }
+        : { blockContent: input.brief.blockContent }),
+      ...(input.brief.adminInstructions?.trim()
+        ? { adminInstructions: input.brief.adminInstructions.trim() }
+        : {}),
     });
+    const autoRepair =
+      structuredInput.schemaVersion === QUESTION_FIGURE_SCHEMA_VERSION
+        ? autoRepairQuestionFigureLatexSource({
+            source,
+            subjectKey: input.subject.key,
+            authorityText,
+          })
+        : structuredInput.schemaVersion === SOLUTION_FIGURE_SCHEMA_VERSION
+          ? autoRepairSolutionFigureLatexSource({
+              source,
+              subjectKey: input.subject.key,
+              authorityText,
+            })
+          : autoRepairStemFigureLatexSource({
+              source,
+              subjectKey: input.subject.key,
+              mode: promptMode,
+              authorityText,
+            });
     if (autoRepair.changes.length) {
       this.logger.warn(
         `Stem figure ${input.figureId} applied ${autoRepair.changes.length} deterministic source repair(s).`,
@@ -444,6 +485,13 @@ function buildCreateNewStructuredInput(input: {
     blockType: providerBrief.blockContent.type,
     targetMode: input.brief.targetMode,
   });
+  const sharedAuthoredFigureInput = buildSharedSummaryAuthoredFigureInput({
+    ...input,
+    promptMode,
+    providerBrief,
+  });
+  if (sharedAuthoredFigureInput) return sharedAuthoredFigureInput;
+
   const defaultUserPrompt = [
     buildStemFigureCreateUserPromptLead(promptMode, {
       hasAdminInstructions: Boolean(authoritativeAdminInstructions),
@@ -474,6 +522,74 @@ function buildCreateNewStructuredInput(input: {
       retention: "in_memory",
     },
   } as const;
+}
+
+function buildSharedSummaryAuthoredFigureInput(input: {
+  subject: LessonSummarySubjectSnapshot;
+  brief: StemFigureGenerationBrief;
+  providerBrief: ReturnType<typeof toProviderGenerationBrief>;
+  promptMode: StemFigureCreatePromptMode;
+  systemPrompt?: string | null;
+  userPrompt?: string | null;
+}) {
+  const isQuestionCreate =
+    input.promptMode === "GENERATE_FROM_BLOCK" && input.brief.targetMode === "QUESTION";
+  const isQuestionEdit =
+    input.promptMode === "EDIT_CURRENT_SOURCE" && input.brief.targetMode === "QUESTION";
+  const isSolutionCreate = input.promptMode === "GENERATE_SOLUTION_FROM_BLOCK";
+  const isSolutionEdit =
+    input.promptMode === "EDIT_CURRENT_SOURCE" && input.brief.targetMode === "SOLUTION";
+  if (!isQuestionCreate && !isQuestionEdit && !isSolutionCreate && !isSolutionEdit) {
+    return null;
+  }
+
+  const problem = readProviderBriefText(input.providerBrief.blockContent, "problem");
+  if (!problem) return null;
+  if (isQuestionCreate || isQuestionEdit) {
+    return buildQuestionFigureStructuredInput({
+      subject: input.subject,
+      problem,
+      targetGrade: input.brief.targetGrade,
+      adminInstructions: input.brief.adminInstructions,
+      mode: isQuestionEdit ? "EDIT_CURRENT" : "REGENERATE",
+      currentQuestionLatexSource: input.brief.currentLatexSource,
+      systemPrompt: input.systemPrompt,
+      userPrompt: input.userPrompt,
+    });
+  }
+
+  const solution = readProviderBriefText(input.providerBrief.blockContent, "solution");
+  if (!solution) return null;
+
+  return buildSolutionFigureStructuredInput({
+    subject: input.subject,
+    problem,
+    solution,
+    targetGrade: input.brief.targetGrade,
+    adminInstructions: input.brief.adminInstructions,
+    mode: isSolutionEdit ? "EDIT_CURRENT" : "REGENERATE",
+    currentSolutionLatexSource: input.brief.currentLatexSource,
+    systemPrompt: input.systemPrompt,
+    userPrompt: input.userPrompt,
+  });
+}
+
+function readProviderBriefText(
+  blockContent: Record<string, unknown>,
+  key: "problem" | "solution",
+) {
+  const value = blockContent[key];
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function resolveCreateOutputSchema(input: { schemaVersion: string }) {
+  if (input.schemaVersion === QUESTION_FIGURE_SCHEMA_VERSION) {
+    return generatedQuestionFigureSchema;
+  }
+  if (input.schemaVersion === SOLUTION_FIGURE_SCHEMA_VERSION) {
+    return generatedSolutionFigureSchema;
+  }
+  return generatedStemFigureSchema;
 }
 
 type StemFigureCreatePromptMode =

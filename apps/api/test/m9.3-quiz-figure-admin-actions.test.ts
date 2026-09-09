@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { QuizFigureArtifactService } from "#api/modules/quiz-figures/services/quiz-figure-artifact.service";
 import { QuizFigureDraftService } from "#api/modules/quiz-figures/services/quiz-figure-draft.service";
 import { QuizFiguresService } from "#api/modules/quiz-figures/services/quiz-figures.service";
 
@@ -17,6 +18,69 @@ const latexSource = [
 const previewSvg = '<svg xmlns="http://www.w3.org/2000/svg"><circle/></svg>';
 
 describe("M9.3 Quiz figure admin actions", () => {
+  it("promotes a freshly uploaded question image when attaching an admin figure", async () => {
+    const transaction = {
+      quizFigure: {
+        findFirstOrThrow: vi.fn().mockResolvedValue({
+          id: figureId,
+          currentRevisionId,
+        }),
+        update: vi.fn().mockResolvedValue({}),
+      },
+      file: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "66666666-6666-4666-8666-666666666666",
+          status: "UPLOADED",
+        }),
+        update: vi.fn().mockResolvedValue({}),
+      },
+      quizFigureRevision: {
+        findFirst: vi.fn().mockResolvedValue({ sourceVersion: 1 }),
+        create: vi.fn().mockResolvedValue({ id: draftRevisionId }),
+      },
+    };
+    const prisma = {
+      $transaction: vi.fn(async (callback: (tx: typeof transaction) => unknown) =>
+        callback(transaction),
+      ),
+    };
+    const service = new QuizFigureArtifactService(
+      prisma as never,
+      {} as never,
+      {} as never,
+    );
+
+    await service.attachAdminUpload({
+      figureId,
+      fileId: "66666666-6666-4666-8666-666666666666",
+      actorUserId,
+      altText: "Hình minh họa đề bài Quiz",
+    });
+
+    expect(transaction.file.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: "66666666-6666-4666-8666-666666666666",
+        purpose: "QUESTION_IMAGE",
+        status: { in: ["UPLOADED", "READY"] },
+        mimeType: { startsWith: "image/" },
+        deletedAt: null,
+      },
+      select: { id: true, status: true },
+    });
+    expect(transaction.file.update).toHaveBeenCalledWith({
+      where: { id: "66666666-6666-4666-8666-666666666666" },
+      data: { status: "READY" },
+    });
+    expect(transaction.quizFigureRevision.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          sourceKind: "ADMIN_UPLOAD",
+          deliveryFileId: "66666666-6666-4666-8666-666666666666",
+        }),
+      }),
+    );
+  });
+
   it("compiles and applies a code draft without calling AI", async () => {
     const prisma = {
       quizFigure: {

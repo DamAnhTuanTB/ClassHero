@@ -1,0 +1,1 @@
+ALTER TYPE "FlashcardFigureRole" ADD VALUE IF NOT EXISTS 'SOLUTION';

@@ -100,6 +100,14 @@ Khi task cần gọi provider trả phí thật như Mathpix, OpenAI/Gemini, ema
 
 Mỗi khi sửa code liên quan đến phần Worker (`apps/api/src/workers/*` hoặc các module background jobs), Codex phải luôn có cơ chế khởi động lại worker hoặc nhắc nhở owner rõ ràng bằng một block lệnh để khởi động lại `pnpm dev`. Worker có thể không tự động hot-reload đúng cách, dẫn đến code mới không có tác dụng. Nếu cần thiết, có thể dùng `kill` hoặc các lệnh shell để ngắt process cũ.
 
+### 2.5. Multi-agent workflow cho implementation plan lớn
+
+- Khi owner nói `Thực thi plan hiện tại bằng multi-agent workflow`, yêu cầu chạy plan lớn bằng subagent hoặc yêu cầu coordinator điều phối, main agent phải dùng project skill `.codex/skills/multi-agent-execution/SKILL.md`.
+- Main agent giữ vai trò coordinator; không spawn thêm coordinator nếu không có parent workflow khác cần giao nguyên một nhánh điều phối.
+- Dùng đúng custom agent trong `.codex/agents/`: `implementer`, `tester`, `fixer`, `reviewer`; chỉ dùng `coordinator` khi cần delegation điều phối lồng nhau có chủ đích.
+- Delegation phải tuân thủ state machine, escalation gate, completion gate và giới hạn concurrency trong project skill/config. Mặc định chỉ một agent có quyền sửa tại một thời điểm; chỉ chạy song song khi ownership và dependency thực sự độc lập.
+- Yêu cầu multi-agent cho phép tạo subagent trong phạm vi plan đã duyệt, nhưng không thay thế phê duyệt triển khai, không mở rộng scope và không tự cấp quyền cho external action, migration production hoặc paid provider.
+
 ---
 
 ## 3. Cách Đọc Tài Liệu

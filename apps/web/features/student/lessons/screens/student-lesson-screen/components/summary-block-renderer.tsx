@@ -39,6 +39,7 @@ import {
   StemFigureMathText,
   type StemFigureVisual,
 } from "@/components/common/content/stem-figure";
+import { cn } from "@/lib/utils";
 import { LessonSummaryExampleCard } from "@/components/common/content/lesson-summary-example-content";
 import { LessonSummaryExerciseCard } from "@/components/common/content/lesson-summary-exercise-card";
 import type { LessonSummaryFigureRenderer } from "@/components/common/content/lesson-summary-problem-content";
@@ -151,6 +152,9 @@ interface SummaryBlockRendererProps {
         },
   ) => void;
   showTableOfContents?: boolean;
+  hideObjectives?: boolean;
+  hideSectionHeadings?: boolean;
+  className?: string;
 }
 
 const BLOCK_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
@@ -273,6 +277,9 @@ export function SummaryBlockRenderer({
   showTableOfContents = false,
   stemFigureVisuals,
   renderStemFigure,
+  hideObjectives = false,
+  hideSectionHeadings = false,
+  className,
 }: SummaryBlockRendererProps) {
   const isReadOnly = !onChange;
   const [draggedItem, setDraggedItem] = React.useState<{
@@ -478,7 +485,7 @@ export function SummaryBlockRenderer({
   };
 
   return (
-    <div className="mt-4 space-y-8 react-json-custom-edit-wrapper">
+    <div className={cn("space-y-6 react-json-custom-edit-wrapper", className ?? "mt-4")}>
       {/* Title */}
       {!hideTitle && (
         <div className="relative group/title">
@@ -594,7 +601,7 @@ export function SummaryBlockRenderer({
       ) : null}
 
       {/* Objectives */}
-      {data.objectives && data.objectives.length > 0 && (
+      {!hideObjectives && data.objectives && data.objectives.length > 0 && (
         <div className={showTableOfContents && hideTitle ? "space-y-3" : undefined}>
           {showTableOfContents && hideTitle ? (
             <LessonSummaryTableOfContents
@@ -885,7 +892,7 @@ export function SummaryBlockRenderer({
           <div
             key={idx}
             id={getLessonSummarySectionAnchorId(idx)}
-            className={`scroll-mt-24 space-y-4 transition-all rounded-2xl ${
+            className={`scroll-mt-24 space-y-3 transition-all rounded-2xl ${
               draggedSection === idx
                 ? "opacity-50 ring-2 ring-blue-500 ring-offset-4 ring-offset-white dark:ring-offset-slate-900"
                 : ""
@@ -968,85 +975,89 @@ export function SummaryBlockRenderer({
               }
             }}
           >
-            <div className="relative">
-              {!isReadOnly && viewMode === "SPLIT" && (
-                <div className="flex justify-end gap-2 w-full relative mb-2">
-                  {renderSectionActions()}
-                </div>
-              )}
-              <div
-                className={`transition-all ${viewMode === "SPLIT" ? "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" : "group/header flex flex-col items-stretch gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6"}`}
-              >
-                <h3
-                  className={`group flex items-center gap-3 text-xl font-bold text-slate-800 dark:text-slate-100 mb-2 ${viewMode !== "SPLIT" ? "flex-1" : ""}`}
-                >
-                  <span className="flex-none bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 w-9 h-9 rounded-xl flex items-center justify-center text-base font-black border border-blue-200/50 dark:border-blue-800/50 shadow-sm">
-                    {section.order || idx + 1}
-                  </span>
-                  <span className="relative pb-1">
-                    <StemFigureMathText
-                      displayMathAsInline
-                      inheritMathWeight
-                      value={section.displayHeading}
-                    />
-                    <span className="absolute bottom-0 left-0 w-12 h-1 bg-blue-500/20 dark:bg-blue-400/20 rounded-full group-hover:w-full transition-all duration-500 ease-out"></span>
-                  </span>
-                </h3>
-
-                {/* Tool Bar Section */}
-                {!isReadOnly && (
-                  <div
-                    className={`flex flex-col items-end gap-2 ${viewMode === "SPLIT" ? "w-full" : "z-10 w-full flex-none opacity-100 transition-opacity sm:w-auto sm:opacity-0 sm:group-hover/header:opacity-100"}`}
-                  >
-                    {viewMode === "UI_ONLY" && (
-                      <div className="relative flex w-full flex-wrap justify-end gap-2">
-                        {renderSectionActions()}
-                      </div>
-                    )}
-
-                    {isSectionEditing && (
-                      <div className="relative border rounded-lg p-3 bg-slate-50 dark:bg-slate-900 overflow-auto w-full mb-4 [&_*:has(textarea)]:!flex-wrap [&_*:has(>textarea)]:!basis-full [&_*:has(>textarea)]:!block [&_*:has(>textarea)]:!w-full [&_textarea]:!w-full [&_textarea]:!min-h-[100px] [&_textarea]:!mt-2 [&_textarea]:!p-2 [&_textarea]:!box-border [&_textarea]:!leading-relaxed">
-                        <div className="absolute top-2 right-2 flex items-center gap-1 bg-white/90 dark:bg-slate-800/90 shadow-sm border border-slate-200 dark:border-slate-700 rounded-md px-1 py-0.5 z-10">
-                          {viewMode === "UI_ONLY" && (
-                            <ImmediateTooltip content="Đóng phần chỉnh sửa đề mục">
-                              <button
-                                aria-label="Đóng phần chỉnh sửa đề mục"
-                                type="button"
-                                onClick={() => toggleEdit(`section-${idx}`)}
-                                className="flex items-center gap-1 p-1.5 text-slate-500 transition-colors hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
-                              >
-                                <X className="h-3.5 w-3.5" aria-hidden="true" />
-                              </button>
-                            </ImmediateTooltip>
-                          )}
-                        </div>
-                        <ReactJson
-                          src={{ displayHeading: section.displayHeading }}
-                          onEdit={(e) => {
-                            const newData = { ...data };
-                            if (newData.sections) {
-                              newData.sections[idx] = {
-                                ...newData.sections[idx],
-                                ...(e.updated_src as any),
-                              };
-                            }
-                            onChange?.(newData);
-                          }}
-                          theme="rjv-default"
-                          style={{ backgroundColor: "transparent" }}
-                          displayDataTypes={false}
-                          name={false}
-                          enableClipboard={false}
-                          keyModifier={(e: any) =>
-                            e.detail >= 2 || e.metaKey || e.ctrlKey
-                          }
-                        />
-                      </div>
-                    )}
+            {(!hideSectionHeadings || !isReadOnly || viewMode === "SPLIT") && (
+              <div className="relative">
+                {!isReadOnly && viewMode === "SPLIT" && (
+                  <div className="flex justify-end gap-2 w-full relative mb-2">
+                    {renderSectionActions()}
                   </div>
                 )}
+                <div
+                  className={`transition-all ${viewMode === "SPLIT" ? "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" : "group/header flex flex-col items-stretch gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6"}`}
+                >
+                  {!hideSectionHeadings && (
+                    <h3
+                      className={`group flex items-center gap-3 text-xl font-bold text-slate-800 dark:text-slate-100 mb-0 ${viewMode !== "SPLIT" ? "flex-1" : ""}`}
+                    >
+                      <span className="flex-none bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 w-9 h-9 rounded-xl flex items-center justify-center text-base font-black border border-blue-200/50 dark:border-blue-800/50 shadow-sm">
+                        {section.order || idx + 1}
+                      </span>
+                      <span className="relative pb-1">
+                        <StemFigureMathText
+                          displayMathAsInline
+                          inheritMathWeight
+                          value={section.displayHeading}
+                        />
+                        <span className="absolute bottom-0 left-0 w-12 h-1 bg-blue-500/20 dark:bg-blue-400/20 rounded-full group-hover:w-full transition-all duration-500 ease-out"></span>
+                      </span>
+                    </h3>
+                  )}
+
+                  {/* Tool Bar Section */}
+                  {!isReadOnly && (
+                    <div
+                      className={`flex flex-col items-end gap-2 ${viewMode === "SPLIT" ? "w-full" : "z-10 w-full flex-none opacity-100 transition-opacity sm:w-auto sm:opacity-0 sm:group-hover/header:opacity-100"}`}
+                    >
+                      {viewMode === "UI_ONLY" && (
+                        <div className="relative flex w-full flex-wrap justify-end gap-2">
+                          {renderSectionActions()}
+                        </div>
+                      )}
+
+                      {isSectionEditing && (
+                        <div className="relative border rounded-lg p-3 bg-slate-50 dark:bg-slate-900 overflow-auto w-full mb-4 [&_*:has(textarea)]:!flex-wrap [&_*:has(>textarea)]:!basis-full [&_*:has(>textarea)]:!block [&_*:has(>textarea)]:!w-full [&_textarea]:!w-full [&_textarea]:!min-h-[100px] [&_textarea]:!mt-2 [&_textarea]:!p-2 [&_textarea]:!box-border [&_textarea]:!leading-relaxed">
+                          <div className="absolute top-2 right-2 flex items-center gap-1 bg-white/90 dark:bg-slate-800/90 shadow-sm border border-slate-200 dark:border-slate-700 rounded-md px-1 py-0.5 z-10">
+                            {viewMode === "UI_ONLY" && (
+                              <ImmediateTooltip content="Đóng phần chỉnh sửa đề mục">
+                                <button
+                                  aria-label="Đóng phần chỉnh sửa đề mục"
+                                  type="button"
+                                  onClick={() => toggleEdit(`section-${idx}`)}
+                                  className="flex items-center gap-1 p-1.5 text-slate-500 transition-colors hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
+                                >
+                                  <X className="h-3.5 w-3.5" aria-hidden="true" />
+                                </button>
+                              </ImmediateTooltip>
+                            )}
+                          </div>
+                          <ReactJson
+                            src={{ displayHeading: section.displayHeading }}
+                            onEdit={(e) => {
+                              const newData = { ...data };
+                              if (newData.sections) {
+                                newData.sections[idx] = {
+                                  ...newData.sections[idx],
+                                  ...(e.updated_src as any),
+                                };
+                              }
+                              onChange?.(newData);
+                            }}
+                            theme="rjv-default"
+                            style={{ backgroundColor: "transparent" }}
+                            displayDataTypes={false}
+                            name={false}
+                            enableClipboard={false}
+                            keyModifier={(e: any) =>
+                              e.detail >= 2 || e.metaKey || e.ctrlKey
+                            }
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="space-y-4">
               {section.blocks?.map((block, bIdx) => {

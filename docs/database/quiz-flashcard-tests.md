@@ -241,11 +241,12 @@ flashcard_set_id uuid fk flashcard_sets.id
 lesson_id uuid fk lessons.id
 front_json jsonb
 back_json jsonb
+solution_json jsonb?
 hint_json jsonb?
 source_metadata_json jsonb?
-explanation_id uuid? fk ai_explanations.id
 difficulty Difficulty default MEDIUM
 review_status ReviewStatus default APPROVED
+published_at timestamp?
 sort_order int default 0
 created_at timestamp
 updated_at timestamp
@@ -257,11 +258,75 @@ Rules:
 - `hint_json` là cột legacy nullable; contract M6.3 mới không đọc/ghi trường này.
 - Flashcard AI không sinh hoặc ghi `hint_json`; provenance được lưu riêng trong
   `source_metadata_json` và chỉ dùng ở flow quản trị.
-- Lời giải chi tiết do admin nhập tái sử dụng `ai_explanations`:
-  `target_type=FLASHCARD`, `target_id=flashcards.id`, `source=ADMIN`,
-  `review_status=APPROVED`; `flashcards.explanation_id` trỏ tới bản ghi này.
-- Khi admin sửa `front_json` hoặc `back_json` mà không gửi lời giải mới,
-  service phải mark explanation hiện tại là stale.
+- `back_json` là đáp án trực tiếp cho `front_json`; `solution_json` là lời giải
+  chi tiết của cùng câu hỏi, có thể rỗng với thẻ admin cũ/thủ công nhưng bắt buộc
+  trong output AI Phase 1.
+- Flashcard sở hữu `solution_json` trực tiếp, không dùng `explanation_id` hoặc
+  relation `AiExplanation`. Hard-cutover xóa các `ai_explanations` target
+  `FLASHCARD` cũ thay vì sao chép dữ liệu.
+- `published_at` là watermark phát hành của từng card. Card mới/sửa/duyệt có
+  `published_at=null`; `SAVE`/`PUBLISH` gắn mốc cho card `APPROVED`, còn student
+  chỉ đọc card `APPROVED` có watermark. `WITHDRAW` ẩn set nhưng không phá mốc để
+  lần phát hành sau giữ được lịch sử ổn định.
+- Index `(flashcard_set_id, published_at)` phục vụ student selector và thống kê
+  card đã duyệt nhưng chưa lưu.
+
+### 8.2.1. `flashcard_generation_request_drafts`
+
+```txt
+id uuid pk
+lesson_id uuid fk lessons.id on delete cascade
+created_by_id uuid?
+request_hash string
+packet_hash string
+manifest_hash string
+packet_object_key string
+packet_filename string
+packet_size_bytes bigint
+packet_page_count int
+system_instructions text
+user_prompt text
+schema_name string
+schema_version string
+schema_hash string
+schema_json jsonb
+manifest_json jsonb
+source_snapshot_json jsonb
+model_config_json jsonb
+cost_estimate_json jsonb?
+expires_at timestamp
+consumed_at timestamp?
+created_at timestamp
+```
+
+Rules:
+
+- Draft thuộc riêng pipeline Flashcard, immutable theo request/source/schema/model
+  configuration; queue chỉ nhận draft chưa hết hạn/chưa dùng và hash còn khớp.
+- Snapshot giữ metadata/hash/config và manifest ánh xạ trang; packet PDF xác định
+  nằm ở object tạm. Worker tải đúng packet, kiểm byte hash/size/source hash rồi
+  gửi PDF trực tiếp đến model; không tái dựng request từ OCR chunks.
+- Index `(lesson_id, created_at desc)`, `request_hash`, `expires_at` phục vụ cleanup
+  và validation nhanh.
+
+### 8.2.2. `flashcard_figures`, revisions và render attempts
+
+- `flashcard_figures` là logical resource độc lập, unique
+  `(flashcard_id, role)`. Luồng hiện hành chỉ tạo/đọc `role=SOLUTION`; enum vẫn
+  giữ `FRONT|BACK` để dữ liệu legacy không bị xóa phá hủy, nhưng hai role này
+  không còn được API/worker/UI mới sử dụng. Row giữ subject snapshot, trạng thái,
+  current/pending revision và lỗi gần nhất.
+- `flashcard_figure_revisions` lưu source kind/origin, source version, TikZ,
+  alt/caption, renderer/validator metadata và delivery File SVG.
+- Admin có thể tải ảnh raster cho duy nhất role `SOLUTION`. Thao tác này tạo một
+  revision `source_kind=ADMIN_UPLOAD`, `origin=ADMIN_UPLOAD`, `status=SUCCEEDED`
+  với delivery File đã `READY`, promote ngay thành current revision và xóa pending
+  AI revision; không enqueue worker hoặc dùng asset riêng cho `FRONT|BACK`.
+- `flashcard_figure_render_attempts` gắn revision với background job, attempt
+  number, source hash, compile log, duration và failure category/code.
+- Queue riêng `FLASHCARD_FIGURE_RENDERING`; xóa Flashcard cascade resource,
+  revision/attempt. Delivery File dùng `onDelete=SetNull` để lifecycle storage
+  được quản lý tách biệt.
 
 ### 8.3. `flashcard_progress`
 

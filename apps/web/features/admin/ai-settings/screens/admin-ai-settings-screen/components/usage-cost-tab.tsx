@@ -28,6 +28,7 @@ import {
   formatDateTime,
   formatNumber,
   formatUsagePurpose,
+  formatUsageTarget,
   formatVnd,
   usageStatusLabels,
 } from "@/features/admin/ai-settings/utils/provider-operations-formatters";
@@ -439,6 +440,11 @@ export function UsageCostTab({
                             ? ` · ${formatCacheStatus(event.cacheStatus)}`
                             : ""}
                         </p>
+                        {formatUsageTarget(event) ? (
+                          <p className="mt-0.5 text-xs font-semibold text-[var(--theme-text)]">
+                            {formatUsageTarget(event)}
+                          </p>
+                        ) : null}
                       </td>
                       <td className="px-4 py-3 font-semibold text-[var(--theme-text)]">
                         {event.category === "OCR_SERVICE"
@@ -527,6 +533,11 @@ export function UsageCostTab({
                 <p className="mt-0.5 text-sm font-semibold text-[var(--theme-text-muted)]">
                   {formatUsagePurpose(selectedEvent)}
                 </p>
+                {formatUsageTarget(selectedEvent) ? (
+                  <p className="mt-1 text-sm font-extrabold text-[var(--theme-text)]">
+                    {formatUsageTarget(selectedEvent)}
+                  </p>
+                ) : null}
               </div>
               <div>
                 <p className="text-sm font-semibold text-[var(--theme-text-muted)] mb-2">

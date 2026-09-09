@@ -1,7 +1,7 @@
 # ADR-0025 - Hình lời giải độc lập cho Summary Ví dụ/Bài tập
 
 Date: 2026-09-05
-Status: Accepted
+Status: Superseded in part by ADR-0027
 
 ## Context
 
@@ -18,10 +18,9 @@ Khi figure là `GENERATED_FROM_BRIEF`, block là `example` hoặc `exercise` và
 prompt áp dụng authority `solution > problem` và bắt buộc dựng full source không
 phụ thuộc hình đề, ảnh SGK hoặc source khác.
 
-Summary sở hữu resolver, prompt theo từng môn, version, cache namespace và worker
-contract của mình. Không import hoặc gọi builder/prompt prose của Quiz. Việc
-“giống Quiz” là đồng nhất invariant nghiệp vụ và tiêu chuẩn output, không phải tạo
-dependency code giữa hai domain.
+Summary giữ worker, persistence và contract domain riêng. System prompt, schema
+và request builder của đúng role `SOLUTION` đã được chuyển sang Solution Figure
+Core dùng chung theo ADR-0027.
 
 Manual authoring dùng target tường minh `QUESTION | SOLUTION`. `QUESTION` chỉ gửi
 `problem` và dùng slot `0`; `SOLUTION` gửi `solution > problem`, loại `answer` và

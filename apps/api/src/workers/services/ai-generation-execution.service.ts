@@ -10,6 +10,7 @@ import type {
 import { LessonSummaryGenerationService } from "#api/workers/services/lesson-summary-generation.service";
 import { LessonContentGenerationService } from "#api/workers/services/lesson-content-generation.service";
 import { QuizGenerationService } from "#api/workers/services/quiz-generation.service";
+import { FlashcardGenerationService } from "#api/workers/services/flashcard-generation.service";
 
 /**
  * Dispatch boundary for M9 generation handlers.
@@ -24,6 +25,8 @@ export class AiGenerationExecutionService {
     private readonly lessonContentGeneration: LessonContentGenerationService,
     @Inject(QuizGenerationService)
     private readonly quizGeneration: QuizGenerationService,
+    @Inject(FlashcardGenerationService)
+    private readonly flashcardGeneration: FlashcardGenerationService,
   ) {}
 
   async generate(
@@ -35,10 +38,10 @@ export class AiGenerationExecutionService {
     if (context.type === AiGenerationType.QUIZ) {
       return this.quizGeneration.generate(context);
     }
-    if (
-      context.type === AiGenerationType.FLASHCARD ||
-      context.type === AiGenerationType.TEST
-    ) {
+    if (context.type === AiGenerationType.FLASHCARD) {
+      return this.flashcardGeneration.generate(context);
+    }
+    if (context.type === AiGenerationType.TEST) {
       return this.lessonContentGeneration.generate(context);
     }
     throw new UnrecoverableError(
@@ -56,10 +59,10 @@ export class AiGenerationExecutionService {
     if (context.type === AiGenerationType.QUIZ) {
       return this.quizGeneration.persist(context, prepared);
     }
-    if (
-      context.type === AiGenerationType.FLASHCARD ||
-      context.type === AiGenerationType.TEST
-    ) {
+    if (context.type === AiGenerationType.FLASHCARD) {
+      return this.flashcardGeneration.persist(context, prepared);
+    }
+    if (context.type === AiGenerationType.TEST) {
       return this.lessonContentGeneration.persist(context, prepared);
     }
     throw new UnrecoverableError("AI generation persistence handler is not registered.");

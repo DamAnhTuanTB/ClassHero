@@ -174,6 +174,11 @@ Thứ tự này ưu tiên nền tảng trước tính năng sau. Nếu `.codex/p
 | 52.13  | `M9.25` | Sửa trực tiếp từng nhãn và số đo trong bộ chỉnh nhanh TikZ — Done 2026-08-28     |
 | 52.14  | `M9.26` | Chỉnh nhanh góc, cạnh, trung điểm và marker TikZ — Done 2026-09-05              |
 | 52.15  | `M9.27` | Summary Ví dụ/Bài tập sinh hình lời giải độc lập ở Phase 2 — Done 2026-09-05   |
+| 52.16  | `M9.28` | Flashcard Phase 1 độc lập, modal parity Quiz và review từng thẻ — Done 2026-09-07 |
+| 52.17  | `M9.29` | Flashcard sinh một hình minh họa lời giải theo quyết định của lượt tạo nội dung |
+| 52.18  | `M9.30` | Admin authoring/tinh chỉnh hình Flashcard độc lập                              |
+| 52.19  | `M9.31` | Student Flashcard delivery và hardening pipeline AI                            |
+| 52.20  | `M9.32` | Ghi nhận đích đến cụ thể cho mọi lượt gọi AI và hiển thị ngắn trong thống kê — Done 2026-09-09 |
 | 53     | `M9.4`  | Student request-new reserve-first UI + API                                         |
 | 54     | `M9.5`  | AI explanation cache inline UI + API                                               |
 | 55     | `M9.6`  | Chat AI trong lesson bằng RAG                                                      |
@@ -314,6 +319,16 @@ Ghi chú:
 - `M9.24` phụ thuộc Quiz-owned core `M9.3`, review UI `M9.8`, provider routing và
   budget `M9.9-M9.12`, route text `M9.20`; dùng background job hiện có, không đổi
   database schema và không làm lan sang Explanation `M9.5`.
+- `M9.28` phụ thuộc Flashcard CRUD `M6.3`, panel `M9.8`, job foundation `M9.1`
+  và route text/image `M9.20`; tách hard boundary Flashcard khỏi shared
+  Flashcard/Test cũ, chưa gọi Phase 2 tạo hình.
+- `M9.29-M9.31` thực hiện tuần tự sau `M9.28`: sinh asset hình lời giải,
+  authoring/revision độc lập và cuối cùng delivery/hardening phía học sinh.
+- `M9.32` phụ thuộc provider usage `M9.9-M9.12` và các pipeline AI hiện có.
+  Mọi provider attempt AI phải snapshot đích đến trước khi gọi, kể cả tạo mới,
+  tinh chỉnh, chỉnh sửa, sửa lỗi và lượt thất bại; UI chỉ hiện nhãn ngắn, còn ID
+  kỹ thuật nằm trong dialog chi tiết. Các pipeline bổ sung sau đó phải tuân cùng
+  contract thay vì tự tạo nhãn riêng.
 - `M9.4` phụ thuộc `M9.2`, `M9.3`, `M6.2-M6.4`, `M7.1-M7.4` theo loại nội dung và phải
   nối luôn các action request-new hiện có trên UI học sinh.
 - `M9.5` phụ thuộc `M9.1`, `M5.3`, `M6.2-M6.4`, `M7.2-M7.4` và phải có inline

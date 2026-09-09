@@ -62,6 +62,7 @@ export interface QueueQuizGenerationInput {
   targetQuizSetId?: string;
   documentIds?: string[];
   questionCount: number;
+  realWorldQuestionCount?: number;
   difficulty: Difficulty;
   difficultyCounts?: { easy: number; medium: number; hard: number };
   questionTypes?: QuestionType[];
@@ -683,6 +684,7 @@ function normalizeConfiguration(
   return {
     targetQuizSetId,
     questionCount: input.questionCount,
+    realWorldQuestionCount: input.realWorldQuestionCount,
     difficulty: input.difficulty,
     difficultyCounts: normalizeDifficultyCounts(input),
     questionTypes,

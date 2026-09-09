@@ -2500,7 +2500,7 @@ describe("M9.3 Quiz-owned generation core", () => {
     });
     expect(JSON.parse(request.userPrompt)).toEqual({
       role: "QUESTION",
-      mode: "REGENERATE",
+      aiMode: "REGENERATE",
       targetGrade: 8,
       problem: "Cho tam giác ABC vuông tại A.",
     });
@@ -2518,8 +2518,8 @@ describe("M9.3 Quiz-owned generation core", () => {
       currentLatexSource: "\\begin{tikzpicture}\\draw (0,0)--(1,0);\\end{tikzpicture}",
       adminInstructions: "Đặt nhãn A xa cạnh hơn.",
     });
-    expect(editRequest.userPrompt).toContain('"mode":"EDIT_CURRENT"');
-    expect(editRequest.userPrompt).toContain('"currentLatexSource"');
+    expect(editRequest.userPrompt).toContain('"aiMode":"EDIT_CURRENT"');
+    expect(editRequest.userPrompt).toContain('"currentQuestionLatexSource"');
     expect(editRequest.userPrompt).toContain("Đặt nhãn A xa cạnh hơn");
     expect(editRequest.systemPrompt).toContain(
       "xóa mọi nét/annotation cũ không truy được về whitelist",
@@ -2551,7 +2551,7 @@ describe("M9.3 Quiz-owned generation core", () => {
     expect(request.systemPrompt).not.toContain("GT–KL");
     expect(request.schemaReferenceStrategy).toBe("auto");
     expect(request.promptCache).toEqual({
-      namespace: "quiz-figure-question",
+      namespace: "question-figure",
       keyEnabled: true,
       retention: "in_memory",
     });
@@ -2614,9 +2614,7 @@ describe("M9.3 Quiz-owned generation core", () => {
     );
     expect(request.systemPrompt).toContain("Đồ thị/hệ trục/đường số/miền nghiệm");
     expect(request.systemPrompt).toContain("Bảng biến thiên/xét dấu/dữ liệu/biểu đồ");
-    expect(request.promptVersion).toBe(
-      "quiz-figure-math-question-v66-independent-single-semantic-check",
-    );
+    expect(request.promptVersion).toBe("question-figure-math-v1-shared");
     expect(request.systemPrompt).toContain("Bắt buộc dựng trước, chú thích sau");
     expect(request.systemPrompt).toContain("thành một hệ ràng buộc duy nhất");
     expect(request.systemPrompt).toContain(
@@ -2634,7 +2632,7 @@ describe("M9.3 Quiz-owned generation core", () => {
       "### CỔNG CUỐI VỀ HÌNH HỌC VÀ KHẢ NĂNG ĐỌC",
     );
     const mathRulesHeadingIndex = request.systemPrompt.indexOf(
-      "### QUY TẮC HÌNH TOÁN CỦA QUIZ",
+      "### QUY TẮC HÌNH TOÁN CỦA ĐỀ BÀI",
     );
     const requestContractHeadingIndex = request.systemPrompt.indexOf(
       "### HỢP ĐỒNG LƯỢT VẼ HÌNH ĐỀ",
@@ -2644,7 +2642,7 @@ describe("M9.3 Quiz-owned generation core", () => {
     expect(mathSelfCheckIndex).toBeGreaterThan(requestContractHeadingIndex);
     expect(request.systemPrompt).not.toContain("QUY CHUẨN HÌNH TOÀN HỆ THỐNG");
     expect(request.systemPrompt).toContain(
-      "\n\n### QUY TẮC HÌNH TOÁN CỦA QUIZ\n- Phạm vi biểu diễn",
+      "\n\n### QUY TẮC HÌNH TOÁN CỦA ĐỀ BÀI\n- Phạm vi biểu diễn",
     );
     expect(request.systemPrompt).toContain(
       "\n\n### HỢP ĐỒNG LƯỢT VẼ HÌNH ĐỀ\n- Chỉ trả structured output",
@@ -2758,10 +2756,8 @@ describe("M9.3 Quiz-owned generation core", () => {
     );
     expect(request.systemPrompt).not.toContain("solution rồi problem");
     expect(request.systemPrompt).toContain("hoàn toàn độc lập với hình đề");
-    expect(request.outputName).toBe("quiz_solution_figure");
-    expect(request.promptVersion).toBe(
-      "quiz-figure-math-solution-v66-independent-single-semantic-check",
-    );
+    expect(request.outputName).toBe("solution_figure");
+    expect(request.promptVersion).toBe("solution-figure-math-v1-shared");
     expect(
       generatedQuizSolutionFigureSchema.safeParse({
         latexSource: "\\begin{tikzpicture}\\draw (0,0)--(1,0);\\end{tikzpicture}",
@@ -2772,26 +2768,25 @@ describe("M9.3 Quiz-owned generation core", () => {
   it.each([
     {
       subject: { key: "MATH", name: "Toán", slug: "toan" },
-      createVersion: "quiz-figure-math-solution-v66-independent-single-semantic-check",
+      createVersion: "solution-figure-math-v1-shared",
       refinementVersion:
         "quiz-figure-math-solution-refinement-comprehensive-v39-single-semantic-check",
     },
     {
       subject: { key: "PHYSICS", name: "Vật lý", slug: "vat-ly" },
-      createVersion: "quiz-figure-physics-solution-v50-independent-single-semantic-check",
+      createVersion: "solution-figure-physics-v1-shared",
       refinementVersion:
         "quiz-figure-physics-solution-refinement-comprehensive-v26-single-semantic-check",
     },
     {
       subject: { key: "CHEMISTRY", name: "Hóa học", slug: "hoa-hoc" },
-      createVersion:
-        "quiz-figure-chemistry-solution-v49-independent-single-semantic-check",
+      createVersion: "solution-figure-chemistry-v1-shared",
       refinementVersion:
         "quiz-figure-chemistry-solution-refinement-comprehensive-v25-single-semantic-check",
     },
     {
       subject: { key: "GENERAL", name: "Sinh học", slug: "sinh-hoc" },
-      createVersion: "quiz-figure-general-solution-v49-independent-single-semantic-check",
+      createVersion: "solution-figure-general-v1-shared",
       refinementVersion:
         "quiz-figure-general-solution-refinement-comprehensive-v25-single-semantic-check",
     },
@@ -2863,14 +2858,14 @@ describe("M9.3 Quiz-owned generation core", () => {
       subject: { key: "MATH", name: "Toán", slug: "toan" },
       plan,
     });
-    expect(math.systemPrompt).toContain("### QUY TẮC HÌNH TOÁN CỦA QUIZ");
+    expect(math.systemPrompt).toContain("### QUY TẮC HÌNH TOÁN CỦA ĐỀ BÀI");
     expect(math.systemPrompt).toContain("Vạch bằng nhau/trung điểm");
     expect(math.systemPrompt).toContain("bắt buộc có đúng một điểm đánh dấu");
     expect(math.systemPrompt).not.toContain("topology, nút nối, cực tính");
     expect(math.systemPrompt).not.toContain("hóa trị, điện tích");
 
     expect(physics.systemPrompt).toContain("Vector và lực phải có đúng gốc");
-    expect(physics.systemPrompt).toContain("### QUY TẮC HÌNH VẬT LÝ CỦA QUIZ");
+    expect(physics.systemPrompt).toContain("### QUY TẮC HÌNH VẬT LÝ CỦA ĐỀ BÀI");
     expect(physics.systemPrompt).toContain("topology, nút nối, cực tính");
     expect(physics.systemPrompt).not.toContain("Vạch bằng nhau/trung điểm");
     expect(physics.systemPrompt).not.toContain("hóa trị");
@@ -2878,22 +2873,16 @@ describe("M9.3 Quiz-owned generation core", () => {
     expect(physics.systemPrompt).not.toContain("node `$(O)$`");
 
     expect(chemistry.systemPrompt).toContain("đúng nguyên tố, số liên kết");
-    expect(chemistry.systemPrompt).toContain("### QUY TẮC HÌNH HÓA HỌC CỦA QUIZ");
+    expect(chemistry.systemPrompt).toContain("### QUY TẮC HÌNH HÓA HỌC CỦA ĐỀ BÀI");
     expect(chemistry.systemPrompt).toContain("dụng cụ/ống nối");
     expect(chemistry.systemPrompt).not.toContain("Vạch bằng nhau/trung điểm");
     expect(chemistry.systemPrompt).not.toContain("Vector và lực");
     expect(chemistry.systemPrompt).not.toContain("angle=X--V--Y");
     expect(chemistry.systemPrompt).not.toContain("node `$(O)$`");
 
-    expect(math.promptVersion).toBe(
-      "quiz-figure-math-question-v66-independent-single-semantic-check",
-    );
-    expect(physics.promptVersion).toBe(
-      "quiz-figure-physics-question-v50-independent-single-semantic-check",
-    );
-    expect(chemistry.promptVersion).toBe(
-      "quiz-figure-chemistry-question-v49-independent-single-semantic-check",
-    );
+    expect(math.promptVersion).toBe("question-figure-math-v1-shared");
+    expect(physics.promptVersion).toBe("question-figure-physics-v1-shared");
+    expect(chemistry.promptVersion).toBe("question-figure-chemistry-v1-shared");
   });
 
   it("passes targetGrade as context for every Quiz figure subject and mode without grade-band rules", () => {
@@ -2924,7 +2913,7 @@ describe("M9.3 Quiz-owned generation core", () => {
 
       for (const request of requests) {
         expect(JSON.parse(request.userPrompt)).toMatchObject({ targetGrade: 8 });
-        expect(request.promptVersion).toContain("independent-");
+        expect(request.promptVersion).toMatch(/(?:question-figure-|solution-figure-)/u);
         expect(request.systemPrompt).not.toContain("Lớp 3–5");
         expect(request.systemPrompt).not.toContain("Lớp 6–9");
         expect(request.systemPrompt).not.toContain("Lớp 10–12");

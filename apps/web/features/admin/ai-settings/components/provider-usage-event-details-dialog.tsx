@@ -6,6 +6,7 @@ import {
   formatReasoningEffort,
   formatUsageDuration,
   formatUsagePurpose,
+  formatUsageTarget,
   formatVnd,
 } from "@/features/admin/ai-settings/utils/provider-operations-formatters";
 
@@ -63,6 +64,11 @@ export function ProviderUsageEventDetailsDialog({
             <p className="mt-0.5 text-sm font-semibold text-[var(--theme-text-muted)]">
               {formatUsagePurpose(event)}
             </p>
+            {formatUsageTarget(event) ? (
+              <p className="mt-1 text-sm font-extrabold text-[var(--theme-text)]">
+                {formatUsageTarget(event)}
+              </p>
+            ) : null}
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">

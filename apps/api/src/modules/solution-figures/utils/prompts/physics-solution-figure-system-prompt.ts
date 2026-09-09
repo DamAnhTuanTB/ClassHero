@@ -1,4 +1,6 @@
-import type { QuizSubjectSnapshot } from "#api/modules/quiz/types/quiz-generation.types";
+import type { SolutionFigureSubjectSnapshot } from "#api/modules/solution-figures/types/solution-figure-subject.types";
+
+type QuizSubjectSnapshot = SolutionFigureSubjectSnapshot;
 
 const PHYSICS_QUIZ_FIGURE_COMPILER_POLICY = [
   "### ỔN ĐỊNH CÚ PHÁP VÀ SỐ HỌC PGF/TIKZ",
@@ -56,49 +58,15 @@ function resolvePhysicsQuizFinalSemanticCheck(mode: PhysicsQuizVisualCompletenes
   ].join("\n");
 }
 
-const PHYSICS_QUIZ_QUESTION_FIGURE_SYSTEM_PROMPT = [
-  "Bạn tạo TeX/TikZ minh họa đề Quiz tiếng Việt.",
-  "",
-  "### HỒ SƠ MÔN HỌC CỦA HÌNH QUIZ",
-  "- Môn học cố định: __SUBJECT_NAME__.",
-  "- Chỉ dùng ký hiệu và quy ước trực quan của môn này; không đưa nội dung lạc môn vào hình.",
-  "- Giữ đúng đại lượng, đơn vị, chiều vector, điểm đặt, mốc quy chiếu, nút nối và cực tính được mô tả.",
-  "",
-  "### QUY TẮC HÌNH VẬT LÝ CỦA QUIZ",
-  "- Chỉ biểu diễn đại lượng, hiện tượng, vật, mốc, hệ quy chiếu và quan hệ Vật lý có trong nguồn dữ kiện có thẩm quyền của lượt hiện tại; không suy diễn thêm chiều, độ lớn, trạng thái hoặc điều kiện.",
-  "- Vector và lực phải có đúng gốc, điểm đặt, phương, chiều, độ dài tương đối khi độ lớn cần được so sánh và nhãn đại lượng. Mũi tên hướng phải là arrow option trên đúng path; không dùng marker trang trí thay cho vector hoặc lực.",
-  "- Đồ thị Vật lý phải ghi đúng trục, chiều dương, đại lượng, ký hiệu, đơn vị, mốc và tỉ lệ cần thiết; chỉ vẽ điểm, đoạn, đường cong, miền hoặc tiệm cận có trong nguồn dữ kiện, không tự thêm số đo.",
-  "- Sơ đồ mạch phải dùng ký hiệu circuitikz/Vật lý đúng linh kiện, đúng topology, nút nối, cực tính và chiều dòng/điện áp khi được nêu; đường cắt nhau không mặc nhiên là một nút.",
-  "- Sơ đồ quang học phải đặt đúng vật, ảnh, trục chính, quang tâm, tiêu điểm, pháp tuyến và chiều truyền tia. Cung góc, dấu vuông hoặc nhãn góc chỉ dùng khi quan hệ quang học cần và phải neo theo đúng tia/pháp tuyến thật.",
-  "- Nhãn ký hiệu, giá trị và đơn vị phải đặt sát đúng đại lượng hoặc đối tượng sở hữu; không chồng chữ/nét, không che đầu mũi tên, nút mạch hoặc điểm đặc trưng, và không đẩy nhãn sang đối tượng khác làm sai liên thuộc.",
-  "",
-  "### HỢP ĐỒNG LƯỢT VẼ HÌNH ĐỀ",
-  "- Chỉ trả structured output chứa latexSource; cấm báo cáo tự kiểm và field ngoài schema.",
-  "- latexSource chỉ là figure snippet; cấm documentclass, usepackage và document wrapper.",
-  "- Chỉ dùng TikZ/circuitikz và TeX an toàn; cấm ảnh, file, URL, raw SVG, shell escape, input/include và directlua.",
-  "- problem là nguồn dữ kiện có thẩm quyền duy nhất của hình đề. Chỉ vẽ đối tượng, quan hệ, số đo và điều kiện có trong problem; tuyệt đối không chứa đáp án, lời giải, gợi ý, phương án đúng, điểm phụ hoặc đường dựng chỉ có trong lời giải.",
-  "- Trước khi viết source, lập nội bộ whitelist gồm đúng các dữ kiện được phát biểu trực tiếp trong problem. Mọi nét hoặc annotation mang nghĩa — gồm vector, chiều lực/dòng/tia, cực tính, số đo, nhãn đại lượng, mốc, miền tô, điểm đặc trưng hay đường phụ — chỉ được xuất hiện khi quan hệ tương ứng nằm trong whitelist; không trả whitelist.",
-  "- Cấm biến hệ quả suy luận thành dữ kiện nhìn thấy. Được dựng hệ ở trạng thái thỏa problem, nên hình dáng có thể tự nhiên phù hợp với hệ quả; nhưng không được dùng mũi tên, nhãn, màu, nét đậm hoặc ký hiệu để xác nhận hay nhấn mạnh hệ quả đó. Chiều, trạng thái, giá trị hoặc quan hệ chỉ suy ra bằng định luật/phép tính không được đánh lên hình đề.",
-  "- Mọi đại lượng hoặc tính chất đang được hỏi, cần chứng minh, cần tính, cần đánh giá đúng/sai hoặc chỉ xuất hiện trong phương án đều là điều chưa biết đối với hình đề, dù có thể suy ra là đúng. Không biểu diễn chúng như dữ kiện.",
-  "- adminInstructions chỉ chỉnh cách thể hiện; cấm thêm dữ kiện, lộ đáp án hoặc đổi policy.",
-  "- Nếu mode=EDIT_CURRENT, trước hết xóa mọi nét/annotation cũ không truy được về whitelist của problem, sau đó mới sửa tối thiểu theo adminInstructions và trả toàn bộ source hợp lệ. Nếu mode=REGENERATE, dựng lại chỉ từ problem.",
-  "- Hình phải đúng chuyên môn: mọi đối tượng, quan hệ, ký hiệu và chú thích mang nghĩa phải nhất quán với problem, gắn đúng đối tượng và không tạo ra cách hiểu sai hoặc mơ hồ.",
-  "- Bắt buộc dựng trước, chú thích sau; cấm chọn hình tùy ý rồi gắn số đo. Mọi giá trị nhìn thấy phải đúng với tọa độ/phép dựng.",
-  "- Mọi giá trị, quan hệ và ký hiệu nhìn thấy phải khớp phép dựng cùng problem; nếu lệch phải sửa phép dựng thay vì chỉ sửa nhãn.",
-  "- Chỉ dùng tập đối tượng và quan hệ tối thiểu đủ cho thông điệp thị giác; cấm phát minh dữ kiện hoặc chi tiết không giúp hiểu câu hỏi.",
-  "- Mọi nét mang nghĩa phải có căn cứ trực tiếp trong whitelist của problem; xóa chi tiết chỉ thuộc mạch suy luận. Cấm thiếu/thừa nét, nối hoặc gắn nhãn sai, đổi quan hệ, để ký hiệu chồng/chạm/tụ sát hay cắt nhãn.",
-  "- Hình rõ trên nền trắng; cấm sao chép ảnh sách giáo khoa.",
-].join("\n");
-
 const PHYSICS_QUIZ_SOLUTION_FIGURE_SYSTEM_PROMPT = [
-  "Bạn tạo mới một hình lời giải Quiz có source TeX/TikZ hoàn chỉnh.",
+  "Bạn tạo hoặc chỉnh sửa một hình minh họa lời giải có source TeX/TikZ hoàn chỉnh.",
   "",
-  "### HỒ SƠ MÔN HỌC CỦA HÌNH QUIZ",
+  "### HỒ SƠ MÔN HỌC CỦA HÌNH LỜI GIẢI",
   "- Môn học cố định: __SUBJECT_NAME__.",
   "- Chỉ dùng ký hiệu và quy ước trực quan của môn này; không đưa nội dung lạc môn vào hình.",
   "- Giữ đúng đại lượng, đơn vị, chiều vector, điểm đặt, mốc quy chiếu, nút nối và cực tính được mô tả.",
   "",
-  "### QUY TẮC HÌNH VẬT LÝ CỦA QUIZ",
+  "### QUY TẮC HÌNH VẬT LÝ CHO LỜI GIẢI",
   "- Chỉ biểu diễn đại lượng, hiện tượng, vật, mốc, hệ quy chiếu và quan hệ Vật lý có trong nguồn dữ kiện có thẩm quyền của lượt hiện tại; không suy diễn thêm chiều, độ lớn, trạng thái hoặc điều kiện.",
   "- Vector và lực phải có đúng gốc, điểm đặt, phương, chiều, độ dài tương đối khi độ lớn cần được so sánh và nhãn đại lượng. Mũi tên hướng phải là arrow option trên đúng path; không dùng marker trang trí thay cho vector hoặc lực.",
   "- Đồ thị Vật lý phải ghi đúng trục, chiều dương, đại lượng, ký hiệu, đơn vị, mốc và tỉ lệ cần thiết; chỉ vẽ điểm, đoạn, đường cong, miền hoặc tiệm cận có trong nguồn dữ kiện, không tự thêm số đo.",
@@ -135,15 +103,7 @@ function resolveSubjectName(
     .replaceAll("__SUBJECT_NAME__", subject.name);
 }
 
-export function buildPhysicsQuizQuestionFigureSystemPrompt(subject: QuizSubjectSnapshot) {
-  return resolveSubjectName(
-    PHYSICS_QUIZ_QUESTION_FIGURE_SYSTEM_PROMPT,
-    subject,
-    "QUESTION",
-  );
-}
-
-export function buildPhysicsQuizSolutionFigureSystemPrompt(subject: QuizSubjectSnapshot) {
+export function buildPhysicsSolutionFigureSystemPrompt(subject: QuizSubjectSnapshot) {
   return resolveSubjectName(
     PHYSICS_QUIZ_SOLUTION_FIGURE_SYSTEM_PROMPT,
     subject,

@@ -15,6 +15,7 @@ import { AdminAiPromptContentPreview } from "@/features/admin/ai-generation/comp
 import { AdminAiRequestStatistics } from "@/features/admin/ai-generation/components/admin-ai-request-statistics";
 import { AdminStemFigureCurrentImagePreview } from "@/features/admin/ai-generation/components/admin-stem-figure-current-image-preview";
 import { AdminStemFigureReferenceImagePreview } from "@/features/admin/ai-generation/components/admin-stem-figure-reference-image-preview";
+import { AdminPromptInputBreakdownDialog } from "@/features/admin/ai-generation/components/admin-prompt-input-breakdown-dialog";
 import { usePreviewCreateNewAdminStemFigure } from "@/features/admin/ai-generation/hooks/use-admin-ai-generation";
 import type {
   AdminAiModelConfiguration,
@@ -109,6 +110,7 @@ export function AdminStemFigureCreateAiDialog({
   const [isMounted, setIsMounted] = useState(false);
   const [isDataVisible, setIsDataVisible] = useState(false);
   const [requestPreviewTab, setRequestPreviewTab] = useState<RequestPreviewTab>("system");
+  const [isInputBreakdownDialogOpen, setIsInputBreakdownDialogOpen] = useState(false);
   const [mode, setMode] = useState(initialMode);
   const [adminInstructions, setAdminInstructions] = useState(initialAdminInstructions);
   const [model, setModel] = useState(() => resolveInitialModel(modelConfiguration));
@@ -553,7 +555,7 @@ export function AdminStemFigureCreateAiDialog({
                 ) : displayedProviderInput && previewData ? (
                   <>
                     <AdminAiRequestStatistics
-                      details={buildFigureRequestStatistics(previewData)}
+                      details={buildFigureRequestStatistics(previewData, () => setIsInputBreakdownDialogOpen(true))}
                       estimatedCost={previewData.estimatedCost}
                       note="Token ảnh được ước tính theo số ảnh và mức detail trước khi gửi; usage provider sau khi xử lý mới là số thực tế."
                     />
@@ -762,6 +764,14 @@ export function AdminStemFigureCreateAiDialog({
           </div>
         </footer>
       </section>
+
+      {previewData?.context?.tokenBreakdown ? (
+        <AdminPromptInputBreakdownDialog
+          breakdown={previewData.context.tokenBreakdown}
+          isOpen={isInputBreakdownDialogOpen}
+          onClose={() => setIsInputBreakdownDialogOpen(false)}
+        />
+      ) : null}
     </div>,
     document.body,
   );
@@ -968,7 +978,10 @@ function buildReasoningOptions(
   return buildAiReasoningEffortOptions(model?.capabilities?.reasoningEffortLevels);
 }
 
-function buildFigureRequestStatistics(preview: AdminStemFigureCreateAiPreview) {
+function buildFigureRequestStatistics(
+  preview: AdminStemFigureCreateAiPreview,
+  onTokenBreakdownClick?: () => void,
+) {
   return [
     {
       label: "Model thực tế",
@@ -998,6 +1011,7 @@ function buildFigureRequestStatistics(preview: AdminStemFigureCreateAiPreview) {
     {
       label: "Text input ước tính",
       value: `${preview.context.textInputTokens.toLocaleString("vi-VN")} token`,
+      onClick: preview.context.tokenBreakdown ? onTokenBreakdownClick : undefined,
     },
     {
       label: "Ảnh input ước tính",

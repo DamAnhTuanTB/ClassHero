@@ -2,15 +2,24 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createAdminFlashcard,
   createAdminFlashcardSet,
+  attachAdminFlashcardSolutionFigureUpload,
   deleteAdminFlashcard,
+  deleteAdminFlashcardFigure,
   deleteAdminFlashcardSet,
   getAdminFlashcards,
   getAdminFlashcardSets,
+  reviewAdminFlashcard,
+  reviewAdminFlashcardSet,
+  reviewAllPendingAiFlashcards,
+  previewAdminFlashcardFigureWithAi,
+  createAdminFlashcardFigureWithAi,
   updateAdminFlashcard,
   updateAdminFlashcardSet,
+  uploadAdminFlashcardSolutionImage,
   type AdminFlashcardPayload,
   type AdminFlashcardSet,
   type AdminFlashcardSetPayload,
+  type AdminFlashcardFigurePreviewInput,
 } from "@/features/admin/flashcards/api/admin-flashcards-api";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 
@@ -68,6 +77,42 @@ export function useAdminFlashcardSets(lessonId: string) {
   });
 }
 
+export function useAdminFlashcardFigurePreview(flashcardId: string) {
+  const session = useAuthSessionStore((state) => state.session);
+  return useMutation({
+    mutationFn: (input: AdminFlashcardFigurePreviewInput) => {
+      if (!session?.accessToken) throw new Error("No token");
+      return previewAdminFlashcardFigureWithAi(
+        flashcardId,
+        input,
+        session.accessToken,
+      );
+    },
+  });
+}
+
+export function useAdminFlashcardFigureCreate(
+  flashcardId: string,
+  flashcardSetId: string,
+) {
+  const session = useAuthSessionStore((state) => state.session);
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: AdminFlashcardFigurePreviewInput) => {
+      if (!session?.accessToken) throw new Error("No token");
+      return createAdminFlashcardFigureWithAi(
+        flashcardId,
+        input,
+        session.accessToken,
+      );
+    },
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: adminFlashcardQueryKeys.cards(flashcardSetId),
+      }),
+  });
+}
+
 export function useAdminFlashcardSetMutations(lessonId: string) {
   const session = useAuthSessionStore((state) => state.session);
   const token = session?.accessToken;
@@ -103,7 +148,26 @@ export function useAdminFlashcardSetMutations(lessonId: string) {
     onSuccess: invalidateSets,
   });
 
-  return { createSet, deleteSet, updateSet };
+  const reviewSet = useMutation({
+    mutationFn: ({
+      action,
+      reviewStatus,
+      setId,
+    }: {
+      action: "SAVE" | "PUBLISH" | "WITHDRAW";
+      reviewStatus: "APPROVED" | "NEEDS_REVIEW" | "HIDDEN";
+      setId: string;
+    }) =>
+      reviewAdminFlashcardSet(
+        setId,
+        reviewStatus,
+        action,
+        requireToken(token),
+      ),
+    onSuccess: invalidateSets,
+  });
+
+  return { createSet, deleteSet, reviewSet, updateSet };
 }
 
 export function useAdminFlashcards(setId: string) {
@@ -152,7 +216,56 @@ export function useAdminFlashcardMutations(setId: string, lessonId: string) {
     onSuccess: invalidateCards,
   });
 
-  return { createCard, deleteCard, updateCard };
+  const uploadSolutionFigure = useMutation({
+    mutationFn: async (input: { flashcardId: string; file: File; altText: string }) => {
+      const uploaded = await uploadAdminFlashcardSolutionImage(
+        input.file,
+        requireToken(token),
+      );
+      return attachAdminFlashcardSolutionFigureUpload(
+        input.flashcardId,
+        { fileId: uploaded.fileId, altText: input.altText },
+        requireToken(token),
+      );
+    },
+    onSuccess: invalidateCards,
+  });
+
+  const deleteSolutionFigure = useMutation({
+    mutationFn: (input: { flashcardId: string; figureId: string }) =>
+      deleteAdminFlashcardFigure(
+        input.flashcardId,
+        input.figureId,
+        requireToken(token),
+      ),
+    onSuccess: invalidateCards,
+  });
+
+  const reviewCard = useMutation({
+    mutationFn: ({
+      flashcardId,
+      reviewStatus,
+    }: {
+      flashcardId: string;
+      reviewStatus: "APPROVED" | "NEEDS_REVIEW" | "HIDDEN";
+    }) => reviewAdminFlashcard(flashcardId, reviewStatus, requireToken(token)),
+    onSuccess: invalidateCards,
+  });
+
+  const reviewAllPendingAiCards = useMutation({
+    mutationFn: () => reviewAllPendingAiFlashcards(setId, requireToken(token)),
+    onSuccess: invalidateCards,
+  });
+
+  return {
+    createCard,
+    deleteCard,
+    deleteSolutionFigure,
+    reviewAllPendingAiCards,
+    reviewCard,
+    uploadSolutionFigure,
+    updateCard,
+  };
 }
 
 function requireToken(token: string | undefined) {

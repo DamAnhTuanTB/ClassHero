@@ -32,6 +32,7 @@ export const adminQuizGenerationSchema = z
     ]),
     documentIds: z.array(z.string().uuid()).min(1, "Chọn ít nhất một tài liệu").max(20),
     questionCount: numericText("Số câu hỏi", 1, 50),
+    realWorldCount: optionalNumber("Số câu thực tế", 0, 50),
     difficulty: z.enum(["EASY", "MEDIUM", "HARD", "MIXED"]),
     easyCount: numericText("Số câu dễ", 0, 50),
     mediumCount: numericText("Số câu trung bình", 0, 50),

@@ -1,4 +1,7 @@
-import type { ProviderUsageOperation } from "@learning-path/shared";
+import type {
+  ProviderUsageOperation,
+  ProviderUsageTargetContext,
+} from "@learning-path/shared";
 
 export type { ProviderUsageOperation } from "@learning-path/shared";
 
@@ -162,6 +165,8 @@ export type UsageEvent = {
   feature: AiFeature | null;
   purpose: AiModelPurpose | null;
   operation: ProviderUsageOperation | null;
+  targetContext?: ProviderUsageTargetContext | null;
+  targetLabel?: string;
   reasoningEffort: string | null;
   status: "RUNNING" | "SUCCEEDED" | "FAILED";
   cacheStatus: string | null;

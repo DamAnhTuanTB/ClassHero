@@ -287,6 +287,14 @@ Performance và cost rules:
   không tạo figure/job và không gọi provider. Mỗi lần admin bấm `Thực hiện` chỉ
   tạo tối đa một paid call cho target đã chọn; thay hình đề không âm thầm sinh lại
   lời giải EXTEND, tránh nhân đôi chi phí ngoài dự kiến.
+- Question Figure Core dùng chung cho Summary/Quiz có schema
+  `question-figure-schema-v1`, prompt version
+  `question-figure-<subject>-v1-shared` và namespace `question-figure`. Rollout
+  là `NEW_STABLE_PREFIX_WARMUP`: không tái sử dụng prefix hình đề cũ, không dùng
+  chung cache giữa subject hoặc với Solution Figure Core; sau warm-up, phần
+  problem/current source động vẫn nằm sau stable breakpoint. Preview chỉ dựng
+  request/token/cost estimate, không gọi provider; execute giữ tối đa một paid
+  call do adapter domain sở hữu.
 - Preview hai action lời giải AI M9.24 chỉ dựng request, token/cost estimate và
   request hash; không gọi provider. Execute tạo tối đa một job và một paid call,
   tái sử dụng job còn hoạt động của cùng câu hỏi, `maxAttempts=1`, đồng thời kiểm
@@ -305,6 +313,11 @@ Provider operations rules:
   biệt `STEM_FIGURE` là `Tạo hình minh họa` và `QUIZ_FIGURE` là
   `Tạo hình minh họa Quiz`; chỉ fallback về `SUMMARY`/`QUIZ`/`FLASHCARD`/`TEST`
   khi event không có resource type chuyên biệt.
+- Nhãn đích `M9.32` phải đọc trực tiếp từ snapshot trên usage event; endpoint list
+  không truy vấn từng block/câu/thẻ để dựng nhãn và không phát sinh N+1. Snapshot
+  được ghi trước provider call để cả latency, lỗi và chi phí của attempt thất bại
+  vẫn gắn đúng đích. Backfill lịch sử chỉ resolve theo batch và không đoán khi
+  quan hệ không duy nhất.
 - OCR cache hit không tạo delay giả. Mathpix retry resume `pdfId` đã lưu để tránh double-charge; debug artifact local tắt mặc định ở production.
 - Hard-stop `M9.12` serialize ngắn chỉ ở bước reserve theo `period + scope`; không giữ database lock trong lúc gọi provider. Lock scope theo thứ tự cố định để tránh deadlock.
 - Reservation AI lấy giới hạn input/output từ cấu hình của đúng feature, không

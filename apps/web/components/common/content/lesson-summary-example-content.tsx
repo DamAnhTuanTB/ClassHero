@@ -72,6 +72,11 @@ export function LessonSummaryExampleCard({
       <div className="mb-1 flex items-center gap-1.5 text-[13px] font-black uppercase tracking-wider text-blue-600/70 dark:text-blue-400/70">
         <PlayCircle className="h-4 w-4" aria-hidden="true" />
         {label} {displayNumber ?? ""}
+        {block.origin === "AI_AUTHORED" && (
+          <span className="ml-1 rounded bg-blue-500/20 px-1.5 py-[1px] text-[9px] font-bold text-blue-700 dark:bg-blue-500/30 dark:text-blue-300">
+            NEW
+          </span>
+        )}
       </div>
       <div className="learning-content-text space-y-2 leading-relaxed text-slate-800 opacity-90 dark:text-slate-200">
         <LessonSummaryProblemContent

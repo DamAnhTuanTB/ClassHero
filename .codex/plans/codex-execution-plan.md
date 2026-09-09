@@ -363,6 +363,8 @@ chung`/`Bài tập cuối chương`. Output hợp lệ kỹ thuật luôn đư�
     43.9. `M9.25` - Sửa trực tiếp từng nhãn và số đo trong bộ chỉnh nhanh TikZ. Done 2026-08-28.
     43.10. `M9.26` - Nhập góc nhanh, tự nối cạnh và tạo nhóm cung TikZ. Done 2026-09-05.
     43.11. `M9.27` - Summary Ví dụ/Bài tập sinh hình lời giải độc lập. Done 2026-09-05.
+    43.12. `M9.32` - Snapshot đích đến cụ thể cho mọi AI attempt và hiển thị nhãn
+    ngắn theo khối/câu/thẻ trong thống kê chi phí. Done 2026-09-09.
 44. `M9.4` - Student request-new reserve-first UI + API.
 45. `M9.5` - AI explanation cache inline UI + API.
 46. `M9.6` - Chat AI trong lesson bằng RAG.

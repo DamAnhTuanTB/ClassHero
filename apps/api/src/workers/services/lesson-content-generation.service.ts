@@ -25,9 +25,7 @@ import type {
   AiGenerationPreparedOutput,
 } from "#api/modules/ai/types/ai-generation.types";
 import {
-  flashcardGenerationJobInputSchema,
   getGeneratedTestOutputSchema,
-  generatedFlashcardOutputSchema,
   LESSON_CONTENT_MAX_OUTPUT_TOKENS,
   LESSON_CONTENT_SCHEMA_VERSION,
   testGenerationJobInputSchema,
@@ -38,15 +36,14 @@ import { parseAiStructuredOutput } from "#api/modules/ai/utils/ai-output-validat
 import {
   assertGeneratedContent,
   mapGeneratedQuestion,
-  toTiptap,
 } from "#api/modules/ai/utils/lesson-content-generation-mapper";
 import {
-  buildFlashcardPrompt,
   buildLessonContentSystemPrompt,
   buildTestPrompt,
   resolveLessonContentPromptVersion,
 } from "#api/modules/ai/utils/lesson-content-generation-prompt";
 import type { ProviderUsageOperation } from "#api/modules/provider-operations/types/provider-operations.types";
+import { buildWholeFeatureUsageTarget } from "#api/modules/provider-operations/utils/provider-usage-target";
 
 @Injectable()
 export class LessonContentGenerationService {
@@ -65,8 +62,6 @@ export class LessonContentGenerationService {
   ): Promise<AiGenerationPreparedOutput> {
     if (!context.lessonId)
       throw new UnrecoverableError("AI content generation requires lessonId.");
-    if (context.type === AiGenerationType.FLASHCARD)
-      return this.generateFlashcards(context);
     if (context.type === AiGenerationType.TEST) return this.generateTest(context);
     throw new UnrecoverableError(
       `Unsupported lesson content generation type ${context.type}.`,
@@ -79,64 +74,11 @@ export class LessonContentGenerationService {
   ): Promise<AiGenerationPersistenceResult> {
     if (!context.lessonId)
       throw new UnrecoverableError("AI content persistence requires lessonId.");
-    if (context.type === AiGenerationType.FLASHCARD)
-      return this.persistFlashcards(context, prepared);
     if (context.type === AiGenerationType.TEST)
       return this.persistTest(context, prepared);
     throw new UnrecoverableError(
       `Unsupported lesson content persistence type ${context.type}.`,
     );
-  }
-
-  private async generateFlashcards(context: AiGenerationExecutionContext) {
-    const input = parseJobInput(
-      flashcardGenerationJobInputSchema,
-      context.inputMeta,
-      "flashcard",
-    );
-    const source = await this.retrieve(
-      context.lessonId!,
-      input.documentIds,
-      input.sourceHash,
-      "khái niệm công thức định nghĩa và kiến thức cần ghi nhớ",
-    );
-    const request = structuredInput(
-      source,
-      buildFlashcardPrompt({
-        lessonTitle: source.lessonTitle,
-        ...input,
-        subject: source.subject,
-      }),
-      "generated_flashcards",
-    );
-    const output = this.providerCall
-      ? await this.providerCall.generateStructured(
-          providerContext(context, "FLASHCARD_GENERATION"),
-          request,
-          generatedFlashcardOutputSchema,
-        )
-      : await this.aiService.generateStructured(request, generatedFlashcardOutputSchema);
-    if (output.data.cards.length !== input.cardCount) {
-      throw new UnrecoverableError(
-        "AI_OUTPUT_COUNT_MISMATCH: Flashcard count does not match the request.",
-      );
-    }
-    if (
-      input.difficulty !== Difficulty.MIXED &&
-      output.data.cards.some((item) => item.difficulty !== input.difficulty)
-    ) {
-      throw new UnrecoverableError(
-        "AI_OUTPUT_DIFFICULTY_MISMATCH: Flashcard difficulty does not match the request.",
-      );
-    }
-    assertGenerated(
-      source,
-      output.data.cards.map((card) => ({
-        sourceChunkIds: card.sourceChunkIds,
-        text: `${card.front}\n${card.back}`,
-      })),
-    );
-    return { action: "FLASHCARD", output };
   }
 
   private async generateTest(context: AiGenerationExecutionContext) {
@@ -195,81 +137,6 @@ export class LessonContentGenerationService {
     }
   }
 
-  private async persistFlashcards(
-    context: AiGenerationExecutionContext,
-    prepared: AiGenerationPreparedOutput,
-  ) {
-    const input = parseJobInput(
-      flashcardGenerationJobInputSchema,
-      context.inputMeta,
-      "flashcard",
-    );
-    const output = parseAiStructuredOutput(
-      generatedFlashcardOutputSchema,
-      prepared.output.data,
-    );
-    return this.prisma.$transaction(async (tx) => {
-      const sortOrder = await nextSetSortOrder(tx, "flashcard", context.lessonId!);
-      const set = await tx.flashcardSet.create({
-        data: {
-          lessonId: context.lessonId!,
-          title: output.title,
-          difficulty: input.difficulty,
-          source: ContentSource.AI,
-          reviewStatus: ReviewStatus.NEEDS_REVIEW,
-          generatedByUserId: context.ownerUserId,
-          aiGenerationId: context.aiGenerationId,
-          cardCount: output.cards.length,
-          sortOrder,
-          createdById: context.ownerUserId,
-          updatedById: context.ownerUserId,
-        },
-        select: { id: true },
-      });
-      for (const [index, card] of output.cards.entries()) {
-        const id = randomUUID();
-        const explanationId = randomUUID();
-        await tx.aiExplanation.create({
-          data: {
-            id: explanationId,
-            targetType: AiExplanationTargetType.FLASHCARD,
-            targetId: id,
-            lessonId: context.lessonId!,
-            contentJson: json(toTiptap(card.explanation)),
-            source: ContentSource.AI,
-            reviewStatus: ReviewStatus.NEEDS_REVIEW,
-            aiGenerationId: context.aiGenerationId,
-            targetContentHash: hashAiValue({ front: card.front, back: card.back }),
-            sourceContextHash: input.sourceHash,
-          },
-        });
-        await tx.flashcard.create({
-          data: {
-            id,
-            flashcardSetId: set.id,
-            lessonId: context.lessonId!,
-            frontJson: json(toTiptap(card.front)),
-            backJson: json(toTiptap(card.back)),
-            difficulty: card.difficulty,
-            reviewStatus: ReviewStatus.NEEDS_REVIEW,
-            explanationId,
-            sortOrder: index,
-            sourceMetadataJson: json(
-              await sourceMetadata(tx, card.sourceChunkIds, input.sourceHash),
-            ),
-          },
-        });
-      }
-      await auditGenerated(tx, context, "FlashcardSet", set.id);
-      return result(
-        "FLASHCARD_SET",
-        set.id,
-        "Đã tạo bộ flashcard bằng AI.",
-        output.cards.length,
-      );
-    });
-  }
-
   private async persistTest(
     context: AiGenerationExecutionContext,
     prepared: AiGenerationPreparedOutput,
@@ -280,7 +147,7 @@ export class LessonContentGenerationService {
       prepared.output.data,
     );
     return this.prisma.$transaction(async (tx) => {
-      const sortOrder = await nextSetSortOrder(tx, "test", context.lessonId!);
+      const sortOrder = await nextTestSetSortOrder(tx, context.lessonId!);
       const set = await tx.testSet.create({
         data: {
           lessonId: context.lessonId!,
@@ -334,6 +201,7 @@ function providerContext(
     backgroundJobId: context.backgroundJobId,
     attempt: context.attempt,
     operation,
+    targetContext: buildWholeFeatureUsageTarget(context.type, context.aiGenerationId),
     routeSnapshot: context.providerRouteSnapshot,
   };
 }
@@ -522,23 +390,15 @@ async function sourceMetadata(
   return { sourceHash, sourceChunkIds: chunkIds, sources: chunks, ...extra };
 }
 
-async function nextSetSortOrder(
+async function nextTestSetSortOrder(
   tx: Prisma.TransactionClient,
-  kind: "flashcard" | "test",
   lessonId: string,
 ) {
-  const record =
-    kind === "flashcard"
-      ? await tx.flashcardSet.findFirst({
-          where: { lessonId, deletedAt: null },
-          orderBy: { sortOrder: "desc" },
-          select: { sortOrder: true },
-        })
-      : await tx.testSet.findFirst({
-          where: { lessonId, deletedAt: null },
-          orderBy: { sortOrder: "desc" },
-          select: { sortOrder: true },
-        });
+  const record = await tx.testSet.findFirst({
+    where: { lessonId, deletedAt: null },
+    orderBy: { sortOrder: "desc" },
+    select: { sortOrder: true },
+  });
   return (record?.sortOrder ?? -1) + 1;
 }
 

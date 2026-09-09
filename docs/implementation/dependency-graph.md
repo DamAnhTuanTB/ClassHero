@@ -93,6 +93,9 @@ M14 testing/hardening/deploy
 - `M9.20` phụ thuộc hai pipeline phase hiện có `M9.2/M9.3`, panel generation
   `M9.8`, provider operations `M9.9-M9.12` và token config `M9.19`; mở rộng khóa
   config từ feature thành `(feature, purpose)` và snapshot riêng text/ảnh.
+- `M9.32` phụ thuộc provider usage `M9.9-M9.12` và inventory các call path
+  `M9.2-M9.7`, `M9.21-M9.31`; các pipeline AI mới phải truyền target context vào
+  gateway chung trước call. Task không phụ thuộc live provider smoke test.
 - `M9.21` phụ thuộc Quiz figure `M9.3`, panel/action frame `M9.8`, route ảnh
   `M9.20`, R2 và TeX renderer; thêm một paid multimodal call chỉ khi admin bấm
   `Tinh chỉnh`, giữ current revision cho tới khi candidate pass toàn bộ gate.

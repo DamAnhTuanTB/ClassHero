@@ -811,6 +811,28 @@ Màn chi tiết buổi học admin:
   Taxonomy phải phân biệt sinh nội dung, tạo/chỉnh sửa/tinh chỉnh/sửa lỗi ảnh,
   hình đề/hình lời giải Quiz và tinh chỉnh/tạo lại lời giải Quiz. Event cũ thiếu
   snapshot hiển thị fallback rõ ràng, không tự nhận là một tác vụ mới.
+  Mỗi dòng còn hiển thị một dòng đích ngắn ngay dưới tên tác vụ, chẳng hạn
+  `Ví dụ 2 · Hình lời giải`, `Quiz · Câu 4 · Hình đề` hoặc `Flashcard · Thẻ 2 ·
+  Hình lời giải`; không thêm cột mới và không đưa UUID/mô tả dài vào bảng. Quy
+  tắc này áp dụng cả tạo mới, tinh chỉnh, chỉnh sửa ảnh bằng AI, sửa lỗi ảnh và
+  lượt thất bại; metadata đầy đủ chỉ mở ở dialog chi tiết.
+- Tab quản trị Flashcard dùng cùng cấu trúc và state machine với tab Quiz: tab
+  từng bộ có số đã duyệt/chờ duyệt; summary card có tổng chi phí, tổng ảnh, tổng
+  thẻ, mức độ; hàng action có `Duyệt tất cả`, `Lưu` và
+  `Phát hành`/`Thu hồi phát hành`; thanh điều hướng tách `AI chờ duyệt` và
+  `Đã duyệt`; phần chi tiết chỉ render thẻ đang chọn và có trước/sau. Flashcard
+  chỉ có đúng một hàng nội dung `Thẻ ghi nhớ` trong mỗi nhóm trạng thái, tuyệt
+  đối không hiển thị hoặc phụ thuộc bốn loại câu hỏi của Quiz.
+- `Tổng chi phí` Flashcard mở lịch sử sinh độc lập của set và tiếp tục mở chi
+  tiết usage; `Tổng ảnh` đếm ảnh thực tế trong Tiptap và current asset minh họa
+  lời giải rồi mở overview điều hướng về đúng thẻ.
+- Card AI Flashcard có ba chế độ `Chỉ xem UI | Chỉ xem JSON | Song song`, nhãn
+  `AI`, action duyệt và menu tạo ảnh có đúng một lựa chọn `Tạo ảnh cho lời giải`.
+  Lựa chọn mở modal cùng pattern Quiz (shell, cấu hình AI, yêu cầu, thống kê/chi
+  phí, ba tab request, sticky footer). Modal luôn có `Tạo mới lại`; chỉ hiện
+  `Chỉnh sửa hình hiện tại` khi current asset lời giải là `AI_TEX` có source.
+  Asset và trạng thái được hiển thị trong khối lời giải, không nằm ở mặt trước
+  hoặc mặt sau; orchestration vẫn thuộc riêng Flashcard.
 - Form câu hỏi quiz hỗ trợ `MULTIPLE_CHOICE`, `TRUE_FALSE`,
   `MULTI_STATEMENT_TRUE_FALSE`, `TEXT_INPUT`, mức độ, gợi ý và lời giải chi
   tiết. Multiple choice dùng danh sách phương án động:
@@ -836,6 +858,10 @@ Trong lesson detail `/admin/lessons/[lessonId]`:
 - Trong tab Quiz, action `Phát hành` khả dụng khi bộ có ít nhất một câu đã duyệt,
   kể cả khi vẫn còn câu chờ duyệt. Action `Lưu` đưa các câu mới duyệt vào lượt
   phát hành gần nhất của cùng bộ và không tạo mốc phát hành mới.
+- Tab Flashcard áp dụng độc lập cùng contract phát hành của Quiz: duyệt từng
+  thẻ/bulk review không tự công khai; `Lưu` đưa thẻ đã duyệt vào lượt phát hành
+  hiện tại; `Phát hành` công khai set khi có ít nhất một thẻ đã duyệt; `Thu hồi`
+  ẩn set với học sinh.
 - Modal Summary cho chọn tài liệu READY, cấu hình văn phong/độ dài/model/prompt và
   xem prompt + chi phí ước tính. Generate luôn dựng request mới nhất phía server.
 - Cùng nhóm cấu hình nội dung có hai numeric text field đặt cạnh nhau trên màn

@@ -10,6 +10,7 @@ import { TextareaField } from "@/components/common/forms/textarea-field";
 import { AdminAiJsonInputViewer } from "@/features/admin/ai-generation/components/admin-ai-json-input-viewer";
 import { AdminAiPromptContentPreview } from "@/features/admin/ai-generation/components/admin-ai-prompt-content-preview";
 import { AdminAiRequestStatistics } from "@/features/admin/ai-generation/components/admin-ai-request-statistics";
+import { AdminPromptInputBreakdownDialog } from "@/features/admin/ai-generation/components/admin-prompt-input-breakdown-dialog";
 import type {
   AdminQuizFigure,
   AdminQuizFigureRefinementPreview,
@@ -50,6 +51,7 @@ export function AdminQuizFigureRefinementDialog({
   const mutatePreview = previewMutation.mutateAsync;
   const resetPreview = previewMutation.reset;
   const [isMounted, setIsMounted] = useState(false);
+  const [isInputBreakdownDialogOpen, setIsInputBreakdownDialogOpen] = useState(false);
   const [previewData, setPreviewData] = useState<AdminQuizFigureRefinementPreview | null>(
     null,
   );
@@ -92,7 +94,8 @@ export function AdminQuizFigureRefinementDialog({
     setRequestPreviewTab("user");
     resetPreview();
     void loadPreview("");
-  }, [figure.id, isOpen, loadPreview, resetPreview]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [figure.id, isOpen, resetPreview]);
   useEffect(() => {
     if (!isOpen) return;
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -241,7 +244,7 @@ export function AdminQuizFigureRefinementDialog({
                 </h3>
                 <div className="mt-3">
                   <AdminAiRequestStatistics
-                    details={buildRequestStatistics(previewData)}
+                    details={buildRequestStatistics(previewData, () => setIsInputBreakdownDialogOpen(true))}
                     estimatedCost={previewData.estimatedCost}
                     note="Mở modal và xem trước không gọi provider trả phí. Chi phí thực tế chỉ phát sinh sau khi bấm Thực hiện và có thể thấp hơn mức tối đa."
                   />
@@ -325,12 +328,23 @@ export function AdminQuizFigureRefinementDialog({
           </button>
         </footer>
       </section>
+
+      {previewData?.context.tokenBreakdown ? (
+        <AdminPromptInputBreakdownDialog
+          breakdown={previewData.context.tokenBreakdown}
+          isOpen={isInputBreakdownDialogOpen}
+          onClose={() => setIsInputBreakdownDialogOpen(false)}
+        />
+      ) : null}
     </div>,
     document.body,
   );
 }
 
-function buildRequestStatistics(preview: AdminQuizFigureRefinementPreview) {
+function buildRequestStatistics(
+  preview: AdminQuizFigureRefinementPreview,
+  onTokenBreakdownClick?: () => void,
+) {
   return [
     {
       label: "Model thực tế",
@@ -360,6 +374,7 @@ function buildRequestStatistics(preview: AdminQuizFigureRefinementPreview) {
     {
       label: "Text input ước tính",
       value: `${preview.context.textInputTokens.toLocaleString("vi-VN")} token`,
+      onClick: preview.context.tokenBreakdown ? onTokenBreakdownClick : undefined,
     },
     {
       label: "Ảnh input ước tính",
