@@ -41,10 +41,18 @@ export class QuizFigureJobService {
         id: true,
         lessonId: true,
         role: true,
+        quizQuestionId: true,
+        testQuestionId: true,
         pendingRevisionId: true,
         currentRevisionId: true,
       },
     });
+    const target = figure.quizQuestionId
+      ? ({ kind: "QUIZ", questionId: figure.quizQuestionId } as const)
+      : figure.testQuestionId
+        ? ({ kind: "TEST", questionId: figure.testQuestionId } as const)
+        : null;
+    if (!target) throw new Error(`Quiz figure ${figureId} has no question target.`);
     const revisionId = figure.pendingRevisionId ?? figure.currentRevisionId;
     if (!revisionId) throw new Error(`Quiz figure ${figureId} has no revision.`);
     const revision = await this.prisma.quizFigureRevision.findFirstOrThrow({
@@ -77,6 +85,7 @@ export class QuizFigureJobService {
             figureId: figure.id,
             revisionId: revision.id,
             role: figure.role,
+            target,
             routeSnapshot: routeSnapshot ?? null,
             adminInstructions: createOptions?.adminInstructions ?? null,
             aiMode: createOptions?.aiMode ?? "REGENERATE",

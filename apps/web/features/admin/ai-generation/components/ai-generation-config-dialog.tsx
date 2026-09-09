@@ -23,7 +23,6 @@ import type {
   AdminAiConfigurationCapability,
   AdminAiModelConfiguration,
   AdminAiPanelDocument,
-  AdminAiQuestionType,
   AdminSummaryGenerationPayload,
   AdminSummaryLength,
   AdminSummaryStyle,
@@ -52,14 +51,7 @@ const summaryLengthOptions = [
   { value: "standard", label: "Tiêu chuẩn" },
   { value: "detailed", label: "Chi tiết" },
 ];
-const questionTypeOptions = [
-  { value: "MULTIPLE_CHOICE", label: "Trắc nghiệm một đáp án" },
-  { value: "TRUE_FALSE", label: "Đúng / Sai" },
-  { value: "MULTI_STATEMENT_TRUE_FALSE", label: "Nhiều mệnh đề Đúng / Sai" },
-  { value: "TEXT_INPUT", label: "Nhập đáp án" },
-] as const;
-
-type AiGenerationConfigType = "SUMMARY" | "FLASHCARD" | "TEST";
+type AiGenerationConfigType = "SUMMARY" | "FLASHCARD";
 
 export function AiGenerationConfigDialog({
   documents,
@@ -257,13 +249,8 @@ export function AiGenerationConfigDialog({
   const title = {
     SUMMARY: "Tạo Kiến thức bằng AI",
     FLASHCARD: "Tạo Flashcard bằng AI",
-    TEST: "Tạo bài Test bằng AI",
   }[type];
   const countField = form.register("count");
-  const durationField = form.register("durationMinutes");
-  const easyRatioField = form.register("easyRatio");
-  const mediumRatioField = form.register("mediumRatio");
-  const hardRatioField = form.register("hardRatio");
   const targetWordCountField = form.register("summaryTargetWordCount");
   const standardExerciseCountField = form.register("standardExerciseCount");
   const realWorldExerciseCountField = form.register("realWorldExerciseCount");
@@ -984,113 +971,27 @@ export function AiGenerationConfigDialog({
                 {...countField}
                 onChange={numericChange(countField.onChange)}
               />
-              {type !== "TEST" ? (
-                <OptionField
-                  id="ai-generation-difficulty"
-                  label="Mức độ"
-                  value={form.watch("difficulty")}
-                  options={difficultyOptions}
-                  icon={null}
-                  error={form.formState.errors.difficulty}
-                  onChange={(value) =>
-                    form.setValue(
-                      "difficulty",
-                      value as AdminAiGenerationFormValues["difficulty"],
-                      {
-                        shouldDirty: true,
-                        shouldTouch: true,
-                        shouldValidate: true,
-                      },
-                    )
-                  }
-                />
-              ) : null}
+              <OptionField
+                id="ai-generation-difficulty"
+                label="Mức độ"
+                value={form.watch("difficulty")}
+                options={difficultyOptions}
+                icon={null}
+                error={form.formState.errors.difficulty}
+                onChange={(value) =>
+                  form.setValue(
+                    "difficulty",
+                    value as AdminAiGenerationFormValues["difficulty"],
+                    {
+                      shouldDirty: true,
+                      shouldTouch: true,
+                      shouldValidate: true,
+                    },
+                  )
+                }
+              />
             </>
           )}
-
-          {type === "TEST" ? (
-            <fieldset className="space-y-2">
-              <legend className="text-sm font-extrabold text-[var(--theme-text-strong)]">
-                Loại câu hỏi
-              </legend>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {questionTypeOptions.map((option) => (
-                  <CheckboxField
-                    key={option.value}
-                    id={`ai-question-type-${option.value}`}
-                    label={option.label}
-                    checked={form.watch("questionTypes").includes(option.value)}
-                    onChange={(event) =>
-                      updateQuestionTypes(form, option.value, event.currentTarget.checked)
-                    }
-                  />
-                ))}
-              </div>
-              {form.formState.errors.questionTypes ? (
-                <p className="text-sm text-[var(--theme-error-text)]">
-                  {form.formState.errors.questionTypes.message}
-                </p>
-              ) : null}
-            </fieldset>
-          ) : null}
-
-          {type === "TEST" ? (
-            <>
-              <TextField
-                id="ai-test-duration"
-                label="Thời gian làm bài (phút)"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                icon={null}
-                error={form.formState.errors.durationMinutes}
-                {...durationField}
-                onChange={numericChange(durationField.onChange)}
-              />
-              <fieldset className="space-y-3">
-                <legend className="text-sm font-extrabold text-[var(--theme-text-strong)]">
-                  Tỷ lệ độ khó
-                </legend>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <TextField
-                    id="ai-test-easy-ratio"
-                    label="Dễ (%)"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    icon={null}
-                    error={form.formState.errors.easyRatio}
-                    {...easyRatioField}
-                    onChange={numericChange(easyRatioField.onChange, () =>
-                      form.trigger(["easyRatio", "mediumRatio", "hardRatio"]),
-                    )}
-                  />
-                  <TextField
-                    id="ai-test-medium-ratio"
-                    label="Trung bình (%)"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    icon={null}
-                    error={form.formState.errors.mediumRatio}
-                    {...mediumRatioField}
-                    onChange={numericChange(mediumRatioField.onChange, () =>
-                      form.trigger(["easyRatio", "mediumRatio", "hardRatio"]),
-                    )}
-                  />
-                  <TextField
-                    id="ai-test-hard-ratio"
-                    label="Khó (%)"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    icon={null}
-                    error={form.formState.errors.hardRatio}
-                    {...hardRatioField}
-                    onChange={numericChange(hardRatioField.onChange, () =>
-                      form.trigger(["easyRatio", "mediumRatio", "hardRatio"]),
-                    )}
-                  />
-                </div>
-              </fieldset>
-            </>
-          ) : null}
         </div>
 
         <footer className="theme-dialog-footer grid shrink-0 grid-cols-2 gap-2 p-3 sm:flex sm:justify-end sm:p-4">
@@ -1159,11 +1060,6 @@ function getDefaultValues(
     summaryFigureMaxOutputTokens: "",
     count: type === "FLASHCARD" ? "10" : "8",
     difficulty: "MIXED",
-    questionTypes: questionTypeOptions.map((option) => option.value),
-    durationMinutes: "15",
-    easyRatio: "30",
-    mediumRatio: "50",
-    hardRatio: "20",
     easyCount: "3",
     mediumCount: "3",
     hardCount: "2",
@@ -1310,14 +1206,10 @@ function toPayload(
   }
   return {
     type: values.type,
-    questionCount: Number(values.count),
-    durationSeconds: Number(values.durationMinutes) * 60,
-    difficultyRatio: {
-      easy: Number(values.easyRatio) / 100,
-      medium: Number(values.mediumRatio) / 100,
-      hard: Number(values.hardRatio) / 100,
-    },
-    questionTypes: values.questionTypes,
+    documentIds: values.documentIds,
+    cardCount: Number(values.count),
+    difficulty: values.difficulty,
+    style: values.style,
   };
 }
 
@@ -1438,18 +1330,4 @@ function getPresentationPreset(style: string, targetGrade: number | null) {
   return targetGrade
     ? "Dễ hiểu, gần gũi, sử dụng cách diễn đạt và mức độ chi tiết phù hợp lứa tuổi."
     : "Dễ hiểu, gần gũi và phù hợp với người học của khóa học.";
-}
-
-function updateQuestionTypes(
-  form: ReturnType<typeof useForm<AdminAiGenerationFormValues>>,
-  type: AdminAiQuestionType,
-  checked: boolean,
-) {
-  const current = form.getValues("questionTypes");
-  form.setValue(
-    "questionTypes",
-    checked ? [...current, type] : current.filter((item) => item !== type),
-    { shouldDirty: true, shouldTouch: true, shouldValidate: true },
-  );
-  void form.trigger(["questionTypes", "count"]);
 }

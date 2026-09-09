@@ -315,6 +315,7 @@ describe("M6.5 student lesson content integration", () => {
           exactMatch: true,
         },
         reviewStatus: ReviewStatus.APPROVED,
+        publishedAt: new Date(),
         sortOrder: 0,
       },
     });

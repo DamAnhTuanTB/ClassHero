@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { AiGenerationType, AiModelPurpose, QuizFigureRole } from "@prisma/client";
+import { AiModelPurpose, Prisma, QuizFigureRole } from "@prisma/client";
 
 import { badRequestException, notFoundException } from "#api/common/errors/api-exception";
 import { PrismaService } from "#api/common/prisma/prisma.service";
@@ -44,6 +44,57 @@ import type { QuizSubjectSnapshot } from "#api/modules/quiz/types/quiz-generatio
 import { serializeQuizRichText } from "#api/modules/quiz/utils/quiz-generation-output";
 import { resolveQuizSubject } from "#api/modules/quiz/utils/quiz-subject";
 import { FilesService } from "#api/modules/files/services/files.service";
+import {
+  quizFigureTargetCreateData,
+  quizFigureTargetFeature,
+  quizFigureTargetLabel,
+  quizFigureTargetWhere,
+  type QuizFigureTarget,
+} from "#api/modules/quiz-figures/types/quiz-figure-target";
+
+const questionFigureAuthoringSelect = {
+  id: true,
+  lessonId: true,
+  questionType: true,
+  questionJson: true,
+  sourceMetadataJson: true,
+  explanation: { select: { contentJson: true } },
+  lesson: {
+    select: {
+      learningPath: {
+        select: {
+          domain: { select: { name: true, slug: true } },
+          targetAudiences: { select: { targetAudience: { select: { grade: true } } } },
+        },
+      },
+    },
+  },
+  figures: {
+    select: {
+      id: true,
+      role: true,
+      deletedAt: true,
+      pendingRevisionId: true,
+      planJson: true,
+      subjectKey: true,
+      subjectName: true,
+      subjectSlug: true,
+      currentRevisionId: true,
+      currentRevision: {
+        select: {
+          id: true,
+          status: true,
+          sourceKind: true,
+          origin: true,
+          latexSource: true,
+          altText: true,
+          caption: true,
+          deliveryFile: { select: { mimeType: true } },
+        },
+      },
+    },
+  },
+} satisfies Prisma.QuizQuestionSelect & Prisma.TestQuestionSelect;
 
 @Injectable()
 export class QuizFiguresService {
@@ -69,43 +120,62 @@ export class QuizFiguresService {
     altText: string;
     caption?: string | null;
     actorUserId: string;
+    target?: QuizFigureTarget;
   }) {
-    const question = await this.prisma.quizQuestion.findFirst({
-      where: { id: input.questionId, deletedAt: null },
-      select: { id: true, lessonId: true },
-    });
+    const target = input.target ?? {
+      kind: "QUIZ" as const,
+      questionId: input.questionId,
+    };
+    const question = await this.findQuestion(target);
     if (!question) {
-      throw notFoundException("QUIZ_QUESTION_NOT_FOUND", "Không tìm thấy câu Quiz.");
+      throw notFoundException(
+        `${target.kind}_QUESTION_NOT_FOUND`,
+        `Không tìm thấy câu ${quizFigureTargetLabel(target)}.`,
+      );
     }
-    const figure = await this.prisma.quizFigure.upsert({
-      where: {
-        quizQuestionId_role: {
-          quizQuestionId: question.id,
-          role: input.role,
-        },
-      },
-      create: {
-        lessonId: question.lessonId,
-        quizQuestionId: question.id,
-        role: input.role,
-        subjectKey: "GENERAL",
-        subjectName: "Tổng quát",
-        subjectSlug: "general",
-        status: "QUEUED",
-        createdById: input.actorUserId,
-      },
-      update: { deletedAt: null },
-      select: { id: true },
-    });
+    const create = {
+      lessonId: question.lessonId,
+      ...quizFigureTargetCreateData(target),
+      role: input.role,
+      subjectKey: "GENERAL",
+      subjectName: "Tổng quát",
+      subjectSlug: "general",
+      status: "QUEUED" as const,
+      createdById: input.actorUserId,
+    };
+    const persisted =
+      target.kind === "QUIZ"
+        ? await this.prisma.quizFigure.upsert({
+            where: {
+              quizQuestionId_role: {
+                quizQuestionId: target.questionId,
+                role: input.role,
+              },
+            },
+            update: { deletedAt: null },
+            create,
+            select: { id: true },
+          })
+        : await this.prisma.quizFigure.upsert({
+            where: {
+              testQuestionId_role: {
+                testQuestionId: target.questionId,
+                role: input.role,
+              },
+            },
+            update: { deletedAt: null },
+            create,
+            select: { id: true },
+          });
     await this.artifacts.attachAdminUpload({
-      figureId: figure.id,
+      figureId: persisted.id,
       fileId: input.fileId,
       actorUserId: input.actorUserId,
       altText: input.altText,
       caption: input.caption,
     });
     const updated = await this.prisma.quizFigure.findUniqueOrThrow({
-      where: { id: figure.id },
+      where: { id: persisted.id },
       select: quizFigureSelect,
     });
     return serializeQuizFigureAccessUrl(updated, this.files);
@@ -116,8 +186,9 @@ export class QuizFiguresService {
     figureId: string,
     actorUserId: string,
     dto: CompileQuizFigureDraftDto,
+    target: QuizFigureTarget = { kind: "QUIZ", questionId },
   ) {
-    return this.drafts.compile(questionId, figureId, actorUserId, dto);
+    return this.drafts.compile(questionId, figureId, actorUserId, dto, target);
   }
 
   applyDraft(
@@ -125,33 +196,35 @@ export class QuizFiguresService {
     figureId: string,
     actorUserId: string,
     dto: ApplyQuizFigureDraftDto,
+    target: QuizFigureTarget = { kind: "QUIZ", questionId },
   ) {
-    return this.drafts.apply(questionId, figureId, actorUserId, dto);
+    return this.drafts.apply(questionId, figureId, actorUserId, dto, target);
   }
 
   async createForQuestion(
     questionId: string,
     actorUserId: string,
     dto: CreateQuestionQuizFigureAiDto,
+    target: QuizFigureTarget = { kind: "QUIZ", questionId },
   ) {
-    const context = await this.loadQuestionFigureAuthoringContext(questionId, dto);
+    const context = await this.loadQuestionFigureAuthoringContext(target, dto);
     this.assertQuestionFigureAuthoringContext(context, dto, true);
     const plan = buildQuestionFigureAuthoringPlan(context, dto.targetMode);
     const role = targetRole(dto.targetMode);
-    const target = context.targetFigure;
-    const figure = target
+    const targetFigure = context.targetFigure;
+    const figure = targetFigure
       ? await this.prisma.quizFigure.update({
-          where: { id: target.id },
+          where: { id: targetFigure.id },
           data: {
             deletedAt: null,
-            ...(target.planJson == null ? { planJson: plan } : {}),
+            ...(targetFigure.planJson == null ? { planJson: plan } : {}),
           },
           select: { id: true },
         })
       : await this.prisma.quizFigure.create({
           data: {
             lessonId: context.question.lessonId,
-            quizQuestionId: context.question.id,
+            ...quizFigureTargetCreateData(target),
             role,
             planJson: plan,
             subjectKey: context.subject.key,
@@ -175,9 +248,9 @@ export class QuizFiguresService {
         status: "QUEUED",
         sourceVersion: (latest?.sourceVersion ?? 0) + 1,
         altText:
-          target?.currentRevision?.altText ??
+          targetFigure?.currentRevision?.altText ??
           defaultAuthoringAltText(dto.targetMode, context.problem),
-        caption: target?.currentRevision?.caption ?? null,
+        caption: targetFigure?.currentRevision?.caption ?? null,
         createdById: actorUserId,
       },
       select: { id: true },
@@ -193,7 +266,7 @@ export class QuizFiguresService {
         lastErrorMessage: null,
       },
     });
-    const routeSnapshot = await this.resolveAiRoute(dto, role);
+    const routeSnapshot = await this.resolveAiRoute(dto, role, target);
     const job = await this.jobs.enqueue(figure.id, actorUserId, routeSnapshot, {
       adminInstructions: dto.adminInstructions?.trim() || null,
       aiMode: dto.mode,
@@ -204,12 +277,16 @@ export class QuizFiguresService {
     return { jobId: job.id, status: job.status };
   }
 
-  async previewForQuestion(questionId: string, dto: CreateQuestionQuizFigureAiDto) {
-    const context = await this.loadQuestionFigureAuthoringContext(questionId, dto);
+  async previewForQuestion(
+    questionId: string,
+    dto: CreateQuestionQuizFigureAiDto,
+    target: QuizFigureTarget = { kind: "QUIZ", questionId },
+  ) {
+    const context = await this.loadQuestionFigureAuthoringContext(target, dto);
     this.assertQuestionFigureAuthoringContext(context, dto, false);
     const plan = buildQuestionFigureAuthoringPlan(context, dto.targetMode);
     const role = targetRole(dto.targetMode);
-    const routeSnapshot = await this.resolveAiRoute(dto, role);
+    const routeSnapshot = await this.resolveAiRoute(dto, role, target);
     let structuredInput: AiStructuredInput;
     let trace: ResolvedAiStructuredRequestPreview;
     if (plan.role === "QUESTION") {
@@ -223,7 +300,7 @@ export class QuizFiguresService {
       });
       structuredInput = applyPromptOverrides(structuredInput, dto);
       trace = await this.provider.previewStructuredRequest(
-        { feature: AiGenerationType.QUIZ, routeSnapshot },
+        { feature: quizFigureTargetFeature(target), routeSnapshot },
         structuredInput,
         generatedQuizQuestionFigureSchema,
       );
@@ -238,7 +315,7 @@ export class QuizFiguresService {
       });
       structuredInput = applyPromptOverrides(structuredInput, dto);
       trace = await this.provider.previewStructuredRequest(
-        { feature: AiGenerationType.QUIZ, routeSnapshot },
+        { feature: quizFigureTargetFeature(target), routeSnapshot },
         structuredInput,
         generatedQuizSolutionFigureSchema,
       );
@@ -251,8 +328,9 @@ export class QuizFiguresService {
     figureId: string,
     actorUserId: string,
     dto: CreateQuizFigureAiDto,
+    target: QuizFigureTarget = { kind: "QUIZ", questionId },
   ) {
-    const figure = await this.requireFigure(questionId, figureId);
+    const figure = await this.requireFigure(target, figureId);
     this.assertBaseRevision(figure.currentRevisionId, dto.baseRevisionId);
     const plan = readPlan(figure.planJson);
     this.assertPlanRole(figure.role, plan);
@@ -295,7 +373,7 @@ export class QuizFiguresService {
         lastErrorMessage: null,
       },
     });
-    const routeSnapshot = await this.resolveAiRoute(dto, figure.role);
+    const routeSnapshot = await this.resolveAiRoute(dto, figure.role, target);
     const job = await this.jobs.enqueue(figure.id, actorUserId, routeSnapshot, {
       adminInstructions: dto.adminInstructions?.trim() || null,
       aiMode: dto.mode,
@@ -305,8 +383,13 @@ export class QuizFiguresService {
     return { jobId: job.id, status: job.status };
   }
 
-  async previewNewAi(questionId: string, figureId: string, dto: CreateQuizFigureAiDto) {
-    const figure = await this.requireFigure(questionId, figureId);
+  async previewNewAi(
+    questionId: string,
+    figureId: string,
+    dto: CreateQuizFigureAiDto,
+    target: QuizFigureTarget = { kind: "QUIZ", questionId },
+  ) {
+    const figure = await this.requireFigure(target, figureId);
     this.assertBaseRevision(figure.currentRevisionId, dto.baseRevisionId);
     if (
       dto.mode === "EDIT_CURRENT" &&
@@ -322,7 +405,7 @@ export class QuizFiguresService {
     this.assertPlanRole(figure.role, plan);
     const subject = readSubject(figure);
     const targetGrade = readQuizFigureTargetGrade(figure.aiGeneration?.inputMetaJson);
-    const routeSnapshot = await this.resolveAiRoute(dto, figure.role);
+    const routeSnapshot = await this.resolveAiRoute(dto, figure.role, target);
     let structuredInput: AiStructuredInput;
     let trace: ResolvedAiStructuredRequestPreview;
     if (figure.role === QuizFigureRole.QUESTION) {
@@ -342,7 +425,7 @@ export class QuizFiguresService {
       });
       structuredInput = applyPromptOverrides(structuredInput, dto);
       trace = await this.provider.previewStructuredRequest(
-        { feature: AiGenerationType.QUIZ, routeSnapshot },
+        { feature: quizFigureTargetFeature(target), routeSnapshot },
         structuredInput,
         generatedQuizQuestionFigureSchema,
       );
@@ -363,7 +446,7 @@ export class QuizFiguresService {
       });
       structuredInput = applyPromptOverrides(structuredInput, dto);
       trace = await this.provider.previewStructuredRequest(
-        { feature: AiGenerationType.QUIZ, routeSnapshot },
+        { feature: quizFigureTargetFeature(target), routeSnapshot },
         structuredInput,
         generatedQuizSolutionFigureSchema,
       );
@@ -385,8 +468,9 @@ export class QuizFiguresService {
     figureId: string,
     actorUserId: string,
     dto: RefineQuizFigureWithAiDto,
+    target: QuizFigureTarget = { kind: "QUIZ", questionId },
   ) {
-    const figure = await this.requireFigure(questionId, figureId);
+    const figure = await this.requireFigure(target, figureId);
     this.assertBaseRevision(figure.currentRevisionId, dto.baseRevisionId);
     const current = figure.currentRevision;
     if (
@@ -407,6 +491,7 @@ export class QuizFiguresService {
     const routeSnapshot = await this.resolveAiRoute(
       { mode: "EDIT_CURRENT" },
       figure.role,
+      target,
     );
     const latest = await this.prisma.quizFigureRevision.findFirst({
       where: { quizFigureId: figure.id },
@@ -448,8 +533,9 @@ export class QuizFiguresService {
     questionId: string,
     figureId: string,
     dto: RefineQuizFigureWithAiDto,
+    target: QuizFigureTarget = { kind: "QUIZ", questionId },
   ) {
-    const figure = await this.requireFigure(questionId, figureId);
+    const figure = await this.requireFigure(target, figureId);
     this.assertBaseRevision(figure.currentRevisionId, dto.baseRevisionId);
     const current = figure.currentRevision;
     if (
@@ -471,6 +557,7 @@ export class QuizFiguresService {
     const routeSnapshot = await this.resolveAiRoute(
       { mode: "EDIT_CURRENT" },
       figure.role,
+      target,
     );
     const currentSvg = await this.artifacts.readDeliveryObject(
       current.deliveryFile.objectKey,
@@ -484,7 +571,7 @@ export class QuizFiguresService {
       currentLatexSource: current.latexSource,
       currentImageDataUrl,
     });
-    const previewContext = { feature: AiGenerationType.QUIZ, routeSnapshot };
+    const previewContext = { feature: quizFigureTargetFeature(target), routeSnapshot };
     const trace: ResolvedAiStructuredRequestPreview =
       await this.provider.previewStructuredRequest(
         previewContext,
@@ -540,8 +627,9 @@ export class QuizFiguresService {
     figureId: string,
     actorUserId: string,
     dto: UpdateQuizFigureCaptionDto,
+    target: QuizFigureTarget = { kind: "QUIZ", questionId },
   ) {
-    const figure = await this.requireFigure(questionId, figureId);
+    const figure = await this.requireFigure(target, figureId);
     this.assertBaseRevision(figure.currentRevisionId, dto.baseRevisionId);
     const current = figure.currentRevision;
     if (!current) {
@@ -590,8 +678,9 @@ export class QuizFiguresService {
     questionId: string,
     figureId: string,
     dto: QuizFigureRevisionGuardDto,
+    target: QuizFigureTarget = { kind: "QUIZ", questionId },
   ) {
-    const figure = await this.requireFigure(questionId, figureId);
+    const figure = await this.requireFigure(target, figureId);
     this.assertBaseRevision(figure.currentRevisionId, dto.baseRevisionId);
     await this.prisma.$transaction(async (tx) => {
       await tx.quizFigure.update({
@@ -606,9 +695,9 @@ export class QuizFiguresService {
     return { deleted: true, figureId };
   }
 
-  private async requireFigure(questionId: string, figureId: string) {
+  private async requireFigure(target: QuizFigureTarget, figureId: string) {
     const figure = await this.prisma.quizFigure.findFirst({
-      where: { id: figureId, quizQuestionId: questionId, deletedAt: null },
+      where: { id: figureId, ...quizFigureTargetWhere(target), deletedAt: null },
       select: {
         id: true,
         role: true,
@@ -637,17 +726,34 @@ export class QuizFiguresService {
       },
     });
     if (!figure) {
-      throw notFoundException("QUIZ_FIGURE_NOT_FOUND", "Không tìm thấy hình Quiz.");
+      throw notFoundException(
+        `${target.kind}_FIGURE_NOT_FOUND`,
+        `Không tìm thấy hình ${quizFigureTargetLabel(target)}.`,
+      );
     }
     return figure;
+  }
+
+  private findQuestion(target: QuizFigureTarget) {
+    if (target.kind === "QUIZ") {
+      return this.prisma.quizQuestion.findFirst({
+        where: { id: target.questionId, deletedAt: null },
+        select: questionFigureAuthoringSelect,
+      });
+    }
+    return this.prisma.testQuestion.findFirst({
+      where: { id: target.questionId, deletedAt: null },
+      select: questionFigureAuthoringSelect,
+    });
   }
 
   private async resolveAiRoute(
     dto: CreateQuizFigureAiDto,
     _role: QuizFigureRole,
+    target: Pick<QuizFigureTarget, "kind">,
   ): Promise<AiFeatureRoute> {
     const base = await this.modelRouting.resolve(
-      AiGenerationType.QUIZ,
+      quizFigureTargetFeature(target),
       AiModelPurpose.IMAGE,
     );
     let candidates = base.candidates;
@@ -748,59 +854,15 @@ export class QuizFiguresService {
   }
 
   private async loadQuestionFigureAuthoringContext(
-    questionId: string,
+    target: QuizFigureTarget,
     dto: CreateQuestionQuizFigureAiDto,
   ) {
-    const question = await this.prisma.quizQuestion.findFirst({
-      where: { id: questionId, deletedAt: null },
-      select: {
-        id: true,
-        lessonId: true,
-        questionType: true,
-        questionJson: true,
-        sourceMetadataJson: true,
-        explanation: { select: { contentJson: true } },
-        lesson: {
-          select: {
-            learningPath: {
-              select: {
-                domain: { select: { name: true, slug: true } },
-                targetAudiences: {
-                  select: { targetAudience: { select: { grade: true } } },
-                },
-              },
-            },
-          },
-        },
-        figures: {
-          select: {
-            id: true,
-            role: true,
-            deletedAt: true,
-            pendingRevisionId: true,
-            planJson: true,
-            subjectKey: true,
-            subjectName: true,
-            subjectSlug: true,
-            currentRevisionId: true,
-            currentRevision: {
-              select: {
-                id: true,
-                status: true,
-                sourceKind: true,
-                origin: true,
-                latexSource: true,
-                altText: true,
-                caption: true,
-                deliveryFile: { select: { mimeType: true } },
-              },
-            },
-          },
-        },
-      },
-    });
+    const question = await this.findQuestion(target);
     if (!question) {
-      throw notFoundException("QUIZ_QUESTION_NOT_FOUND", "Không tìm thấy câu Quiz.");
+      throw notFoundException(
+        `${target.kind}_QUESTION_NOT_FOUND`,
+        `Không tìm thấy câu ${quizFigureTargetLabel(target)}.`,
+      );
     }
     const role = targetRole(dto.targetMode);
     const targetFigure = question.figures.find((figure) => figure.role === role) ?? null;

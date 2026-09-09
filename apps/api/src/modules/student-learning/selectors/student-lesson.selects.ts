@@ -62,6 +62,7 @@ const approvedFlashcardWhere = {
 const approvedTestQuestionWhere = {
   deletedAt: null,
   reviewStatus: ReviewStatus.APPROVED,
+  publishedAt: { not: null },
 } satisfies Prisma.TestQuestionWhereInput;
 
 export const studentLessonContentSelect = {

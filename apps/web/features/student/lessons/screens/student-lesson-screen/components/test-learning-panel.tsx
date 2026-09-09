@@ -645,7 +645,7 @@ export function TestLearningPanel({
               disabled={!hasQuizContent}
               onClick={() => void onStartPrerequisite("quiz")}
               className={cn(
-                "student-quiz-cta-3d inline-flex min-h-14 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-2 text-[15px] font-black text-white focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-45 sm:px-3 sm:text-base",
+                "student-quiz-cta-3d inline-flex min-h-14 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-2 text-lg font-black text-white focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-45 sm:px-3",
                 !showFlashcardPrerequisiteAction && "col-span-2",
               )}
             >
@@ -659,7 +659,7 @@ export function TestLearningPanel({
               disabled={!hasFlashcardContent}
               onClick={() => void onStartPrerequisite("flashcard")}
               className={cn(
-                "student-flashcard-cta-3d inline-flex min-h-14 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-violet-500 px-2 text-[15px] font-black text-white hover:bg-violet-400 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-45 sm:px-3 sm:text-base",
+                "student-flashcard-cta-3d inline-flex min-h-14 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-violet-500 px-2 text-base font-black text-white hover:bg-violet-400 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-45 sm:px-3 sm:text-lg",
                 !showQuizPrerequisiteAction && "col-span-2",
               )}
             >

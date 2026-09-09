@@ -54,34 +54,25 @@ import { MathpixMarkdownRenderer } from "@/components/shared/mathpix-markdown-re
 import { TiptapContentView } from "@/components/common/content/tiptap-content-view";
 import type {
   AdminMultiStatementAnswer,
-  AdminQuizInitialData,
   AdminQuizQuestion,
   AdminQuizSet,
 } from "@/features/admin/quiz/api/admin-quiz-api";
+import type {
+  AdminAssessmentInitialData,
+  AdminAssessmentKind,
+  AdminAssessmentQuestion,
+  AdminAssessmentSet,
+} from "@/features/admin/assessments/types/admin-assessment.types";
 import {
-  useAdminQuizQuestionMutations,
-  useAdminQuizQuestions,
-  useAdminQuizSetMutations,
-  useAdminQuizSets,
-} from "@/features/admin/quiz/hooks/use-admin-quiz";
+  useAdminAssessmentQuestionMutations,
+  useAdminAssessmentQuestions,
+  useAdminAssessmentSetMutations,
+  useAdminAssessmentSets,
+} from "@/features/admin/assessments/hooks/use-admin-assessment";
 import { QuizRichContentViewer } from "@/features/admin/quiz/components/quiz-rich-content-viewer";
 import { AdminQuizFigurePreview } from "@/features/admin/quiz/components/admin-quiz-figure-preview";
 import { AdminQuizFigureStatusSummary } from "@/features/admin/quiz/components/admin-quiz-figure-status-summary";
 import { AdminQuizQuestionFigureAiMenu } from "@/features/admin/quiz/components/admin-quiz-question-figure-ai-menu";
-import type {
-  AdminTestQuestion,
-  AdminTestSet,
-} from "@/features/admin/tests/api/admin-tests-api";
-import {
-  useAdminTestQuestionMutations,
-  useAdminTestQuestions,
-  useAdminTestSetMutations,
-  useAdminTestSets,
-} from "@/features/admin/tests/hooks/use-admin-tests";
-import {
-  AdminTestExplanationCard,
-  isTestExplanationBlockData,
-} from "@/features/admin/tests/components/admin-test-explanation-content";
 import {
   getTiptapDocumentText,
   removeTrailingOptionPeriod,
@@ -98,6 +89,11 @@ import {
 
 const ReactJson = dynamic(() => import("@microlink/react-json-view"), { ssr: false });
 
+// Legacy names stay local during the screen extraction. Test transport is normalized
+// before reaching this component, so neither alias imports the old Test feature.
+type AdminTestSet = AdminAssessmentSet;
+type AdminTestQuestion = AdminAssessmentQuestion;
+
 const AdminAssessmentQuestionEditorDialog = dynamic(
   () =>
     import("@/features/admin/assessments/components/admin-assessment-question-editor-dialog").then(
@@ -106,10 +102,10 @@ const AdminAssessmentQuestionEditorDialog = dynamic(
   { ssr: false },
 );
 
-const AdminQuizSetEditorDialog = dynamic(
+const AdminAssessmentSetEditorDialog = dynamic(
   () =>
-    import("@/features/admin/quiz/components/admin-quiz-set-editor-dialog").then(
-      (module) => module.AdminQuizSetEditorDialog,
+    import("@/features/admin/assessments/components/admin-assessment-set-editor-dialog").then(
+      (module) => module.AdminAssessmentSetEditorDialog,
     ),
   { ssr: false },
 );
@@ -130,17 +126,9 @@ const AdminQuizGenerationHistoryDialog = dynamic(
   { ssr: false },
 );
 
-const AdminTestSetEditorDialog = dynamic(
-  () =>
-    import("@/features/admin/tests/screens/admin-tests-tab/components/admin-test-set-editor-dialog").then(
-      (module) => module.AdminTestSetEditorDialog,
-    ),
-  { ssr: false },
-);
-
 interface AdminAssessmentTabProps {
-  assessmentKind?: "quiz" | "test";
-  initialQuizData?: AdminQuizInitialData;
+  assessmentKind?: AdminAssessmentKind;
+  initialQuizData?: AdminAssessmentInitialData;
   lessonId: string;
   onSelectedSetIdChange?: (setId: string | undefined) => void;
   preferredSetId?: string;
@@ -155,8 +143,8 @@ type QuizQuestionViewMode = "UI_ONLY" | "JSON_ONLY" | "SPLIT";
 
 const approvedQuizQuestionRowLabels: Record<OrderedQuizQuestionType, string> = {
   MULTIPLE_CHOICE: "Trắc nghiệm",
-  TRUE_FALSE: "Đúng/Sai 1 mệnh đề",
-  MULTI_STATEMENT_TRUE_FALSE: "Đúng/Sai nhiều mệnh đề",
+  TRUE_FALSE: "Đúng / Sai 1 mệnh đề",
+  MULTI_STATEMENT_TRUE_FALSE: "Đúng / Sai nhiều mệnh đề",
   TEXT_INPUT: "Nhập đáp án",
 };
 
@@ -175,15 +163,13 @@ export function AdminAssessmentTab({
   preferredSetId,
 }: AdminAssessmentTabProps) {
   const isTest = assessmentKind === "test";
-  const quizSetsQuery = useAdminQuizSets(
+  const setsQuery = useAdminAssessmentSets(
+    assessmentKind,
     lessonId,
-    !isTest,
-    isTest ? undefined : initialQuizData?.sets,
+    true,
+    initialQuizData?.sets,
   );
-  const testSetsQuery = useAdminTestSets(lessonId, isTest);
-  const quizSetMutations = useAdminQuizSetMutations(lessonId);
-  const testSetMutations = useAdminTestSetMutations(lessonId);
-  const setsQuery = isTest ? testSetsQuery : quizSetsQuery;
+  const setMutations = useAdminAssessmentSetMutations(assessmentKind, lessonId);
   const quizSets = setsQuery.data;
   const queryRenderState = getQueryRenderState(setsQuery);
   const copy = getAssessmentCopy(assessmentKind);
@@ -191,17 +177,18 @@ export function AdminAssessmentTab({
     isTest ? "" : (initialQuizData?.questionSetId ?? ""),
   );
   const appliedPreferredSetIdRef = useRef<string | null>(null);
-  const [editorQuestion, setEditorQuestion] = useState<
-    AdminQuizQuestion | AdminTestQuestion | null
-  >(null);
+  const [editorQuestion, setEditorQuestion] = useState<AdminAssessmentQuestion | null>(
+    null,
+  );
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isSetEditorOpen, setIsSetEditorOpen] = useState(false);
-  const [setEditorTarget, setSetEditorTarget] = useState<
-    AdminQuizSet | AdminTestSet | null
-  >(null);
+  const [setEditorTarget, setSetEditorTarget] = useState<AdminAssessmentSet | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
-  const quizQuestionMutations = useAdminQuizQuestionMutations(selectedSetId, lessonId);
-  const testQuestionMutations = useAdminTestQuestionMutations(selectedSetId, lessonId);
+  const questionMutations = useAdminAssessmentQuestionMutations(
+    assessmentKind,
+    selectedSetId,
+    lessonId,
+  );
   const {
     minHeight: quizSetPanelMinHeight,
     panelRef: quizSetPanelRef,
@@ -289,39 +276,18 @@ export function AdminAssessmentTab({
     focusQuizSetTab(nextSet.id);
   }
 
-  const handleSaveSet = async (values: {
-    difficulty?: AdminTestSet["difficulty"];
-    durationMinutes?: string;
-    title: string;
-  }) => {
+  const handleSaveSet = async (values: { durationMinutes?: string; title: string }) => {
     try {
-      if (isTest && (!values.difficulty || !values.durationMinutes)) {
+      if (isTest && !values.durationMinutes) {
         throw new Error("Test set form is missing required values");
       }
-
-      const savedSet = isTest
-        ? setEditorTarget
-          ? await testSetMutations.updateSet.mutateAsync({
-              setId: setEditorTarget.id,
-              data: {
-                title: values.title,
-                difficulty: values.difficulty,
-                durationSeconds: Number(values.durationMinutes) * 60,
-              },
-            })
-          : await testSetMutations.createSet.mutateAsync({
-              title: values.title,
-              difficulty: values.difficulty,
-              durationSeconds: Number(values.durationMinutes) * 60,
-            })
-        : setEditorTarget
-          ? await quizSetMutations.updateSet.mutateAsync({
-              setId: setEditorTarget.id,
-              data: { title: values.title },
-            })
-          : await quizSetMutations.createSet.mutateAsync({
-              title: values.title,
-            });
+      const data = {
+        title: values.title,
+        ...(isTest ? { durationSeconds: Number(values.durationMinutes) * 60 } : {}),
+      };
+      const savedSet = setEditorTarget
+        ? await setMutations.updateSet.mutateAsync({ setId: setEditorTarget.id, data })
+        : await setMutations.createSet.mutateAsync(data);
       handleSelectQuizSet(savedSet.id);
       setIsSetEditorOpen(false);
       setSetEditorTarget(null);
@@ -338,15 +304,9 @@ export function AdminAssessmentTab({
     }
   };
 
-  const handleReviewQuestion = async (
-    question: AdminQuizQuestion | AdminTestQuestion,
-  ) => {
+  const handleReviewQuestion = async (question: AdminAssessmentQuestion) => {
     try {
-      if (isTest) {
-        await testQuestionMutations.reviewQuestion.mutateAsync(question.id);
-      } else {
-        await quizQuestionMutations.reviewQuestion.mutateAsync(question.id);
-      }
+      await questionMutations.reviewQuestion.mutateAsync(question.id);
       toast.success("Đã duyệt câu hỏi AI");
     } catch (error) {
       toast.error(
@@ -357,7 +317,7 @@ export function AdminAssessmentTab({
 
   const handleReviewAllQuizQuestions = async () => {
     try {
-      const result = await quizQuestionMutations.reviewAllQuestions.mutateAsync();
+      const result = await questionMutations.reviewAllQuestions.mutateAsync();
       toast.success(
         result.approvedQuestionCount > 0
           ? `Đã duyệt ${result.approvedQuestionCount} câu hỏi AI`
@@ -525,29 +485,25 @@ export function AdminAssessmentTab({
                 setIsSetEditorOpen(true);
               }}
               onEditQuestion={(question) => {
-                setEditorQuestion(question);
+                setEditorQuestion(question as AdminAssessmentQuestion);
                 setIsEditorOpen(true);
               }}
-              onReviewQuestion={(question) => void handleReviewQuestion(question)}
+              onReviewQuestion={(question) =>
+                void handleReviewQuestion(question as AdminAssessmentQuestion)
+              }
               onReviewAllQuestions={() => void handleReviewAllQuizQuestions()}
               onSaveGenerationJson={async (questionId, generationQuestionJson) => {
-                await quizQuestionMutations.updateGenerationJson.mutateAsync({
+                await questionMutations.updateGenerationJson.mutateAsync({
                   questionId,
                   generationQuestionJson,
                 });
               }}
-              isSavingGenerationJson={
-                quizQuestionMutations.updateGenerationJson.isPending
-              }
-              isReviewingAllQuestions={quizQuestionMutations.reviewAllQuestions.isPending}
+              isSavingGenerationJson={questionMutations.updateGenerationJson.isPending}
+              isReviewingAllQuestions={questionMutations.reviewAllQuestions.isPending}
               reviewingQuestionId={
-                isTest
-                  ? testQuestionMutations.reviewQuestion.isPending
-                    ? testQuestionMutations.reviewQuestion.variables
-                    : undefined
-                  : quizQuestionMutations.reviewQuestion.isPending
-                    ? quizQuestionMutations.reviewQuestion.variables
-                    : undefined
+                questionMutations.reviewQuestion.isPending
+                  ? questionMutations.reviewQuestion.variables
+                  : undefined
               }
             />
           ) : null}
@@ -568,30 +524,13 @@ export function AdminAssessmentTab({
         </>
       )}
 
-      {isSetEditorOpen && isTest ? (
-        <AdminTestSetEditorDialog
+      {isSetEditorOpen ? (
+        <AdminAssessmentSetEditorDialog
           defaultTitle={getNextSetTitle(quizSets, assessmentKind)}
           isOpen
-          isSaving={
-            testSetMutations.createSet.isPending || testSetMutations.updateSet.isPending
-          }
-          set={setEditorTarget as AdminTestSet | null}
-          onClose={() => {
-            setIsSetEditorOpen(false);
-            setSetEditorTarget(null);
-          }}
-          onSubmit={handleSaveSet}
-        />
-      ) : null}
-
-      {isSetEditorOpen && !isTest ? (
-        <AdminQuizSetEditorDialog
-          defaultTitle={getNextSetTitle(quizSets, assessmentKind)}
-          isOpen
-          isSaving={
-            quizSetMutations.createSet.isPending || quizSetMutations.updateSet.isPending
-          }
-          set={setEditorTarget as AdminQuizSet | null}
+          isSaving={setMutations.createSet.isPending || setMutations.updateSet.isPending}
+          kind={assessmentKind}
+          set={setEditorTarget}
           onClose={() => {
             setIsSetEditorOpen(false);
             setSetEditorTarget(null);
@@ -603,11 +542,7 @@ export function AdminAssessmentTab({
       <DeleteConfirmDialog
         isOpen={deleteTarget !== null}
         isConfirming={
-          isTest
-            ? testSetMutations.deleteSet.isPending ||
-              testQuestionMutations.deleteQuestion.isPending
-            : quizSetMutations.deleteSet.isPending ||
-              quizQuestionMutations.deleteQuestion.isPending
+          setMutations.deleteSet.isPending || questionMutations.deleteQuestion.isPending
         }
         itemName={deleteTarget?.label ?? ""}
         title={deleteTarget?.type === "set" ? copy.deleteSetTitle : "Xóa câu hỏi"}
@@ -623,18 +558,10 @@ export function AdminAssessmentTab({
           if (!deleteTarget) return;
           try {
             if (deleteTarget.type === "set") {
-              if (isTest) {
-                await testSetMutations.deleteSet.mutateAsync(deleteTarget.id);
-              } else {
-                await quizSetMutations.deleteSet.mutateAsync(deleteTarget.id);
-              }
+              await setMutations.deleteSet.mutateAsync(deleteTarget.id);
               toast.success(`Đã xóa ${copy.setName}`);
             } else {
-              if (isTest) {
-                await testQuestionMutations.deleteQuestion.mutateAsync(deleteTarget.id);
-              } else {
-                await quizQuestionMutations.deleteQuestion.mutateAsync(deleteTarget.id);
-              }
+              await questionMutations.deleteQuestion.mutateAsync(deleteTarget.id);
               toast.success("Đã xóa câu hỏi");
             }
             setDeleteTarget(null);
@@ -672,7 +599,7 @@ function QuizSetPanel({
   reviewingQuestionId,
 }: {
   assessmentKind: "quiz" | "test";
-  activeSet: AdminQuizSet | AdminTestSet;
+  activeSet: AdminAssessmentSet;
   initialQuestions?: AdminQuizQuestion[];
   lessonId: string;
   minHeight: number;
@@ -693,14 +620,14 @@ function QuizSetPanel({
   reviewingQuestionId?: string;
 }) {
   const isTest = assessmentKind === "test";
-  const quizQuestionsQuery = useAdminQuizQuestions(
+  const questionsQuery = useAdminAssessmentQuestions(
+    assessmentKind,
     activeSet.id,
-    lessonId,
-    !isTest,
-    isTest ? undefined : initialQuestions,
+    true,
+    isTest
+      ? undefined
+      : initialQuestions?.map((question) => ({ ...question, setId: question.quizSetId })),
   );
-  const testQuestionsQuery = useAdminTestQuestions(activeSet.id, isTest);
-  const questionsQuery = isTest ? testQuestionsQuery : quizQuestionsQuery;
   const questions = questionsQuery.data;
   const queryRenderState = getQueryRenderState(questionsQuery);
   const [selectedQuestionId, setSelectedQuestionId] = useState("");
@@ -718,23 +645,7 @@ function QuizSetPanel({
     revision: 0,
   });
   const quizQuestionNavigation = useMemo(() => {
-    if (isTest) {
-      return {
-        approvedQuestions: [] as AdminQuizQuestion[],
-        navigableQuestions: [] as AdminQuizQuestion[],
-        pendingQuestions: [] as AdminQuizQuestion[],
-        rows: [] as Array<{
-          icon: LucideIcon;
-          id: string;
-          label: string;
-          questions: AdminQuizQuestion[];
-          isPendingAi?: boolean;
-          type?: OrderedQuizQuestionType;
-        }>,
-      };
-    }
-
-    const quizQuestions = (questions ?? []) as AdminQuizQuestion[];
+    const quizQuestions = (questions ?? []) as unknown as AdminQuizQuestion[];
     const pendingQuestions = orderQuizQuestionsByType(
       quizQuestions.filter(
         (question) =>
@@ -782,14 +693,12 @@ function QuizSetPanel({
       pendingQuestions,
       rows,
     };
-  }, [activeSet.source, isTest, questions]);
+  }, [activeSet.source, questions]);
   const selectedQuestionIndex =
     questions?.findIndex((question) => question.id === selectedQuestionId) ?? -1;
   const selectedQuestion =
     selectedQuestionIndex >= 0 ? questions?.[selectedQuestionIndex] : undefined;
-  const selectedQuizQuestion = isTest
-    ? undefined
-    : (selectedQuestion as AdminQuizQuestion | undefined);
+  const selectedQuizQuestion = selectedQuestion as AdminQuizQuestion | undefined;
   const selectedApprovedQuestionIndex =
     quizQuestionNavigation.approvedQuestions.findIndex(
       (question) => question.id === selectedQuestionId,
@@ -825,8 +734,8 @@ function QuizSetPanel({
         )
       : selectedQuizQuestion;
   const selectedGenerationIssues = getSelectedQuizGenerationIssues(
-    isTest ? null : (activeSet as AdminQuizSet),
-    (questions ?? []) as AdminQuizQuestion[],
+    activeSet as AdminQuizSet,
+    (questions ?? []) as unknown as AdminQuizQuestion[],
     selectedQuizQuestion,
   );
   const {
@@ -836,7 +745,6 @@ function QuizSetPanel({
   } = useRevealActiveHorizontalItem(selectedQuestionId);
 
   useEffect(() => {
-    if (isTest) return;
     setSelectedQuestionId((currentQuestionId) =>
       quizQuestionNavigation.navigableQuestions.some(
         (question) => question.id === currentQuestionId,
@@ -844,7 +752,7 @@ function QuizSetPanel({
         ? currentQuestionId
         : (quizQuestionNavigation.navigableQuestions.at(0)?.id ?? ""),
     );
-  }, [activeSet.id, isTest, quizQuestionNavigation.navigableQuestions]);
+  }, [activeSet.id, quizQuestionNavigation.navigableQuestions]);
 
   useEffect(() => {
     setQuestionReviewJson(
@@ -957,8 +865,6 @@ function QuizSetPanel({
   );
 
   useEffect(() => {
-    if (isTest) return;
-
     function handleQuizShortcut(event: globalThis.KeyboardEvent) {
       if (
         event.defaultPrevented ||
@@ -1003,7 +909,6 @@ function QuizSetPanel({
     window.addEventListener("keydown", handleQuizShortcut);
     return () => window.removeEventListener("keydown", handleQuizShortcut);
   }, [
-    isTest,
     onReviewQuestion,
     reviewingQuestionId,
     selectedQuizQuestion,
@@ -1012,7 +917,9 @@ function QuizSetPanel({
 
   const unpublishedApprovedQuestionCount =
     activeSet.unpublishedApprovedQuestionCount ?? 0;
-  const quizDifficultyCounts = ((questions ?? []) as AdminQuizQuestion[]).reduce(
+  const quizDifficultyCounts = (
+    (questions ?? []) as unknown as AdminQuizQuestion[]
+  ).reduce(
     (counts, question) => {
       counts[question.difficulty] += 1;
       return counts;
@@ -1034,29 +941,27 @@ function QuizSetPanel({
           </h4>
           {isTest ? (
             <>
-              <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] px-2.5 py-1 text-xs font-extrabold text-[var(--theme-text-muted)]">
-                {difficultyLabel((activeSet as AdminTestSet).difficulty)}
-              </span>
               <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] px-2.5 py-1 text-xs font-extrabold text-[var(--theme-text-muted)]">
                 <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
-                {formatDuration((activeSet as AdminTestSet).durationSeconds)}
+                {formatDuration(activeSet.durationSeconds ?? 0)}
               </span>
             </>
           ) : null}
-          {!isTest ? (
+          <>
             <>
               <button
                 type="button"
                 aria-haspopup="dialog"
                 onClick={() => setIsGenerationHistoryOpen(true)}
                 className="-m-1 inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-md p-1 text-sm font-extrabold text-[var(--theme-text-muted)] transition-colors hover:bg-[var(--theme-surface-soft)] hover:text-[var(--theme-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-primary)]"
-                title="Xem toàn bộ lịch sử sinh và chi phí của bộ Quiz"
+                title={`Xem toàn bộ lịch sử sinh và chi phí của bộ ${isTest ? "Test" : "Quiz"}`}
               >
                 <Coins className="size-4" aria-hidden="true" />
                 Tổng chi phí: {formatQuizGenerationCost(activeSet as AdminQuizSet)}
               </button>
               {questions ? (
                 <AdminQuizFigureStatusSummary
+                  assessmentKind={assessmentKind}
                   approvedQuestions={quizQuestionNavigation.approvedQuestions}
                   onNavigateToQuestion={navigateToQuizQuestion}
                   pendingQuestions={quizQuestionNavigation.pendingQuestions}
@@ -1064,87 +969,82 @@ function QuizSetPanel({
                 />
               ) : null}
             </>
-          ) : null}
-        </div>
-        {isTest ? (
-          <p className="mt-1 text-sm font-medium text-[var(--theme-text-muted)]">
-            {questions?.length ?? activeSet._count?.questions ?? activeSet.questionCount}{" "}
-            câu hỏi
-          </p>
-        ) : (
-          <>
-            <div className="mt-3 flex flex-wrap gap-2" aria-label="Thống kê bộ Quiz">
-              <span className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] px-3 text-xs font-bold text-[var(--theme-text-muted)]">
-                <FileQuestion className="size-4 text-slate-500" aria-hidden="true" />
-                Tổng câu
-                <strong className="text-sm font-black text-[var(--theme-text-strong)]">
-                  {questions?.length ??
-                    activeSet._count?.questions ??
-                    activeSet.questionCount}
-                </strong>
-              </span>
-              <span className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-bold text-emerald-700 dark:border-emerald-800/70 dark:bg-emerald-950/35 dark:text-emerald-300">
-                <CheckCircle2 className="size-4" aria-hidden="true" />
-                Đã duyệt
-                <strong className="text-sm font-black">
-                  {quizQuestionNavigation.approvedQuestions.length}
-                </strong>
-              </span>
-              <span className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 text-xs font-bold text-amber-700 dark:border-amber-800/70 dark:bg-amber-950/35 dark:text-amber-300">
-                <Sparkles className="size-4" aria-hidden="true" />
-                AI chờ duyệt
-                <strong className="text-sm font-black">
-                  {quizQuestionNavigation.pendingQuestions.length}
-                </strong>
-              </span>
-            </div>
-            <div
-              className="mt-2 flex flex-wrap items-center gap-2"
-              aria-label="Thống kê mức độ Quiz"
-            >
-              <span className="inline-flex min-h-8 items-center gap-1.5 pr-1 text-xs font-extrabold text-[var(--theme-text-muted)]">
-                <Gauge className="size-4" aria-hidden="true" />
-                Mức độ
-              </span>
-              {(
-                [
-                  ["EASY", "Dễ"],
-                  ["MEDIUM", "Trung bình"],
-                  ["HARD", "Khó"],
-                ] as const
-              ).map(([difficulty, label]) => (
-                <span
-                  key={difficulty}
-                  className={cn(
-                    "inline-flex min-h-8 items-center gap-2 rounded-lg border px-3 text-xs font-extrabold",
-                    questionDifficultyBadgeClassName(difficulty),
-                  )}
-                >
-                  {label}
-                  <strong className="text-sm font-black">
-                    {quizDifficultyCounts[difficulty]}
-                  </strong>
-                </span>
-              ))}
-            </div>
           </>
-        )}
+        </div>
+        <>
+          <div
+            className="mt-3 flex flex-wrap gap-2"
+            aria-label={`Thống kê bộ ${isTest ? "Test" : "Quiz"}`}
+          >
+            <span className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] px-3 text-xs font-bold text-[var(--theme-text-muted)]">
+              <FileQuestion className="size-4 text-slate-500" aria-hidden="true" />
+              Tổng câu
+              <strong className="text-sm font-black text-[var(--theme-text-strong)]">
+                {questions?.length ??
+                  activeSet._count?.questions ??
+                  activeSet.questionCount}
+              </strong>
+            </span>
+            <span className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-bold text-emerald-700 dark:border-emerald-800/70 dark:bg-emerald-950/35 dark:text-emerald-300">
+              <CheckCircle2 className="size-4" aria-hidden="true" />
+              Đã duyệt
+              <strong className="text-sm font-black">
+                {quizQuestionNavigation.approvedQuestions.length}
+              </strong>
+            </span>
+            <span className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 text-xs font-bold text-amber-700 dark:border-amber-800/70 dark:bg-amber-950/35 dark:text-amber-300">
+              <Sparkles className="size-4" aria-hidden="true" />
+              AI chờ duyệt
+              <strong className="text-sm font-black">
+                {quizQuestionNavigation.pendingQuestions.length}
+              </strong>
+            </span>
+          </div>
+          <div
+            className="mt-2 flex flex-wrap items-center gap-2"
+            aria-label={`Thống kê mức độ ${isTest ? "Test" : "Quiz"}`}
+          >
+            <span className="inline-flex min-h-8 items-center gap-1.5 pr-1 text-xs font-extrabold text-[var(--theme-text-muted)]">
+              <Gauge className="size-4" aria-hidden="true" />
+              Mức độ
+            </span>
+            {(
+              [
+                ["EASY", "Dễ"],
+                ["MEDIUM", "Trung bình"],
+                ["HARD", "Khó"],
+              ] as const
+            ).map(([difficulty, label]) => (
+              <span
+                key={difficulty}
+                className={cn(
+                  "inline-flex min-h-8 items-center gap-2 rounded-lg border px-3 text-xs font-extrabold",
+                  questionDifficultyBadgeClassName(difficulty),
+                )}
+              >
+                {label}
+                <strong className="text-sm font-black">
+                  {quizDifficultyCounts[difficulty]}
+                </strong>
+              </span>
+            ))}
+          </div>
+        </>
         <AdminGeneratedSetReviewActions
           approvedQuestionCount={quizQuestionNavigation.approvedQuestions.length}
           isReviewingAllPending={isReviewingAllQuestions}
           lessonId={lessonId}
-          onReviewAllPending={isTest ? undefined : onReviewAllQuestions}
+          onReviewAllPending={onReviewAllQuestions}
           pendingReviewQuestionCount={
-            isTest
-              ? activeSet.pendingReviewQuestionCount
-              : quizQuestionNavigation.pendingQuestions.length
+            activeSet.pendingReviewQuestionCount ??
+            quizQuestionNavigation.pendingQuestions.length
           }
           reviewStatus={activeSet.reviewStatus}
           setId={activeSet.id}
           source={activeSet.source}
           type={isTest ? "TEST" : "QUIZ"}
         />
-        {!isTest && unpublishedApprovedQuestionCount > 0 ? (
+        {unpublishedApprovedQuestionCount > 0 ? (
           <div
             className="relative mt-3 flex max-w-xl items-start gap-3 overflow-hidden rounded-xl border border-sky-200 bg-gradient-to-r from-sky-50 via-blue-50/70 to-white px-4 py-3 text-sky-950 shadow-sm dark:border-sky-800/80 dark:from-sky-950/70 dark:via-blue-950/50 dark:to-slate-950 dark:text-sky-100"
             aria-live="polite"
@@ -1206,8 +1106,7 @@ function QuizSetPanel({
     <div className="space-y-3">
       {setSummary}
 
-      {!isTest &&
-      quizQuestionNavigation.navigableQuestions.length > 0 &&
+      {quizQuestionNavigation.navigableQuestions.length > 0 &&
       selectedQuestionIndex >= 0 ? (
         <div className="grid gap-2">
           {quizQuestionNavigation.pendingQuestions.length > 0 ? (
@@ -1225,7 +1124,7 @@ function QuizSetPanel({
           <div
             ref={questionNumbersRef}
             role="tablist"
-            aria-label="Chọn câu hỏi Quiz"
+            aria-label={`Chọn câu hỏi ${isTest ? "Test" : "Quiz"}`}
             className="min-w-0 py-0.5"
           >
             <div className="grid min-w-0 gap-2">
@@ -1511,22 +1410,6 @@ function QuizSetPanel({
               Tạo câu hỏi đầu tiên
             </button>
           </div>
-        ) : isTest ? (
-          <div className="divide-y divide-[var(--theme-border)]">
-            {questions.map((question, index) => (
-              <QuestionCard
-                key={question.id}
-                assessmentKind={assessmentKind}
-                index={index}
-                question={question}
-                setId={activeSet.id}
-                onDelete={() => onDeleteQuestion(question)}
-                onEdit={() => onEditQuestion(question)}
-                onReview={() => onReviewQuestion(question)}
-                isReviewing={reviewingQuestionId === question.id}
-              />
-            ))}
-          </div>
         ) : selectedQuestion && selectedQuestionIndex >= 0 ? (
           isAiGeneratedQuestion && questionViewMode !== "UI_ONLY" ? (
             <div
@@ -1681,13 +1564,11 @@ function QuizSetPanel({
           )
         ) : null}
       </section>
-      {!isTest ? (
-        <AdminQuizGenerationHistoryDialog
-          isOpen={isGenerationHistoryOpen}
-          onClose={() => setIsGenerationHistoryOpen(false)}
-          quizSet={activeSet as AdminQuizSet}
-        />
-      ) : null}
+      <AdminQuizGenerationHistoryDialog
+        isOpen={isGenerationHistoryOpen}
+        onClose={() => setIsGenerationHistoryOpen(false)}
+        quizSet={activeSet as AdminQuizSet}
+      />
     </div>
   );
 }
@@ -1754,7 +1635,7 @@ function QuestionCard({
   );
   const isAiGenerated = Boolean(question.sourceMetadataJson?.aiGenerationId);
   const isApproved = question.reviewStatus === "APPROVED";
-  const quizQuestion = assessmentKind === "quiz" ? (question as AdminQuizQuestion) : null;
+  const quizQuestion = question as unknown as AdminQuizQuestion;
   const questionFigure = quizQuestion?.figures.find(
     (figure) => figure.role === "QUESTION",
   );
@@ -1771,17 +1652,12 @@ function QuestionCard({
   const hint = getTiptapDocumentText(question.hintJson);
   const explanation = getTiptapDocumentText(question.explanation?.contentJson);
   const quizExplanationBlock = useMemo(() => {
-    if (assessmentKind !== "quiz") return null;
     const candidate = question.sourceMetadataJson?.quizExplanationBlock;
     return isQuizExplanationBlockData(candidate) ? candidate : null;
-  }, [assessmentKind, question.sourceMetadataJson?.quizExplanationBlock]);
-  const testExampleBlock = useMemo(() => {
-    if (assessmentKind !== "test") return null;
-    const candidate = question.sourceMetadataJson?.exampleBlock;
-    return isTestExplanationBlockData(candidate) ? candidate : null;
-  }, [assessmentKind, question.sourceMetadataJson?.exampleBlock]);
+  }, [question.sourceMetadataJson?.quizExplanationBlock]);
   const solutionFigurePreview = solutionFigure ? (
     <AdminQuizFigurePreview
+      assessmentKind={assessmentKind}
       figure={solutionFigure}
       questionId={question.id}
       role="SOLUTION"
@@ -1791,35 +1667,31 @@ function QuestionCard({
   const hasCurrentSolution = Boolean(
     quizExplanationBlock?.solution?.trim() || explanation,
   );
-  const solutionRefinementAction =
-    quizQuestion && hasCurrentSolution ? (
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <button
-          className="theme-button-primary-subtle inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-xs font-extrabold"
-          onClick={() => setSolutionAiMode("REFINE")}
-          type="button"
-        >
-          <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-          Tinh chỉnh lời giải
-        </button>
-        <button
-          className="theme-button-primary-subtle inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-xs font-extrabold"
-          onClick={() => setSolutionAiMode("REGENERATE")}
-          type="button"
-        >
-          <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
-          Tạo lại lời giải
-        </button>
-      </div>
-    ) : null;
+  const solutionRefinementAction = hasCurrentSolution ? (
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      <button
+        className="theme-button-primary-subtle inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-xs font-extrabold"
+        onClick={() => setSolutionAiMode("REFINE")}
+        type="button"
+      >
+        <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+        Tinh chỉnh lời giải
+      </button>
+      <button
+        className="theme-button-primary-subtle inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-xs font-extrabold"
+        onClick={() => setSolutionAiMode("REGENERATE")}
+        type="button"
+      >
+        <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+        Tạo lại lời giải
+      </button>
+    </div>
+  ) : null;
 
   return (
     <article
       id={`quiz-question-${question.id}`}
-      className={cn(
-        "space-y-4 p-4 sm:p-5",
-        assessmentKind === "quiz" && "learning-content-text",
-      )}
+      className={cn("space-y-4 p-4 sm:p-5", "learning-content-text")}
     >
       <div className="space-y-2">
         <div className="flex min-h-10 items-center justify-between gap-3">
@@ -1855,13 +1727,12 @@ function QuestionCard({
             <span aria-hidden="true" />
           )}
           <div className="ml-auto flex shrink-0 gap-2">
-            {quizQuestion ? (
-              <AdminQuizQuestionFigureAiMenu
-                hasSolutionText={Boolean(explanation || quizExplanationBlock)}
-                question={quizQuestion}
-                setId={setId}
-              />
-            ) : null}
+            <AdminQuizQuestionFigureAiMenu
+              assessmentKind={assessmentKind}
+              hasSolutionText={Boolean(explanation || quizExplanationBlock)}
+              question={quizQuestion}
+              setId={setId}
+            />
             <button
               type="button"
               onClick={onEdit}
@@ -1935,6 +1806,7 @@ function QuestionCard({
 
       {questionFigure ? (
         <AdminQuizFigurePreview
+          assessmentKind={assessmentKind}
           figure={questionFigure}
           questionId={question.id}
           role="QUESTION"
@@ -2042,11 +1914,7 @@ function QuestionCard({
         </div>
       )}
 
-      {solutionFigure ||
-      hint ||
-      explanation ||
-      quizExplanationBlock ||
-      testExampleBlock ? (
+      {solutionFigure || hint || explanation || quizExplanationBlock ? (
         <div className="space-y-3">
           {hint ? (
             <div className="rounded-lg border border-[var(--theme-info-border)] bg-[var(--theme-info-bg)] p-3">
@@ -2073,8 +1941,6 @@ function QuestionCard({
               showProblem={false}
               headerAction={solutionRefinementAction}
             />
-          ) : testExampleBlock ? (
-            <AdminTestExplanationCard block={testExampleBlock} showProblem={false} />
           ) : explanation || solutionFigurePreview ? (
             <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2095,16 +1961,15 @@ function QuestionCard({
           ) : null}
         </div>
       ) : null}
-      {quizQuestion ? (
-        <AdminQuizSolutionRefinementDialog
-          currentSolution={quizExplanationBlock?.solution ?? explanation ?? ""}
-          isOpen={solutionAiMode !== null}
-          mode={solutionAiMode ?? "REFINE"}
-          onClose={() => setSolutionAiMode(null)}
-          questionId={quizQuestion.id}
-          setId={setId}
-        />
-      ) : null}
+      <AdminQuizSolutionRefinementDialog
+        assessmentKind={assessmentKind}
+        currentSolution={quizExplanationBlock?.solution ?? explanation ?? ""}
+        isOpen={solutionAiMode !== null}
+        mode={solutionAiMode ?? "REFINE"}
+        onClose={() => setSolutionAiMode(null)}
+        questionId={question.id}
+        setId={setId}
+      />
     </article>
   );
 }
@@ -2214,10 +2079,7 @@ function getNextSetTitle(
 }
 
 function difficultyLabel(
-  difficulty:
-    | AdminTestSet["difficulty"]
-    | AdminQuizQuestion["difficulty"]
-    | AdminTestQuestion["difficulty"],
+  difficulty: AdminQuizQuestion["difficulty"] | AdminTestQuestion["difficulty"],
 ) {
   return {
     EASY: "Dễ",

@@ -11,10 +11,12 @@ import {
   type StemFigureSourceActionsHandle,
 } from "@/components/admin/stem-figures/stem-figure-source-actions";
 import { StemFigureCodeEditor } from "@/features/admin/ai-generation/components/stem-figure-code-editor";
-import type { AdminQuizFigure } from "@/features/admin/quiz/api/admin-quiz-api";
+import type {
+  AdminQuizAssessmentKind,
+  AdminQuizFigure,
+} from "@/features/admin/quiz/api/admin-quiz-api";
 import { useAdminQuizFigureMutations } from "@/features/admin/quiz/hooks/use-admin-quiz";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
-import { cn } from "@/lib/utils";
 import { useStableImageUrl } from "@/hooks/use-stable-image-url";
 import { getStemFigureDraftDisplayPercent } from "@/lib/stem-figure-display";
 import {
@@ -42,6 +44,7 @@ import {
 } from "@/lib/stem-figure-source-actions";
 
 export function AdminQuizFigureCodeDialog({
+  assessmentKind,
   figure,
   isOpen,
   mode,
@@ -49,6 +52,7 @@ export function AdminQuizFigureCodeDialog({
   questionId,
   setId,
 }: {
+  assessmentKind: AdminQuizAssessmentKind;
   figure: AdminQuizFigure;
   isOpen: boolean;
   mode: "create" | "edit";
@@ -56,7 +60,7 @@ export function AdminQuizFigureCodeDialog({
   questionId: string;
   setId: string;
 }) {
-  const mutations = useAdminQuizFigureMutations(setId);
+  const mutations = useAdminQuizFigureMutations(setId, assessmentKind);
   const [source, setSource] = useState("");
   const [caption, setCaption] = useState("");
   const [result, setResult] = useState<{
@@ -89,7 +93,9 @@ export function AdminQuizFigureCodeDialog({
     readStemFigureDisplayScale(source) ?? 1,
   );
 
-  const stablePublicUrl = useStableImageUrl(figure.currentRevision?.deliveryFile?.publicUrl);
+  const stablePublicUrl = useStableImageUrl(
+    figure.currentRevision?.deliveryFile?.publicUrl,
+  );
   const previewUrl = result
     ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(result.previewSvg)}`
     : mode === "edit"

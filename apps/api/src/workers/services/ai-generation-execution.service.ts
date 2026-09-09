@@ -42,6 +42,9 @@ export class AiGenerationExecutionService {
       return this.flashcardGeneration.generate(context);
     }
     if (context.type === AiGenerationType.TEST) {
+      if (usesAssessmentQuizPipeline(context.inputMeta)) {
+        return this.quizGeneration.generate(context);
+      }
       return this.lessonContentGeneration.generate(context);
     }
     throw new UnrecoverableError(
@@ -63,8 +66,20 @@ export class AiGenerationExecutionService {
       return this.flashcardGeneration.persist(context, prepared);
     }
     if (context.type === AiGenerationType.TEST) {
+      if (usesAssessmentQuizPipeline(context.inputMeta)) {
+        return this.quizGeneration.persist(context, prepared);
+      }
       return this.lessonContentGeneration.persist(context, prepared);
     }
     throw new UnrecoverableError("AI generation persistence handler is not registered.");
   }
+}
+
+/** Keep durable TEST jobs created before M6.6 on their original worker path. */
+function usesAssessmentQuizPipeline(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return (
+    record.assessmentKind === "TEST" && record.pipelineVersion === "ASSESSMENT_QUIZ_V1"
+  );
 }

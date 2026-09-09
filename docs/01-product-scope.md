@@ -532,6 +532,16 @@ Phần mở rộng `M15` được triển khai sau luồng học sinh cốt lõi
 
 ### 4.7. Bài kiểm tra
 
+- Admin Test là mode `TEST` của cùng Quiz/Assessment implementation: mọi CRUD,
+  rich editor, review/publish, generation JSON, figure và solution refinement
+  tái sử dụng Quiz; không tạo code admin Test độc lập.
+- Modal tạo/sửa TestSet chỉ thêm `durationSeconds` vào modal QuizSet. Thời gian
+  chỉ được cấu hình tại TestSet editor, không có trong modal AI, không được gửi
+  từ modal AI và không là input prompt.
+- AI Test append vào `targetTestSetId` đã chọn. Nếu lesson chưa có TestSet,
+  admin vẫn có thể bắt đầu tạo; backend tự tạo `Bộ đề 1` với thời gian mặc định
+  15 phút. Admin đổi thời gian sau đó tại modal sửa bộ đề, không phải modal AI.
+  Duration không làm thay đổi nội dung hoặc shape câu AI sinh ra.
 - Bài kiểm tra chỉ mở vào ngày/giờ admin thiết lập.
 - Bài kiểm tra chỉ mở sau khi học sinh đã hoàn thành cả Quiz và Flashcard của
   lesson. Lesson thiếu bộ Quiz/Flashcard có nội dung được duyệt vẫn phải khóa

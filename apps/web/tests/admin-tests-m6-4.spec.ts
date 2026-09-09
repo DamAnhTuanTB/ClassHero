@@ -1,7 +1,37 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import { serializeAdminAiGenerationPayload } from "@/features/admin/ai-generation/api/admin-ai-generation-api";
+import type { AdminTestGenerationPayload } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
 
 const apiBaseUrl = "http://localhost:4000/api/v1";
 const lessonId = "lesson-tests-m6-4";
+
+test("Test AI payload only carries the Test target and shared Quiz generation fields", () => {
+  const payload = {
+    type: "TEST",
+    targetQuizSetId: "legacy-quiz-target",
+    targetTestSetId: "test-set-1",
+    durationSeconds: 900,
+    difficultyRatioJson: { EASY: 20, MEDIUM: 60, HARD: 20 },
+    documentIds: ["document-1"],
+    questionCount: 10,
+    difficulty: "MIXED",
+    questionTypes: ["MULTIPLE_CHOICE"],
+    style: "student_friendly",
+  } as AdminTestGenerationPayload & {
+    difficultyRatioJson: Record<string, number>;
+    durationSeconds: number;
+    targetQuizSetId: string;
+  };
+
+  expect(serializeAdminAiGenerationPayload(payload)).toEqual({
+    targetTestSetId: "test-set-1",
+    documentIds: ["document-1"],
+    questionCount: 10,
+    difficulty: "MIXED",
+    questionTypes: ["MULTIPLE_CHOICE"],
+    style: "student_friendly",
+  });
+});
 
 test("admin creates a timed test set and a question from lesson detail", async ({
   page,
@@ -23,6 +53,8 @@ test("admin creates a timed test set and a question from lesson detail", async (
 
   await expect(page.getByRole("tab", { name: /Bộ đề 1/ })).toBeVisible();
   await expect(page.getByText("20 phút", { exact: true })).toBeVisible();
+  await expect(page.getByRole("group", { name: "Hành động bộ Test" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Lưu", exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Thêm bộ đề" }).click();
   await expect(setDialog.getByLabel("Tên bộ đề")).toHaveValue("Bộ đề 2");
@@ -36,6 +68,8 @@ test("admin creates a timed test set and a question from lesson detail", async (
 
   await page.getByRole("button", { name: "Thêm câu hỏi" }).first().click();
   const questionDialog = page.getByRole("dialog", { name: "Thêm câu hỏi" });
+  await expect(questionDialog.getByText("Hình đề", { exact: true })).toBeVisible();
+  await expect(questionDialog.getByText("Hình lời giải", { exact: true })).toBeVisible();
   await questionDialog.getByLabel("Loại câu hỏi").click();
   await expect(
     page.getByRole("option", { name: "Đúng / Sai nhiều mệnh đề" }),
@@ -54,9 +88,87 @@ test("admin creates a timed test set and a question from lesson detail", async (
   await questionDialog.getByRole("button", { name: "Thêm câu hỏi" }).click();
 
   await expect(questionDialog).toBeHidden();
-  await expect(page.getByText("Đúng / Sai nhiều mệnh đề", { exact: true })).toBeVisible();
+  await expect(
+    page
+      .getByTestId("quiz-question-navigation-MULTI_STATEMENT_TRUE_FALSE")
+      .getByText("Đúng / Sai nhiều mệnh đề", { exact: true }),
+  ).toBeVisible();
   await expect(page.getByText("Số 2 là số chẵn.", { exact: true })).toBeVisible();
   await expect(page.getByText("Số 3 là số chẵn.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("tablist", { name: "Chọn câu hỏi Test" })).toBeVisible();
+  await expectNoFrameworkOverlay(page);
+});
+
+test("Tạo mới Test opens the shared Quiz AI modal without duration", async ({ page }) => {
+  await seedAdminSession(page);
+  await setupTestsApiMock(page);
+
+  await page.goto(`/admin/lessons/${lessonId}`);
+  await page.getByRole("tab", { name: "Test" }).click();
+  await page.getByRole("button", { name: "Thêm bộ đề" }).click();
+  await page
+    .getByRole("dialog", { name: "Thêm bộ đề" })
+    .getByRole("button", { name: "Thêm bộ đề" })
+    .click();
+
+  const testCard = page.locator("article").filter({
+    has: page.getByRole("heading", { name: "Test", exact: true }),
+  });
+  await testCard.getByRole("button", { name: "Tạo mới" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Tạo Test bằng AI" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByLabel("Bộ đề được chọn")).toBeVisible();
+  await expect(dialog.getByLabel("Số câu hỏi")).toBeVisible();
+  await expect(dialog.getByLabel("Số câu thực tế")).toBeVisible();
+  await expect(dialog.getByLabel("Mức độ")).toBeVisible();
+  await expect(dialog.getByText("Loại câu hỏi", { exact: true })).toBeVisible();
+  await expect(dialog.getByLabel("Cách trình bày")).toBeVisible();
+  await expect(dialog.getByLabel("Model", { exact: true })).toBeVisible();
+  await expect(dialog.getByLabel("Model tạo hình", { exact: true })).toBeVisible();
+  await expect(
+    dialog.getByText("Cấu hình này chỉ được dùng khi câu Test cần sinh hình minh họa."),
+  ).toBeVisible();
+  await expect(dialog.getByText(/Thời gian làm bài/i)).toHaveCount(0);
+  await expect(dialog.locator('[name*="duration" i]')).toHaveCount(0);
+  await expectNoFrameworkOverlay(page);
+});
+
+test("Test AI creates Bộ đề 1 when the lesson has no Test set", async ({ page }) => {
+  await seedAdminSession(page);
+  await setupTestsApiMock(page);
+
+  await page.goto(`/admin/lessons/${lessonId}`);
+  await page.getByRole("tab", { name: "Test" }).click();
+  const testCard = page.locator("article").filter({
+    has: page.getByRole("heading", { name: "Test", exact: true }),
+  });
+  await testCard.getByRole("button", { name: "Tạo mới" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Tạo Test bằng AI" });
+  await expect(dialog.getByLabel("Bộ đề được chọn")).toContainText("Chưa có bộ đề");
+  await expect(
+    dialog.getByText(
+      "Hệ thống sẽ tạo “Bộ đề 1” với thời gian mặc định 15 phút. Bạn có thể đổi thời gian tại phần sửa bộ đề.",
+    ),
+  ).toBeVisible();
+  await dialog.getByLabel("Tài liệu dùng để tạo").click();
+  await page.getByRole("option", { name: /Tài liệu Test/ }).click();
+  const startButton = dialog.getByRole("button", { name: "Bắt đầu tạo" });
+  await expect(startButton).toBeEnabled();
+
+  const generateRequestPromise = page.waitForRequest(
+    (request) =>
+      request.method() === "POST" &&
+      new URL(request.url()).pathname.endsWith(
+        `/admin/lessons/${lessonId}/test-sets/generate-ai`,
+      ),
+  );
+  await startButton.click();
+  const generateRequest = await generateRequestPromise;
+  expect(generateRequest.postDataJSON()).not.toHaveProperty("targetTestSetId");
+  expect(generateRequest.postDataJSON()).not.toHaveProperty("durationSeconds");
+  await expect(dialog).toBeHidden();
   await expectNoFrameworkOverlay(page);
 });
 
@@ -249,13 +361,39 @@ async function setupTestsApiMock(page: Page) {
         data: {
           lesson: { id: lessonId, title: "Buổi 1: Kiến thức nền" },
           readiness: {
-            summaryReady: false,
-            generationReady: false,
-            readyDocumentCount: 0,
-            embeddedDocumentCount: 0,
-            reason: "Buổi học chưa có tài liệu.",
+            summaryReady: true,
+            generationReady: true,
+            quizReady: true,
+            readyDocumentCount: 1,
+            embeddedDocumentCount: 1,
+            reason: null,
+            quizReason: null,
           },
-          documents: [],
+          documents: [
+            {
+              id: "11111111-1111-4111-8111-111111111111",
+              title: "Tài liệu Test",
+              kind: "SUPPLEMENT",
+              status: "READY",
+              chunkCount: 1,
+              pageRange: { pageStart: 1, pageEnd: 1 },
+              embeddingReady: true,
+              canUseForSummary: true,
+              canUseForQuiz: true,
+              canUseForFlashcard: true,
+              unavailableReason: null,
+              quizUnavailableReason: null,
+              flashcardUnavailableReason: null,
+            },
+          ],
+          summaryConfiguration: modelConfiguration("gpt-summary"),
+          summaryFigureConfiguration: modelConfiguration("gpt-summary-figure"),
+          quizConfiguration: modelConfiguration("gpt-quiz"),
+          quizFigureConfiguration: modelConfiguration("gpt-quiz-figure"),
+          testConfiguration: modelConfiguration("gpt-test"),
+          testFigureConfiguration: modelConfiguration("gpt-test-figure"),
+          flashcardConfiguration: modelConfiguration("gpt-flashcard"),
+          flashcardFigureConfiguration: modelConfiguration("gpt-flashcard-figure"),
           jobs: { SUMMARY: null, QUIZ: null, FLASHCARD: null, TEST: null },
         },
       });
@@ -282,6 +420,12 @@ async function setupTestsApiMock(page: Page) {
           status: "PUBLISHED",
           customVideoSettings: null,
         },
+      });
+    }
+
+    if (method === "GET" && pathname === "/admin/learning-paths/path-math-8") {
+      return fulfillJson(route, 200, {
+        data: { id: "path-math-8", title: "Toán 8" },
       });
     }
 
@@ -323,6 +467,100 @@ async function setupTestsApiMock(page: Page) {
       return fulfillJson(route, 201, { data: createdSetResponse });
     }
 
+    if (
+      method === "POST" &&
+      pathname === `/admin/lessons/${lessonId}/test-sets/generate-ai/preview`
+    ) {
+      const body = request.postDataJSON() as Record<string, unknown>;
+      return fulfillJson(route, 200, {
+        data: {
+          requestDraftId: "22222222-2222-4222-8222-222222222222",
+          requestHash: "a".repeat(64),
+          expiresAt: new Date(Date.now() + 60_000).toISOString(),
+          promptVersion: "quiz-v1",
+          schemaVersion: "quiz-v1",
+          systemPrompt: "Shared Quiz system prompt",
+          userPrompt: "Shared Quiz user prompt",
+          inputPrompt: "Shared Quiz input",
+          openAiFileUploadRequest: { purpose: "user_data", file: "packet.pdf" },
+          openAiRequest: {
+            model: "gpt-test",
+            instructions: "Shared Quiz system prompt",
+            input: [],
+            text: { format: {} },
+            max_output_tokens: 8_000,
+          },
+          context: {
+            lessonTitle: "Buổi 1: Kiến thức nền",
+            documentCount: 1,
+            chunkCount: 1,
+            estimatedTokens: 1_000,
+            textInputTokens: 100,
+            pdfInputTokens: 900,
+            contextTokens: 1_000,
+            maxContextTokens: 100_000,
+            packet: {
+              filename: "packet.pdf",
+              pageCount: 1,
+              sizeBytes: 1_000,
+              packetHash: "b".repeat(64),
+              manifestHash: "c".repeat(64),
+              detail: "high",
+              manifest: {
+                version: 1,
+                lessonId,
+                packetHash: "b".repeat(64),
+                pageCount: 1,
+                pages: [
+                  {
+                    packetPageNumber: 1,
+                    sourceKey: "D01",
+                    lessonDocumentId: "11111111-1111-4111-8111-111111111111",
+                    sourceDocumentId: "11111111-1111-4111-8111-111111111111",
+                    sourceFileId: "file-test",
+                    sourcePdfPageNumber: 1,
+                    printedPageLabel: "1",
+                    pageRangeId: "range-test",
+                    documentTitle: "Tài liệu Test",
+                    segmentOrder: 0,
+                  },
+                ],
+              },
+            },
+            chunks: [],
+          },
+          configuration: {
+            ...modelConfiguration("gpt-test"),
+            targetTestSet: {
+              id: String(body.targetTestSetId),
+              title: "Bộ đề 1",
+              durationSeconds: 900,
+            },
+            selectedModel: "gpt-test",
+          },
+          estimatedCost: {
+            available: true,
+            inputUpperBoundUsd: 0.001,
+            inputUpperBoundVnd: 25,
+            outputUpperBoundUsd: 0.002,
+            outputUpperBoundVnd: 50,
+            upperBoundUsd: 0.003,
+            upperBoundVnd: 75,
+            fxRateVndPerUsd: 25_000,
+          },
+        },
+      });
+    }
+
+    if (
+      method === "POST" &&
+      pathname === `/admin/lessons/${lessonId}/test-sets/generate-ai`
+    ) {
+      return fulfillJson(route, 202, {
+        data: { mode: "QUEUED", jobId: "test-job-1", status: "QUEUED" },
+      });
+    }
+
     const questionsMatch = pathname.match(/^\/admin\/test-sets\/([^/]+)\/questions$/);
     if (questionsMatch && method === "GET") {
       return fulfillJson(route, 200, {
@@ -360,6 +598,29 @@ async function setupTestsApiMock(page: Page) {
       error: { code: "NOT_FOUND", message: `${method} ${pathname}` },
     });
   });
+}
+
+function modelConfiguration(model: string) {
+  return {
+    isDefaultConfigured: true,
+    resolvedProvider: "OPENAI",
+    resolvedModel: model,
+    temperature: 0.1,
+    reasoningEffort: null,
+    maxOutputTokens: 8_000,
+    modelOptions: [
+      {
+        provider: "OPENAI",
+        model,
+        available: true,
+        capabilities: {
+          aiConfiguration: "TEMPERATURE",
+          pdfInput: true,
+          pdfDetailLevels: ["high"],
+        },
+      },
+    ],
+  };
 }
 
 function createUnsignedToken(payload: Record<string, unknown>) {

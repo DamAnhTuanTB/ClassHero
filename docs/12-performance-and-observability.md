@@ -167,6 +167,15 @@ bốn job của queue embedding. Khi chạy nhiều worker process, concurrency 
 dụng tăng theo số instance; cần theo dõi provider rate limit, chi phí, CPU/RAM,
 database connection và tỷ lệ retry trước khi scale thêm.
 
+M6.6 dùng một versioned Quiz/Assessment job path cho Admin Quiz/Test. Metric,
+job result, trace và usage phải luôn có `assessmentKind` cùng target ID; target
+Test không được nhầm với target Quiz. `AiGenerationType.TEST` vẫn là dimension
+provider/accounting. Request duration từ AI modal là metric/validation failure,
+không phải fallback; duration chỉ được resolve từ TestSet sau authorization.
+Trong cutover cần theo dõi job legacy/new theo version và không retry một job
+với contract khác. Sau deploy worker, restart worker trước khi realtime visual
+smoke test.
+
 Riêng Summary có `TEX_FIGURE`, generation và render là các bước tách biệt.
 Structured-output call của Summary chỉ sinh nội dung + figure plan. Mỗi figure
 dùng một structured-output call chuyên vẽ, lưu raw core fragment rồi enqueue một

@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, type ComponentType } from "react";
 import { createPortal } from "react-dom";
 
 import type {
+  AdminQuizAssessmentKind,
   AdminQuizFigureAiTargetMode,
   AdminQuizQuestion,
 } from "@/features/admin/quiz/api/admin-quiz-api";
@@ -22,10 +23,12 @@ const AiDialog = dynamic(
 const ACTIVE_STATUSES = new Set(["QUEUED", "RENDERING", "REPAIRING"]);
 
 export function AdminQuizQuestionFigureAiMenu({
+  assessmentKind,
   hasSolutionText,
   question,
   setId,
 }: {
+  assessmentKind: AdminQuizAssessmentKind;
   hasSolutionText: boolean;
   question: AdminQuizQuestion;
   setId: string;
@@ -161,6 +164,7 @@ export function AdminQuizQuestionFigureAiMenu({
         : null}
       {targetMode ? (
         <AiDialog
+          assessmentKind={assessmentKind}
           figure={targetMode === "QUESTION" ? questionFigure : solutionFigure}
           isOpen
           onClose={() => setTargetMode(null)}

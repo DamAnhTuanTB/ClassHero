@@ -11,9 +11,9 @@ import {
   getAdminQuizSetsQueryOptions,
 } from "@/features/admin/quiz/hooks/use-admin-quiz";
 import {
-  getAdminTestQuestionsQueryOptions,
-  getAdminTestSetsQueryOptions,
-} from "@/features/admin/tests/hooks/use-admin-tests";
+  getAdminAssessmentQuestionsQueryOptions,
+  getAdminAssessmentSetsQueryOptions,
+} from "@/features/admin/assessments/hooks/use-admin-assessment";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 
 export function useAdminLessonContentPrefetch(lessonId: string, enabled: boolean) {
@@ -62,13 +62,19 @@ export function useAdminLessonContentPrefetch(lessonId: string, enabled: boolean
 
       const prefetchTests = async () => {
         const sets = await queryClient.ensureQueryData(
-          getAdminTestSetsQueryOptions({ accessToken, lessonId, userId }),
+          getAdminAssessmentSetsQueryOptions({
+            accessToken,
+            kind: "test",
+            lessonId,
+            userId,
+          }),
         );
         const firstSetId = sets[0]?.id;
         if (firstSetId) {
           await queryClient.prefetchQuery(
-            getAdminTestQuestionsQueryOptions({
+            getAdminAssessmentQuestionsQueryOptions({
               accessToken,
+              kind: "test",
               setId: firstSetId,
               userId,
             }),

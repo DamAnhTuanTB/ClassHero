@@ -1,0 +1,25 @@
+[agents]
+enabled = true
+max_concurrent_threads_per_session = 3
+default_subagent_model = "gpt-5.6-terra"
+default_subagent_reasoning_effort = "medium"
+
+[agents.coordinator]
+description = "Điều phối implementation plan, phân batch, giao đúng agent và tổng hợp kết quả."
+config_file = "./agents/coordinator.toml"
+
+[agents.implementer]
+description = "Triển khai production code cho bước đã rõ phạm vi và kiến trúc."
+config_file = "./agents/implementer.toml"
+
+[agents.tester]
+description = "Chạy kiểm tra deterministic và thu thập bằng chứng pass/fail."
+config_file = "./agents/tester.toml"
+
+[agents.fixer]
+description = "Áp dụng bản sửa nhỏ khi root cause hoặc remediation đã rõ."
+config_file = "./agents/fixer.toml"
+
+[agents.reviewer]
+description = "Review read-only cấp senior cho correctness và rủi ro hệ thống."
+config_file = "./agents/reviewer.toml"

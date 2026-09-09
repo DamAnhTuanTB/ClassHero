@@ -5,10 +5,8 @@ import type { getRequestContext } from "#api/common/api/request-context";
 import {
   AiExplanationTargetType,
   AiGenerationType,
-  BackgroundJobStatus,
   ContentSource,
   Prisma,
-  ProviderUsageStatus,
   QuestionType,
   ReviewStatus,
 } from "@prisma/client";
@@ -17,29 +15,20 @@ import {
   UpdateQuizGenerationQuestionJsonDto,
   UpdateQuizQuestionContentDto,
 } from "#api/modules/quiz/dto/quiz-question-content.dto";
+import type { ReviewQuizSetDto } from "#api/modules/quiz/dto/review-quiz-set.dto";
 import {
-  QuizSetReviewActionDto,
-  type ReviewQuizSetDto,
-} from "#api/modules/quiz/dto/review-quiz-set.dto";
-import {
-  correctAnswerSchema,
-  multiStatementCorrectAnswerSchema,
-  multiStatementOptionsSchema,
-  multipleChoiceOptionsSchema,
-  textInputCorrectAnswerSchema,
-} from "#api/modules/quiz/types/quiz.types";
-import { getTiptapText } from "#api/common/validation/rich-text-content";
+  changesAssessmentExplanationContext,
+  syncAssessmentExplanation,
+  toOptionalJsonRecord as toAssessmentOptionalJsonRecord,
+  validateAssessmentQuestionContent,
+} from "#api/modules/assessments/utils/assessment-question-content";
 import {
   getGeneratedQuizOutputSchema,
   quizExplanationBlockSchema,
   quizSubjectKeySchema,
   type QuizExplanationBlock,
 } from "#api/modules/quiz/types/quiz-generation.types";
-import {
-  quizFigureSelect,
-  readQuizFigurePendingAiTargetMode,
-  serializeQuizFigureAccessUrl,
-} from "#api/modules/quiz-figures/services/quiz-figures.service";
+import { quizFigureSelect } from "#api/modules/quiz-figures/services/quiz-figures.service";
 import { hashAiValue } from "#api/modules/ai/utils/ai-hash";
 import {
   readQuizGenerationQuestion,
@@ -56,6 +45,12 @@ import { mapGeneratedQuizQuestion } from "#api/modules/quiz/utils/quiz-generatio
 import { validateQuizOutput } from "#api/modules/quiz/utils/quiz-generation-validation";
 import { StoredFileCleanupService } from "#api/modules/files/services/stored-file-cleanup.service";
 import { FilesService } from "#api/modules/files/services/files.service";
+import { enrichAssessmentQuestionFigures } from "#api/modules/assessments/services/assessment-question-figure-enrichment";
+import {
+  reviewAllPendingAssessmentAiQuestions,
+  reviewAssessmentQuestion,
+  reviewAssessmentSet,
+} from "#api/modules/assessments/services/assessment-admin-publication";
 
 type RequestContext = ReturnType<typeof getRequestContext>;
 
@@ -255,91 +250,7 @@ export class QuizService {
     input: ReviewQuizSetDto,
     context: RequestContext,
   ) {
-    const current = await this.prisma.quizSet.findUnique({
-      where: { id: setId, deletedAt: null },
-      select: { id: true, reviewStatus: true },
-    });
-    if (!current) {
-      throw notFoundException("NOT_FOUND", "Không tìm thấy bộ câu hỏi");
-    }
-    const action =
-      input.action ??
-      (input.reviewStatus === ReviewStatus.APPROVED
-        ? QuizSetReviewActionDto.PUBLISH
-        : input.reviewStatus === ReviewStatus.HIDDEN
-          ? QuizSetReviewActionDto.WITHDRAW
-          : QuizSetReviewActionDto.SAVE);
-    return this.prisma.$transaction(async (transaction) => {
-      if (action === QuizSetReviewActionDto.PUBLISH) {
-        const approvedQuestionCount = await transaction.quizQuestion.count({
-          where: {
-            quizSetId: setId,
-            deletedAt: null,
-            reviewStatus: ReviewStatus.APPROVED,
-          },
-        });
-        if (approvedQuestionCount < 1) {
-          throw badRequestException(
-            "QUIZ_SET_HAS_NO_APPROVED_QUESTIONS",
-            "Cần có ít nhất 1 câu Quiz được duyệt để phát hành",
-            { approvedQuestionCount },
-          );
-        }
-      }
-      const latestPublication =
-        action === QuizSetReviewActionDto.SAVE
-          ? await transaction.quizQuestion.findFirst({
-              where: {
-                quizSetId: setId,
-                deletedAt: null,
-                publishedAt: { not: null },
-              },
-              orderBy: { publishedAt: "desc" },
-              select: { publishedAt: true },
-            })
-          : null;
-      const publishedAt = latestPublication?.publishedAt ?? new Date();
-      if (
-        action === QuizSetReviewActionDto.SAVE ||
-        action === QuizSetReviewActionDto.PUBLISH
-      ) {
-        await transaction.quizQuestion.updateMany({
-          where: {
-            quizSetId: setId,
-            deletedAt: null,
-            reviewStatus: ReviewStatus.APPROVED,
-          },
-          data: { publishedAt },
-        });
-      }
-      const nextReviewStatus =
-        action === QuizSetReviewActionDto.PUBLISH
-          ? ReviewStatus.APPROVED
-          : action === QuizSetReviewActionDto.WITHDRAW
-            ? ReviewStatus.HIDDEN
-            : current.reviewStatus;
-      const updated = await transaction.quizSet.update({
-        where: { id: setId },
-        data: { reviewStatus: nextReviewStatus, updatedById: userId },
-      });
-      await transaction.auditLog.create({
-        data: {
-          actorUserId: userId,
-          action: "QUIZ_SET_REVIEWED",
-          entityType: "QuizSet",
-          entityId: setId,
-          before: toInputJson(current),
-          after: toInputJson({
-            id: updated.id,
-            action,
-            reviewStatus: updated.reviewStatus,
-          }),
-          ipAddress: context.ipAddress,
-          userAgent: context.userAgent,
-        },
-      });
-      return updated;
-    });
+    return reviewAssessmentSet(this.prisma, "QUIZ", setId, userId, input, context);
   }
 
   async deleteQuizSet(setId: string, userId: string, context: RequestContext) {
@@ -476,84 +387,18 @@ export class QuizService {
         }),
       ),
     ];
-    const currentFigureAssets = questions.flatMap((question) =>
-      question.figures.flatMap((figure) => {
-        const deliveryFileId = figure.currentRevision?.deliveryFile?.id;
-        return deliveryFileId ? [{ figureId: figure.id, deliveryFileId }] : [];
-      }),
-    );
-    const figureIds = [...new Set(currentFigureAssets.map((asset) => asset.figureId))];
-    const deliveryFileIds = [
-      ...new Set(currentFigureAssets.map((asset) => asset.deliveryFileId)),
-    ];
-    const activeFigureIds = [
-      ...new Set(
-        questions.flatMap((question) =>
-          question.figures
-            .filter((figure) =>
-              ["QUEUED", "RENDERING", "REPAIRING"].includes(figure.status),
-            )
-            .map((figure) => figure.id),
-        ),
-      ),
-    ];
-    const [generations, figureCostAttempts, activeFigureJobs] = await Promise.all([
+    const [generations, enrichedFigures] = await Promise.all([
       generationIds.length > 0
         ? this.prisma.aiGeneration.findMany({
             where: { id: { in: generationIds } },
             select: { id: true, outputJson: true },
           })
         : Promise.resolve([]),
-      figureIds.length > 0
-        ? this.prisma.quizFigureRenderAttempt.findMany({
-            where: {
-              quizFigureId: { in: figureIds },
-              revision: { deliveryFileId: { in: deliveryFileIds } },
-            },
-            select: {
-              quizFigureId: true,
-              revision: { select: { deliveryFileId: true } },
-              backgroundJob: {
-                select: {
-                  providerUsageEvents: {
-                    where: {
-                      provider: "OPENAI",
-                      status: ProviderUsageStatus.SUCCEEDED,
-                    },
-                    select: { id: true, cachedInputTokens: true, costVnd: true },
-                  },
-                },
-              },
-            },
-          })
-        : Promise.resolve([]),
-      activeFigureIds.length > 0
-        ? this.prisma.backgroundJob.findMany({
-            where: {
-              resourceType: "QUIZ_FIGURE",
-              resourceId: { in: activeFigureIds },
-              status: {
-                in: [BackgroundJobStatus.QUEUED, BackgroundJobStatus.RUNNING],
-              },
-            },
-            orderBy: { createdAt: "desc" },
-            select: { resourceId: true, inputMeta: true },
-          })
-        : Promise.resolve([]),
+      enrichAssessmentQuestionFigures(this.prisma, this.files, questions),
     ]);
     const outputByGenerationId = new Map(
       generations.map((generation) => [generation.id, generation.outputJson]),
     );
-    const openAiUsageByFigureAsset = collectOpenAiFigureUsage(figureCostAttempts);
-    const pendingAiTargetModeByFigureId = new Map<string, "QUESTION" | "SOLUTION">();
-    for (const job of activeFigureJobs) {
-      if (!job.resourceId || pendingAiTargetModeByFigureId.has(job.resourceId)) continue;
-      const pendingTargetMode = readQuizFigurePendingAiTargetMode(job.inputMeta);
-      if (pendingTargetMode) {
-        pendingAiTargetModeByFigureId.set(job.resourceId, pendingTargetMode);
-      }
-    }
-
     return Promise.all(
       questions.map(async (question) => {
         const reference = readQuizGenerationQuestionReference(
@@ -567,28 +412,8 @@ export class QuizService {
           : null;
         return {
           ...question,
-          figures: await Promise.all(
-            question.figures.map(async (figure) => {
-              const deliveryFileId = figure.currentRevision?.deliveryFile?.id;
-              const serializedFigure = await serializeQuizFigureAccessUrl(
-                figure,
-                this.files,
-              );
-              return {
-                ...serializedFigure,
-                pendingAiTargetMode: pendingAiTargetModeByFigureId.get(figure.id) ?? null,
-                openAiGenerationCostVnd: deliveryFileId
-                  ? (openAiUsageByFigureAsset.get(
-                      quizFigureAssetKey(figure.id, deliveryFileId),
-                    )?.costVnd ?? null)
-                  : null,
-                openAiCachedInputTokens: deliveryFileId
-                  ? (openAiUsageByFigureAsset.get(
-                      quizFigureAssetKey(figure.id, deliveryFileId),
-                    )?.cachedInputTokens ?? null)
-                  : null,
-              };
-            }),
+          figures: question.figures.map(
+            (figure) => enrichedFigures.get(figure.id) ?? figure,
           ),
           sourceMetadataJson: stripQuizGeometryStatementFromMetadata(
             question.sourceMetadataJson,
@@ -612,7 +437,7 @@ export class QuizService {
       throw notFoundException("NOT_FOUND", "Không tìm thấy bộ câu hỏi");
     }
 
-    validateQuestionContent(dto);
+    validateAssessmentQuestionContent(dto, "QUIZ");
 
     return this.prisma.$transaction(async (transaction) => {
       const lastQuestion = await transaction.quizQuestion.findFirst({
@@ -636,11 +461,12 @@ export class QuizService {
         },
       });
 
-      const explanationId = await syncExplanation(transaction, {
+      const explanationId = await syncAssessmentExplanation(transaction, {
         currentExplanationId: null,
         explanationJson: dto.explanationJson,
         lessonId: set.lessonId,
         questionId: question.id,
+        targetType: "QUIZ_QUESTION",
       });
 
       if (explanationId) {
@@ -702,13 +528,13 @@ export class QuizService {
       correctAnswerJson:
         dto.correctAnswerJson ??
         (question.correctAnswerJson as QuizQuestionContentDto["correctAnswerJson"]),
-      hintJson: dto.hintJson ?? toOptionalJsonRecord(question.hintJson),
+      hintJson: dto.hintJson ?? toAssessmentOptionalJsonRecord(question.hintJson, "QUIZ"),
       gradingConfigJson:
         dto.gradingConfigJson ?? toOptionalJsonValue(question.gradingConfigJson),
       explanationJson:
         dto.explanationJson ?? toOptionalJsonRecord(question.explanation?.contentJson),
     };
-    validateQuestionContent(mergedContent);
+    validateAssessmentQuestionContent(mergedContent, "QUIZ");
     let quizExplanationBlock: QuizExplanationBlock | null = null;
     if (dto.quizExplanationBlock) {
       const parsedExplanationBlock = quizExplanationBlockSchema.safeParse(
@@ -748,7 +574,10 @@ export class QuizService {
       updateData.sourceMetadataJson = toInputJson(
         replaceQuizExplanationBlock(question.sourceMetadataJson, quizExplanationBlock),
       );
-    } else if (changesExplanationContext(dto) || dto.explanationJson !== undefined) {
+    } else if (
+      changesAssessmentExplanationContext(dto) ||
+      dto.explanationJson !== undefined
+    ) {
       updateData.sourceMetadataJson = toInputJson(
         removeQuizExplanationBlock(question.sourceMetadataJson),
       );
@@ -764,18 +593,19 @@ export class QuizService {
       if (
         dto.explanationJson === undefined &&
         question.explanationId &&
-        changesExplanationContext(dto)
+        changesAssessmentExplanationContext(dto)
       ) {
         await transaction.aiExplanation.update({
           where: { id: question.explanationId },
           data: { staleAt: new Date() },
         });
       }
-      const explanationId = await syncExplanation(transaction, {
+      const explanationId = await syncAssessmentExplanation(transaction, {
         currentExplanationId: question.explanationId,
         explanationJson: dto.explanationJson,
         lessonId: question.lessonId,
         questionId,
+        targetType: "QUIZ_QUESTION",
       });
       if (dto.explanationJson !== undefined) {
         updateData.explanation =
@@ -926,11 +756,12 @@ export class QuizService {
     ];
 
     return this.prisma.$transaction(async (transaction) => {
-      const explanationId = await syncExplanation(transaction, {
+      const explanationId = await syncAssessmentExplanation(transaction, {
         currentExplanationId: question.explanationId,
         explanationJson: mapped.explanationJson,
         lessonId: question.lessonId,
         questionId,
+        targetType: "QUIZ_QUESTION",
       });
       const updated = await transaction.quizQuestion.update({
         where: { id: questionId },
@@ -1006,65 +837,14 @@ export class QuizService {
     input: { reviewStatus: ReviewStatus },
     context: RequestContext,
   ) {
-    const current = await this.prisma.quizQuestion.findUnique({
-      where: { id: questionId, deletedAt: null },
-      select: {
-        id: true,
-        quizSetId: true,
-        explanationId: true,
-        reviewStatus: true,
-      },
-    });
-    if (!current) {
-      throw notFoundException("NOT_FOUND", "Không tìm thấy câu hỏi");
-    }
-
-    return this.prisma.$transaction(async (transaction) => {
-      if (current.explanationId) {
-        await transaction.aiExplanation.update({
-          where: { id: current.explanationId },
-          data: { reviewStatus: input.reviewStatus },
-        });
-      }
-      const updated = await transaction.quizQuestion.update({
-        where: { id: questionId },
-        data: { reviewStatus: input.reviewStatus, publishedAt: null },
-        include: {
-          explanation: {
-            select: {
-              id: true,
-              contentJson: true,
-              reviewStatus: true,
-              staleAt: true,
-            },
-          },
-        },
-      });
-
-      const pendingReviewQuestionCount = await transaction.quizQuestion.count({
-        where: {
-          quizSetId: current.quizSetId,
-          deletedAt: null,
-          reviewStatus: ReviewStatus.NEEDS_REVIEW,
-        },
-      });
-      await transaction.auditLog.create({
-        data: {
-          actorUserId: userId,
-          action: "QUIZ_QUESTION_REVIEWED",
-          entityType: "QuizQuestion",
-          entityId: questionId,
-          before: toInputJson({ reviewStatus: current.reviewStatus }),
-          after: toInputJson({
-            reviewStatus: updated.reviewStatus,
-            pendingReviewQuestionCount,
-          }),
-          ipAddress: context.ipAddress,
-          userAgent: context.userAgent,
-        },
-      });
-      return updated;
-    });
+    return reviewAssessmentQuestion(
+      this.prisma,
+      "QUIZ",
+      questionId,
+      userId,
+      input,
+      context,
+    );
   }
 
   async reviewAllPendingAiQuestions(
@@ -1072,88 +852,13 @@ export class QuizService {
     userId: string,
     context: RequestContext,
   ) {
-    return this.prisma.$transaction(async (transaction) => {
-      const quizSet = await transaction.quizSet.findUnique({
-        where: { id: setId, deletedAt: null },
-        select: { id: true, source: true },
-      });
-      if (!quizSet) {
-        throw notFoundException("NOT_FOUND", "Không tìm thấy bộ Quiz");
-      }
-
-      const pendingQuestions = await transaction.quizQuestion.findMany({
-        where: {
-          quizSetId: setId,
-          deletedAt: null,
-          reviewStatus: ReviewStatus.NEEDS_REVIEW,
-        },
-        select: {
-          id: true,
-          explanationId: true,
-          sourceMetadataJson: true,
-        },
-      });
-      const aiQuestions = pendingQuestions.filter(
-        (question) =>
-          quizSet.source === ContentSource.AI ||
-          readQuizGenerationQuestionReference(question.sourceMetadataJson) !== null,
-      );
-      const questionIds = aiQuestions.map((question) => question.id);
-      const explanationIds = aiQuestions.flatMap((question) =>
-        question.explanationId ? [question.explanationId] : [],
-      );
-
-      if (explanationIds.length > 0) {
-        await transaction.aiExplanation.updateMany({
-          where: { id: { in: explanationIds } },
-          data: { reviewStatus: ReviewStatus.APPROVED },
-        });
-      }
-      const approved =
-        questionIds.length > 0
-          ? await transaction.quizQuestion.updateMany({
-              where: {
-                id: { in: questionIds },
-                deletedAt: null,
-                reviewStatus: ReviewStatus.NEEDS_REVIEW,
-              },
-              data: {
-                reviewStatus: ReviewStatus.APPROVED,
-                publishedAt: null,
-              },
-            })
-          : { count: 0 };
-      const pendingReviewQuestionCount = await transaction.quizQuestion.count({
-        where: {
-          quizSetId: setId,
-          deletedAt: null,
-          reviewStatus: ReviewStatus.NEEDS_REVIEW,
-        },
-      });
-
-      if (approved.count > 0) {
-        await transaction.auditLog.create({
-          data: {
-            actorUserId: userId,
-            action: "QUIZ_AI_QUESTIONS_BULK_REVIEWED",
-            entityType: "QuizSet",
-            entityId: setId,
-            before: toInputJson({ pendingAiQuestionCount: aiQuestions.length }),
-            after: toInputJson({
-              approvedQuestionCount: approved.count,
-              pendingReviewQuestionCount,
-            }),
-            ipAddress: context.ipAddress,
-            userAgent: context.userAgent,
-          },
-        });
-      }
-
-      return {
-        approvedQuestionCount: approved.count,
-        pendingReviewQuestionCount,
-      };
-    });
+    return reviewAllPendingAssessmentAiQuestions(
+      this.prisma,
+      "QUIZ",
+      setId,
+      userId,
+      context,
+    );
   }
 
   async deleteQuestion(questionId: string, userId: string, context: RequestContext) {
@@ -1229,47 +934,6 @@ export class QuizService {
 
     return { success: true, ...result };
   }
-}
-
-function collectOpenAiFigureUsage(
-  attempts: Array<{
-    quizFigureId: string;
-    revision: { deliveryFileId: string | null };
-    backgroundJob: {
-      providerUsageEvents: Array<{
-        id: string;
-        cachedInputTokens: number;
-        costVnd: number;
-      }>;
-    } | null;
-  }>,
-) {
-  const usage = new Map<string, { cachedInputTokens: number; costVnd: number }>();
-  const eventIdsByAsset = new Map<string, Set<string>>();
-
-  for (const attempt of attempts) {
-    const deliveryFileId = attempt.revision.deliveryFileId;
-    if (!deliveryFileId) continue;
-    const key = quizFigureAssetKey(attempt.quizFigureId, deliveryFileId);
-    const seenEventIds = eventIdsByAsset.get(key) ?? new Set<string>();
-
-    for (const event of attempt.backgroundJob?.providerUsageEvents ?? []) {
-      if (seenEventIds.has(event.id)) continue;
-      seenEventIds.add(event.id);
-      const current = usage.get(key) ?? { cachedInputTokens: 0, costVnd: 0 };
-      usage.set(key, {
-        cachedInputTokens: current.cachedInputTokens + event.cachedInputTokens,
-        costVnd: current.costVnd + event.costVnd,
-      });
-    }
-    eventIdsByAsset.set(key, seenEventIds);
-  }
-
-  return usage;
-}
-
-function quizFigureAssetKey(figureId: string, deliveryFileId: string) {
-  return `${figureId}:${deliveryFileId}`;
 }
 
 async function updateGenerationCurationMetadata(
@@ -1381,204 +1045,6 @@ function replaceQuizExplanationBlock(
     ...rest
   } = metadata;
   return { ...rest, quizExplanationBlock };
-}
-
-function validateQuestionContent(dto: QuizQuestionContentDto) {
-  if (getTiptapText(dto.questionJson).trim().length === 0) {
-    throw badRequestException(
-      "QUIZ_QUESTION_EMPTY_CONTENT",
-      "Nội dung câu hỏi không được để trống",
-    );
-  }
-
-  const correctAnswer = correctAnswerSchema.safeParse(dto.correctAnswerJson);
-  if (!correctAnswer.success) {
-    throw badRequestException(
-      "QUIZ_QUESTION_INVALID_CORRECT_ANSWER",
-      "Đáp án đúng chưa hợp lệ",
-      correctAnswer.error.flatten(),
-    );
-  }
-
-  if (dto.questionType === QuestionType.MULTIPLE_CHOICE) {
-    const options = multipleChoiceOptionsSchema.safeParse(dto.optionsJson);
-    if (!options.success) {
-      throw badRequestException(
-        "QUIZ_QUESTION_INVALID_OPTIONS",
-        "Câu hỏi trắc nghiệm cần ít nhất 2 phương án hợp lệ",
-        options.error.flatten(),
-      );
-    }
-
-    const optionIds = options.data.map((option) => option.id);
-    if (new Set(optionIds).size !== optionIds.length) {
-      throw badRequestException(
-        "QUIZ_QUESTION_DUPLICATE_OPTIONS",
-        "Mã phương án trả lời không được trùng nhau",
-      );
-    }
-    const optionTexts = options.data.map((option) =>
-      getTiptapText(option.richText).trim().toLocaleLowerCase("vi"),
-    );
-    if (optionTexts.some((text) => text.length === 0)) {
-      throw badRequestException(
-        "QUIZ_QUESTION_EMPTY_OPTION",
-        "Nội dung phương án trả lời không được để trống",
-      );
-    }
-    if (new Set(optionTexts).size !== optionTexts.length) {
-      throw badRequestException(
-        "QUIZ_QUESTION_DUPLICATE_OPTION_CONTENT",
-        "Nội dung các phương án trả lời không được trùng nhau",
-      );
-    }
-    if (
-      !Array.isArray(correctAnswer.data) ||
-      correctAnswer.data.length !== 1 ||
-      correctAnswer.data.some(
-        (answerId) => typeof answerId !== "string" || !optionIds.includes(answerId),
-      )
-    ) {
-      throw badRequestException(
-        "QUIZ_QUESTION_CORRECT_OPTION_NOT_FOUND",
-        "Câu trắc nghiệm phải có đúng một đáp án và đáp án đó phải thuộc danh sách phương án",
-      );
-    }
-  }
-
-  if (
-    dto.questionType === QuestionType.TRUE_FALSE &&
-    typeof correctAnswer.data !== "boolean"
-  ) {
-    throw badRequestException(
-      "QUIZ_QUESTION_INVALID_TRUE_FALSE_ANSWER",
-      "Câu hỏi đúng/sai phải chọn một đáp án đúng",
-    );
-  }
-
-  if (dto.questionType === QuestionType.MULTI_STATEMENT_TRUE_FALSE) {
-    const statements = multiStatementOptionsSchema.safeParse(dto.optionsJson);
-    if (!statements.success) {
-      throw badRequestException(
-        "QUIZ_QUESTION_INVALID_STATEMENTS",
-        "Câu hỏi đúng/sai nhiều mệnh đề cần ít nhất 2 mệnh đề hợp lệ",
-        statements.error.flatten(),
-      );
-    }
-
-    const statementIds = statements.data.map((statement) => statement.id);
-    if (new Set(statementIds).size !== statementIds.length) {
-      throw badRequestException(
-        "QUIZ_QUESTION_DUPLICATE_STATEMENT_IDS",
-        "Mã mệnh đề không được trùng nhau",
-      );
-    }
-    if (
-      statements.data.some(
-        (statement) => getTiptapText(statement.richText).trim().length === 0,
-      )
-    ) {
-      throw badRequestException(
-        "QUIZ_QUESTION_EMPTY_STATEMENT",
-        "Nội dung mệnh đề không được để trống",
-      );
-    }
-
-    const answers = multiStatementCorrectAnswerSchema.safeParse(dto.correctAnswerJson);
-    if (!answers.success) {
-      throw badRequestException(
-        "QUIZ_QUESTION_INVALID_STATEMENT_ANSWERS",
-        "Mỗi mệnh đề phải có một đáp án Đúng hoặc Sai",
-        answers.error.flatten(),
-      );
-    }
-    const answerIds = answers.data.map((answer) => answer.statementId);
-    if (
-      new Set(answerIds).size !== answerIds.length ||
-      answerIds.length !== statementIds.length ||
-      answerIds.some((statementId) => !statementIds.includes(statementId))
-    ) {
-      throw badRequestException(
-        "QUIZ_QUESTION_STATEMENT_ANSWER_MISMATCH",
-        "Đáp án phải ánh xạ đúng một lần cho mọi mệnh đề",
-      );
-    }
-  }
-
-  if (dto.questionType === QuestionType.TEXT_INPUT) {
-    const textAnswer = textInputCorrectAnswerSchema.safeParse(dto.correctAnswerJson);
-    if (!textAnswer.success) {
-      throw badRequestException(
-        "QUIZ_QUESTION_INVALID_TEXT_ANSWERS",
-        "Câu hỏi nhập đáp án cần đúng một đáp án chuẩn hợp lệ",
-        textAnswer.error.flatten(),
-      );
-    }
-  }
-}
-
-function changesExplanationContext(dto: UpdateQuizQuestionContentDto) {
-  return [
-    dto.questionType,
-    dto.questionJson,
-    dto.optionsJson,
-    dto.correctAnswerJson,
-    dto.hintJson,
-  ].some((value) => value !== undefined);
-}
-
-async function syncExplanation(
-  transaction: Prisma.TransactionClient,
-  input: {
-    currentExplanationId: string | null;
-    explanationJson: Record<string, unknown> | null | undefined;
-    lessonId: string;
-    questionId: string;
-  },
-) {
-  if (input.explanationJson === undefined) {
-    return input.currentExplanationId;
-  }
-
-  if (input.explanationJson === null || isEmptyTiptapDocument(input.explanationJson)) {
-    if (input.currentExplanationId) {
-      await transaction.aiExplanation.delete({
-        where: { id: input.currentExplanationId },
-      });
-    }
-    return null;
-  }
-
-  if (input.currentExplanationId) {
-    const explanation = await transaction.aiExplanation.update({
-      where: { id: input.currentExplanationId },
-      data: {
-        contentJson: toInputJson(input.explanationJson),
-        source: ContentSource.ADMIN,
-        reviewStatus: ReviewStatus.APPROVED,
-        staleAt: null,
-      },
-      select: { id: true },
-    });
-    return explanation.id;
-  }
-
-  const explanation = await transaction.aiExplanation.create({
-    data: {
-      targetType: AiExplanationTargetType.QUIZ_QUESTION,
-      targetId: input.questionId,
-      lessonId: input.lessonId,
-      contentJson: toInputJson(input.explanationJson),
-      source: ContentSource.ADMIN,
-      reviewStatus: ReviewStatus.APPROVED,
-    },
-    select: { id: true },
-  });
-  return explanation.id;
-}
-
-function isEmptyTiptapDocument(value: Record<string, unknown>) {
-  return getTiptapText(value).trim().length === 0;
 }
 
 function toRecord(value: Prisma.JsonValue, fieldName: string) {

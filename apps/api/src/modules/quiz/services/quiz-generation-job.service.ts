@@ -1,11 +1,16 @@
 import { randomUUID } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { isAiReasoningEffort, type AiReasoningEffort } from "@learning-path/shared";
+import {
+  DEFAULT_TEST_DURATION_SECONDS,
+  isAiReasoningEffort,
+  type AiReasoningEffort,
+} from "@learning-path/shared";
 import {
   AiGenerationType,
   AiModelPurpose,
   AiProviderName,
+  ContentSource,
   Difficulty,
   Prisma,
   ProviderUsageMetric,
@@ -57,9 +62,13 @@ import {
 const ALL_QUESTION_TYPES = Object.values(QuestionType);
 
 export interface QueueQuizGenerationInput {
+  assessmentKind?: "QUIZ" | "TEST";
+  pipelineVersion?: "ASSESSMENT_QUIZ_V1";
   requestDraftId?: string;
   requestHash?: string;
   targetQuizSetId?: string;
+  targetTestSetId?: string;
+  durationSeconds?: number;
   documentIds?: string[];
   questionCount: number;
   realWorldQuestionCount?: number;
@@ -134,9 +143,27 @@ export class QuizGenerationJobService {
         "Nguồn PDF hoặc khoảng trang đã thay đổi; hãy cập nhật dữ liệu gửi AI.",
       );
     }
+    const isTest = input.assessmentKind === "TEST";
     const snapshotTargetQuizSetId = readNullableString(sourceSnapshot.targetQuizSetId);
+    const snapshotTargetTestSetId = readNullableString(sourceSnapshot.targetTestSetId);
+    const target = await this.resolveAssessmentTargetSet(
+      lessonId,
+      isTest
+        ? (snapshotTargetTestSetId ?? undefined)
+        : (snapshotTargetQuizSetId ?? undefined),
+      isTest,
+    );
     const configuration = {
-      ...normalizeConfiguration(input, snapshotTargetQuizSetId),
+      ...normalizeConfiguration(
+        {
+          ...input,
+          durationSeconds: isTest
+            ? (target?.durationSeconds ?? DEFAULT_TEST_DURATION_SECONDS)
+            : undefined,
+        },
+        snapshotTargetQuizSetId,
+        snapshotTargetTestSetId,
+      ),
       ...this.resolveQuizTransportConfiguration(),
     };
     if (
@@ -148,11 +175,14 @@ export class QuizGenerationJobService {
         "Cấu hình sinh Quiz hiện tại không còn khớp bản xem trước.",
       );
     }
-    const targetQuizSetId = await this.ensureQuizTargetSet(
-      lessonId,
-      actorUserId,
-      snapshotTargetQuizSetId,
-    );
+    const targetSetId =
+      target?.id ??
+      (await this.ensureAssessmentTargetSet(
+        lessonId,
+        actorUserId,
+        isTest ? snapshotTargetTestSetId : snapshotTargetQuizSetId,
+        isTest,
+      ));
     const route = readJsonRecord(
       readJsonRecord(draft.modelConfigJson).routeSnapshot,
     ) as unknown as AiFeatureRoute;
@@ -178,23 +208,29 @@ export class QuizGenerationJobService {
       subjectName: readRequiredString(sourceSnapshot.subjectName, "subjectName"),
       subjectSlug: readRequiredString(sourceSnapshot.subjectSlug, "subjectSlug"),
       ...configuration,
-      targetQuizSetId,
+      targetQuizSetId: isTest ? null : targetSetId,
+      targetTestSetId: isTest ? targetSetId : undefined,
+      assessmentKind: isTest ? "TEST" : "QUIZ",
+      pipelineVersion: "ASSESSMENT_QUIZ_V1" as const,
       imageRouteSnapshot,
     };
     const job = await this.jobs.createAndEnqueue({
-      type: AiGenerationType.QUIZ,
+      type: isTest ? AiGenerationType.TEST : AiGenerationType.QUIZ,
       createdByUserId: actorUserId,
       lessonId,
-      targetType: "QUIZ_SET",
-      targetId: targetQuizSetId,
+      targetType: isTest ? "TEST_SET" : "QUIZ_SET",
+      targetId: targetSetId,
       promptVersion: resolveQuizPromptVersion(subjectKey),
       schemaVersion: QUIZ_SCHEMA_VERSION,
       inputFingerprint: { lessonId, ...inputMeta },
       inputMeta,
       routeSnapshot: route,
-      idempotencyKey: ["quiz-generation", lessonId, currentSourceHash, randomUUID()].join(
-        ":",
-      ),
+      idempotencyKey: [
+        isTest ? "test-generation-v2" : "quiz-generation",
+        lessonId,
+        currentSourceHash,
+        randomUUID(),
+      ].join(":"),
       deduplicateActive: true,
       maxAttempts: 1,
     });
@@ -205,35 +241,47 @@ export class QuizGenerationJobService {
     return { mode: "QUEUED" as const, jobId: job.backgroundJobId, status: job.status };
   }
 
+  queueTest(lessonId: string, actorUserId: string, input: QueueQuizGenerationInput) {
+    return this.queueQuiz(lessonId, actorUserId, {
+      ...input,
+      assessmentKind: "TEST",
+      pipelineVersion: "ASSESSMENT_QUIZ_V1",
+    });
+  }
+
   async previewQuiz(
     lessonId: string,
     actorUserId: string,
     input: QueueQuizGenerationInput,
   ) {
     await this.cleanupRequestDraftPackets(lessonId, actorUserId);
+    const isTest = input.assessmentKind === "TEST";
     const [targetQuizSet, source, existingQuestions] = await Promise.all([
-      this.resolveQuizTargetSet(lessonId, input.targetQuizSetId),
+      this.resolveAssessmentTargetSet(
+        lessonId,
+        isTest ? input.targetTestSetId : input.targetQuizSetId,
+        isTest,
+      ),
       this.loadPacket(lessonId, input.documentIds),
-      this.prisma.quizQuestion.findMany({
-        where: {
-          lessonId,
-          deletedAt: null,
-          quizSet: { deletedAt: null },
-        },
-        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-        select: {
-          questionType: true,
-          questionJson: true,
-          optionsJson: true,
-        },
-      }),
+      this.loadExistingAssessmentQuestions(lessonId, isTest),
     ]);
     if (!source.packet) throw new Error("Missing Quiz source packet.");
     const configuration = {
-      ...normalizeConfiguration(input, targetQuizSet?.id ?? null),
+      ...normalizeConfiguration(
+        {
+          ...input,
+          durationSeconds: isTest
+            ? (targetQuizSet?.durationSeconds ?? DEFAULT_TEST_DURATION_SECONDS)
+            : undefined,
+        },
+        isTest ? null : (targetQuizSet?.id ?? null),
+        isTest ? (targetQuizSet?.id ?? null) : null,
+      ),
       ...this.resolveQuizTransportConfiguration(),
     };
     const jobConfiguration: QuizGenerationJobInput = {
+      assessmentKind: isTest ? "TEST" : "QUIZ",
+      pipelineVersion: "ASSESSMENT_QUIZ_V1",
       requestDraftId: randomUUID(),
       requestHash: "0".repeat(64),
       packetHash: source.packet.packetHash,
@@ -246,8 +294,8 @@ export class QuizGenerationJobService {
       subjectSlug: source.subject.slug,
       ...configuration,
     };
-    const { baseRoute, route } = await this.resolveQuizRoute(input);
-    const imageRoute = await this.resolveQuizImageRoute(input);
+    const { baseRoute, route } = await this.resolveAssessmentRoute(input);
+    const imageRoute = await this.resolveAssessmentImageRoute(input);
     const request = buildQuizStructuredInput({
       lessonId,
       lessonTitle: source.lessonTitle,
@@ -349,7 +397,9 @@ export class QuizGenerationJobService {
           subjectKey: source.subject.key,
           subjectName: source.subject.name,
           subjectSlug: source.subject.slug,
-          targetQuizSetId: targetQuizSet?.id ?? null,
+          targetQuizSetId: isTest ? null : (targetQuizSet?.id ?? null),
+          targetTestSetId: isTest ? (targetQuizSet?.id ?? null) : undefined,
+          durationSeconds: isTest ? (targetQuizSet?.durationSeconds ?? null) : null,
           generationConfiguration: configuration,
         } as Prisma.InputJsonValue,
         modelConfigJson: {
@@ -520,11 +570,10 @@ export class QuizGenerationJobService {
     throw badRequestException(error.code, error.message, error.details);
   }
 
-  private async resolveQuizRoute(input: QueueQuizGenerationInput) {
-    const baseRoute = await this.modelRouting.resolve(
-      AiGenerationType.QUIZ,
-      AiModelPurpose.TEXT,
-    );
+  private async resolveAssessmentRoute(input: QueueQuizGenerationInput) {
+    const feature =
+      input.assessmentKind === "TEST" ? AiGenerationType.TEST : AiGenerationType.QUIZ;
+    const baseRoute = await this.modelRouting.resolve(feature, AiModelPurpose.TEXT);
     let candidates = baseRoute.candidates.filter(supportsHighDetailPdfInput);
     if (!input.model && candidates.length === 0) {
       throw badRequestException(
@@ -567,11 +616,10 @@ export class QuizGenerationJobService {
     return { baseRoute, route };
   }
 
-  private async resolveQuizImageRoute(input: QueueQuizGenerationInput) {
-    const baseRoute = await this.modelRouting.resolve(
-      AiGenerationType.QUIZ,
-      AiModelPurpose.IMAGE,
-    );
+  private async resolveAssessmentImageRoute(input: QueueQuizGenerationInput) {
+    const feature =
+      input.assessmentKind === "TEST" ? AiGenerationType.TEST : AiGenerationType.QUIZ;
+    const baseRoute = await this.modelRouting.resolve(feature, AiModelPurpose.IMAGE);
     let candidates = baseRoute.candidates;
     if (input.figureModel) {
       const selected =
@@ -613,12 +661,77 @@ export class QuizGenerationJobService {
     };
   }
 
+  private async loadExistingAssessmentQuestions(lessonId: string, isTest: boolean) {
+    const select = {
+      questionType: true,
+      questionJson: true,
+      optionsJson: true,
+    } satisfies Prisma.QuizQuestionSelect;
+    const orderBy = [{ createdAt: "asc" as const }, { id: "asc" as const }];
+    const quizQuestions = this.prisma.quizQuestion.findMany({
+      where: {
+        lessonId,
+        deletedAt: null,
+        quizSet: { deletedAt: null },
+      },
+      orderBy,
+      select,
+    });
+    if (!isTest) return quizQuestions;
+
+    const [existingQuizQuestions, existingTestQuestions] = await Promise.all([
+      quizQuestions,
+      this.prisma.testQuestion.findMany({
+        where: {
+          lessonId,
+          deletedAt: null,
+          testSet: { deletedAt: null },
+        },
+        orderBy,
+        select,
+      }),
+    ]);
+    return [...existingQuizQuestions, ...existingTestQuestions];
+  }
+
   private async getFxRateVndPerUsd() {
     const setting = await this.prisma.providerAccountingSetting.findUnique({
       where: { singletonKey: "default" },
       select: { fxRateVndPerUsd: true },
     });
     return setting?.fxRateVndPerUsd.toNumber() ?? 25_000;
+  }
+
+  private async resolveAssessmentTargetSet(
+    lessonId: string,
+    targetSetId: string | undefined,
+    isTest: boolean,
+  ): Promise<{ id: string; title: string; durationSeconds?: number } | null> {
+    if (isTest) {
+      const set = await this.prisma.testSet.findFirst({
+        where: targetSetId
+          ? { id: targetSetId, lessonId, deletedAt: null }
+          : { lessonId, deletedAt: null },
+        orderBy: targetSetId ? undefined : [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        select: { id: true, title: true, durationSeconds: true },
+      });
+      if (!targetSetId) {
+        if (set) {
+          throw badRequestException(
+            "TEST_TARGET_SET_REQUIRED",
+            "Danh sách bộ Test đã thay đổi. Hãy tải lại và chọn đúng bộ Test trước khi tạo.",
+          );
+        }
+        return null;
+      }
+      if (!set)
+        throw badRequestException(
+          "TEST_TARGET_SET_INVALID",
+          "Bộ Test không hợp lệ hoặc đã bị xóa.",
+        );
+      return set;
+    }
+    return this.resolveQuizTargetSet(lessonId, targetSetId);
   }
 
   private async resolveQuizTargetSet(lessonId: string, targetQuizSetId?: string) {
@@ -650,15 +763,35 @@ export class QuizGenerationJobService {
     return null;
   }
 
-  private async ensureQuizTargetSet(
+  private async ensureAssessmentTargetSet(
     lessonId: string,
     actorUserId: string,
-    targetQuizSetId: string | null,
+    targetSetId: string | null,
+    isTest: boolean,
   ) {
-    const existing = await this.resolveQuizTargetSet(
-      lessonId,
-      targetQuizSetId ?? undefined,
-    );
+    if (isTest) {
+      const target = await this.resolveAssessmentTargetSet(
+        lessonId,
+        targetSetId ?? undefined,
+        true,
+      );
+      if (target) return target.id;
+      const created = await this.prisma.testSet.create({
+        data: {
+          lessonId,
+          title: "Bộ đề 1",
+          durationSeconds: DEFAULT_TEST_DURATION_SECONDS,
+          source: ContentSource.ADMIN,
+          reviewStatus: "APPROVED",
+          sortOrder: 0,
+          createdById: actorUserId,
+          updatedById: actorUserId,
+        },
+        select: { id: true },
+      });
+      return created.id;
+    }
+    const existing = await this.resolveQuizTargetSet(lessonId, targetSetId ?? undefined);
     if (existing) return existing.id;
     const created = await this.prisma.quizSet.create({
       data: {
@@ -679,10 +812,14 @@ export class QuizGenerationJobService {
 function normalizeConfiguration(
   input: QueueQuizGenerationInput,
   targetQuizSetId: string | null,
+  targetTestSetId: string | null = null,
 ) {
   const questionTypes = [...new Set(input.questionTypes ?? ALL_QUESTION_TYPES)];
   return {
     targetQuizSetId,
+    ...(input.assessmentKind === "TEST"
+      ? { targetTestSetId, durationSeconds: input.durationSeconds }
+      : {}),
     questionCount: input.questionCount,
     realWorldQuestionCount: input.realWorldQuestionCount,
     difficulty: input.difficulty,

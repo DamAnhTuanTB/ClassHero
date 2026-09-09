@@ -24,6 +24,7 @@ import {
   supportsTemperature,
 } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
 import type {
+  AdminQuizAssessmentKind,
   AdminQuizFigure,
   AdminQuizFigureAiTargetMode,
   AdminQuizFigureCreateAiInput,
@@ -59,6 +60,7 @@ const REQUEST_PREVIEW_TABS: Array<{ value: RequestPreviewTab; label: string }> =
 ];
 
 export function AdminQuizFigureAiDialog({
+  assessmentKind,
   figure: providedFigure,
   isOpen,
   onClose,
@@ -67,6 +69,7 @@ export function AdminQuizFigureAiDialog({
   setId,
   targetMode,
 }: {
+  assessmentKind: AdminQuizAssessmentKind;
   figure: AdminQuizFigure | null;
   isOpen: boolean;
   onClose: () => void;
@@ -80,7 +83,7 @@ export function AdminQuizFigureAiDialog({
     [targetMode],
   );
   const figure = providedFigure ?? emptyFigure;
-  const mutations = useAdminQuizFigureMutations(setId);
+  const mutations = useAdminQuizFigureMutations(setId, assessmentKind);
   const createMutation = targetMode
     ? mutations.createForQuestionWithAi
     : mutations.createWithAi;
@@ -116,7 +119,7 @@ export function AdminQuizFigureAiDialog({
   );
 
   const currentImageUrl = useStableImageUrl(
-    providedFigure?.currentRevision?.deliveryFile?.publicUrl
+    providedFigure?.currentRevision?.deliveryFile?.publicUrl,
   );
 
   const resetPreview = previewMutation.reset;
@@ -200,7 +203,6 @@ export function AdminQuizFigureAiDialog({
     setPreviewInputKey(null);
     resetPreview();
     void refreshPreview(emptyPreviewInput("REGENERATE"), false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [figure.id, isOpen, resetPreview]);
   useEffect(() => {
     if (!isOpen) return;
@@ -508,7 +510,9 @@ export function AdminQuizFigureAiDialog({
                 ) : displayedProviderInput && previewData ? (
                   <>
                     <AdminAiRequestStatistics
-                      details={buildRequestStatistics(previewData, () => setIsInputBreakdownDialogOpen(true))}
+                      details={buildRequestStatistics(previewData, () =>
+                        setIsInputBreakdownDialogOpen(true),
+                      )}
                       estimatedCost={previewData.estimatedCost}
                       note="Usage provider sau khi xử lý mới là số thực tế."
                     />

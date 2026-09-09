@@ -5,6 +5,7 @@ import {
   Prisma,
   ReviewStatus,
 } from "@prisma/client";
+import { readStemFigureDisplayScale } from "@learning-path/shared";
 import {
   assertCompleteStudentAnswer,
   createPendingAnswerJson,
@@ -35,6 +36,23 @@ const studentTestQuestionSelect = {
   points: true,
   difficulty: true,
   sortOrder: true,
+  figures: {
+    where: {
+      deletedAt: null,
+      currentRevision: { is: { status: "SUCCEEDED" } },
+    },
+    select: {
+      role: true,
+      currentRevision: {
+        select: {
+          altText: true,
+          caption: true,
+          latexSource: true,
+          deliveryFile: { select: { id: true, publicUrl: true, mimeType: true } },
+        },
+      },
+    },
+  },
   explanation: {
     select: {
       contentJson: true,
@@ -44,8 +62,28 @@ const studentTestQuestionSelect = {
   },
 } satisfies Prisma.TestQuestionSelect;
 
+const studentTestRunnerQuestionSelect = {
+  id: true,
+  questionType: true,
+  questionJson: true,
+  optionsJson: true,
+  difficulty: true,
+  sortOrder: true,
+  figures: {
+    where: {
+      role: "QUESTION",
+      deletedAt: null,
+      currentRevision: { is: { status: "SUCCEEDED" } },
+    },
+    select: studentTestQuestionSelect.figures.select,
+  },
+} satisfies Prisma.TestQuestionSelect;
+
 type StudentTestQuestionRecord = Prisma.TestQuestionGetPayload<{
   select: typeof studentTestQuestionSelect;
+}>;
+type StudentTestRunnerQuestionRecord = Prisma.TestQuestionGetPayload<{
+  select: typeof studentTestRunnerQuestionSelect;
 }>;
 
 @Injectable()
@@ -70,6 +108,7 @@ export class StudentTestAttemptsService {
         some: {
           deletedAt: null,
           reviewStatus: ReviewStatus.APPROVED,
+          publishedAt: { not: null },
         },
       },
     } satisfies Prisma.TestSetWhereInput;
@@ -96,6 +135,7 @@ export class StudentTestAttemptsService {
                   where: {
                     deletedAt: null,
                     reviewStatus: ReviewStatus.APPROVED,
+                    publishedAt: { not: null },
                   },
                 },
               },
@@ -216,6 +256,7 @@ export class StudentTestAttemptsService {
           some: {
             deletedAt: null,
             reviewStatus: ReviewStatus.APPROVED,
+            publishedAt: { not: null },
           },
         },
       },
@@ -229,9 +270,10 @@ export class StudentTestAttemptsService {
           where: {
             deletedAt: null,
             reviewStatus: ReviewStatus.APPROVED,
+            publishedAt: { not: null },
           },
           orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-          select: studentTestQuestionSelect,
+          select: studentTestRunnerQuestionSelect,
         },
       },
     });
@@ -553,7 +595,7 @@ export class StudentTestAttemptsService {
               questionType: answer.question.questionType,
             });
         return {
-          ...serializeTestRunnerQuestion(answer.question),
+          ...serializeTestReviewQuestion(answer.question),
           answerJson: answer.answerJson,
           isCorrect: answer.isCorrect,
           correctAnswerJson: answer.question.correctAnswerJson,
@@ -703,7 +745,10 @@ function selectNextTestSet<T extends { id: string }>(
   );
 }
 
-function serializeTestRunnerQuestion(question: StudentTestQuestionRecord) {
+function serializeTestRunnerQuestion(question: StudentTestRunnerQuestionRecord) {
+  const questionFigure = serializeTestFigure(
+    question.figures.find((figure) => figure.role === "QUESTION"),
+  );
   return {
     id: question.id,
     questionType: question.questionType,
@@ -711,6 +756,34 @@ function serializeTestRunnerQuestion(question: StudentTestQuestionRecord) {
     optionsJson: question.optionsJson,
     difficulty: question.difficulty,
     sortOrder: question.sortOrder,
+    questionFigure,
+  };
+}
+
+function serializeTestReviewQuestion(question: StudentTestQuestionRecord) {
+  const solutionFigure = serializeTestFigure(
+    question.figures.find((figure) => figure.role === "SOLUTION"),
+  );
+  return {
+    ...serializeTestRunnerQuestion(question),
+    solutionFigure,
+  };
+}
+
+function serializeTestFigure(
+  figure: StudentTestQuestionRecord["figures"][number] | undefined,
+) {
+  const revision = figure?.currentRevision;
+  const file = revision?.deliveryFile;
+  if (!revision || !file) return null;
+  return {
+    role: figure.role,
+    altText: revision.altText,
+    caption: revision.caption,
+    fileId: file.id,
+    mimeType: file.mimeType,
+    url: file.publicUrl,
+    displayScale: readStemFigureDisplayScale(revision.latexSource),
   };
 }
 

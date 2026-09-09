@@ -51,6 +51,8 @@ const usageOperationLabels: Record<ProviderUsageOperation, string> = {
   DIAGRAM_GENERATION: "Tạo ảnh mới",
   QUIZ_SOLUTION_REFINEMENT: "Tinh chỉnh lời giải",
   QUIZ_SOLUTION_REGENERATION: "Tạo lại lời giải",
+  TEST_SOLUTION_REFINEMENT: "Tinh chỉnh lời giải Test",
+  TEST_SOLUTION_REGENERATION: "Tạo lại lời giải Test",
   SUMMARY_FIGURE_GENERATION: "Tạo ảnh mới",
   SUMMARY_QUESTION_FIGURE_GENERATION: "Tạo ảnh đề bài",
   SUMMARY_SOLUTION_FIGURE_GENERATION: "Tạo ảnh lời giải",
@@ -62,6 +64,12 @@ const usageOperationLabels: Record<ProviderUsageOperation, string> = {
   QUIZ_SOLUTION_FIGURE_GENERATION: "Tạo ảnh lời giải Quiz",
   QUIZ_SOLUTION_FIGURE_EDITING: "Chỉnh sửa ảnh lời giải Quiz",
   QUIZ_SOLUTION_FIGURE_REFINEMENT: "Tinh chỉnh ảnh lời giải Quiz",
+  TEST_QUESTION_FIGURE_GENERATION: "Tạo ảnh đề Test",
+  TEST_QUESTION_FIGURE_EDITING: "Chỉnh sửa ảnh đề Test",
+  TEST_QUESTION_FIGURE_REFINEMENT: "Tinh chỉnh ảnh đề Test",
+  TEST_SOLUTION_FIGURE_GENERATION: "Tạo ảnh lời giải Test",
+  TEST_SOLUTION_FIGURE_EDITING: "Chỉnh sửa ảnh lời giải Test",
+  TEST_SOLUTION_FIGURE_REFINEMENT: "Tinh chỉnh ảnh lời giải Test",
   FLASHCARD_SOLUTION_FIGURE_GENERATION: "Tạo ảnh lời giải Flashcard",
 };
 

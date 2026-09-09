@@ -37,6 +37,7 @@ const REQUEST_PREVIEW_TABS: Array<{ value: RequestPreviewTab; label: string }> =
 ];
 
 export function AdminQuizSolutionRefinementDialog({
+  assessmentKind,
   isOpen,
   currentSolution,
   mode,
@@ -44,6 +45,7 @@ export function AdminQuizSolutionRefinementDialog({
   questionId,
   setId,
 }: {
+  assessmentKind: "quiz" | "test";
   isOpen: boolean;
   currentSolution: string;
   mode: AdminQuizSolutionMode;
@@ -51,7 +53,7 @@ export function AdminQuizSolutionRefinementDialog({
   questionId: string;
   setId: string;
 }) {
-  const refinement = useAdminQuizSolutionRefinement(setId);
+  const refinement = useAdminQuizSolutionRefinement(setId, assessmentKind);
   const {
     isPending: isPreviewPending,
     mutateAsync: previewAsync,
@@ -126,7 +128,6 @@ export function AdminQuizSolutionRefinementDialog({
     setPreviewTab("user");
     resetPreview();
     void refreshPreview({ adminInstructions: "" }, false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, resetPreview]);
 
   useEffect(() => {

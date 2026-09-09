@@ -189,6 +189,7 @@ describe("M7 student learning flow integration", () => {
         ],
         correctAnswerJson: ["B"],
         reviewStatus: ReviewStatus.APPROVED,
+        publishedAt: new Date(),
       },
     });
     const alternateTestSet = await prisma.testSet.create({
@@ -213,6 +214,7 @@ describe("M7 student learning flow integration", () => {
         ],
         correctAnswerJson: ["B"],
         reviewStatus: ReviewStatus.APPROVED,
+        publishedAt: new Date(),
       },
     });
   });
@@ -1075,6 +1077,7 @@ describe("M7 student learning flow integration", () => {
 
     const failedAttempt = await testAttemptsService.startAttempt(lessonId, studentUserId);
     expect(JSON.stringify(failedAttempt)).not.toContain("correctAnswerJson");
+    expect(JSON.stringify(failedAttempt)).not.toContain("solutionFigure");
     const failedResult = await testAttemptsService.submitAttempt(
       failedAttempt.id,
       studentUserId,
@@ -1125,6 +1128,12 @@ describe("M7 student learning flow integration", () => {
     );
     expect(passingResult.score).toBe(10);
     expect(passingResult.passed).toBe(true);
+    const passingReview = await testAttemptsService.reviewAttempt(
+      passingAttempt.id,
+      studentUserId,
+      QuizAttemptScopeDto.ALL,
+    );
+    expect(passingReview.questions[0]).toHaveProperty("solutionFigure");
     const statusAfterPassingAttempt = await lessonsService.getTestSetsStatus(
       lessonId,
       studentUserId,

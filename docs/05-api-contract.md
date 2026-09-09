@@ -39,42 +39,42 @@ Nếu chỉ làm `/task-ui` mock data, dùng API docs để hiểu data shape, k
 
 ## 3. Mapping file chi tiết
 
-| Khi làm về | Đọc file |
-| --- | --- |
-| Envelope, pagination, status, error code, security rule | `docs/api/conventions-errors-security.md` |
-| Register, login, refresh, logout, forgot/reset, current user/profile | `docs/api/auth-profile.md` |
-| Public/admin learning path, chapter, lesson, Summary, STEM figure review/raster cleanup, file/material | `docs/api/learning-paths-lessons.md` |
-| Student lesson content, notes, comments, favorites | `docs/api/student-learning.md` |
-| Quiz, flashcard, test, attempts | `docs/api/quiz-flashcard-tests.md` |
-| AI explanation, chat, generated content | `docs/api/ai-chat.md` |
-| Admin model routing, provider price/usage/budget, OCR accounting | `docs/api/provider-operations.md` |
-| Parent dashboard, child link, parent course/payment view | `docs/api/parent.md` |
-| Payment, payOS webhook, discount | `docs/api/payment-discount.md` |
-| Notification API | `docs/api/notification.md` |
-| Report, moderation, news/event/livestream | `docs/api/report-news.md` |
-| Leaderboard | `docs/api/leaderboard.md` |
-| Job status/polling | `docs/api/jobs.md` |
+| Khi làm về                                                                                             | Đọc file                                                                                                                                                                                              |
+| ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Envelope, pagination, status, error code, security rule                                                | `docs/api/conventions-errors-security.md`                                                                                                                                                             |
+| Register, login, refresh, logout, forgot/reset, current user/profile                                   | `docs/api/auth-profile.md`                                                                                                                                                                            |
+| Public/admin learning path, chapter, lesson, Summary, STEM figure review/raster cleanup, file/material | `docs/api/learning-paths-lessons.md`                                                                                                                                                                  |
+| Student lesson content, notes, comments, favorites                                                     | `docs/api/student-learning.md`                                                                                                                                                                        |
+| Quiz, flashcard, test, attempts                                                                        | `docs/api/quiz-flashcard-tests.md` — M6.6 giữ route Test tương thích nhưng Admin Test dùng shared Quiz/Assessment contract; `durationSeconds` chỉ thuộc TestSet, không thuộc AI modal/prompt payload. |
+| AI explanation, chat, generated content                                                                | `docs/api/ai-chat.md`                                                                                                                                                                                 |
+| Admin model routing, provider price/usage/budget, OCR accounting                                       | `docs/api/provider-operations.md`                                                                                                                                                                     |
+| Parent dashboard, child link, parent course/payment view                                               | `docs/api/parent.md`                                                                                                                                                                                  |
+| Payment, payOS webhook, discount                                                                       | `docs/api/payment-discount.md`                                                                                                                                                                        |
+| Notification API                                                                                       | `docs/api/notification.md`                                                                                                                                                                            |
+| Report, moderation, news/event/livestream                                                              | `docs/api/report-news.md`                                                                                                                                                                             |
+| Leaderboard                                                                                            | `docs/api/leaderboard.md`                                                                                                                                                                             |
+| Job status/polling                                                                                     | `docs/api/jobs.md`                                                                                                                                                                                    |
 
 ---
 
 ## 4. Milestone routing nhanh
 
-| Milestone | API docs thường cần |
-| --- | --- |
-| `M2.x` | `auth-profile`, `conventions-errors-security` |
-| `M3.x` | `learning-paths-lessons`, `conventions-errors-security` |
-| `M4.x` | `learning-paths-lessons`, `jobs`, `conventions-errors-security` |
-| `M5.x` | `ai-chat`, `jobs`, `conventions-errors-security` |
-| `M6.x` | `quiz-flashcard-tests`, `conventions-errors-security` |
-| `M7.x` | `student-learning`, `quiz-flashcard-tests`, `conventions-errors-security` |
-| `M8.x` | `payment-discount`, `conventions-errors-security` |
-| `M9.x` | `learning-paths-lessons`, `ai-chat`, `provider-operations`, `jobs`, `conventions-errors-security` |
-| `M10.x` | `notification`, `jobs`, `conventions-errors-security` |
-| `M11.x` | `parent`, `payment-discount`, `conventions-errors-security` |
-| `M12.x` | `report-news`, `conventions-errors-security` |
-| `M13.x` | `leaderboard`, `auth-profile`, `conventions-errors-security` |
-| `M14.x` | File API liên quan đến flow được test/harden/deploy |
-| `M15.x` | `student-learning`, `ai-chat`, `quiz-flashcard-tests`, `conventions-errors-security`; admin analytics có thể tách file khi implement |
+| Milestone | API docs thường cần                                                                                                                  |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `M2.x`    | `auth-profile`, `conventions-errors-security`                                                                                        |
+| `M3.x`    | `learning-paths-lessons`, `conventions-errors-security`                                                                              |
+| `M4.x`    | `learning-paths-lessons`, `jobs`, `conventions-errors-security`                                                                      |
+| `M5.x`    | `ai-chat`, `jobs`, `conventions-errors-security`                                                                                     |
+| `M6.x`    | `quiz-flashcard-tests`, `conventions-errors-security`                                                                                |
+| `M7.x`    | `student-learning`, `quiz-flashcard-tests`, `conventions-errors-security`                                                            |
+| `M8.x`    | `payment-discount`, `conventions-errors-security`                                                                                    |
+| `M9.x`    | `learning-paths-lessons`, `ai-chat`, `provider-operations`, `jobs`, `conventions-errors-security`                                    |
+| `M10.x`   | `notification`, `jobs`, `conventions-errors-security`                                                                                |
+| `M11.x`   | `parent`, `payment-discount`, `conventions-errors-security`                                                                          |
+| `M12.x`   | `report-news`, `conventions-errors-security`                                                                                         |
+| `M13.x`   | `leaderboard`, `auth-profile`, `conventions-errors-security`                                                                         |
+| `M14.x`   | File API liên quan đến flow được test/harden/deploy                                                                                  |
+| `M15.x`   | `student-learning`, `ai-chat`, `quiz-flashcard-tests`, `conventions-errors-security`; admin analytics có thể tách file khi implement |
 
 ---
 

@@ -358,7 +358,11 @@ Các bước chung:
 
 1. Admin mở buổi học.
 2. Chọn loại nội dung cần tạo bằng AI.
-3. Nhập tham số như số lượng, độ khó, loại câu hỏi, thời gian làm bài nếu có.
+3. Nhập tham số như số lượng, độ khó và loại câu hỏi. Với Test, admin chọn
+   TestSet đích giống hệt chọn QuizSet đích. Nếu chưa có TestSet, admin vẫn bắt
+   đầu được và backend tự tạo `Bộ đề 1` với thời gian mặc định 15 phút. Modal AI
+   Test không hiển thị, không gửi và không được nhận `durationSeconds`; thời
+   gian chỉ được đổi tại create/edit TestSet.
    Riêng `Sinh kiến thức`, admin nhập riêng số bài tập vận dụng không phải ứng
    dụng thực tế và số bài ứng dụng thực tế; hai ô mặc định `2`/`2`. Preview và
    lượt tạo thật phải dùng cùng hai giá trị làm mục tiêu. Nếu Phase 1 trả thiếu
@@ -366,11 +370,18 @@ Các bước chung:
    Với Quiz, modal có select `Bộ câu hỏi được chọn` liệt kê các bộ hiện có và
    mặc định là tab bộ đang mở. Admin có thể giữ hoặc đổi bộ đích; giá trị cuối
    cùng được gửi làm `targetQuizSetId`, cùng số câu và tài liệu nguồn đã chọn.
+   Test dùng cùng modal/UI/logic và chỉ gửi `targetTestSetId` khi đã có bộ được
+   chọn; không có branch UI hay payload duration dành riêng cho Test.
 4. Backend tạo BullMQ job.
 5. Worker lấy context đúng `lesson_id`.
 6. Worker gọi AI qua `AiProvider`.
 7. Worker validate output bằng schema.
-8. Với Quiz, worker dùng schema/prompt/mapper/renderer thuộc riêng domain Quiz và
+8. Với Quiz và Test, worker dùng schema/prompt/mapper/renderer versioned thuộc
+   Assessment/Quiz core; target kind chỉ quyết định set đích, provider routing
+   và accounting. Worker append các câu vào set đã chọn; nếu Quiz/Test chưa có
+   set nào thì API tạo bộ đầu tiên trước khi enqueue worker;
+   Test không có pipeline AI admin riêng. Duration không đi vào prompt.
+   Với Quiz, worker dùng schema/prompt/mapper/renderer thuộc riêng domain Quiz và
    lưu `quizExplanationBlock`; tuyệt đối không import hoặc gọi core Sinh kiến
    thức. Worker append các câu vào bộ Quiz đang mở và danh sách câu bên dưới;
    không tạo một bộ/tab mới cho từng lượt AI. Flashcard/Test vẫn lưu theo set
@@ -605,7 +616,8 @@ Acceptance Criteria:
 - Mỗi lượt Quiz giữ lineage riêng. Ví dụ AI sinh 10 câu rồi admin xóa 2 câu thì
   audit của chính lượt đó còn 8, trong khi các câu thủ công và lượt AI khác trong
   cùng bộ vẫn được giữ nguyên.
-- Quiz/Flashcard/Test giữ text-only trong giai đoạn TeX/TikZ Summary đầu tiên.
+- Trong giai đoạn TeX/TikZ Summary đầu tiên, Flashcard giữ text-only; Quiz/Test
+  Admin dùng shared figure core sau M6.6.
 - Figure thành công không cần `NEEDS_REVIEW`/`APPROVED`; validator kỹ thuật là
   điều kiện thành công, còn admin chủ động sửa/thay/sinh lại nếu hình chưa đẹp.
 - Checkbox dùng ảnh gốc phải được snapshot vào request draft/job. Bật checkbox

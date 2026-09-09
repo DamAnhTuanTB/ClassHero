@@ -12,7 +12,10 @@ import { OptionField } from "@/components/common/forms/option-field";
 import { TextareaField } from "@/components/common/forms/textarea-field";
 import { TextField } from "@/components/common/forms/text-field";
 import { buildAiReasoningEffortOptions } from "@/lib/ai-reasoning-effort";
-import { usePreviewAdminQuizPrompt } from "@/features/admin/ai-generation/hooks/use-admin-ai-generation";
+import {
+  usePreviewAdminQuizPrompt,
+  usePreviewAdminTestPrompt,
+} from "@/features/admin/ai-generation/hooks/use-admin-ai-generation";
 import type {
   AdminAiConfigurationCapability,
   AdminAiModelConfiguration,
@@ -20,6 +23,7 @@ import type {
   AdminAiQuestionType,
   AdminQuizGenerationPayload,
   AdminQuizPromptPreview as AdminQuizPromptPreviewData,
+  AdminTestGenerationPayload,
 } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
 import {
   supportsReasoningEffort,
@@ -28,6 +32,10 @@ import {
 import { AdminQuizDocumentMultiSelectField } from "@/features/admin/quiz/components/admin-quiz-document-multi-select-field";
 import { AdminQuizPromptPreview } from "@/features/admin/quiz/components/admin-quiz-prompt-preview";
 import type { AdminQuizSet } from "@/features/admin/quiz/api/admin-quiz-api";
+import type {
+  AdminAssessmentKind,
+  AdminAssessmentSet,
+} from "@/features/admin/assessments/types/admin-assessment.types";
 import {
   adminQuizGenerationSchema,
   type AdminQuizGenerationFormValues,
@@ -63,6 +71,7 @@ const DEFAULT_QUIZ_DIFFICULTY_COUNTS = {
 } as const;
 
 export function AdminQuizGenerationDialog({
+  assessmentKind = "quiz",
   documents,
   initialGenerationConfiguration,
   initialFigureModelConfiguration,
@@ -75,6 +84,7 @@ export function AdminQuizGenerationDialog({
   quizSets,
   quizTargetSetId,
 }: {
+  assessmentKind?: AdminAssessmentKind;
   documents: AdminAiPanelDocument[];
   initialGenerationConfiguration?: Record<string, unknown> | null;
   initialFigureModelConfiguration: AdminAiModelConfiguration;
@@ -83,13 +93,24 @@ export function AdminQuizGenerationDialog({
   isSubmitting: boolean;
   lessonId: string;
   onClose: () => void;
-  onSubmit: (payload: AdminQuizGenerationPayload) => Promise<void>;
-  quizSets: AdminQuizSet[];
+  onSubmit: (
+    payload: AdminQuizGenerationPayload | AdminTestGenerationPayload,
+  ) => Promise<void>;
+  quizSets: Array<AdminQuizSet | AdminAssessmentSet>;
   quizTargetSetId?: string;
 }) {
-  const previewMutation = usePreviewAdminQuizPrompt(lessonId);
-  const previewPrompt = previewMutation.mutateAsync;
-  const resetPreviewMutation = previewMutation.reset;
+  const quizPreviewMutation = usePreviewAdminQuizPrompt(lessonId);
+  const testPreviewMutation = usePreviewAdminTestPrompt(lessonId);
+  const previewPrompt = (
+    payload: AdminQuizGenerationPayload | AdminTestGenerationPayload,
+  ) =>
+    payload.type === "TEST"
+      ? testPreviewMutation.mutateAsync(payload)
+      : quizPreviewMutation.mutateAsync(payload);
+  const resetPreviewMutation = () => {
+    quizPreviewMutation.reset();
+    testPreviewMutation.reset();
+  };
   const [preview, setPreview] = useState<AdminQuizPromptPreviewData | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [isPreviewRequestPending, setIsPreviewRequestPending] = useState(false);
@@ -109,6 +130,7 @@ export function AdminQuizGenerationDialog({
         initialFigureModelConfiguration,
         quizSets,
         quizTargetSetId,
+        assessmentKind,
       ),
     [
       documents,
@@ -117,6 +139,7 @@ export function AdminQuizGenerationDialog({
       initialModelConfiguration,
       quizSets,
       quizTargetSetId,
+      assessmentKind,
     ],
   );
   const form = useForm<AdminQuizGenerationFormValues>({
@@ -152,7 +175,9 @@ export function AdminQuizGenerationDialog({
     setIsPreparingSubmission(false);
     setPreviewTab("system");
 
-    if (defaults.documentIds.length === 0) return;
+    if (defaults.documentIds.length === 0) {
+      return;
+    }
 
     previewRequestInFlightRef.current = true;
     setIsPreviewRequestPending(true);
@@ -160,6 +185,7 @@ export function AdminQuizGenerationDialog({
       toPayload(
         defaults,
         getModelConfigurationCapability(initialModelConfiguration, defaults.model),
+        assessmentKind,
       ),
     )
       .then((result) => {
@@ -196,6 +222,7 @@ export function AdminQuizGenerationDialog({
     isOpen,
     previewPrompt,
     quizTargetSetId,
+    assessmentKind,
     resetPreviewMutation,
   ]);
 
@@ -261,6 +288,7 @@ export function AdminQuizGenerationDialog({
             preserveUserPrompt: hasAdminEditedUserPromptRef.current,
           }),
           capability,
+          assessmentKind,
         ),
       );
       if (requestSequence !== previewRequestSequenceRef.current) return;
@@ -293,7 +321,7 @@ export function AdminQuizGenerationDialog({
       preserveSystemPrompt: hasAdminEditedSystemPromptRef.current,
       preserveUserPrompt: hasAdminEditedUserPromptRef.current,
     });
-    const payload = toPayload(previewValues, capability);
+    const payload = toPayload(previewValues, capability, assessmentKind);
     setPreviewError(null);
     setIsPreparingSubmission(true);
     setIsPreviewRequestPending(true);
@@ -331,7 +359,7 @@ export function AdminQuizGenerationDialog({
 
   return (
     <EditorDialogShell
-      ariaLabel="Tạo Quiz bằng AI"
+      ariaLabel={`Tạo ${assessmentKind === "test" ? "Test" : "Quiz"} bằng AI`}
       isOpen={isOpen}
       onClose={() => !isDialogBusy && onClose()}
       panelClassName="max-w-3xl"
@@ -339,21 +367,29 @@ export function AdminQuizGenerationDialog({
       <form className="flex min-h-0 flex-1 flex-col" onSubmit={submit}>
         <header className="theme-dialog-header flex min-h-16 shrink-0 items-center px-5 pr-16">
           <h2 className="text-lg font-extrabold text-[var(--theme-text-strong)]">
-            Tạo Quiz bằng AI
+            Tạo {assessmentKind === "test" ? "Test" : "Quiz"} bằng AI
           </h2>
         </header>
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5">
           <div>
             <OptionField
-              id="ai-quiz-target-set"
-              label="Bộ câu hỏi được chọn"
+              id={`ai-${assessmentKind}-target-set`}
+              label={
+                assessmentKind === "test" ? "Bộ đề được chọn" : "Bộ câu hỏi được chọn"
+              }
               value={form.watch("targetQuizSetId")}
               options={quizSets.map((set) => ({
                 value: set.id,
                 label: set.title,
               }))}
               placeholder={
-                quizSets.length === 0 ? "Chưa có bộ câu hỏi" : "Chọn bộ câu hỏi"
+                quizSets.length === 0
+                  ? assessmentKind === "test"
+                    ? "Chưa có bộ đề"
+                    : "Chưa có bộ câu hỏi"
+                  : assessmentKind === "test"
+                    ? "Chọn bộ đề"
+                    : "Chọn bộ câu hỏi"
               }
               disabled={quizSets.length === 0}
               icon={null}
@@ -368,7 +404,9 @@ export function AdminQuizGenerationDialog({
             />
             {quizSets.length === 0 ? (
               <p className="mt-1.5 text-sm leading-5 text-[var(--theme-text-muted)]">
-                Hệ thống sẽ tạo “Bộ câu hỏi 1” khi bắt đầu sinh Quiz.
+                {assessmentKind === "test"
+                  ? "Hệ thống sẽ tạo “Bộ đề 1” với thời gian mặc định 15 phút. Bạn có thể đổi thời gian tại phần sửa bộ đề."
+                  : "Hệ thống sẽ tạo “Bộ câu hỏi 1” khi bắt đầu sinh Quiz."}
               </p>
             ) : null}
           </div>
@@ -544,7 +582,7 @@ export function AdminQuizGenerationDialog({
 
           <section className="space-y-4 rounded-xl border border-[var(--theme-primary-border)] bg-[var(--theme-primary-soft)] p-4">
             <h3 className="text-sm font-extrabold text-[var(--theme-text-strong)]">
-              Phase 1 · Model tạo nội dung Quiz
+              Phase 1 · Model tạo nội dung {assessmentKind === "test" ? "Test" : "Quiz"}
             </h3>
             <div className="grid gap-4 sm:grid-cols-2">
               <OptionField
@@ -666,10 +704,11 @@ export function AdminQuizGenerationDialog({
           <section className="space-y-4 rounded-xl border border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)] p-4">
             <div>
               <h3 className="text-sm font-extrabold text-[var(--theme-text-strong)]">
-                Phase 2 · Model tạo hình Quiz
+                Phase 2 · Model tạo hình {assessmentKind === "test" ? "Test" : "Quiz"}
               </h3>
               <p className="mt-1 text-xs font-semibold text-[var(--theme-text-muted)]">
-                Cấu hình này chỉ được dùng khi câu Quiz cần sinh hình minh họa.
+                Cấu hình này chỉ được dùng khi câu{" "}
+                {assessmentKind === "test" ? "Test" : "Quiz"} cần sinh hình minh họa.
               </p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -856,8 +895,9 @@ function getInitialValues(
   initial?: Record<string, unknown> | null,
   initialModelConfiguration?: AdminAiModelConfiguration,
   initialFigureModelConfiguration?: AdminAiModelConfiguration,
-  quizSets: AdminQuizSet[] = [],
+  quizSets: Array<AdminQuizSet | AdminAssessmentSet> = [],
   quizTargetSetId?: string,
+  assessmentKind: AdminAssessmentKind = "quiz",
 ): AdminQuizGenerationFormValues {
   const available = new Set(
     documents.filter((document) => document.canUseForQuiz).map((document) => document.id),
@@ -885,7 +925,10 @@ function getInitialValues(
   const restoredReasoningEffort = isAiReasoningEffort(initial?.reasoningEffort)
     ? initial.reasoningEffort
     : "";
-  const restoredTargetSetId = readString(initial?.targetQuizSetId, "");
+  const restoredTargetSetId = readString(
+    initial?.[assessmentKind === "test" ? "targetTestSetId" : "targetQuizSetId"],
+    "",
+  );
   const configuredFigureModel =
     initialFigureModelConfiguration?.isDefaultConfigured &&
     initialFigureModelConfiguration.resolvedModel
@@ -986,13 +1029,14 @@ function getInitialValues(
 function toPayload(
   values: AdminQuizGenerationFormValues,
   capability: AdminAiConfigurationCapability | undefined,
-): AdminQuizGenerationPayload {
-  return {
-    type: "QUIZ",
-    ...(values.targetQuizSetId ? { targetQuizSetId: values.targetQuizSetId } : {}),
+  assessmentKind: AdminAssessmentKind = "quiz",
+): AdminQuizGenerationPayload | AdminTestGenerationPayload {
+  const commonPayload = {
     documentIds: values.documentIds,
     questionCount: Number(values.questionCount),
-    ...(values.realWorldCount ? { realWorldQuestionCount: Number(values.realWorldCount) } : {}),
+    ...(values.realWorldCount
+      ? { realWorldQuestionCount: Number(values.realWorldCount) }
+      : {}),
     difficulty: values.difficulty,
     ...(values.difficulty === "MIXED"
       ? {
@@ -1039,6 +1083,18 @@ function toPayload(
     ...(values.figureMaxOutputTokens
       ? { figureMaxOutputTokens: Number(values.figureMaxOutputTokens) }
       : {}),
+  };
+  if (assessmentKind === "test") {
+    return {
+      ...commonPayload,
+      type: "TEST",
+      ...(values.targetQuizSetId ? { targetTestSetId: values.targetQuizSetId } : {}),
+    };
+  }
+  return {
+    ...commonPayload,
+    type: "QUIZ",
+    ...(values.targetQuizSetId ? { targetQuizSetId: values.targetQuizSetId } : {}),
   };
 }
 

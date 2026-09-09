@@ -43,6 +43,7 @@ import {
 } from "#api/modules/quiz/dto/refine-quiz-solution.dto";
 import { QuizSolutionRefinementService } from "#api/modules/quiz/services/quiz-solution-refinement.service";
 import { IsString, IsOptional } from "class-validator";
+import { AssessmentAdminService } from "#api/modules/assessments/services/assessment-admin.service";
 
 // We create wrapper DTOs for the sets for ClassValidator
 export class CreateQuizSetBodyDto implements CreateQuizSetDto {
@@ -69,12 +70,14 @@ export class AdminQuizController {
     private readonly generationJobs: QuizGenerationJobService,
     @Inject(QuizSolutionRefinementService)
     private readonly solutionRefinement: QuizSolutionRefinementService,
+    @Inject(AssessmentAdminService)
+    private readonly assessments: AssessmentAdminService,
   ) {}
 
   @Get("lessons/:lessonId/quiz-sets")
   @ApiOperation({ summary: "List quiz sets in a lesson" })
   listSets(@Param("lessonId") lessonId: string) {
-    return this.quizService.listQuizSetsByLesson(lessonId);
+    return this.assessments.listSetsByLesson("QUIZ", lessonId);
   }
 
   @Post("lessons/:lessonId/quiz-sets/generate-ai")
@@ -109,12 +112,13 @@ export class AdminQuizController {
     @Body() dto: CreateQuizSetBodyDto,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.quizService.createQuizSet(
+    return this.assessments.createSet({
+      kind: "QUIZ",
       lessonId,
-      user.id,
+      userId: user.id,
       dto,
-      getRequestContext(request),
-    );
+      context: getRequestContext(request),
+    });
   }
 
   @Patch("quiz-sets/:setId")
@@ -125,12 +129,13 @@ export class AdminQuizController {
     @Body() dto: UpdateQuizSetBodyDto,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.quizService.updateQuizSet(
+    return this.assessments.updateSet({
+      kind: "QUIZ",
       setId,
-      user.id,
+      userId: user.id,
       dto,
-      getRequestContext(request),
-    );
+      context: getRequestContext(request),
+    });
   }
 
   @Post("quiz-sets/:setId/review")
@@ -141,12 +146,13 @@ export class AdminQuizController {
     @Body() dto: ReviewQuizSetDto,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.quizService.reviewQuizSet(
+    return this.assessments.reviewSet({
+      kind: "QUIZ",
       setId,
-      user.id,
+      userId: user.id,
       dto,
-      getRequestContext(request),
-    );
+      context: getRequestContext(request),
+    });
   }
 
   @Post("quiz-sets/:setId/questions/review-all-ai")
@@ -156,7 +162,8 @@ export class AdminQuizController {
     @CurrentUser() user: AuthenticatedUser,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.quizService.reviewAllPendingAiQuestions(
+    return this.assessments.reviewAllPendingAiQuestions(
+      "QUIZ",
       setId,
       user.id,
       getRequestContext(request),
@@ -170,13 +177,13 @@ export class AdminQuizController {
     @CurrentUser() user: AuthenticatedUser,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.quizService.deleteQuizSet(setId, user.id, getRequestContext(request));
+    return this.assessments.deleteSet("QUIZ", setId, user.id, getRequestContext(request));
   }
 
   @Get("quiz-sets/:setId/questions")
   @ApiOperation({ summary: "List questions in a quiz set" })
   listQuestions(@Param("setId") setId: string) {
-    return this.quizService.listQuestionsBySet(setId);
+    return this.assessments.listQuestionsBySet("QUIZ", setId);
   }
 
   @Post("quiz-sets/:setId/questions")
@@ -187,12 +194,13 @@ export class AdminQuizController {
     @Body() dto: QuizQuestionContentDto,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.quizService.createQuestion(
+    return this.assessments.createQuestion({
+      kind: "QUIZ",
       setId,
-      user.id,
+      userId: user.id,
       dto,
-      getRequestContext(request),
-    );
+      context: getRequestContext(request),
+    });
   }
 
   @Patch("quiz-questions/:questionId")
@@ -203,12 +211,13 @@ export class AdminQuizController {
     @Body() dto: UpdateQuizQuestionContentDto,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.quizService.updateQuestion(
+    return this.assessments.updateQuestion({
+      kind: "QUIZ",
       questionId,
-      user.id,
+      userId: user.id,
       dto,
-      getRequestContext(request),
-    );
+      context: getRequestContext(request),
+    });
   }
 
   @Patch("quiz-questions/:questionId/generation-json")
@@ -219,12 +228,13 @@ export class AdminQuizController {
     @Body() dto: UpdateQuizGenerationQuestionJsonDto,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.quizService.updateGenerationQuestionJson(
+    return this.assessments.updateGenerationQuestionJson({
+      kind: "QUIZ",
       questionId,
-      user.id,
+      userId: user.id,
       dto,
-      getRequestContext(request),
-    );
+      context: getRequestContext(request),
+    });
   }
 
   @Post("quiz-questions/:questionId/solution-refinement/preview")
@@ -258,12 +268,13 @@ export class AdminQuizController {
     @Body() dto: ReviewContentSetDto,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.quizService.reviewQuestion(
+    return this.assessments.reviewQuestion({
+      kind: "QUIZ",
       questionId,
-      user.id,
+      userId: user.id,
       dto,
-      getRequestContext(request),
-    );
+      context: getRequestContext(request),
+    });
   }
 
   @Delete("quiz-questions/:questionId")
@@ -273,7 +284,8 @@ export class AdminQuizController {
     @CurrentUser() user: AuthenticatedUser,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.quizService.deleteQuestion(
+    return this.assessments.deleteQuestion(
+      "QUIZ",
       questionId,
       user.id,
       getRequestContext(request),

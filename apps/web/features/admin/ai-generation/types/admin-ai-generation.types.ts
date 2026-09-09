@@ -120,6 +120,8 @@ export interface AdminAiGenerationPanelData {
   summaryFigureConfiguration: AdminAiModelConfiguration;
   quizConfiguration: AdminAiModelConfiguration;
   quizFigureConfiguration: AdminAiModelConfiguration;
+  testConfiguration: AdminAiModelConfiguration;
+  testFigureConfiguration: AdminAiModelConfiguration;
   flashcardConfiguration: AdminAiModelConfiguration;
   flashcardFigureConfiguration: AdminAiModelConfiguration;
   jobs: Record<AdminAiGenerationType, AdminAiPanelJob | null>;
@@ -197,6 +199,19 @@ export type AdminQuizGenerationPayload = {
   requestHash?: string;
 };
 
+/**
+ * Test uses the identical Quiz generation contract. The optional target is the
+ * only Test-specific input at the transport boundary; when omitted for an empty
+ * lesson, the API creates the first Test set with the default duration.
+ */
+export type AdminTestGenerationPayload = Omit<
+  AdminQuizGenerationPayload,
+  "type" | "targetQuizSetId"
+> & {
+  type: "TEST";
+  targetTestSetId?: string;
+};
+
 export type AdminFlashcardGenerationPayload = {
   type: "FLASHCARD";
   targetFlashcardSetId?: string;
@@ -226,13 +241,7 @@ export type AdminAiGenerationPayload =
   | AdminSummaryGenerationPayload
   | AdminQuizGenerationPayload
   | AdminFlashcardGenerationPayload
-  | {
-      type: "TEST";
-      questionCount: number;
-      durationSeconds: number;
-      difficultyRatio: { easy: number; medium: number; hard: number };
-      questionTypes: AdminAiQuestionType[];
-    };
+  | AdminTestGenerationPayload;
 
 export interface AdminLessonSummaryPromptPreview {
   requestDraftId?: string;
@@ -387,6 +396,12 @@ export interface AdminQuizPromptPreview {
     fxRateVndPerUsd: number;
   };
 }
+
+export type AdminTestPromptPreview = Omit<AdminQuizPromptPreview, "configuration"> & {
+  configuration: AdminQuizPromptPreview["configuration"] & {
+    targetTestSet?: { id: string; title: string; durationSeconds: number } | null;
+  };
+};
 
 export interface AdminFlashcardPromptPreview {
   requestDraftId: string;

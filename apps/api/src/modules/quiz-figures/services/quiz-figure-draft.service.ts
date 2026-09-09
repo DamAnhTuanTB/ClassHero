@@ -14,6 +14,11 @@ import {
   assertQuizFigureLatexSource,
   sanitizeQuizFigureSvg,
 } from "#api/modules/quiz-figures/utils/quiz-figure-source-policy";
+import {
+  quizFigureTargetLabel,
+  quizFigureTargetWhere,
+  type QuizFigureTarget,
+} from "#api/modules/quiz-figures/types/quiz-figure-target";
 
 @Injectable()
 export class QuizFigureDraftService {
@@ -30,8 +35,9 @@ export class QuizFigureDraftService {
     figureId: string,
     actorUserId: string,
     dto: CompileQuizFigureDraftDto,
+    target: QuizFigureTarget = { kind: "QUIZ", questionId },
   ) {
-    const figure = await this.requireFigure(questionId, figureId);
+    const figure = await this.requireFigure(target, figureId);
     this.assertBaseRevision(figure.currentRevisionId, dto.baseRevisionId);
     const latexSource = dto.latexSource.trim();
     try {
@@ -105,8 +111,9 @@ export class QuizFigureDraftService {
     figureId: string,
     actorUserId: string,
     dto: ApplyQuizFigureDraftDto,
+    target: QuizFigureTarget = { kind: "QUIZ", questionId },
   ) {
-    const figure = await this.requireFigure(questionId, figureId);
+    const figure = await this.requireFigure(target, figureId);
     this.assertBaseRevision(figure.currentRevisionId, dto.baseRevisionId);
     const revision = await this.prisma.quizFigureRevision.findFirst({
       where: {
@@ -136,13 +143,16 @@ export class QuizFigureDraftService {
     return { status: "SUCCEEDED" as const, revisionId: dto.revisionId };
   }
 
-  private async requireFigure(questionId: string, figureId: string) {
+  private async requireFigure(target: QuizFigureTarget, figureId: string) {
     const figure = await this.prisma.quizFigure.findFirst({
-      where: { id: figureId, quizQuestionId: questionId, deletedAt: null },
+      where: { id: figureId, ...quizFigureTargetWhere(target), deletedAt: null },
       select: { id: true, role: true, subjectKey: true, currentRevisionId: true },
     });
     if (!figure) {
-      throw notFoundException("QUIZ_FIGURE_NOT_FOUND", "Không tìm thấy hình Quiz.");
+      throw notFoundException(
+        `${target.kind}_FIGURE_NOT_FOUND`,
+        `Không tìm thấy hình ${quizFigureTargetLabel(target)}.`,
+      );
     }
     return figure;
   }

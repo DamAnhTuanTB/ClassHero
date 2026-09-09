@@ -1567,7 +1567,7 @@ khiến chúng cùng dạng: kiểm tra phép tính trên giá trị cụ thể 
 chất với lập luận về tính chất tổng quát. Chỉ coi khung trừu tượng là lặp khi mục
 tiêu và phần lớn thao tác chi phối vẫn giữ nguyên mà chỉ đổi số lượng, nhãn, giá
 trị hoặc vài ý con. Cùng chủ đề/nhóm kỹ năng nhưng khác thực chất các trục trên
-là counterexample hợp lệ. Câu đã xóa mềm hoặc thuộc Quiz set đã hard delete
+là counterexample hợp lệ. Câu đã xóa mềm hoặc thuộc Quiz set đã xóa mềm
 không còn nằm trong index.
 System prompt sở hữu định nghĩa và invariant của bốn loại câu hỏi; user prompt
 chỉ chứa cấu hình động của lượt sinh. JSON Schema được dựng theo chính request:
@@ -2398,14 +2398,22 @@ Rules:
 
 ### 5.4. Test generation
 
-Input:
+Test Admin dùng versioned Quiz/Assessment generation pipeline, không dùng
+pipeline prompt/schema/mapper riêng. `AiGenerationType.TEST` vẫn được giữ cho
+provider routing, usage và accounting; target kind quyết định TestSet đích.
+Legacy Test job đã enqueue trước M6.6 được phép hoàn tất theo contract cũ trong
+cửa sổ cutover, job mới phải dùng contract dưới đây.
+
+Input v2:
 
 ```json
 {
   "lessonId": "uuid",
+  "targetTestSetId": "uuid",
+  "documentIds": ["uuid"],
   "questionCount": 10,
-  "durationSeconds": 900,
-  "difficultyRatio": { "easy": 0.4, "medium": 0.4, "hard": 0.2 }
+  "difficulty": "MIXED",
+  "difficultyCounts": { "easy": 3, "medium": 4, "hard": 3 }
 }
 ```
 
@@ -2413,8 +2421,6 @@ Output schema:
 
 ```json
 {
-  "title": "string",
-  "durationSeconds": 900,
   "questions": [
     {
       "questionType": "MULTIPLE_CHOICE",
@@ -2432,10 +2438,21 @@ Output schema:
 
 Rules:
 
-- Tổng điểm bài thi là 10.
-- Nếu không set `points`, backend chia điểm đều.
-- Test generation dùng cùng union bốn loại câu hỏi của Quiz generation:
+- Test generation dùng cùng union bốn loại câu hỏi, prompt/schema validator,
+  immutable request draft/hash, mapper, generation JSON, figure và solution
+  refinement của Quiz generation:
   `MULTIPLE_CHOICE`, `TRUE_FALSE`, `MULTI_STATEMENT_TRUE_FALSE`, `TEXT_INPUT`.
+- Test generation dùng nguyên cơ chế chống trùng của Quiz: backend luôn lấy toàn
+  bộ câu Quiz còn tồn tại trong lesson ở mọi trạng thái review. Với mode `TEST`,
+  backend nối thêm toàn bộ câu Test còn tồn tại trong lesson, cũng ở mọi trạng
+  thái review, rồi mới dùng cùng serializer/index JSONL của Quiz để đưa vào user
+  prompt. Câu hoặc set đã xóa mềm không được đưa vào index; Quiz generation vẫn
+  chỉ dùng tập câu Quiz như trước.
+- `durationSeconds` **không có trong modal AI, request, prompt hay output**.
+  Backend resolve duration server-side từ `targetTestSetId`; nếu lesson chưa có
+  TestSet và target bị bỏ trống, backend tạo `Bộ đề 1` với mặc định 900 giây
+  trước khi enqueue. Duration không tác động vào nội dung/số lượng/shape câu
+  sinh. Payload duration legacy chỉ được ignore trong cửa sổ compatibility.
 - Bài thi do AI tạo từ học sinh request-new có `review_status = NEEDS_REVIEW` nhưng vẫn được dùng.
 - Câu hỏi trong bài thi phải là câu hỏi mới bám kiến thức lesson, không copy nguyên văn bài tập/ví dụ từ context.
 
@@ -2514,12 +2531,17 @@ AI output
 ```txt
 AI output
   -> validate schema
-  -> create test_sets
-  -> create test_questions
+  -> resolve target_test_set từ targetTestSetId
+  -> append test_questions bằng Assessment/Quiz v2 mapper
   -> if question.explanation exists:
        create ai_explanations target_type TEST_QUESTION
        update test_questions.explanation_id
 ```
+
+Duration được đọc từ `test_sets.duration_seconds` sau khi target đã được
+authorize/resolve; không persist lại duration từ AI output/input. Figure dùng
+`quiz_figures` target XOR (`quiz_question_id` hoặc `test_question_id`) cùng
+revision/render core, nhưng Test giữ target type/accounting riêng.
 
 ### 6.5. STEM figure của Summary
 
@@ -2843,6 +2865,12 @@ Processor phải tách `generate` và `persist` thành hai bước theo đúng t
 Zod. Refusal, output rỗng hoặc schema-invalid là lỗi không recoverable trong
 foundation để không vừa lưu dữ liệu sai vừa retry tốn phí; lỗi timeout/network
 tạm thời vẫn đi qua retry BullMQ.
+
+Với M6.6, worker generation/refinement/figure nhận `assessmentKind=QUIZ|TEST`
+và target ID đã validate. Core không suy duration từ client hoặc prompt: với
+`TEST`, worker chỉ resolve target TestSet server-side. Khi deploy worker đổi
+code, phải restart process worker (`pnpm dev` ở local) trước khi smoke test;
+không chạy paid provider trong unit/integration test.
 
 Với OpenAI Responses API, `output_parsed=null` không được gom vào một câu lỗi
 chung. `incomplete_details.reason=max_output_tokens` phải hiển thị hướng dẫn tăng

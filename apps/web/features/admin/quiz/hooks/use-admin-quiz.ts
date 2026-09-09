@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
+import { adminAssessmentQueryKeys } from "@/features/admin/assessments/hooks/use-admin-assessment";
 import {
   getAdminQuizSets,
   createAdminQuizSet,
@@ -32,6 +33,7 @@ import {
   type AdminQuizQuestionPayload,
   type AdminQuizQuestionUpdatePayload,
   type AdminQuizSet,
+  type AdminQuizAssessmentKind,
 } from "@/features/admin/quiz/api/admin-quiz-api";
 
 const ACTIVE_QUIZ_FIGURE_STATUSES = new Set<AdminQuizFigure["status"]>([
@@ -332,7 +334,10 @@ export function useAdminQuizQuestionMutations(setId: string, lessonId: string) {
   };
 }
 
-export function useAdminQuizFigureUpload(setId: string) {
+export function useAdminQuizFigureUpload(
+  setId: string,
+  assessmentKind: AdminQuizAssessmentKind = "quiz",
+) {
   const session = useAuthSessionStore((state) => state.session);
   const queryClient = useQueryClient();
   return useMutation({
@@ -354,22 +359,26 @@ export function useAdminQuizFigureUpload(setId: string) {
           caption: input.caption,
         },
         session.accessToken,
+        assessmentKind,
       );
     },
     onSuccess: () =>
       queryClient.invalidateQueries({
-        queryKey: adminQuizQueryKeys.questions(setId),
+        queryKey: adminAssessmentQueryKeys.questions(assessmentKind, setId),
       }),
   });
 }
 
-export function useAdminQuizFigureMutations(setId: string) {
+export function useAdminQuizFigureMutations(
+  setId: string,
+  assessmentKind: AdminQuizAssessmentKind = "quiz",
+) {
   const session = useAuthSessionStore((state) => state.session);
   const queryClient = useQueryClient();
   const token = session?.accessToken ?? "";
   const invalidate = () =>
     queryClient.invalidateQueries({
-      queryKey: adminQuizQueryKeys.questions(setId),
+      queryKey: adminAssessmentQueryKeys.questions(assessmentKind, setId),
     });
 
   const compileDraft = useMutation({
@@ -392,6 +401,7 @@ export function useAdminQuizFigureMutations(setId: string) {
           caption: input.caption,
         },
         token,
+        assessmentKind,
       );
     },
   });
@@ -411,6 +421,7 @@ export function useAdminQuizFigureMutations(setId: string) {
           sourceVersion: input.sourceVersion,
         },
         token,
+        assessmentKind,
       ),
     onSuccess: invalidate,
   });
@@ -435,6 +446,7 @@ export function useAdminQuizFigureMutations(setId: string) {
           userPrompt: input.userPrompt,
         },
         token,
+        assessmentKind,
       ),
     onSuccess: invalidate,
   });
@@ -461,6 +473,7 @@ export function useAdminQuizFigureMutations(setId: string) {
           userPrompt: input.userPrompt,
         },
         token,
+        assessmentKind,
       ),
     onSuccess: invalidate,
   });
@@ -485,6 +498,7 @@ export function useAdminQuizFigureMutations(setId: string) {
           userPrompt: input.userPrompt,
         },
         token,
+        assessmentKind,
       ),
   });
   const previewForQuestionWithAi = useMutation({
@@ -510,6 +524,7 @@ export function useAdminQuizFigureMutations(setId: string) {
           userPrompt: input.userPrompt,
         },
         token,
+        assessmentKind,
       ),
   });
   const refineWithAi = useMutation({
@@ -526,6 +541,7 @@ export function useAdminQuizFigureMutations(setId: string) {
           adminInstructions: input.adminInstructions,
         },
         token,
+        assessmentKind,
       ),
     onSuccess: invalidate,
   });
@@ -543,6 +559,7 @@ export function useAdminQuizFigureMutations(setId: string) {
           adminInstructions: input.adminInstructions,
         },
         token,
+        assessmentKind,
       ),
   });
   const updateCaption = useMutation({
@@ -559,6 +576,7 @@ export function useAdminQuizFigureMutations(setId: string) {
           caption: input.caption,
         },
         token,
+        assessmentKind,
       ),
     onSuccess: invalidate,
   });
@@ -569,6 +587,7 @@ export function useAdminQuizFigureMutations(setId: string) {
         input.figure.id,
         { baseRevisionId: input.figure.currentRevision?.id ?? null },
         token,
+        assessmentKind,
       ),
     onSuccess: invalidate,
   });

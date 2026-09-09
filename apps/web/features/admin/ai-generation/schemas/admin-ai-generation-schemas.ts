@@ -4,14 +4,8 @@ import {
 } from "@learning-path/shared";
 import { z } from "zod";
 
-const generationTypeSchema = z.enum(["SUMMARY", "FLASHCARD", "TEST"]);
+const generationTypeSchema = z.enum(["SUMMARY", "FLASHCARD"]);
 const difficultySchema = z.enum(["EASY", "MEDIUM", "HARD", "MIXED"]);
-const questionTypeSchema = z.enum([
-  "MULTIPLE_CHOICE",
-  "TRUE_FALSE",
-  "MULTI_STATEMENT_TRUE_FALSE",
-  "TEXT_INPUT",
-]);
 const summaryStyleSchema = z.enum(["student_friendly", "concise", "academic"]);
 const summaryLengthSchema = z.enum(["short", "standard", "detailed"]);
 const numericTextSchema = (label: string, min: number, max: number) =>
@@ -87,11 +81,6 @@ export const adminAiGenerationFormSchema = z
     ),
     count: numericTextSchema("Số lượng", 1, 60),
     difficulty: difficultySchema,
-    questionTypes: z.array(questionTypeSchema).max(4),
-    durationMinutes: numericTextSchema("Thời gian", 1, 240),
-    easyRatio: numericTextSchema("Tỷ lệ dễ", 0, 100),
-    mediumRatio: numericTextSchema("Tỷ lệ trung bình", 0, 100),
-    hardRatio: numericTextSchema("Tỷ lệ khó", 0, 100),
     easyCount: numericTextSchema("Số câu dễ", 0, 50),
     mediumCount: numericTextSchema("Số câu trung bình", 0, 50),
     hardCount: numericTextSchema("Số câu khó", 0, 50),
@@ -130,33 +119,6 @@ export const adminAiGenerationFormSchema = z
         path: ["summaryFigureMaxOutputTokens"],
         message: "Vui lòng nhập số token đầu ra tạo hình",
       });
-    }
-    if (values.type === "TEST") {
-      if (values.questionTypes.length === 0) {
-        context.addIssue({
-          code: "custom",
-          path: ["questionTypes"],
-          message: "Chọn ít nhất một loại câu hỏi",
-        });
-      }
-      if (Number(values.count) > 50) {
-        context.addIssue({
-          code: "custom",
-          path: ["count"],
-          message: "Số câu tối đa là 50",
-        });
-      }
-    }
-    if (values.type === "TEST") {
-      const total =
-        Number(values.easyRatio) + Number(values.mediumRatio) + Number(values.hardRatio);
-      if (total !== 100) {
-        context.addIssue({
-          code: "custom",
-          path: ["hardRatio"],
-          message: `Tổng ba tỷ lệ phải bằng 100% (hiện là ${total}%)`,
-        });
-      }
     }
   });
 

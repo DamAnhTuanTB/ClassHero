@@ -11,11 +11,13 @@ import { EditorDialogShell } from "@/components/admin/courses/editor-dialog-shel
 import { FieldLabel } from "@/components/common/forms/field-label";
 import { OptionField } from "@/components/common/forms/option-field";
 import { ImmediateTooltip } from "@/components/common/ui/immediate-tooltip";
+import type { AdminMultiStatementAnswer } from "@/features/admin/quiz/api/admin-quiz-api";
 import type {
-  AdminMultiStatementAnswer,
-  AdminQuizQuestion,
-  AdminQuizQuestionPayload,
-} from "@/features/admin/quiz/api/admin-quiz-api";
+  AdminAssessmentKind,
+  AdminAssessmentQuestion,
+  AdminAssessmentQuestionPayload,
+} from "@/features/admin/assessments/types/admin-assessment.types";
+import { useAdminAssessmentQuestionMutations } from "@/features/admin/assessments/hooks/use-admin-assessment";
 import {
   QuizRichContentEditor,
   ScientificAnswerField,
@@ -29,10 +31,7 @@ import {
 import {
   useAdminQuizFigureMutations,
   useAdminQuizFigureUpload,
-  useAdminQuizQuestionMutations,
 } from "@/features/admin/quiz/hooks/use-admin-quiz";
-import type { AdminTestQuestion } from "@/features/admin/tests/api/admin-tests-api";
-import { useAdminTestQuestionMutations } from "@/features/admin/tests/hooks/use-admin-tests";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import {
   createEmptyTiptapDocument,
@@ -173,27 +172,26 @@ export function AdminAssessmentQuestionEditorDialog({
   setId,
   onClose,
 }: {
-  assessmentKind?: "quiz" | "test";
+  assessmentKind?: AdminAssessmentKind;
   isOpen: boolean;
   lessonId: string;
-  question: AdminQuizQuestion | AdminTestQuestion | null;
+  question: AdminAssessmentQuestion | null;
   setId: string;
   onClose: () => void;
 }) {
-  const { createQuestion, updateQuestion } = useAdminQuizQuestionMutations(
+  const { createQuestion, updateQuestion } = useAdminAssessmentQuestionMutations(
+    assessmentKind,
     setId,
     lessonId,
   );
-  const uploadQuizFigure = useAdminQuizFigureUpload(setId);
-  const quizFigureMutations = useAdminQuizFigureMutations(setId);
-  const quizQuestion =
-    assessmentKind === "quiz" ? (question as AdminQuizQuestion | null) : null;
+  const uploadQuizFigure = useAdminQuizFigureUpload(setId, assessmentKind);
+  const quizFigureMutations = useAdminQuizFigureMutations(setId, assessmentKind);
+  const quizQuestion = question as
+    import("@/features/admin/quiz/api/admin-quiz-api").AdminQuizQuestion | null;
   const [draftFigureFiles, setDraftFigureFiles] = useState<AdminQuizDraftFigureFiles>({});
   const [deletedFigureRoles, setDeletedFigureRoles] = useState<AdminQuizFigureRole[]>([]);
   const [isUploadingNewQuestionFigures, setIsUploadingNewQuestionFigures] =
     useState(false);
-  const { createQuestion: createTestQuestion, updateQuestion: updateTestQuestion } =
-    useAdminTestQuestionMutations(setId, lessonId);
   const form = useForm<QuestionFormValues>({
     resolver: zodResolver(questionFormSchema) as Resolver<QuestionFormValues>,
     mode: "onChange",
@@ -209,10 +207,7 @@ export function AdminAssessmentQuestionEditorDialog({
   const correctOptionId = form.watch("correctOptionId");
   const statementValues = form.watch("statements");
   const isSaving =
-    isUploadingNewQuestionFigures ||
-    (assessmentKind === "test"
-      ? createTestQuestion.isPending || updateTestQuestion.isPending
-      : createQuestion.isPending || updateQuestion.isPending);
+    isUploadingNewQuestionFigures || createQuestion.isPending || updateQuestion.isPending;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -292,35 +287,20 @@ export function AdminAssessmentQuestionEditorDialog({
     const payload = toPayload(values);
     try {
       if (question) {
-        if (assessmentKind === "test") {
-          await updateTestQuestion.mutateAsync({
-            questionId: question.id,
-            data: payload,
-          });
-        } else {
-          await updateQuestion.mutateAsync({
-            questionId: question.id,
-            data: payload,
-          });
-          await applyExistingQuizFigureChanges(question.id);
-        }
+        await updateQuestion.mutateAsync({ questionId: question.id, data: payload });
+        await applyExistingQuizFigureChanges(question.id);
         toast.success("Đã cập nhật câu hỏi");
       } else {
-        if (assessmentKind === "test") {
-          await createTestQuestion.mutateAsync(payload);
-          toast.success("Đã thêm câu hỏi");
+        const createdQuestion = await createQuestion.mutateAsync(payload);
+        const failedFigureRoles = await uploadDraftFigures(createdQuestion.id);
+        if (failedFigureRoles.length > 0) {
+          toast.warning(
+            `Đã thêm câu hỏi nhưng chưa tải được ${failedFigureRoles
+              .map(getQuizFigureRoleLabel)
+              .join(" và ")}. Bạn có thể mở chỉnh sửa để tải lại.`,
+          );
         } else {
-          const createdQuestion = await createQuestion.mutateAsync(payload);
-          const failedFigureRoles = await uploadDraftFigures(createdQuestion.id);
-          if (failedFigureRoles.length > 0) {
-            toast.warning(
-              `Đã thêm câu hỏi nhưng chưa tải được ${failedFigureRoles
-                .map(getQuizFigureRoleLabel)
-                .join(" và ")}. Bạn có thể mở chỉnh sửa để tải lại.`,
-            );
-          } else {
-            toast.success("Đã thêm câu hỏi");
-          }
+          toast.success("Đã thêm câu hỏi");
         }
       }
       onClose();
@@ -413,28 +393,26 @@ export function AdminAssessmentQuestionEditorDialog({
             </div>
           </div>
 
-          {assessmentKind === "quiz" ? (
-            <AdminQuizFigureUploadFields
-              question={quizQuestion}
-              deletedRoles={deletedFigureRoles}
-              draftFiles={draftFigureFiles}
-              disabled={
-                uploadQuizFigure.isPending ||
-                quizFigureMutations.deleteFigure.isPending ||
-                isSaving
-              }
-              deletingRole={
-                quizFigureMutations.deleteFigure.isPending
-                  ? quizFigureMutations.deleteFigure.variables?.figure.role
-                  : undefined
-              }
-              pendingRole={
-                uploadQuizFigure.isPending ? uploadQuizFigure.variables?.role : undefined
-              }
-              onDelete={deleteQuizFigureForRole}
-              onFileSelect={selectQuizFigureFile}
-            />
-          ) : null}
+          <AdminQuizFigureUploadFields
+            question={quizQuestion}
+            deletedRoles={deletedFigureRoles}
+            draftFiles={draftFigureFiles}
+            disabled={
+              uploadQuizFigure.isPending ||
+              quizFigureMutations.deleteFigure.isPending ||
+              isSaving
+            }
+            deletingRole={
+              quizFigureMutations.deleteFigure.isPending
+                ? quizFigureMutations.deleteFigure.variables?.figure.role
+                : undefined
+            }
+            pendingRole={
+              uploadQuizFigure.isPending ? uploadQuizFigure.variables?.role : undefined
+            }
+            onDelete={deleteQuizFigureForRole}
+            onFileSelect={selectQuizFigureFile}
+          />
 
           {questionType === "MULTIPLE_CHOICE" ? (
             <section className="space-y-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-4">
@@ -845,9 +823,7 @@ function createEmptyDefaults(): QuestionFormValues {
   };
 }
 
-function toFormValues(
-  question: AdminQuizQuestion | AdminTestQuestion,
-): QuestionFormValues {
+function toFormValues(question: AdminAssessmentQuestion): QuestionFormValues {
   const correctAnswers = getStringAnswers(question.correctAnswerJson);
   const statementAnswers = getMultiStatementAnswers(question.correctAnswerJson);
   const statementAnswerById = new Map(
@@ -885,7 +861,7 @@ function toFormValues(
   };
 }
 
-function toPayload(values: QuestionFormValues): AdminQuizQuestionPayload {
+function toPayload(values: QuestionFormValues): AdminAssessmentQuestionPayload {
   const base = {
     questionType: values.questionType,
     difficulty: values.difficulty,
@@ -962,7 +938,7 @@ function createStatementId() {
 }
 
 function getStringAnswers(
-  correctAnswer: AdminQuizQuestion["correctAnswerJson"],
+  correctAnswer: AdminAssessmentQuestion["correctAnswerJson"],
 ): string[] {
   return Array.isArray(correctAnswer) &&
     correctAnswer.every((answer): answer is string => typeof answer === "string")
@@ -981,7 +957,7 @@ function getQuizFigureRoleLabel(role: AdminQuizFigureRole) {
 }
 
 function getMultiStatementAnswers(
-  correctAnswer: AdminQuizQuestion["correctAnswerJson"],
+  correctAnswer: AdminAssessmentQuestion["correctAnswerJson"],
 ): AdminMultiStatementAnswer[] {
   return Array.isArray(correctAnswer) &&
     correctAnswer.every(

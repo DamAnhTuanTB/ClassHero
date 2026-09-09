@@ -41,6 +41,10 @@ export class AdminQuizFiguresController {
     private readonly figures: QuizFiguresService,
   ) {}
 
+  private target(questionId: string) {
+    return { kind: "QUIZ" as const, questionId };
+  }
+
   @Post(":questionId/figures/admin-upload")
   @ApiOperation({ summary: "Attach an admin-uploaded illustration to a Quiz" })
   attachUpload(
@@ -55,6 +59,7 @@ export class AdminQuizFiguresController {
       altText: dto.altText,
       caption: dto.caption,
       actorUserId: user.id,
+      target: this.target(questionId),
     });
   }
 
@@ -66,7 +71,12 @@ export class AdminQuizFiguresController {
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateQuestionQuizFigureAiDto,
   ) {
-    return this.figures.createForQuestion(questionId, user.id, dto);
+    return this.figures.createForQuestion(
+      questionId,
+      user.id,
+      dto,
+      this.target(questionId),
+    );
   }
 
   @Post(":questionId/figures/create-ai/preview")
@@ -75,7 +85,7 @@ export class AdminQuizFiguresController {
     @Param("questionId") questionId: string,
     @Body() dto: CreateQuestionQuizFigureAiDto,
   ) {
-    return this.figures.previewForQuestion(questionId, dto);
+    return this.figures.previewForQuestion(questionId, dto, this.target(questionId));
   }
 
   @Post(":questionId/figures/:figureId/drafts/compile")
@@ -86,7 +96,13 @@ export class AdminQuizFiguresController {
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CompileQuizFigureDraftDto,
   ) {
-    return this.figures.compileDraft(questionId, figureId, user.id, dto);
+    return this.figures.compileDraft(
+      questionId,
+      figureId,
+      user.id,
+      dto,
+      this.target(questionId),
+    );
   }
 
   @Post(":questionId/figures/:figureId/drafts/apply")
@@ -97,7 +113,13 @@ export class AdminQuizFiguresController {
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: ApplyQuizFigureDraftDto,
   ) {
-    return this.figures.applyDraft(questionId, figureId, user.id, dto);
+    return this.figures.applyDraft(
+      questionId,
+      figureId,
+      user.id,
+      dto,
+      this.target(questionId),
+    );
   }
 
   @Post(":questionId/figures/:figureId/create-new-ai")
@@ -109,7 +131,13 @@ export class AdminQuizFiguresController {
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateQuizFigureAiDto,
   ) {
-    return this.figures.createNewAi(questionId, figureId, user.id, dto);
+    return this.figures.createNewAi(
+      questionId,
+      figureId,
+      user.id,
+      dto,
+      this.target(questionId),
+    );
   }
 
   @Post(":questionId/figures/:figureId/create-new-ai/preview")
@@ -119,7 +147,7 @@ export class AdminQuizFiguresController {
     @Param("figureId") figureId: string,
     @Body() dto: CreateQuizFigureAiDto,
   ) {
-    return this.figures.previewNewAi(questionId, figureId, dto);
+    return this.figures.previewNewAi(questionId, figureId, dto, this.target(questionId));
   }
 
   @Post(":questionId/figures/:figureId/refine-ai/preview")
@@ -129,7 +157,12 @@ export class AdminQuizFiguresController {
     @Param("figureId") figureId: string,
     @Body() dto: RefineQuizFigureWithAiDto,
   ) {
-    return this.figures.previewRefinement(questionId, figureId, dto);
+    return this.figures.previewRefinement(
+      questionId,
+      figureId,
+      dto,
+      this.target(questionId),
+    );
   }
 
   @Post(":questionId/figures/:figureId/refine-ai")
@@ -141,7 +174,13 @@ export class AdminQuizFiguresController {
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: RefineQuizFigureWithAiDto,
   ) {
-    return this.figures.refineWithAi(questionId, figureId, user.id, dto);
+    return this.figures.refineWithAi(
+      questionId,
+      figureId,
+      user.id,
+      dto,
+      this.target(questionId),
+    );
   }
 
   @Patch(":questionId/figures/:figureId/caption")
@@ -152,7 +191,13 @@ export class AdminQuizFiguresController {
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: UpdateQuizFigureCaptionDto,
   ) {
-    return this.figures.updateCaption(questionId, figureId, user.id, dto);
+    return this.figures.updateCaption(
+      questionId,
+      figureId,
+      user.id,
+      dto,
+      this.target(questionId),
+    );
   }
 
   @Delete(":questionId/figures/:figureId")
@@ -162,6 +207,6 @@ export class AdminQuizFiguresController {
     @Param("figureId") figureId: string,
     @Body() dto: QuizFigureRevisionGuardDto,
   ) {
-    return this.figures.deleteFigure(questionId, figureId, dto);
+    return this.figures.deleteFigure(questionId, figureId, dto, this.target(questionId));
   }
 }

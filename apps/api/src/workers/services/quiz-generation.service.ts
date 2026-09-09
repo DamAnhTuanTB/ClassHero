@@ -55,6 +55,7 @@ import {
 } from "#api/modules/quiz/utils/quiz-generation-output";
 import {
   QUIZ_SOLUTION_REFINEMENT_TARGET_TYPE,
+  TEST_SOLUTION_REFINEMENT_TARGET_TYPE,
   isMultiStatementQuizSolutionRefinement,
   multipleChoiceQuizSolutionRegenerationOutputSchema,
   multiStatementQuizSolutionRegenerationOutputSchema,
@@ -97,11 +98,13 @@ export class QuizGenerationService {
   async generate(
     context: AiGenerationExecutionContext,
   ): Promise<AiGenerationPreparedOutput> {
-    if (context.targetType === QUIZ_SOLUTION_REFINEMENT_TARGET_TYPE) {
+    if (isSolutionRefinementJob(context)) {
       return this.generateSolutionRefinement(context);
     }
-    if (!context.lessonId || context.type !== AiGenerationType.QUIZ) {
-      throw new UnrecoverableError("Quiz generation requires a QUIZ job with lessonId.");
+    if (!context.lessonId || !isQuizAssessmentJob(context)) {
+      throw new UnrecoverableError(
+        "Assessment generation requires a QUIZ or versioned TEST job with lessonId.",
+      );
     }
     const input = parseJobInput(quizGenerationJobInputSchema, context.inputMeta, "quiz");
     const draft = await this.prisma.quizGenerationRequestDraft.findFirst({
@@ -179,7 +182,7 @@ export class QuizGenerationService {
     try {
       output = this.providerCall
         ? await this.providerCall.generateStructured(
-            providerContext(context, { operation: "QUIZ_GENERATION" }),
+            providerContext(context),
             request,
             providerSchema,
           )
@@ -218,11 +221,13 @@ export class QuizGenerationService {
     context: AiGenerationExecutionContext,
     prepared: AiGenerationPreparedOutput,
   ): Promise<AiGenerationPersistenceResult> {
-    if (context.targetType === QUIZ_SOLUTION_REFINEMENT_TARGET_TYPE) {
+    if (isSolutionRefinementJob(context)) {
       return this.persistSolutionRefinement(context, prepared);
     }
-    if (!context.lessonId || context.type !== AiGenerationType.QUIZ) {
-      throw new UnrecoverableError("Quiz persistence requires a QUIZ job with lessonId.");
+    if (!context.lessonId || !isQuizAssessmentJob(context)) {
+      throw new UnrecoverableError(
+        "Assessment persistence requires a QUIZ or versioned TEST job with lessonId.",
+      );
     }
     const input = parseJobInput(quizGenerationJobInputSchema, context.inputMeta, "quiz");
     const output = parseAiStructuredOutput(
@@ -240,29 +245,56 @@ export class QuizGenerationService {
       normalizeGeneratedQuizQuestionContent,
     );
     const persisted = await this.prisma.$transaction(async (tx) => {
-      const set = await tx.quizSet.findFirst({
-        where: {
-          id: input.targetQuizSetId ?? undefined,
-          lessonId: context.lessonId!,
-          deletedAt: null,
-        },
-        select: { id: true, questionCount: true },
-      });
+      const isTest = input.assessmentKind === "TEST";
+      const set = isTest
+        ? await tx.testSet.findFirst({
+            where: {
+              id: input.targetTestSetId ?? undefined,
+              lessonId: context.lessonId!,
+              deletedAt: null,
+            },
+            select: { id: true, questionCount: true, durationSeconds: true },
+          })
+        : await tx.quizSet.findFirst({
+            where: {
+              id: input.targetQuizSetId ?? undefined,
+              lessonId: context.lessonId!,
+              deletedAt: null,
+            },
+            select: { id: true, questionCount: true },
+          });
       if (!set) {
         throw new UnrecoverableError(
-          "QUIZ_TARGET_SET_NOT_FOUND: The selected Quiz set no longer exists.",
+          isTest
+            ? "TEST_TARGET_SET_NOT_FOUND: The selected Test set no longer exists."
+            : "QUIZ_TARGET_SET_NOT_FOUND: The selected Quiz set no longer exists.",
         );
       }
-      const lastQuestion = await tx.quizQuestion.findFirst({
-        where: { quizSetId: set.id, deletedAt: null },
-        orderBy: [{ sortOrder: "desc" }, { createdAt: "desc" }],
-        select: { sortOrder: true },
-      });
+      if (
+        isTest &&
+        (!input.durationSeconds ||
+          ("durationSeconds" in set && set.durationSeconds !== input.durationSeconds))
+      ) {
+        throw new UnrecoverableError(
+          "TEST_TARGET_DURATION_STALE: Test duration changed after preview.",
+        );
+      }
+      const lastQuestion = isTest
+        ? await tx.testQuestion.findFirst({
+            where: { testSetId: set.id, deletedAt: null },
+            orderBy: [{ sortOrder: "desc" }, { createdAt: "desc" }],
+            select: { sortOrder: true },
+          })
+        : await tx.quizQuestion.findFirst({
+            where: { quizSetId: set.id, deletedAt: null },
+            orderBy: [{ sortOrder: "desc" }, { createdAt: "desc" }],
+            select: { sortOrder: true },
+          });
       const firstSortOrder = (lastQuestion?.sortOrder ?? -1) + 1;
       const mappingIssues: GenerationRecoveryIssue[] = [];
       const figureIds: string[] = [];
       for (const [index, question] of normalizedQuestions.entries()) {
-        const created = await createGeneratedQuizQuestion(
+        const created = await createGeneratedAssessmentQuestion(
           tx,
           set.id,
           context,
@@ -276,13 +308,22 @@ export class QuizGenerationService {
         mappingIssues.push(...created.recoveryIssues);
         figureIds.push(...created.figureIds);
       }
-      await tx.quizSet.update({
-        where: { id: set.id },
-        data: {
-          questionCount: set.questionCount + normalizedQuestions.length,
-          updatedById: context.ownerUserId,
-        },
-      });
+      if (isTest)
+        await tx.testSet.update({
+          where: { id: set.id },
+          data: {
+            questionCount: set.questionCount + normalizedQuestions.length,
+            updatedById: context.ownerUserId,
+          },
+        });
+      else
+        await tx.quizSet.update({
+          where: { id: set.id },
+          data: {
+            questionCount: set.questionCount + normalizedQuestions.length,
+            updatedById: context.ownerUserId,
+          },
+        });
       const recovery = readRecoveryMetadata(prepared.contextMetadata);
       const generationIssues = [...recovery.issues, ...mappingIssues];
       const generationAudit = {
@@ -304,16 +345,16 @@ export class QuizGenerationService {
           }),
         },
       });
-      await auditGeneratedQuiz(tx, context, set.id);
+      await auditGeneratedAssessment(tx, context, set.id, isTest);
       return {
         figureIds,
         response: {
-          resourceType: "QUIZ_SET",
+          resourceType: isTest ? "TEST_SET" : "QUIZ_SET",
           resourceId: set.id,
           message:
             generationIssues.length > 0
-              ? "Đã thêm câu hỏi AI vào bộ Quiz và giữ các mục cần admin kiểm tra."
-              : "Đã thêm câu hỏi AI vào bộ Quiz.",
+              ? `Đã thêm câu hỏi AI vào bộ ${isTest ? "Test" : "Quiz"} và giữ các mục cần admin kiểm tra.`
+              : `Đã thêm câu hỏi AI vào bộ ${isTest ? "Test" : "Quiz"}.`,
           result: {
             reviewStatus: ReviewStatus.NEEDS_REVIEW,
             itemCount: normalizedQuestions.length,
@@ -340,9 +381,9 @@ export class QuizGenerationService {
       QuizSolutionRefinementOutput | QuizSolutionRegenerationOutput
     >
   > {
-    if (!context.lessonId || context.type !== AiGenerationType.QUIZ) {
+    if (!context.lessonId || !isSolutionRefinementJob(context)) {
       throw new UnrecoverableError(
-        "Quiz solution refinement requires a QUIZ job with lessonId.",
+        "Solution refinement requires a Quiz job or a versioned Test job with lessonId.",
       );
     }
     const input = parseJobInput(
@@ -350,7 +391,8 @@ export class QuizGenerationService {
       context.inputMeta,
       "quiz solution refinement",
     );
-    const targetContext = await this.assertSolutionSnapshotCurrent(input);
+    const target = resolveSolutionRefinementTarget(context, input);
+    const targetContext = await this.assertSolutionSnapshotCurrent(input, target);
     const questionImageDataUrl =
       input.mode === "REGENERATE" && input.questionFigure
         ? await buildQuizFigureRefinementImageDataUrl(
@@ -382,8 +424,8 @@ export class QuizGenerationService {
               callSequence: 1,
               operation:
                 input.mode === "REFINE"
-                  ? "QUIZ_SOLUTION_REFINEMENT"
-                  : "QUIZ_SOLUTION_REGENERATION",
+                  ? target.refinementOperation
+                  : target.regenerationOperation,
               targetContext,
             }),
             request,
@@ -405,7 +447,7 @@ export class QuizGenerationService {
           : await generate(singleQuizSolutionRefinementOutputSchema);
     assertSolutionOperationOutputMatchesQuestion(input, output.data);
     return {
-      action: QUIZ_SOLUTION_REFINEMENT_TARGET_TYPE,
+      action: target.refinementTargetType,
       output,
       recordedOutput: { mode: input.mode, result: output.data },
     };
@@ -420,12 +462,13 @@ export class QuizGenerationService {
       context.inputMeta,
       "quiz solution refinement",
     );
+    const target = resolveSolutionRefinementTarget(context, input);
     const output = parseSolutionOperationOutput(input, prepared.output.data);
     assertSolutionOperationOutputMatchesQuestion(input, output);
     const refinedSolution = toSolutionText(output);
 
     return this.prisma.$transaction(async (tx) => {
-      const question = await tx.quizQuestion.findFirst({
+      const questionQuery = {
         where: { id: input.questionId, deletedAt: null },
         include: {
           explanation: true,
@@ -435,15 +478,19 @@ export class QuizGenerationService {
             include: { currentRevision: { include: { deliveryFile: true } } },
           },
         },
-      });
+      } as const;
+      const question =
+        target.kind === "TEST"
+          ? await tx.testQuestion.findFirst(questionQuery)
+          : await tx.quizQuestion.findFirst(questionQuery);
       if (!question) {
         throw new UnrecoverableError(
-          "QUIZ_QUESTION_NOT_FOUND: Câu Quiz không còn tồn tại.",
+          `${target.code}_QUESTION_NOT_FOUND: Câu ${target.label} không còn tồn tại.`,
         );
       }
       if (hashAiValue(buildStoredQuestionSnapshot(question)) !== input.baseContentHash) {
         throw new UnrecoverableError(
-          "QUIZ_SOLUTION_REFINEMENT_CONFLICT: Nội dung câu Quiz đã đổi sau khi job bắt đầu.",
+          `${target.code}_SOLUTION_REFINEMENT_CONFLICT: Nội dung câu ${target.label} đã đổi sau khi job bắt đầu.`,
         );
       }
       const metadata = asRecord(question.sourceMetadataJson);
@@ -474,7 +521,10 @@ export class QuizGenerationService {
         await tx.aiExplanation.create({
           data: {
             id: explanationId,
-            targetType: AiExplanationTargetType.QUIZ_QUESTION,
+            targetType:
+              target.kind === "TEST"
+                ? AiExplanationTargetType.TEST_QUESTION
+                : AiExplanationTargetType.QUIZ_QUESTION,
             targetId: question.id,
             lessonId: question.lessonId,
             contentJson: json(explanationJson),
@@ -490,23 +540,30 @@ export class QuizGenerationService {
         ...metadata,
         quizExplanationBlock: explanationBlock,
       };
-      await tx.quizQuestion.update({
-        where: { id: question.id },
-        data: {
-          sourceMetadataJson: json(updatedMetadata),
-          explanationId,
-          ...(input.mode === "REGENERATE"
-            ? {
-                correctAnswerJson: json(
-                  toRegeneratedCorrectAnswer(input.questionSnapshot.questionType, output),
-                ),
-                hintJson: json(toQuizTiptap(readRegeneratedHint(output))),
-              }
-            : {}),
-          reviewStatus: ReviewStatus.NEEDS_REVIEW,
-          publishedAt: null,
-        },
-      });
+      const questionUpdateData = {
+        sourceMetadataJson: json(updatedMetadata),
+        explanationId,
+        ...(input.mode === "REGENERATE"
+          ? {
+              correctAnswerJson: json(
+                toRegeneratedCorrectAnswer(input.questionSnapshot.questionType, output),
+              ),
+              hintJson: json(toQuizTiptap(readRegeneratedHint(output))),
+            }
+          : {}),
+        reviewStatus: ReviewStatus.NEEDS_REVIEW,
+      };
+      if (target.kind === "TEST") {
+        await tx.testQuestion.update({
+          where: { id: question.id },
+          data: questionUpdateData,
+        });
+      } else {
+        await tx.quizQuestion.update({
+          where: { id: question.id },
+          data: { ...questionUpdateData, publishedAt: null },
+        });
+      }
       await syncSolutionOperationToGenerationOutput(tx, {
         sourceMetadataJson: updatedMetadata,
         mode: input.mode,
@@ -518,9 +575,9 @@ export class QuizGenerationService {
           actorUserId: context.ownerUserId,
           action:
             input.mode === "REFINE"
-              ? "QUIZ_SOLUTION_AI_REFINED"
-              : "QUIZ_SOLUTION_AI_REGENERATED",
-          entityType: "QuizQuestion",
+              ? `${target.code}_SOLUTION_AI_REFINED`
+              : `${target.code}_SOLUTION_AI_REGENERATED`,
+          entityType: target.kind === "TEST" ? "TestQuestion" : "QuizQuestion",
           entityId: question.id,
           before: toJobJson({ contentHash: input.baseContentHash }),
           after: toJobJson({
@@ -534,19 +591,22 @@ export class QuizGenerationService {
         },
       });
       return {
-        resourceType: QUIZ_SOLUTION_REFINEMENT_TARGET_TYPE,
+        resourceType: target.refinementTargetType,
         resourceId: question.id,
         message:
           input.mode === "REFINE"
-            ? "Đã tinh chỉnh lời giải Quiz bằng AI và chuyển câu về trạng thái cần duyệt."
-            : "Đã tạo lại đáp án, gợi ý và lời giải Quiz bằng AI; câu cần được duyệt lại.",
+            ? `Đã tinh chỉnh lời giải ${target.label} bằng AI và chuyển câu về trạng thái cần duyệt.`
+            : `Đã tạo lại đáp án, gợi ý và lời giải ${target.label} bằng AI; câu cần được duyệt lại.`,
         result: { questionId: question.id, reviewStatus: ReviewStatus.NEEDS_REVIEW },
       };
     });
   }
 
-  private async assertSolutionSnapshotCurrent(input: QuizSolutionRefinementJobInput) {
-    const question = await this.prisma.quizQuestion.findFirst({
+  private async assertSolutionSnapshotCurrent(
+    input: QuizSolutionRefinementJobInput,
+    target: SolutionRefinementTarget,
+  ) {
+    const questionQuery = {
       where: { id: input.questionId, deletedAt: null },
       select: {
         questionType: true,
@@ -573,19 +633,23 @@ export class QuizGenerationService {
           },
         },
       },
-    });
+    } as const;
+    const question =
+      target.kind === "TEST"
+        ? await this.prisma.testQuestion.findFirst(questionQuery)
+        : await this.prisma.quizQuestion.findFirst(questionQuery);
     if (!question) {
       throw new UnrecoverableError(
-        "QUIZ_QUESTION_NOT_FOUND: Câu Quiz không còn tồn tại.",
+        `${target.code}_QUESTION_NOT_FOUND: Câu ${target.label} không còn tồn tại.`,
       );
     }
     if (hashAiValue(buildStoredQuestionSnapshot(question)) !== input.baseContentHash) {
       throw new UnrecoverableError(
-        "QUIZ_SOLUTION_REFINEMENT_CONFLICT: Nội dung câu Quiz đã đổi trước khi gọi AI.",
+        `${target.code}_SOLUTION_REFINEMENT_CONFLICT: Nội dung câu ${target.label} đã đổi trước khi gọi AI.`,
       );
     }
     return buildItemUsageTarget({
-      kind: "QUIZ_QUESTION",
+      kind: target.kind === "TEST" ? "TEST_QUESTION" : "QUIZ_QUESTION",
       entityId: input.questionId,
       sortOrder: question.sortOrder,
     });
@@ -890,7 +954,7 @@ function providerContext(
   };
 }
 
-async function createGeneratedQuizQuestion(
+async function createGeneratedAssessmentQuestion(
   tx: Prisma.TransactionClient,
   setId: string,
   context: AiGenerationExecutionContext,
@@ -901,13 +965,16 @@ async function createGeneratedQuizQuestion(
   subjectName: string,
   subjectSlug: string,
 ) {
+  const isTest = isAssessmentTestMeta(context.inputMeta);
   const mapped = mapGeneratedQuizQuestion(question);
   const id = randomUUID();
   const explanationId = randomUUID();
   await tx.aiExplanation.create({
     data: {
       id: explanationId,
-      targetType: AiExplanationTargetType.QUIZ_QUESTION,
+      targetType: isTest
+        ? AiExplanationTargetType.TEST_QUESTION
+        : AiExplanationTargetType.QUIZ_QUESTION,
       targetId: id,
       lessonId: context.lessonId!,
       contentJson: json(mapped.explanationJson),
@@ -918,34 +985,36 @@ async function createGeneratedQuizQuestion(
       sourceContextHash: null,
     },
   });
-  await tx.quizQuestion.create({
-    data: {
-      id,
-      quizSetId: setId,
-      lessonId: context.lessonId!,
-      questionType: mapped.questionType,
-      questionJson: json(mapped.questionJson),
-      optionsJson: nullableJson(mapped.optionsJson),
-      correctAnswerJson: json(mapped.correctAnswerJson),
-      hintJson: nullableJson(mapped.hintJson),
-      gradingConfigJson: nullableJson(mapped.gradingConfigJson),
-      sourceMetadataJson: json({
-        aiGenerationId: context.aiGenerationId,
-        generationQuestionIndex: questionIndex,
-        quizExplanationBlock: mapped.explanationBlock,
-      }),
-      difficulty: mapped.difficulty,
-      reviewStatus: ReviewStatus.NEEDS_REVIEW,
-      explanationId,
-      sortOrder,
-    },
-  });
+  const questionData = {
+    id,
+    lessonId: context.lessonId!,
+    questionType: mapped.questionType,
+    questionJson: json(mapped.questionJson),
+    optionsJson: nullableJson(mapped.optionsJson),
+    correctAnswerJson: json(mapped.correctAnswerJson),
+    hintJson: nullableJson(mapped.hintJson),
+    gradingConfigJson: nullableJson(mapped.gradingConfigJson),
+    sourceMetadataJson: json({
+      aiGenerationId: context.aiGenerationId,
+      generationQuestionIndex: questionIndex,
+      quizExplanationBlock: mapped.explanationBlock,
+    }),
+    difficulty: mapped.difficulty,
+    reviewStatus: ReviewStatus.NEEDS_REVIEW,
+    explanationId,
+    sortOrder,
+  };
+  if (isTest)
+    await tx.testQuestion.create({
+      data: { ...questionData, testSetId: setId, points: null },
+    });
+  else await tx.quizQuestion.create({ data: { ...questionData, quizSetId: setId } });
   const figureIds: string[] = [];
   if (question.figure.requiresQuestionFigure) {
     const questionFigure = await tx.quizFigure.create({
       data: {
         lessonId: context.lessonId!,
-        quizQuestionId: id,
+        ...(isTest ? { testQuestionId: id } : { quizQuestionId: id }),
         role: "QUESTION",
         aiGenerationId: context.aiGenerationId,
         planJson: json({
@@ -982,7 +1051,7 @@ async function createGeneratedQuizQuestion(
     const solutionFigure = await tx.quizFigure.create({
       data: {
         lessonId: context.lessonId!,
-        quizQuestionId: id,
+        ...(isTest ? { testQuestionId: id } : { quizQuestionId: id }),
         role: "SOLUTION",
         aiGenerationId: context.aiGenerationId,
         planJson: json({
@@ -1026,16 +1095,17 @@ async function createGeneratedQuizQuestion(
   };
 }
 
-async function auditGeneratedQuiz(
+async function auditGeneratedAssessment(
   tx: Prisma.TransactionClient,
   context: AiGenerationExecutionContext,
   entityId: string,
+  isTest: boolean,
 ) {
   await tx.auditLog.create({
     data: {
       actorUserId: context.ownerUserId,
-      action: "QUIZ_SET_AI_GENERATED",
-      entityType: "QuizSet",
+      action: isTest ? "TEST_SET_AI_GENERATED" : "QUIZ_SET_AI_GENERATED",
+      entityType: isTest ? "TestSet" : "QuizSet",
       entityId,
       after: toJobJson({
         source: ContentSource.AI,
@@ -1047,6 +1117,90 @@ async function auditGeneratedQuiz(
       }),
     },
   });
+}
+
+function isAssessmentTestMeta(value: unknown) {
+  return Boolean(
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    (value as Record<string, unknown>).assessmentKind === "TEST",
+  );
+}
+
+function isQuizAssessmentJob(context: AiGenerationExecutionContext) {
+  return (
+    context.type === AiGenerationType.QUIZ ||
+    (context.type === AiGenerationType.TEST && isAssessmentTestMeta(context.inputMeta))
+  );
+}
+
+type SolutionRefinementTarget = {
+  kind: "QUIZ" | "TEST";
+  code: "QUIZ" | "TEST";
+  label: "Quiz" | "Test";
+  refinementTargetType:
+    | typeof QUIZ_SOLUTION_REFINEMENT_TARGET_TYPE
+    | typeof TEST_SOLUTION_REFINEMENT_TARGET_TYPE;
+  refinementOperation: "QUIZ_SOLUTION_REFINEMENT" | "TEST_SOLUTION_REFINEMENT";
+  regenerationOperation: "QUIZ_SOLUTION_REGENERATION" | "TEST_SOLUTION_REGENERATION";
+};
+
+function isSolutionRefinementJob(context: AiGenerationExecutionContext) {
+  return (
+    (context.type === AiGenerationType.QUIZ &&
+      context.targetType === QUIZ_SOLUTION_REFINEMENT_TARGET_TYPE) ||
+    (context.type === AiGenerationType.TEST &&
+      context.targetType === TEST_SOLUTION_REFINEMENT_TARGET_TYPE &&
+      isAssessmentTestMeta(context.inputMeta) &&
+      asRecord(context.inputMeta).pipelineVersion === "ASSESSMENT_QUIZ_V1")
+  );
+}
+
+export function resolveSolutionRefinementTarget(
+  context: AiGenerationExecutionContext,
+  input: QuizSolutionRefinementJobInput,
+): SolutionRefinementTarget {
+  const isVersionedTest = input.assessmentKind === "TEST";
+  if (isVersionedTest) {
+    if (
+      context.type !== AiGenerationType.TEST ||
+      context.targetType !== TEST_SOLUTION_REFINEMENT_TARGET_TYPE ||
+      context.targetId !== input.targetQuestionId ||
+      input.targetQuestionId !== input.questionId
+    ) {
+      throw new UnrecoverableError(
+        "TEST_SOLUTION_REFINEMENT_TARGET_INVALID: Metadata Test không khớp target job.",
+      );
+    }
+    return {
+      kind: "TEST",
+      code: "TEST",
+      label: "Test",
+      refinementTargetType: TEST_SOLUTION_REFINEMENT_TARGET_TYPE,
+      refinementOperation: "TEST_SOLUTION_REFINEMENT",
+      regenerationOperation: "TEST_SOLUTION_REGENERATION",
+    };
+  }
+  if (
+    context.type !== AiGenerationType.QUIZ ||
+    context.targetType !== QUIZ_SOLUTION_REFINEMENT_TARGET_TYPE ||
+    (input.targetQuestionId !== undefined &&
+      input.targetQuestionId !== input.questionId) ||
+    (context.targetId !== null && context.targetId !== input.questionId)
+  ) {
+    throw new UnrecoverableError(
+      "QUIZ_SOLUTION_REFINEMENT_TARGET_INVALID: Metadata Quiz không khớp target job.",
+    );
+  }
+  return {
+    kind: "QUIZ",
+    code: "QUIZ",
+    label: "Quiz",
+    refinementTargetType: QUIZ_SOLUTION_REFINEMENT_TARGET_TYPE,
+    refinementOperation: "QUIZ_SOLUTION_REFINEMENT",
+    regenerationOperation: "QUIZ_SOLUTION_REGENERATION",
+  };
 }
 
 function readRecoveryMetadata(value: unknown): {

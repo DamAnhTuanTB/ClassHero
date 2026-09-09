@@ -4,7 +4,10 @@ import { readStemFigureDisplayScale } from "@learning-path/shared";
 import { AdminFigureCandidateProgress } from "@/components/admin/admin-figure-candidate-progress";
 import { AdminAiFigureUsageBadges } from "@/components/admin/ai-figure-usage-badges";
 import { MathpixMarkdownRenderer } from "@/components/shared/mathpix-markdown-renderer";
-import type { AdminQuizFigure } from "@/features/admin/quiz/api/admin-quiz-api";
+import type {
+  AdminQuizAssessmentKind,
+  AdminQuizFigure,
+} from "@/features/admin/quiz/api/admin-quiz-api";
 import { AdminQuizFigureActionFrame } from "@/features/admin/quiz/components/admin-quiz-figure-action-frame";
 import { getStemFigureDisplayPercent } from "@/lib/stem-figure-display";
 import { cn } from "@/lib/utils";
@@ -17,11 +20,13 @@ const PROCESSING_STATUSES = new Set<AdminQuizFigure["status"]>([
 ]);
 
 export function AdminQuizFigurePreview({
+  assessmentKind,
   figure,
   questionId,
   role,
   setId,
 }: {
+  assessmentKind: AdminQuizAssessmentKind;
   figure: AdminQuizFigure;
   questionId: string;
   role: "QUESTION" | "SOLUTION";
@@ -38,6 +43,7 @@ export function AdminQuizFigurePreview({
   if (imageUrl) {
     return (
       <AdminQuizFigureActionFrame
+        assessmentKind={assessmentKind}
         displayPercent={displayPercent}
         figure={figure}
         questionId={questionId}
@@ -72,7 +78,12 @@ export function AdminQuizFigurePreview({
   }
 
   return (
-    <AdminQuizFigureActionFrame figure={figure} questionId={questionId} setId={setId}>
+    <AdminQuizFigureActionFrame
+      assessmentKind={assessmentKind}
+      figure={figure}
+      questionId={questionId}
+      setId={setId}
+    >
       <div
         aria-live="polite"
         className={cn(

@@ -24,6 +24,7 @@ Behavior:
 - Admin dùng tổng `totalCostVnd` của các lần sinh để hiển thị chi phí cấp bộ.
   Khi chọn một lần sinh, chi tiết từng lượt gọi tiếp tục lazy-load qua API usage
   theo `aiGenerationId` và giữ phân trang hiện có.
+
 #### `POST /admin/lessons/:lessonId/quiz-sets`
 
 Role: `ADMIN`.
@@ -1245,6 +1246,31 @@ Response giống quiz request-new: `200 EXISTING` hoặc `202 QUEUED`.
 
 ## 12. Test API
 
+### M6.6 shared Admin contract và compatibility
+
+- Prefix route Test (`/admin/test-*`) được giữ tương thích, nhưng là adapter
+  `kind=TEST` vào cùng Assessment/Quiz admin core. Test có cùng CRUD question,
+  review/bulk review, generation JSON, publish/review, figure và solution
+  refinement contract với Quiz; không có endpoint business logic Test độc lập.
+- TestSet là nơi duy nhất cấu hình `durationSeconds` (`60..14400`). Modal AI,
+  prompt preview và generate request **không có/không gửi `durationSeconds`**.
+  Backend resolve duration server-side từ `targetTestSetId`; duration không được
+  đưa vào prompt hoặc schema output. Request có `durationSeconds` hoặc
+  `targetQuizSetId` bị từ chối bởi whitelist validation.
+- Cùng request v2 của Quiz được dùng cho Test: `targetTestSetId` tùy chọn thay
+  `targetQuizSetId`, cùng `documentIds`, question count, difficulty/counts,
+  question types, model, figure model, request draft/hash. Khi lesson chưa có
+  TestSet và target được bỏ trống, backend tạo `Bộ đề 1` với duration mặc định
+  900 giây trước khi enqueue. Test gọi
+  `/generate-ai/preview` hoặc `/prompt-preview` để nhận immutable draft trước
+  khi enqueue.
+- Các route tương ứng Quiz cho Test gồm
+  `PATCH /admin/test-questions/:questionId/generation-json`, toàn bộ
+  `/admin/test-questions/:questionId/figures/*`, và
+  `/admin/test-questions/:questionId/solution-refinement[/preview]`; response,
+  authorization, revision guard, polling và lỗi bám cùng contract Quiz với
+  target kind `TEST`.
+
 ### 12.1. Admin test set
 
 #### `GET /admin/lessons/:lessonId/test-sets`
@@ -1265,9 +1291,7 @@ Body:
 ```json
 {
   "title": "Bài kiểm tra ngắn",
-  "durationSeconds": 900,
-  "difficulty": "MIXED",
-  "difficultyRatioJson": { "easy": 0.4, "medium": 0.4, "hard": 0.2 }
+  "durationSeconds": 900
 }
 ```
 
@@ -1276,8 +1300,8 @@ Rules:
 - `durationSeconds` bắt buộc, từ `60` đến `14400` giây.
 - UI quản trị nhập thời gian theo phút rồi đổi sang giây trước khi gọi API.
 - Server tự gán `sortOrder` tiếp theo trong lesson.
-- `difficultyRatioJson` là metadata tùy chọn; UI CRUD thủ công M6.4 giữ cùng
-  field mức độ như Quiz và không bắt admin nhập tỷ lệ riêng.
+- Không nhận difficulty ratio, total score hoặc points như capability Admin Test
+  riêng; difficulty thuộc question như Quiz.
 
 #### `POST /admin/lessons/:lessonId/test-sets/generate-ai`
 
@@ -1287,9 +1311,17 @@ Body:
 
 ```json
 {
+  "targetTestSetId": "uuid",
+  "documentIds": ["uuid"],
   "questionCount": 10,
-  "durationSeconds": 900,
-  "difficultyRatio": { "easy": 0.4, "medium": 0.4, "hard": 0.2 }
+  "difficulty": "MIXED",
+  "difficultyCounts": { "easy": 3, "medium": 4, "hard": 3 },
+  "questionTypes": [
+    "MULTIPLE_CHOICE",
+    "TRUE_FALSE",
+    "MULTI_STATEMENT_TRUE_FALSE",
+    "TEXT_INPUT"
+  ]
 }
 ```
 
@@ -1297,15 +1329,22 @@ Response: `202 Accepted` với `jobId`.
 
 Behavior:
 
-- Worker validate đủ bốn question shape, tỷ lệ difficulty và item provenance
-  trước khi lưu atomically với `source=AI`, `reviewStatus=NEEDS_REVIEW`.
+- Đây là Quiz generation v2 với target kind `TEST`: preview/prompt-preview tạo
+  immutable request draft/hash trước, worker validate cùng bốn question shape,
+  provenance, figure/refinement contract rồi append atomically vào TestSet đích.
+- `durationSeconds` không nằm trong payload/UI/prompt. Backend lấy duration của
+  `targetTestSetId` và snapshot nội bộ để kiểm tra target không đổi. Nếu lesson
+  chưa có bộ và target bị bỏ trống, preview dùng mặc định 900 giây, còn enqueue
+  tạo `Bộ đề 1` cùng giá trị đó; client không thể gửi hoặc ghi đè duration.
+- `targetTestSetId` là tùy chọn duy nhất khi lesson chưa có TestSet. Nếu đã có
+  ít nhất một bộ, request phải chọn rõ target để tránh append nhầm khi danh sách
+  thay đổi giữa preview và enqueue.
 
 #### `PATCH /admin/test-sets/:testSetId`
 
 Role: `ADMIN`.
 
-Body: một phần hoặc toàn bộ `title`, `durationSeconds`, `difficulty`,
-`difficultyRatioJson`.
+Body: một phần hoặc toàn bộ `title`, `durationSeconds`.
 
 #### `DELETE /admin/test-sets/:testSetId`
 
@@ -1317,15 +1356,18 @@ Behavior: soft delete.
 
 Role: `ADMIN`.
 
+Behavior giống Quiz: review câu không tự publish set; câu mới/sửa/duyệt có
+`publishedAt=null`; `SAVE`/`PUBLISH` mới đóng dấu các câu `APPROVED`, còn
+`WITHDRAW` ẩn set nhưng không xóa watermark cũ.
+
 ### 12.2. Admin test question item-level CRUD
 
 #### `GET /admin/test-sets/:testSetId/questions`
 
 Role: `ADMIN`.
 
-Response mỗi câu gồm `points` đã lưu và `effectivePoints`. Khi `points=null`,
-service chia phần điểm còn lại cho các câu chưa đặt điểm riêng, làm tròn hai chữ
-số thập phân và giữ tổng điểm hiệu lực bằng `test_sets.total_score` (mặc định 10).
+Response/question contract giống Quiz. Persistence điểm lịch sử Test còn được
+giữ cho M7 scoring, nhưng Admin M6.6 không cấu hình `points` riêng.
 
 #### `POST /admin/test-sets/:testSetId/questions`
 
@@ -1341,7 +1383,6 @@ Body:
   "correctAnswerJson": {},
   "hintJson": {},
   "gradingConfigJson": {},
-  "points": null,
   "difficulty": "MEDIUM",
   "sortOrder": 1
 }
@@ -1349,7 +1390,7 @@ Body:
 
 Contract nội dung câu hỏi giống mục `10.2 Admin quiz question item-level CRUD`
 và hỗ trợ đủ bốn loại `MULTIPLE_CHOICE`, `TRUE_FALSE`,
-`MULTI_STATEMENT_TRUE_FALSE`, `TEXT_INPUT`; Test bổ sung `points`.
+`MULTI_STATEMENT_TRUE_FALSE`, `TEXT_INPUT`.
 
 #### `PATCH /admin/test-questions/:questionId`
 

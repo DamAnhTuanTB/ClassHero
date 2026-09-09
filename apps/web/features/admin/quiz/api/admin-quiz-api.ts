@@ -377,6 +377,8 @@ export async function uploadAdminQuizImage(file: File, token: string) {
   };
 }
 
+export type AdminQuizAssessmentKind = "quiz" | "test";
+
 export async function attachAdminQuizFigureUpload(
   questionId: string,
   data: {
@@ -386,9 +388,10 @@ export async function attachAdminQuizFigureUpload(
     caption?: string;
   },
   token: string,
+  assessmentKind: AdminQuizAssessmentKind,
 ) {
   return apiRequest<AdminQuizFigure>(
-    `/admin/quiz-questions/${questionId}/figures/admin-upload`,
+    `/admin/${assessmentKind}-questions/${questionId}/figures/admin-upload`,
     { method: "POST", body: data, token },
   );
 }
@@ -404,9 +407,10 @@ export function compileAdminQuizFigureDraft(
     caption: string | null;
   },
   token: string,
+  assessmentKind: AdminQuizAssessmentKind,
 ) {
   return apiRequest<AdminQuizFigureCompileResult>(
-    `/admin/quiz-questions/${questionId}/figures/${figureId}/drafts/compile`,
+    `/admin/${assessmentKind}-questions/${questionId}/figures/${figureId}/drafts/compile`,
     { method: "POST", body: data, token },
   );
 }
@@ -420,9 +424,10 @@ export function applyAdminQuizFigureDraft(
     sourceVersion: number;
   },
   token: string,
+  assessmentKind: AdminQuizAssessmentKind,
 ) {
   return apiRequest<{ status: "SUCCEEDED"; revisionId: string }>(
-    `/admin/quiz-questions/${questionId}/figures/${figureId}/drafts/apply`,
+    `/admin/${assessmentKind}-questions/${questionId}/figures/${figureId}/drafts/apply`,
     { method: "POST", body: data, token },
   );
 }
@@ -432,9 +437,10 @@ export function createNewAdminQuizFigureWithAi(
   figureId: string,
   data: AdminQuizFigureCreateAiInput & { baseRevisionId: string | null },
   token: string,
+  assessmentKind: AdminQuizAssessmentKind,
 ) {
   return apiRequest<{ jobId: string; status: string }>(
-    `/admin/quiz-questions/${questionId}/figures/${figureId}/create-new-ai`,
+    `/admin/${assessmentKind}-questions/${questionId}/figures/${figureId}/create-new-ai`,
     { method: "POST", body: data, token },
   );
 }
@@ -443,9 +449,10 @@ export function createAdminQuizFigureForQuestionWithAi(
   questionId: string,
   data: AdminQuizQuestionFigureCreateAiInput,
   token: string,
+  assessmentKind: AdminQuizAssessmentKind,
 ) {
   return apiRequest<{ jobId: string; status: string }>(
-    `/admin/quiz-questions/${questionId}/figures/create-ai`,
+    `/admin/${assessmentKind}-questions/${questionId}/figures/create-ai`,
     { method: "POST", body: data, token },
   );
 }
@@ -454,9 +461,10 @@ export function previewAdminQuizFigureForQuestionWithAi(
   questionId: string,
   data: AdminQuizQuestionFigureCreateAiInput,
   token: string,
+  assessmentKind: AdminQuizAssessmentKind,
 ) {
   return apiRequest<AdminQuizFigureCreateAiPreview>(
-    `/admin/quiz-questions/${questionId}/figures/create-ai/preview`,
+    `/admin/${assessmentKind}-questions/${questionId}/figures/create-ai/preview`,
     { method: "POST", body: data, token },
   );
 }
@@ -466,9 +474,10 @@ export function previewNewAdminQuizFigureWithAi(
   figureId: string,
   data: AdminQuizFigureCreateAiInput & { baseRevisionId: string | null },
   token: string,
+  assessmentKind: AdminQuizAssessmentKind,
 ) {
   return apiRequest<AdminQuizFigureCreateAiPreview>(
-    `/admin/quiz-questions/${questionId}/figures/${figureId}/create-new-ai/preview`,
+    `/admin/${assessmentKind}-questions/${questionId}/figures/${figureId}/create-new-ai/preview`,
     { method: "POST", body: data, token },
   );
 }
@@ -481,9 +490,10 @@ export function refineAdminQuizFigureWithAi(
     adminInstructions: string | null;
   },
   token: string,
+  assessmentKind: AdminQuizAssessmentKind,
 ) {
   return apiRequest<{ jobId: string; status: string }>(
-    `/admin/quiz-questions/${questionId}/figures/${figureId}/refine-ai`,
+    `/admin/${assessmentKind}-questions/${questionId}/figures/${figureId}/refine-ai`,
     { method: "POST", body: data, token },
   );
 }
@@ -496,9 +506,10 @@ export function previewAdminQuizFigureRefinement(
     adminInstructions: string | null;
   },
   token: string,
+  assessmentKind: AdminQuizAssessmentKind,
 ) {
   return apiRequest<AdminQuizFigureRefinementPreview>(
-    `/admin/quiz-questions/${questionId}/figures/${figureId}/refine-ai/preview`,
+    `/admin/${assessmentKind}-questions/${questionId}/figures/${figureId}/refine-ai/preview`,
     { method: "POST", body: data, token },
   );
 }
@@ -508,9 +519,10 @@ export function updateAdminQuizFigureCaption(
   figureId: string,
   data: { baseRevisionId: string | null; caption: string | null },
   token: string,
+  assessmentKind: AdminQuizAssessmentKind,
 ) {
   return apiRequest<AdminQuizFigure>(
-    `/admin/quiz-questions/${questionId}/figures/${figureId}/caption`,
+    `/admin/${assessmentKind}-questions/${questionId}/figures/${figureId}/caption`,
     { method: "PATCH", body: data, token },
   );
 }
@@ -520,9 +532,10 @@ export function deleteAdminQuizFigure(
   figureId: string,
   data: { baseRevisionId: string | null },
   token: string,
+  assessmentKind: AdminQuizAssessmentKind,
 ) {
   return apiRequest<{ deleted: true; figureId: string }>(
-    `/admin/quiz-questions/${questionId}/figures/${figureId}`,
+    `/admin/${assessmentKind}-questions/${questionId}/figures/${figureId}`,
     { method: "DELETE", body: data, token },
   );
 }
@@ -535,9 +548,10 @@ export function previewAdminQuizSolutionRefinement(
     includeCurrentSolutionAsRejected: boolean;
   },
   token: string,
+  assessmentKind: AdminQuizAssessmentKind,
 ) {
   return apiRequest<AdminQuizSolutionRefinementPreview>(
-    `/admin/quiz-questions/${questionId}/solution-refinement/preview`,
+    `/admin/${assessmentKind}-questions/${questionId}/solution-refinement/preview`,
     { method: "POST", body: data, token },
   );
 }
@@ -551,9 +565,10 @@ export function queueAdminQuizSolutionRefinement(
     requestHash: string;
   },
   token: string,
+  assessmentKind: AdminQuizAssessmentKind,
 ) {
   return apiRequest<{ mode: "QUEUED"; jobId: string; status: string }>(
-    `/admin/quiz-questions/${questionId}/solution-refinement`,
+    `/admin/${assessmentKind}-questions/${questionId}/solution-refinement`,
     { method: "POST", body: data, token },
   );
 }

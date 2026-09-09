@@ -8,8 +8,12 @@ import {
   queueAdminQuizSolutionRefinement,
 } from "@/features/admin/quiz/api/admin-quiz-api";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
+import { adminAssessmentQueryKeys } from "@/features/admin/assessments/hooks/use-admin-assessment";
 
-export function useAdminQuizSolutionRefinement(setId: string) {
+export function useAdminQuizSolutionRefinement(
+  setId: string,
+  assessmentKind: "quiz" | "test",
+) {
   const session = useAuthSessionStore((state) => state.session);
   const token = session?.accessToken ?? "";
   const queryClient = useQueryClient();
@@ -26,10 +30,10 @@ export function useAdminQuizSolutionRefinement(setId: string) {
         {
           mode: input.mode,
           adminInstructions: input.adminInstructions || undefined,
-          includeCurrentSolutionAsRejected:
-            input.includeCurrentSolutionAsRejected,
+          includeCurrentSolutionAsRejected: input.includeCurrentSolutionAsRejected,
         },
         token,
+        assessmentKind,
       ),
   });
   const queue = useMutation({
@@ -45,19 +49,19 @@ export function useAdminQuizSolutionRefinement(setId: string) {
         {
           mode: input.mode,
           adminInstructions: input.adminInstructions || undefined,
-          includeCurrentSolutionAsRejected:
-            input.includeCurrentSolutionAsRejected,
+          includeCurrentSolutionAsRejected: input.includeCurrentSolutionAsRejected,
           requestHash: input.requestHash,
         },
         token,
+        assessmentKind,
       ),
   });
   const invalidateQuestion = useCallback(
     () =>
       queryClient.invalidateQueries({
-        queryKey: ["admin", "quiz", "questions", setId],
+        queryKey: adminAssessmentQueryKeys.questions(assessmentKind, setId),
       }),
-    [queryClient, setId],
+    [assessmentKind, queryClient, setId],
   );
 
   return { invalidateQuestion, preview, queue };

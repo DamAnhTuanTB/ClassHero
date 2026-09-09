@@ -6,24 +6,29 @@ import { toast } from "sonner";
 
 import { EditorDialogShell } from "@/components/admin/courses/editor-dialog-shell";
 import { TextareaField } from "@/components/common/forms/textarea-field";
-import type { AdminQuizFigure } from "@/features/admin/quiz/api/admin-quiz-api";
+import type {
+  AdminQuizAssessmentKind,
+  AdminQuizFigure,
+} from "@/features/admin/quiz/api/admin-quiz-api";
 import { useAdminQuizFigureMutations } from "@/features/admin/quiz/hooks/use-admin-quiz";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 
 export function AdminQuizFigureCaptionDialog({
+  assessmentKind,
   figure,
   isOpen,
   onClose,
   questionId,
   setId,
 }: {
+  assessmentKind: AdminQuizAssessmentKind;
   figure: AdminQuizFigure;
   isOpen: boolean;
   onClose: () => void;
   questionId: string;
   setId: string;
 }) {
-  const mutation = useAdminQuizFigureMutations(setId).updateCaption;
+  const mutation = useAdminQuizFigureMutations(setId, assessmentKind).updateCaption;
   const [caption, setCaption] = useState("");
   useEffect(() => {
     if (isOpen) setCaption(figure.currentRevision?.caption ?? "");

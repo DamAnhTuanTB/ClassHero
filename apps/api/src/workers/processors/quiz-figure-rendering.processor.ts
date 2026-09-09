@@ -1,6 +1,5 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import {
-  AiGenerationType,
   BackgroundJobQueue,
   BackgroundJobStatus,
   Prisma,
@@ -55,6 +54,11 @@ import type {
 } from "#api/modules/provider-operations/types/provider-operations.types";
 import { buildItemUsageTarget } from "#api/modules/provider-operations/utils/provider-usage-target";
 import type { QuizSubjectSnapshot } from "#api/modules/quiz/types/quiz-generation.types";
+import {
+  quizFigureTargetFeature,
+  quizFigureTargetUsageKind,
+  type QuizFigureTarget,
+} from "#api/modules/quiz-figures/types/quiz-figure-target";
 
 const durableJobSelect = {
   id: true,
@@ -131,6 +135,8 @@ export class QuizFigureRenderingProcessor {
           aiGenerationId: true,
           quizQuestionId: true,
           quizQuestion: { select: { sortOrder: true } },
+          testQuestionId: true,
+          testQuestion: { select: { sortOrder: true } },
           planJson: true,
           subjectKey: true,
           subjectName: true,
@@ -157,6 +163,7 @@ export class QuizFigureRenderingProcessor {
       if (!figure.pendingRevision) {
         throw new UnrecoverableError("Quiz figure pending revision is missing.");
       }
+      const target = readFigureTarget(metadata.target, figure);
       const plan = readPlan(metadata.planSnapshot ?? figure.planJson);
       if (plan.role !== figure.role) {
         throw new UnrecoverableError("QUIZ_FIGURE_PLAN_ROLE_MISMATCH");
@@ -183,6 +190,7 @@ export class QuizFigureRenderingProcessor {
             adminInstructions,
             aiMode,
             operation,
+            target,
             systemPrompt,
             userPrompt,
           });
@@ -397,8 +405,10 @@ export class QuizFigureRenderingProcessor {
       id: string;
       role: QuizFigureRole;
       aiGenerationId: string | null;
-      quizQuestionId: string;
-      quizQuestion?: { sortOrder: number };
+      quizQuestionId: string | null;
+      quizQuestion?: { sortOrder: number } | null;
+      testQuestionId: string | null;
+      testQuestion?: { sortOrder: number } | null;
       pendingRevision: { id: string; sourceVersion: number } | null;
       currentRevision: {
         latexSource: string | null;
@@ -417,18 +427,23 @@ export class QuizFigureRenderingProcessor {
     operation: "GENERATE" | "REFINE_CURRENT";
     systemPrompt?: string;
     userPrompt?: string;
+    target?: QuizFigureTarget;
   }) {
+    const target = input.target ?? readFigureTarget(null, input.figure);
     const callContext = {
-      feature: AiGenerationType.QUIZ,
+      feature: quizFigureTargetFeature(target),
       aiGenerationId: input.figure.aiGenerationId,
       backgroundJobId: input.backgroundJobId,
       attempt: input.attempt,
       callSequence: 1,
-      operation: resolveQuizFigureUsageOperation(input),
+      operation: resolveQuizFigureUsageOperation({ ...input, target }),
       targetContext: buildItemUsageTarget({
-        kind: "QUIZ_QUESTION",
-        entityId: input.figure.quizQuestionId,
-        sortOrder: input.figure.quizQuestion?.sortOrder ?? 0,
+        kind: quizFigureTargetUsageKind(target),
+        entityId: target.questionId,
+        sortOrder:
+          target.kind === "QUIZ"
+            ? (input.figure.quizQuestion?.sortOrder ?? 0)
+            : (input.figure.testQuestion?.sortOrder ?? 0),
         figureRole: input.figure.role,
       }),
       routeSnapshot: input.routeSnapshot,
@@ -638,21 +653,70 @@ function readQuizFigureOperation(value: unknown): "GENERATE" | "REFINE_CURRENT" 
 
 function resolveQuizFigureUsageOperation(input: {
   figure: { role: QuizFigureRole };
+  target: Pick<QuizFigureTarget, "kind">;
   aiMode: "REGENERATE" | "EDIT_CURRENT";
   operation: "GENERATE" | "REFINE_CURRENT";
 }): ProviderUsageOperation {
   const isQuestion = input.figure.role === QuizFigureRole.QUESTION;
+  const operations =
+    input.target.kind === "QUIZ"
+      ? {
+          generation: isQuestion
+            ? "QUIZ_QUESTION_FIGURE_GENERATION"
+            : "QUIZ_SOLUTION_FIGURE_GENERATION",
+          editing: isQuestion
+            ? "QUIZ_QUESTION_FIGURE_EDITING"
+            : "QUIZ_SOLUTION_FIGURE_EDITING",
+          refinement: isQuestion
+            ? "QUIZ_QUESTION_FIGURE_REFINEMENT"
+            : "QUIZ_SOLUTION_FIGURE_REFINEMENT",
+        }
+      : {
+          generation: isQuestion
+            ? "TEST_QUESTION_FIGURE_GENERATION"
+            : "TEST_SOLUTION_FIGURE_GENERATION",
+          editing: isQuestion
+            ? "TEST_QUESTION_FIGURE_EDITING"
+            : "TEST_SOLUTION_FIGURE_EDITING",
+          refinement: isQuestion
+            ? "TEST_QUESTION_FIGURE_REFINEMENT"
+            : "TEST_SOLUTION_FIGURE_REFINEMENT",
+        };
   if (input.operation === "REFINE_CURRENT") {
-    return isQuestion
-      ? "QUIZ_QUESTION_FIGURE_REFINEMENT"
-      : "QUIZ_SOLUTION_FIGURE_REFINEMENT";
+    return operations.refinement as ProviderUsageOperation;
   }
   if (input.aiMode === "EDIT_CURRENT") {
-    return isQuestion ? "QUIZ_QUESTION_FIGURE_EDITING" : "QUIZ_SOLUTION_FIGURE_EDITING";
+    return operations.editing as ProviderUsageOperation;
   }
-  return isQuestion
-    ? "QUIZ_QUESTION_FIGURE_GENERATION"
-    : "QUIZ_SOLUTION_FIGURE_GENERATION";
+  return operations.generation as ProviderUsageOperation;
+}
+
+function readFigureTarget(
+  value: unknown,
+  figure: {
+    quizQuestionId: string | null;
+    testQuestionId: string | null;
+  },
+): QuizFigureTarget {
+  const record = readRecord(value);
+  const kind = record.kind;
+  const questionId = record.questionId;
+  if (
+    (kind === "QUIZ" || kind === "TEST") &&
+    typeof questionId === "string" &&
+    questionId.length > 0
+  ) {
+    const target = { kind, questionId } as QuizFigureTarget;
+    if (
+      (target.kind === "QUIZ" && target.questionId === figure.quizQuestionId) ||
+      (target.kind === "TEST" && target.questionId === figure.testQuestionId)
+    )
+      return target;
+    throw new UnrecoverableError("QUIZ_FIGURE_TARGET_MISMATCH");
+  }
+  if (figure.quizQuestionId) return { kind: "QUIZ", questionId: figure.quizQuestionId };
+  if (figure.testQuestionId) return { kind: "TEST", questionId: figure.testQuestionId };
+  throw new UnrecoverableError("QUIZ_FIGURE_TARGET_MISSING");
 }
 
 function firstErrorCode(message: string) {

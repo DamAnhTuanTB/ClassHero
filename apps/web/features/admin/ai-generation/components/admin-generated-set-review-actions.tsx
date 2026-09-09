@@ -33,6 +33,7 @@ export function AdminGeneratedSetReviewActions({
   source: string;
   type: Exclude<AdminAiGenerationType, "SUMMARY">;
 }) {
+  const assessmentLabel = type === "TEST" ? "Test" : "Quiz";
   const token = useAuthSessionStore((state) => state.session?.accessToken ?? "");
   const queryClient = useQueryClient();
   const mutation = useMutation({
@@ -53,9 +54,9 @@ export function AdminGeneratedSetReviewActions({
         input.action === "SAVE"
           ? "Đã lưu vào lượt phát hành gần nhất"
           : input.action === "PUBLISH"
-            ? "Đã phát hành bộ Quiz"
+            ? `Đã phát hành bộ ${assessmentLabel}`
             : input.action === "WITHDRAW"
-              ? "Đã thu hồi phát hành bộ Quiz"
+              ? `Đã thu hồi phát hành bộ ${assessmentLabel}`
               : input.reviewStatus === "APPROVED"
                 ? "Đã duyệt nội dung"
                 : "Đã ẩn nội dung",
@@ -72,23 +73,24 @@ export function AdminGeneratedSetReviewActions({
   });
 
   const isStandaloneAiSet = source === "AI";
-  const isQuiz = type === "QUIZ";
-  const isPublishBlocked = isQuiz && approvedQuestionCount < 1;
+  const isAssessment = type === "QUIZ" || type === "TEST";
+  const isPublishBlocked = isAssessment && approvedQuestionCount < 1;
   const currentReviewStatus: AdminLessonSummaryReviewStatus =
     reviewStatus === "NEEDS_REVIEW" ||
     reviewStatus === "APPROVED" ||
     reviewStatus === "HIDDEN"
       ? reviewStatus
       : "DRAFT";
-  if (!isQuiz && !isStandaloneAiSet && pendingReviewQuestionCount === 0) {
+  if (!isAssessment && !isStandaloneAiSet && pendingReviewQuestionCount === 0) {
     return null;
   }
-  if (isQuiz) {
+  if (isAssessment) {
     const isActionPending = mutation.isPending || isReviewingAllPending;
     return (
       <div
         className="mt-3 flex max-w-full items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        aria-label="Hành động bộ Quiz"
+        aria-label={`Hành động bộ ${assessmentLabel}`}
+        role="group"
       >
         <button
           type="button"
@@ -97,7 +99,7 @@ export function AdminGeneratedSetReviewActions({
           title={
             pendingReviewQuestionCount === 0
               ? "Không còn câu AI chờ duyệt"
-              : "Duyệt tất cả câu AI đang chờ duyệt trong bộ Quiz này"
+              : `Duyệt tất cả câu AI đang chờ duyệt trong bộ ${assessmentLabel} này`
           }
           className="theme-button-success inline-flex min-h-8 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 text-xs font-extrabold disabled:opacity-60"
         >
@@ -138,8 +140,8 @@ export function AdminGeneratedSetReviewActions({
             }
             title={
               isPublishBlocked
-                ? "Cần có ít nhất 1 câu Quiz được duyệt để phát hành"
-                : "Phát hành bộ Quiz"
+                ? `Cần có ít nhất 1 câu ${assessmentLabel} được duyệt để phát hành`
+                : `Phát hành bộ ${assessmentLabel}`
             }
             className="theme-button-primary inline-flex min-h-8 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 text-xs font-extrabold disabled:opacity-60"
           >
@@ -180,7 +182,7 @@ export function AdminGeneratedSetReviewActions({
         {pendingReviewQuestionCount > 0
           ? `${pendingReviewQuestionCount} câu AI cần duyệt`
           : reviewStatus === "APPROVED"
-            ? isQuiz
+            ? isAssessment
               ? "Đã phát hành"
               : "Đã duyệt"
             : reviewStatus === "HIDDEN"

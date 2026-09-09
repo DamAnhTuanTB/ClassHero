@@ -1493,8 +1493,10 @@ model QuizFigure {
   id                String                    @id @default(uuid()) @db.Uuid
   lessonId          String                    @map("lesson_id") @db.Uuid
   lesson            Lesson                    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  quizQuestionId    String                    @map("quiz_question_id") @db.Uuid
-  quizQuestion      QuizQuestion              @relation(fields: [quizQuestionId], references: [id], onDelete: Cascade)
+  quizQuestionId    String?                   @map("quiz_question_id") @db.Uuid
+  quizQuestion      QuizQuestion?             @relation(fields: [quizQuestionId], references: [id], onDelete: Cascade)
+  testQuestionId    String?                   @map("test_question_id") @db.Uuid
+  testQuestion      TestQuestion?             @relation(fields: [testQuestionId], references: [id], onDelete: Cascade)
   role              QuizFigureRole
   aiGenerationId    String?                   @map("ai_generation_id") @db.Uuid
   aiGeneration      AiGeneration?             @relation("QuizFigureAiGeneration", fields: [aiGenerationId], references: [id], onDelete: SetNull)
@@ -1519,8 +1521,10 @@ model QuizFigure {
   attempts          QuizFigureRenderAttempt[]
 
   @@unique([quizQuestionId, role])
+  @@unique([testQuestionId, role])
   @@index([lessonId, status])
   @@index([quizQuestionId, deletedAt])
+  @@index([testQuestionId, deletedAt])
   @@index([aiGenerationId])
   @@map("quiz_figures")
 }
@@ -1917,6 +1921,7 @@ model TestQuestion {
   points             Decimal?            @db.Decimal(5, 2)
   difficulty         Difficulty          @default(MEDIUM)
   reviewStatus       ReviewStatus        @default(APPROVED) @map("review_status")
+  publishedAt        DateTime?           @map("published_at")
   explanationId      String?             @map("explanation_id") @db.Uuid
   explanation        AiExplanation?      @relation("TestQuestionExplanation", fields: [explanationId], references: [id], onDelete: SetNull)
   sortOrder          Int                 @default(0) @map("sort_order")
@@ -1924,8 +1929,10 @@ model TestQuestion {
   updatedAt          DateTime            @updatedAt @map("updated_at")
   deletedAt          DateTime?           @map("deleted_at")
   attemptAnswers     TestAttemptAnswer[]
+  figures            QuizFigure[]
 
   @@index([testSetId, sortOrder])
+  @@index([testSetId, publishedAt])
   @@index([lessonId])
   @@index([lessonId, reviewStatus])
   @@index([explanationId])

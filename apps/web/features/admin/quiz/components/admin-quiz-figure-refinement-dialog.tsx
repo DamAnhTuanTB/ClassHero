@@ -12,6 +12,7 @@ import { AdminAiPromptContentPreview } from "@/features/admin/ai-generation/comp
 import { AdminAiRequestStatistics } from "@/features/admin/ai-generation/components/admin-ai-request-statistics";
 import { AdminPromptInputBreakdownDialog } from "@/features/admin/ai-generation/components/admin-prompt-input-breakdown-dialog";
 import type {
+  AdminQuizAssessmentKind,
   AdminQuizFigure,
   AdminQuizFigureRefinementPreview,
 } from "@/features/admin/quiz/api/admin-quiz-api";
@@ -34,19 +35,21 @@ const REQUEST_PREVIEW_TABS: Array<{ value: RequestPreviewTab; label: string }> =
 ];
 
 export function AdminQuizFigureRefinementDialog({
+  assessmentKind,
   figure,
   isOpen,
   onClose,
   questionId,
   setId,
 }: {
+  assessmentKind: AdminQuizAssessmentKind;
   figure: AdminQuizFigure;
   isOpen: boolean;
   onClose: () => void;
   questionId: string;
   setId: string;
 }) {
-  const mutations = useAdminQuizFigureMutations(setId);
+  const mutations = useAdminQuizFigureMutations(setId, assessmentKind);
   const previewMutation = mutations.previewRefinement;
   const mutatePreview = previewMutation.mutateAsync;
   const resetPreview = previewMutation.reset;
@@ -94,7 +97,6 @@ export function AdminQuizFigureRefinementDialog({
     setRequestPreviewTab("user");
     resetPreview();
     void loadPreview("");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [figure.id, isOpen, resetPreview]);
   useEffect(() => {
     if (!isOpen) return;
@@ -244,7 +246,9 @@ export function AdminQuizFigureRefinementDialog({
                 </h3>
                 <div className="mt-3">
                   <AdminAiRequestStatistics
-                    details={buildRequestStatistics(previewData, () => setIsInputBreakdownDialogOpen(true))}
+                    details={buildRequestStatistics(previewData, () =>
+                      setIsInputBreakdownDialogOpen(true),
+                    )}
                     estimatedCost={previewData.estimatedCost}
                     note="Mở modal và xem trước không gọi provider trả phí. Chi phí thực tế chỉ phát sinh sau khi bấm Thực hiện và có thể thấp hơn mức tối đa."
                   />

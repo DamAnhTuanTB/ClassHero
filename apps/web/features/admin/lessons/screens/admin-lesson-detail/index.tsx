@@ -125,6 +125,7 @@ export function AdminLessonDetailManager({
     initialQuizData?.questionSetId ?? undefined,
   );
   const [activeFlashcardSetId, setActiveFlashcardSetId] = useState<string | undefined>();
+  const [activeTestSetId, setActiveTestSetId] = useState<string | undefined>();
   const [requestedGeneration, setRequestedGeneration] =
     useState<AdminAiGenerationDialogRequest | null>(null);
   const lessonContentPanelId = `admin-lesson-tab-panel-${lessonId}`;
@@ -615,6 +616,7 @@ export function AdminLessonDetailManager({
                 lessonId={lessonId}
                 flashcardTargetSetId={activeFlashcardSetId}
                 quizTargetSetId={activeQuizSetId}
+                testTargetSetId={activeTestSetId}
                 requestedGeneration={requestedGeneration}
                 onOpenResult={handleOpenAiResult}
                 onRequestedGenerationHandled={handleRequestedGenerationHandled}
@@ -668,6 +670,7 @@ export function AdminLessonDetailManager({
                   <div className="h-full sm:p-6">
                     <AdminTestsTab
                       lessonId={lessonId}
+                      onSelectedSetIdChange={setActiveTestSetId}
                       preferredSetId={preferredSetIds.TEST}
                     />
                   </div>

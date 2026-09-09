@@ -4,7 +4,10 @@ import { ChevronDown, Images, Loader2 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
 
-import type { AdminQuizQuestion } from "@/features/admin/quiz/api/admin-quiz-api";
+import type {
+  AdminQuizAssessmentKind,
+  AdminQuizQuestion,
+} from "@/features/admin/quiz/api/admin-quiz-api";
 import { hasActiveAdminFigure } from "@/lib/admin-figure-status";
 
 const QuizFigureOverviewDialog = dynamic(
@@ -16,11 +19,13 @@ const QuizFigureOverviewDialog = dynamic(
 );
 
 export function AdminQuizFigureStatusSummary({
+  assessmentKind,
   approvedQuestions,
   onNavigateToQuestion,
   pendingQuestions,
   setId,
 }: {
+  assessmentKind: AdminQuizAssessmentKind;
   approvedQuestions: AdminQuizQuestion[];
   onNavigateToQuestion: (questionId: string) => void;
   pendingQuestions: AdminQuizQuestion[];
@@ -33,10 +38,11 @@ export function AdminQuizFigureStatusSummary({
     [approvedQuestions, pendingQuestions],
   );
   const hasProcessingFigure = hasActiveAdminFigure(figures);
+  const assessmentLabel = assessmentKind === "test" ? "Test" : "Quiz";
 
   return (
     <>
-      <div aria-label="Theo dõi xử lý hình Quiz" role="group">
+      <div aria-label={`Theo dõi xử lý hình ${assessmentLabel}`} role="group">
         <button
           aria-haspopup="dialog"
           className="inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-full border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] px-2.5 text-xs font-extrabold tabular-nums text-[var(--theme-text-muted)] transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:hover:border-sky-700 dark:hover:bg-sky-950/50 dark:hover:text-sky-200"
@@ -60,6 +66,7 @@ export function AdminQuizFigureStatusSummary({
 
       {isOpen ? (
         <QuizFigureOverviewDialog
+          assessmentKind={assessmentKind}
           approvedQuestions={approvedQuestions}
           isOpen={isOpen}
           onClose={() => setIsOpen(false)}

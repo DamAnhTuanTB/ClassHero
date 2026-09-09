@@ -2935,7 +2935,7 @@ test("test prerequisite actions reflect partial Quiz completion", async ({ page 
     page.getByRole("status", { name: "Đang chuẩn bị Flashcard" }),
   ).toBeVisible();
   expect(new URL(page.url()).searchParams.get("tab")).toBe("test");
-  await expect(page.getByRole("heading", { name: "Thẻ 1/1" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Thẻ 1", exact: true })).toBeVisible();
   await expectNoFrameworkOverlay(page);
 });
 
@@ -2955,7 +2955,7 @@ test("test prerequisite actions reflect partial Flashcard completion", async ({
   await expect(page.getByRole("button", { name: "Làm Flashcard" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Bắt đầu bài thi" })).toBeDisabled();
   await page.getByRole("button", { name: "Làm Quiz" }).click();
-  await expect(page.getByRole("status", { name: "Đang chuẩn bị Quiz" })).toBeVisible();
+  await expect(page.getByRole("status", { name: "Đang chuẩn bị Quiz" }).first()).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Câu hỏi 1", exact: true }),
   ).toBeVisible();

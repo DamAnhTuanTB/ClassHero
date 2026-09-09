@@ -71,6 +71,12 @@ M14 testing/hardening/deploy
 - Course detail từ M3.3/M3.5 dùng ordered `structureItems`: chapter và lesson không thuộc chapter có thể xen kẽ, chapter chứa lessons con; lesson vẫn là đơn vị nội dung bắt buộc thuộc learning path.
 - `M4.5` source document upload/page mapping UI cần `M4.1`, `M4.2`, `M4.3`; paid OCR artifact/page-level content và chunk theo lesson đầy đủ cần `M4.4`.
 - `M7.1` lesson page skeleton cần `M6.5` để đọc lesson content.
+- `M6.6` đi sau M6.2/M6.4 và Quiz figure/refinement/generation nền M9.3;
+  dependency này chỉ áp dụng Admin Test/worker target. M7.4-M7.5 giữ attempt,
+  timer, best-score và completion riêng, không bị thay bằng Quiz runner.
+- Sau M6.6, capability Admin/AI/figure mới cho Test phải đi qua Assessment/Quiz
+  core; `durationSeconds` chỉ được lấy từ TestSet, không được thêm vào AI modal
+  hoặc prompt contract.
 - `M8.4` payment UI cần `M8.2` và `M8.3`; notification thật có thể chờ `M10.1`.
 - Thứ tự triển khai cụm AI là
   `M9.1 -> M9.2 (Summary + TeX/TikZ) -> M9.8 -> M9.17 -> M9.18 -> M9.19 -> M9.20 -> M9.21 -> M9.22 -> M9.23 -> M9.24 -> M9.25 -> M9.26 -> M9.27 -> M9.4 -> M9.5 -> M9.6 -> M9.7`.

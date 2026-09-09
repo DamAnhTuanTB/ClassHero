@@ -8,7 +8,10 @@ import { toast } from "sonner";
 import { DeleteConfirmDialog } from "@/components/admin/courses/delete-confirm-dialog";
 import { ImmediateTooltip } from "@/components/common/ui/immediate-tooltip";
 import { AdminStemFigureActionsMenu } from "@/features/admin/ai-generation/components/admin-stem-figure-actions-menu";
-import type { AdminQuizFigure } from "@/features/admin/quiz/api/admin-quiz-api";
+import type {
+  AdminQuizAssessmentKind,
+  AdminQuizFigure,
+} from "@/features/admin/quiz/api/admin-quiz-api";
 import {
   useAdminQuizFigureMutations,
   useAdminQuizFigureUpload,
@@ -46,19 +49,21 @@ const RefinementDialog = dynamic(
 
 export function AdminQuizFigureActionFrame({
   children,
+  assessmentKind,
   displayPercent,
   figure,
   questionId,
   setId,
 }: {
+  assessmentKind: AdminQuizAssessmentKind;
   children: ReactNode;
   displayPercent?: number | null;
   figure: AdminQuizFigure;
   questionId: string;
   setId: string;
 }) {
-  const mutations = useAdminQuizFigureMutations(setId);
-  const uploadMutation = useAdminQuizFigureUpload(setId);
+  const mutations = useAdminQuizFigureMutations(setId, assessmentKind);
+  const uploadMutation = useAdminQuizFigureUpload(setId, assessmentKind);
   const inputRef = useRef<HTMLInputElement>(null);
   const [codeMode, setCodeMode] = useState<"create" | "edit" | null>(null);
   const [showAi, setShowAi] = useState(false);
@@ -180,6 +185,7 @@ export function AdminQuizFigureActionFrame({
           onClose={() => setCodeMode(null)}
           questionId={questionId}
           setId={setId}
+          assessmentKind={assessmentKind}
         />
       ) : null}
       {showAi ? (
@@ -189,6 +195,7 @@ export function AdminQuizFigureActionFrame({
           onClose={() => setShowAi(false)}
           questionId={questionId}
           setId={setId}
+          assessmentKind={assessmentKind}
         />
       ) : null}
       {showCaption ? (
@@ -198,6 +205,7 @@ export function AdminQuizFigureActionFrame({
           onClose={() => setShowCaption(false)}
           questionId={questionId}
           setId={setId}
+          assessmentKind={assessmentKind}
         />
       ) : null}
       {showRefinement ? (
@@ -207,6 +215,7 @@ export function AdminQuizFigureActionFrame({
           onClose={() => setShowRefinement(false)}
           questionId={questionId}
           setId={setId}
+          assessmentKind={assessmentKind}
         />
       ) : null}
       <DeleteConfirmDialog

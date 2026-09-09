@@ -620,7 +620,14 @@ const difficultyCountsSchema = z
 
 export const quizGenerationJobInputSchema = sourceSnapshotSchema
   .extend({
+    // TEST v2 deliberately uses the Quiz generation contract.  The discriminator
+    // is persisted with the job so workers can keep executing pre-cutover TEST
+    // jobs through the legacy handler.
+    assessmentKind: z.enum(["QUIZ", "TEST"]).default("QUIZ"),
+    pipelineVersion: z.literal("ASSESSMENT_QUIZ_V1").default("ASSESSMENT_QUIZ_V1"),
     targetQuizSetId: z.uuid().nullable().default(null),
+    targetTestSetId: z.uuid().nullable().optional(),
+    durationSeconds: z.number().int().min(60).max(14_400).optional(),
     questionCount: z.number().int().min(1).max(50),
     realWorldQuestionCount: z.number().int().min(0).max(50).optional(),
     difficulty: z.nativeEnum(Difficulty),

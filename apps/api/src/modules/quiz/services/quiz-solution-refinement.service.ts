@@ -58,7 +58,19 @@ export class QuizSolutionRefinementService {
   ) {}
 
   async preview(questionId: string, dto: PreviewQuizSolutionRefinementDto) {
-    const prepared = await this.prepareRequest(questionId, dto);
+    return this.previewForKind(questionId, dto, "QUIZ");
+  }
+
+  async previewTest(questionId: string, dto: PreviewQuizSolutionRefinementDto) {
+    return this.previewForKind(questionId, dto, "TEST");
+  }
+
+  private async previewForKind(
+    questionId: string,
+    dto: PreviewQuizSolutionRefinementDto,
+    kind: "QUIZ" | "TEST",
+  ) {
+    const prepared = await this.prepareRequest(questionId, dto, kind);
     const modelOptions = await this.modelRouting.getAllActiveModels();
     const resolvedRequest = {
       ...buildResolvedRequest(prepared.request, prepared.trace),
@@ -69,8 +81,7 @@ export class QuizSolutionRefinementService {
     };
     return {
       mode: dto.mode,
-      includeCurrentSolutionAsRejected:
-        prepared.includeCurrentSolutionAsRejected,
+      includeCurrentSolutionAsRejected: prepared.includeCurrentSolutionAsRejected,
       requestHash: buildRequestHash(prepared),
       baseContentHash: prepared.baseContentHash,
       questionImageDataUrl: prepared.questionImageDataUrl,
@@ -105,7 +116,24 @@ export class QuizSolutionRefinementService {
     actorUserId: string,
     dto: QueueQuizSolutionRefinementDto,
   ) {
-    const prepared = await this.prepareRequest(questionId, dto);
+    return this.queueForKind(questionId, actorUserId, dto, "QUIZ");
+  }
+
+  async queueTest(
+    questionId: string,
+    actorUserId: string,
+    dto: QueueQuizSolutionRefinementDto,
+  ) {
+    return this.queueForKind(questionId, actorUserId, dto, "TEST");
+  }
+
+  private async queueForKind(
+    questionId: string,
+    actorUserId: string,
+    dto: QueueQuizSolutionRefinementDto,
+    kind: "QUIZ" | "TEST",
+  ) {
+    const prepared = await this.prepareRequest(questionId, dto, kind);
     const requestHash = buildRequestHash(prepared);
     if (requestHash !== dto.requestHash) {
       throw badRequestException(
@@ -116,7 +144,10 @@ export class QuizSolutionRefinementService {
     const active = await this.prisma.backgroundJob.findFirst({
       where: {
         queue: BackgroundJobQueue.AI_GENERATION,
-        resourceType: QUIZ_SOLUTION_REFINEMENT_TARGET_TYPE,
+        resourceType:
+          kind === "TEST"
+            ? "TEST_SOLUTION_REFINEMENT"
+            : QUIZ_SOLUTION_REFINEMENT_TARGET_TYPE,
         resourceId: questionId,
         status: { in: [BackgroundJobStatus.QUEUED, BackgroundJobStatus.RUNNING] },
       },
@@ -126,20 +157,28 @@ export class QuizSolutionRefinementService {
       return { mode: "QUEUED" as const, jobId: active.id, status: active.status };
     }
     const job = await this.jobs.createAndEnqueue({
-      type: AiGenerationType.QUIZ,
+      type: kind === "TEST" ? AiGenerationType.TEST : AiGenerationType.QUIZ,
       createdByUserId: actorUserId,
       lessonId: prepared.lessonId,
-      targetType: QUIZ_SOLUTION_REFINEMENT_TARGET_TYPE,
+      targetType:
+        kind === "TEST"
+          ? "TEST_SOLUTION_REFINEMENT"
+          : QUIZ_SOLUTION_REFINEMENT_TARGET_TYPE,
       targetId: questionId,
       promptVersion: prepared.request.promptVersion,
       schemaVersion: prepared.request.schemaVersion,
       inputFingerprint: { questionId, mode: dto.mode, requestHash, nonce: randomUUID() },
       inputMeta: {
-        operation: QUIZ_SOLUTION_REFINEMENT_TARGET_TYPE,
+        operation:
+          kind === "TEST"
+            ? "TEST_SOLUTION_REFINEMENT"
+            : QUIZ_SOLUTION_REFINEMENT_TARGET_TYPE,
+        assessmentKind: kind,
+        pipelineVersion: "ASSESSMENT_QUIZ_V1",
         mode: dto.mode,
-        includeCurrentSolutionAsRejected:
-          prepared.includeCurrentSolutionAsRejected,
+        includeCurrentSolutionAsRejected: prepared.includeCurrentSolutionAsRejected,
         questionId,
+        targetQuestionId: questionId,
         baseContentHash: prepared.baseContentHash,
         requestHash,
         subjectKey: prepared.subject.key,
@@ -151,7 +190,12 @@ export class QuizSolutionRefinementService {
         questionSnapshot: prepared.questionSnapshot,
       },
       routeSnapshot: prepared.route,
-      idempotencyKey: ["quiz-solution", dto.mode.toLowerCase(), questionId, randomUUID()].join(":"),
+      idempotencyKey: [
+        `${kind.toLowerCase()}-solution`,
+        dto.mode.toLowerCase(),
+        questionId,
+        randomUUID(),
+      ].join(":"),
       maxAttempts: 1,
     });
     return { mode: "QUEUED" as const, jobId: job.backgroundJobId, status: job.status };
@@ -160,8 +204,9 @@ export class QuizSolutionRefinementService {
   private async prepareRequest(
     questionId: string,
     dto: PreviewQuizSolutionRefinementDto,
+    kind: "QUIZ" | "TEST" = "QUIZ",
   ) {
-    const question = await this.prisma.quizQuestion.findFirst({
+    const questionQuery = {
       where: { id: questionId, deletedAt: null },
       select: {
         lessonId: true,
@@ -200,9 +245,16 @@ export class QuizSolutionRefinementService {
           },
         },
       },
-    });
+    } as const;
+    const question =
+      kind === "TEST"
+        ? await this.prisma.testQuestion.findFirst(questionQuery)
+        : await this.prisma.quizQuestion.findFirst(questionQuery);
     if (!question) {
-      throw notFoundException("QUIZ_QUESTION_NOT_FOUND", "Không tìm thấy câu Quiz.");
+      throw notFoundException(
+        `${kind}_QUESTION_NOT_FOUND`,
+        `Không tìm thấy câu ${kind === "TEST" ? "Test" : "Quiz"}.`,
+      );
     }
     const currentSolution = readCurrentSolution(
       question.sourceMetadataJson,
@@ -243,8 +295,7 @@ export class QuizSolutionRefinementService {
       );
     }
     const includeCurrentSolutionAsRejected =
-      dto.mode === "REGENERATE" &&
-      dto.includeCurrentSolutionAsRejected === true;
+      dto.mode === "REGENERATE" && dto.includeCurrentSolutionAsRejected === true;
     const revision = question.figures?.[0]?.currentRevision;
     const questionFigure =
       revision?.status === "SUCCEEDED" &&
@@ -278,8 +329,14 @@ export class QuizSolutionRefinementService {
             questionImageDataUrl,
             includeCurrentSolutionAsRejected,
           });
-    const route = await this.modelRouting.resolve(AiGenerationType.QUIZ, AiModelPurpose.TEXT);
-    const previewContext = { feature: AiGenerationType.QUIZ, routeSnapshot: route };
+    const route = await this.modelRouting.resolve(
+      kind === "TEST" ? AiGenerationType.TEST : AiGenerationType.QUIZ,
+      AiModelPurpose.TEXT,
+    );
+    const previewContext = {
+      feature: kind === "TEST" ? AiGenerationType.TEST : AiGenerationType.QUIZ,
+      routeSnapshot: route,
+    };
     const trace =
       dto.mode === "REGENERATE"
         ? await previewRegenerationRequest(
@@ -350,7 +407,10 @@ async function previewRegenerationRequest(
   }
 }
 
-function buildResolvedRequest(request: AiStructuredInput, trace: ResolvedAiStructuredRequestPreview) {
+function buildResolvedRequest(
+  request: AiStructuredInput,
+  trace: ResolvedAiStructuredRequestPreview,
+) {
   return {
     ...request,
     model: trace.model,

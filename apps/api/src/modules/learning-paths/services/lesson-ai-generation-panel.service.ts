@@ -75,12 +75,13 @@ export class LessonAiGenerationPanelService {
       summaryFigureRoute,
       quizRoute,
       quizFigureRoute,
+      testRoute,
+      testFigureRoute,
       flashcardRoute,
       flashcardFigureRoute,
       activeModels,
       ...generations
-    ] =
-      await Promise.all([
+    ] = await Promise.all([
       this.prisma.lesson.findFirst({
         where: {
           id: lessonId,
@@ -131,6 +132,8 @@ export class LessonAiGenerationPanelService {
       this.modelRouting.resolve(AiGenerationType.SUMMARY, AiModelPurpose.IMAGE),
       this.modelRouting.resolve(AiGenerationType.QUIZ, AiModelPurpose.TEXT),
       this.modelRouting.resolve(AiGenerationType.QUIZ, AiModelPurpose.IMAGE),
+      this.modelRouting.resolve(AiGenerationType.TEST, AiModelPurpose.TEXT),
+      this.modelRouting.resolve(AiGenerationType.TEST, AiModelPurpose.IMAGE),
       this.modelRouting.resolve(AiGenerationType.FLASHCARD, AiModelPurpose.TEXT),
       this.modelRouting.resolve(AiGenerationType.FLASHCARD, AiModelPurpose.IMAGE),
       this.modelRouting.getAllActiveModels(),
@@ -141,7 +144,7 @@ export class LessonAiGenerationPanelService {
           select: panelGenerationSelect,
         }),
       ),
-      ]);
+    ]);
 
     if (!lesson) {
       throwLessonNotFound();
@@ -176,8 +179,7 @@ export class LessonAiGenerationPanelService {
     const documents = lesson.documents.map((document) => {
       const packetUnavailableReason = getPacketDocumentUnavailableReason(document);
       const canUseForSummary =
-        document.status === DocumentStatus.READY &&
-        packetUnavailableReason === null;
+        document.status === DocumentStatus.READY && packetUnavailableReason === null;
       const quizUnavailableReason =
         getQuizDocumentUnavailableReason(document) ??
         getQuizPacketDocumentUnavailableReason(document);
@@ -241,6 +243,12 @@ export class LessonAiGenerationPanelService {
       quizCandidates[0] ??
       null;
     const quizModelOptions = activeModels.filter(supportsHighDetailPdfInput);
+    const testCandidates = testRoute.candidates.filter(supportsHighDetailPdfInput);
+    const resolvedTestCandidate =
+      testCandidates.find((candidate) => candidate.available) ??
+      testCandidates[0] ??
+      null;
+    const testModelOptions = activeModels.filter(supportsHighDetailPdfInput);
     const resolvedSummaryFigureCandidate =
       summaryFigureRoute.candidates.find((candidate) => candidate.available) ??
       summaryFigureRoute.candidates[0] ??
@@ -248,6 +256,10 @@ export class LessonAiGenerationPanelService {
     const resolvedQuizFigureCandidate =
       quizFigureRoute.candidates.find((candidate) => candidate.available) ??
       quizFigureRoute.candidates[0] ??
+      null;
+    const resolvedTestFigureCandidate =
+      testFigureRoute.candidates.find((candidate) => candidate.available) ??
+      testFigureRoute.candidates[0] ??
       null;
     const resolvedFlashcardCandidate =
       flashcardRoute.candidates.find((candidate) => candidate.available) ??
@@ -345,6 +357,34 @@ export class LessonAiGenerationPanelService {
           capabilities: candidate.capabilitiesJson,
         })),
       },
+      testConfiguration: {
+        isDefaultConfigured: testRoute.hasConfiguration,
+        resolvedProvider: resolvedTestCandidate?.provider ?? null,
+        resolvedModel: resolvedTestCandidate?.model ?? null,
+        temperature: testRoute.temperature,
+        reasoningEffort: testRoute.reasoningEffort,
+        maxOutputTokens: testRoute.maxOutputTokens,
+        modelOptions: testModelOptions.map((candidate) => ({
+          provider: candidate.provider,
+          model: candidate.model,
+          available: candidate.available,
+          capabilities: candidate.capabilitiesJson,
+        })),
+      },
+      testFigureConfiguration: {
+        isDefaultConfigured: testFigureRoute.hasConfiguration,
+        resolvedProvider: resolvedTestFigureCandidate?.provider ?? null,
+        resolvedModel: resolvedTestFigureCandidate?.model ?? null,
+        temperature: testFigureRoute.temperature,
+        reasoningEffort: testFigureRoute.reasoningEffort,
+        maxOutputTokens: testFigureRoute.maxOutputTokens,
+        modelOptions: activeModels.map((candidate) => ({
+          provider: candidate.provider,
+          model: candidate.model,
+          available: candidate.available,
+          capabilities: candidate.capabilitiesJson,
+        })),
+      },
       flashcardConfiguration: {
         isDefaultConfigured: flashcardRoute.hasConfiguration,
         resolvedProvider: resolvedFlashcardCandidate?.provider ?? null,
@@ -428,9 +468,7 @@ function getSummaryDocumentUnavailableReason(document: { status: DocumentStatus 
   return null;
 }
 
-function getQuizDocumentUnavailableReason(document: {
-  status: DocumentStatus;
-}) {
+function getQuizDocumentUnavailableReason(document: { status: DocumentStatus }) {
   if (document.status === DocumentStatus.UPLOADED) return "Đang chờ xử lý Quiz";
   if (document.status === DocumentStatus.PROCESSING) return "Đang xử lý Quiz";
   if (document.status === DocumentStatus.FAILED) return "Xử lý Quiz thất bại";

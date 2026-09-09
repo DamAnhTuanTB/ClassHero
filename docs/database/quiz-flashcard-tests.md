@@ -117,9 +117,13 @@ Rules:
 
 ### 7.2a. `quiz_figures`, `quiz_figure_revisions`, `quiz_figure_render_attempts`
 
-- `quiz_figures` có tối đa một row cho mỗi `(quiz_question_id, role)` với role
-  `QUESTION | SOLUTION`, giữ lifecycle, plan, subject snapshot và current/pending
-  revision.
+- `quiz_figures` là shared Question Figure persistence cho Admin Quiz/Test.
+  Một row target đúng một trong `quiz_question_id` hoặc `test_question_id`
+  (`XOR`, enforced bằng DB check); không được có cả hai hoặc cả hai null. Mỗi
+  target có tối đa một row cho mỗi role `QUESTION | SOLUTION`, giữ lifecycle,
+  plan, subject snapshot và current/pending revision. Migration M6.6 chỉ thêm
+  `test_question_id` nullable + XOR/index/foreign key; không gộp bảng
+  `quiz_*`/`test_*` và không đổi attempt.
 - `quiz_figure_revisions` là nguồn chuẩn của TeX/TikZ hoặc file `ADMIN_UPLOAD`
   và preview/delivery asset. Revision `QUESTION` và `SOLUTION` không có lineage
   phụ thuộc lẫn nhau.
@@ -128,8 +132,9 @@ Rules:
   luôn tạo pending revision mới, không ghi đè source/file của current revision.
   Figure có thể chuyển `QUEUED/RUNNING` trong khi current revision `SUCCEEDED`
   vẫn là asset đọc cho student cho tới khi candidate được promote nguyên tử.
-- Đây là các bảng thuộc riêng Quiz, không FK/import sang `stem_figures` của
-  Summary. AI không lưu crop/ảnh gốc SGK; admin upload là đường raster riêng.
+- Các bảng không FK/import sang `stem_figures` của Summary. AI không lưu crop/ảnh
+  gốc SGK; admin upload là đường raster riêng. `AiGenerationType.QUIZ|TEST`
+  được giữ trên job/usage để routing/accounting, không nhân bản figure core.
 
 ### 7.3. `quiz_attempts`
 
@@ -432,6 +437,18 @@ updated_at timestamp
 deleted_at timestamp?
 ```
 
+Rules M6.6:
+
+- `duration_seconds` là cấu hình duy nhất khác Quiz trong Admin. Nó chỉ được
+  ghi bởi create/update TestSet, luôn được server validate `60..14400`; không
+  nhận từ AI generation/prompt request và không được prompt/output AI sở hữu.
+- Các cột difficulty ratio/total score và `test_questions.points` còn tồn tại
+  để tương thích data/attempt scoring M7. Admin shared Assessment UI không tạo
+  thêm policy/configuration riêng từ chúng.
+- M6.6 không gộp `test_sets`/`test_questions` vào `quiz_*`; khác biệt
+  persistence, soft-delete và student attempt hiện hành được giữ. Publication
+  dùng cùng watermark/state machine Quiz.
+
 ### 9.2. `test_questions`
 
 ```txt
@@ -448,6 +465,7 @@ source_metadata_json jsonb?
 points numeric?
 difficulty Difficulty default MEDIUM
 review_status ReviewStatus default APPROVED
+published_at timestamp?
 explanation_id uuid? fk ai_explanations.id
 sort_order int default 0
 created_at timestamp
@@ -458,6 +476,10 @@ deleted_at timestamp?
 Rules:
 
 - Nếu `points` null, service tính điểm bằng nhau để tổng là 10.
+- `published_at` là watermark phát hành dùng chung với Quiz. Câu mới/sửa/duyệt
+  có `published_at=null`; chỉ `SAVE`/`PUBLISH` gắn mốc cho câu `APPROVED`.
+  Student chỉ đọc câu `APPROVED` đã có watermark. Index
+  `(test_set_id, published_at)` phục vụ selector và thống kê chưa lưu.
 - Item AI lưu `source_metadata_json` cùng shape provenance với quiz question.
 - API trả thêm `effectivePoints` (không lưu cột riêng) để UI/flow chấm điểm dùng
   được điểm đã chia đều; phần dư do làm tròn được phân bổ theo thứ tự câu hỏi để

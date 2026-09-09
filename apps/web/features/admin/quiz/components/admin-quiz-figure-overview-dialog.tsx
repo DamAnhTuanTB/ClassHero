@@ -7,6 +7,7 @@ import { AdminFigureStatusBadge } from "@/components/admin/admin-figure-status-b
 import { AdminFigureStatusCounts } from "@/components/admin/admin-figure-status-counts";
 import { EditorDialogShell } from "@/components/admin/courses/editor-dialog-shell";
 import type {
+  AdminQuizAssessmentKind,
   AdminQuizFigure,
   AdminQuizQuestion,
 } from "@/features/admin/quiz/api/admin-quiz-api";
@@ -28,6 +29,7 @@ type QuizFigureOverviewSection = {
 };
 
 export function AdminQuizFigureOverviewDialog({
+  assessmentKind,
   approvedQuestions,
   isOpen,
   onClose,
@@ -35,6 +37,7 @@ export function AdminQuizFigureOverviewDialog({
   pendingQuestions,
   setId,
 }: {
+  assessmentKind: AdminQuizAssessmentKind;
   approvedQuestions: AdminQuizQuestion[];
   isOpen: boolean;
   onClose: () => void;
@@ -170,6 +173,7 @@ export function AdminQuizFigureOverviewDialog({
             onNavigateToQuestion={onNavigateToQuestion}
             section={activeSection}
             setId={setId}
+            assessmentKind={assessmentKind}
           />
         ) : (
           <div className="grid min-h-56 place-items-center rounded-xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-6 text-center">
@@ -195,10 +199,12 @@ export function AdminQuizFigureOverviewDialog({
 }
 
 function QuizFigureOverviewTabPanel({
+  assessmentKind,
   onNavigateToQuestion,
   section,
   setId,
 }: {
+  assessmentKind: AdminQuizAssessmentKind;
   onNavigateToQuestion: (questionId: string) => void;
   section: QuizFigureOverviewSection;
   setId: string;
@@ -217,6 +223,7 @@ function QuizFigureOverviewTabPanel({
               key={entry.figure.id}
               onNavigateToQuestion={onNavigateToQuestion}
               setId={setId}
+              assessmentKind={assessmentKind}
             />
           ))}
         </div>
@@ -241,10 +248,12 @@ function QuizFigureOverviewTabPanel({
 }
 
 function QuizFigureOverviewCard({
+  assessmentKind,
   entry,
   onNavigateToQuestion,
   setId,
 }: {
+  assessmentKind: AdminQuizAssessmentKind;
   entry: QuizFigureOverviewEntry;
   onNavigateToQuestion: (questionId: string) => void;
   setId: string;
@@ -272,6 +281,7 @@ function QuizFigureOverviewCard({
 
       <div className="flex-1 bg-white p-3 dark:bg-white sm:p-4">
         <AdminQuizFigurePreview
+          assessmentKind={assessmentKind}
           figure={entry.figure}
           questionId={entry.question.id}
           role={entry.figure.role}

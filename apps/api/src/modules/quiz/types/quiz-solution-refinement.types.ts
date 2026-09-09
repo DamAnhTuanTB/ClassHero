@@ -4,13 +4,12 @@ import { z } from "zod";
 import type { QuizSubjectKey } from "#api/modules/quiz/types/quiz-generation.types";
 
 export const QUIZ_SOLUTION_REFINEMENT_TARGET_TYPE = "QUIZ_SOLUTION_REFINEMENT" as const;
+export const TEST_SOLUTION_REFINEMENT_TARGET_TYPE = "TEST_SOLUTION_REFINEMENT" as const;
 export const QUIZ_SOLUTION_REFINEMENT_MODES = ["REFINE", "REGENERATE"] as const;
-export type QuizSolutionRefinementMode =
-  (typeof QUIZ_SOLUTION_REFINEMENT_MODES)[number];
+export type QuizSolutionRefinementMode = (typeof QUIZ_SOLUTION_REFINEMENT_MODES)[number];
 export const QUIZ_SOLUTION_REFINEMENT_SCHEMA_VERSION =
   "quiz-solution-refinement-v3-split-mode";
-export const QUIZ_SOLUTION_REGENERATION_SCHEMA_VERSION =
-  "quiz-solution-regeneration-v1";
+export const QUIZ_SOLUTION_REGENERATION_SCHEMA_VERSION = "quiz-solution-regeneration-v1";
 
 const refinedTextSchema = z.string().trim().min(1).max(30_000);
 const hintSchema = z.string().trim().min(1).max(1_000);
@@ -61,7 +60,11 @@ export const multiStatementQuizSolutionRegenerationOutputSchema = z
   })
   .strict();
 export const textInputQuizSolutionRegenerationOutputSchema = z
-  .object({ correctAnswer: numericAnswerSchema, hint: hintSchema, solution: refinedTextSchema })
+  .object({
+    correctAnswer: numericAnswerSchema,
+    hint: hintSchema,
+    solution: refinedTextSchema,
+  })
   .strict();
 
 export type QuizSolutionRefinementOutput =
@@ -84,7 +87,14 @@ export type QuizSolutionRefinementQuestionSnapshot = {
 
 export const quizSolutionRefinementJobInputSchema = z
   .object({
-    operation: z.literal(QUIZ_SOLUTION_REFINEMENT_TARGET_TYPE),
+    // Jobs created before M6.6 did not carry an assessment discriminator. They
+    // remain Quiz jobs; versioned Test jobs must provide both fields below.
+    operation: z.enum([
+      QUIZ_SOLUTION_REFINEMENT_TARGET_TYPE,
+      TEST_SOLUTION_REFINEMENT_TARGET_TYPE,
+    ]),
+    assessmentKind: z.enum(["QUIZ", "TEST"]).optional(),
+    targetQuestionId: z.string().uuid().optional(),
     mode: z.enum(QUIZ_SOLUTION_REFINEMENT_MODES),
     includeCurrentSolutionAsRejected: z.boolean(),
     questionId: z.string().uuid(),
@@ -118,7 +128,33 @@ export const quizSolutionRefinementJobInputSchema = z
       currentSolution: z.string().trim().min(1).max(30_000),
     }),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    if (value.assessmentKind === "TEST") {
+      if (value.operation !== TEST_SOLUTION_REFINEMENT_TARGET_TYPE) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Test refinement requires the Test operation.",
+        });
+      }
+      if (!value.targetQuestionId || value.targetQuestionId !== value.questionId) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Test refinement targetQuestionId must match questionId.",
+        });
+      }
+    }
+    if (
+      value.assessmentKind === "QUIZ" &&
+      value.targetQuestionId &&
+      value.targetQuestionId !== value.questionId
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Quiz refinement targetQuestionId must match questionId.",
+      });
+    }
+  });
 
 export type QuizSolutionRefinementJobInput = z.infer<
   typeof quizSolutionRefinementJobInputSchema

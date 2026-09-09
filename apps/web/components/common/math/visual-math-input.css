@@ -208,6 +208,12 @@
   fill: currentColor;
 }
 
+@media (pointer: fine) {
+  .visual-math-input__field-host math-field::part(virtual-keyboard-toggle) {
+    transform: translateY(4px);
+  }
+}
+
 .visual-math-input__field-host
   math-field[data-virtual-keyboard-open]::part(virtual-keyboard-toggle) {
   border-color: color-mix(in srgb, var(--visual-math-accent) 42%, var(--theme-border));
