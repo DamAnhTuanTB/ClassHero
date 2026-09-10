@@ -17,6 +17,7 @@ export const LESSON_SUMMARY_EDITABLE_BLOCK_TYPES = [
   "note",
   "example",
   "exercise",
+  "summary",
 ] as const;
 
 export type LessonSummaryEditableBlockType =
@@ -43,6 +44,7 @@ const BLOCK_LABELS: Record<LessonSummaryEditableBlockType, string> = {
   note: "Chú ý",
   example: "Ví dụ",
   exercise: "Bài tập",
+  summary: "Tổng kết",
 };
 
 const BLOCK_FIELDS: Record<LessonSummaryEditableBlockType, LessonSummaryEditableField[]> =
@@ -53,6 +55,7 @@ const BLOCK_FIELDS: Record<LessonSummaryEditableBlockType, LessonSummaryEditable
     note: ["content"],
     example: ["problem", "solution", "answer"],
     exercise: ["problem", "solution", "answer"],
+    summary: ["content"],
   };
 
 export function isLessonSummaryEditableBlock(

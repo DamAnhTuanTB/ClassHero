@@ -43,7 +43,7 @@ Nếu task không đổi database, chỉ cần đọc file chi tiết liên quan
 | Quy ước chung, enum | `docs/database/conventions-and-enums.md` |
 | Auth, user, profile, refresh token, parent-child link | `docs/database/auth-users.md` |
 | File upload, R2 metadata, lesson document, document chunks | `docs/database/files-documents.md` |
-| Learning path, chapter, lesson, material, summary | `docs/database/learning-paths-lessons.md` |
+| Learning path, chapter, lesson, material, lesson summary, video summary | `docs/database/learning-paths-lessons.md` |
 | Enrollment, progress, trial lesson | `docs/database/progress-enrollment.md` |
 | Quiz, flashcard, test, attempts | `docs/database/quiz-flashcard-tests.md` |
 | Background jobs, queue/job status | `docs/database/background-jobs.md` |
@@ -74,7 +74,7 @@ Nếu task không đổi database, chỉ cần đọc file chi tiết liên quan
 | `M12.x` | `notification-report-news`, `ai-rag-chat` nếu moderation AI |
 | `M13.x` | `notes-gamification-audit`, `files-documents` nếu avatar |
 | `M14.x` | File liên quan đến flow được test/harden/deploy |
-| `M15.x` | `progress-enrollment`, `notes-gamification-audit`, `quiz-flashcard-tests`, `ai-rag-chat`, `indexes-and-checklist` |
+| `M15.x` | `progress-enrollment`, `notes-gamification-audit`, `quiz-flashcard-tests`, `learning-paths-lessons`, `ai-rag-chat`, `background-jobs`, `indexes-and-checklist`; thêm `provider-operations` khi có AI |
 
 ---
 

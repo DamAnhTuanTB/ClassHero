@@ -15,8 +15,17 @@ const SECTION_ACCENT_CLASSES = [
   "bg-cyan-100 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-300",
 ] as const;
 
-export function getLessonSummarySectionAnchorId(sectionIndex: number) {
-  return `section-${sectionIndex}`;
+export function getLessonSummaryObjectivesAnchorId(anchorPrefix?: string) {
+  return anchorPrefix
+    ? `${anchorPrefix}-${LESSON_SUMMARY_OBJECTIVES_ANCHOR_ID}`
+    : LESSON_SUMMARY_OBJECTIVES_ANCHOR_ID;
+}
+
+export function getLessonSummarySectionAnchorId(
+  sectionIndex: number,
+  anchorPrefix?: string,
+) {
+  return anchorPrefix ? `${anchorPrefix}-section-${sectionIndex}` : `section-${sectionIndex}`;
 }
 
 export function LessonSummaryTableOfContents({
@@ -29,6 +38,8 @@ export function LessonSummaryTableOfContents({
   buttonClassName,
   onSectionClick,
   onCustomItemClick,
+  objectivesLabel = "Mục tiêu học tập",
+  anchorPrefix,
 }: {
   accentTrigger?: boolean;
   desktopBorderless?: boolean;
@@ -39,6 +50,8 @@ export function LessonSummaryTableOfContents({
   buttonClassName?: string;
   onSectionClick?: (anchorId: string) => void;
   onCustomItemClick?: (anchorId: string) => void;
+  objectivesLabel?: string;
+  anchorPrefix?: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const popoverId = useId();
@@ -152,10 +165,11 @@ export function LessonSummaryTableOfContents({
                 className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-bold text-[var(--theme-text)] transition hover:bg-[var(--theme-primary-soft)] hover:text-[var(--theme-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-primary)]"
                 onClick={() => {
                   setIsOpen(false);
-                  if (onSectionClick) onSectionClick(LESSON_SUMMARY_OBJECTIVES_ANCHOR_ID);
-                  else scrollToAnchor(LESSON_SUMMARY_OBJECTIVES_ANCHOR_ID);
+                  const anchorId = getLessonSummaryObjectivesAnchorId(anchorPrefix);
+                  if (onSectionClick) onSectionClick(anchorId);
+                  else scrollToAnchor(anchorId);
                 }}
-                title="Mục tiêu học tập"
+                title={objectivesLabel}
                 type="button"
               >
                 <span
@@ -167,7 +181,7 @@ export function LessonSummaryTableOfContents({
                 >
                   <ListTree className="h-4 w-4" />
                 </span>
-                <span>Mục tiêu học tập</span>
+                <span>{objectivesLabel}</span>
               </button>
             ) : null}
 
@@ -176,7 +190,7 @@ export function LessonSummaryTableOfContents({
                 const accentClass =
                   SECTION_ACCENT_CLASSES[index % SECTION_ACCENT_CLASSES.length] ??
                   SECTION_ACCENT_CLASSES[0];
-                const anchorId = getLessonSummarySectionAnchorId(index);
+                const anchorId = getLessonSummarySectionAnchorId(index, anchorPrefix);
                 return (
                   <button
                     key={`${section.order}-${index}`}

@@ -11,6 +11,7 @@ export function serializeLesson(record: LessonRecord): LessonResponse {
     orderIndex: record.orderIndex,
     title: record.title,
     shortDescription: record.shortDescription,
+    overviewContentJson: record.overviewContentJson,
     lessonType: record.lessonType,
     liveUrl: record.liveUrl,
     scheduledAt: record.scheduledAt,

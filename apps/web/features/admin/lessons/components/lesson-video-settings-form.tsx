@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Loader2, Settings } from "lucide-react";
+import { Check, Loader2, Settings, X } from "lucide-react";
 import { useState } from "react";
 import { useForm as useHookForm } from "react-hook-form";
 import { z } from "zod";
@@ -127,16 +127,18 @@ export function LessonVideoSettingsForm({
 
   return (
     <div className="mt-4 border border-[var(--theme-border)] bg-[var(--theme-surface)] rounded-xl overflow-hidden">
-      <div className="bg-[var(--theme-surface-sunken)] p-4 border-b border-[var(--theme-border)] flex items-center justify-between">
+      <div className="bg-[var(--theme-surface-sunken)] p-4 border-b border-[var(--theme-border)] flex items-center justify-between gap-4">
         <div className="flex items-center gap-2 font-bold text-[var(--theme-text-strong)]">
           <Settings className="w-4 h-4 text-[var(--theme-primary)]" />
           Cài đặt Custom Video Player
         </div>
         <button
+          type="button"
           onClick={() => setIsOpen(false)}
-          className="text-xs font-semibold text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]"
+          className="theme-button-neutral flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+          aria-label="Đóng cài đặt custom video player"
         >
-          Đóng
+          <X className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
 

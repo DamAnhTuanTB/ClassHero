@@ -7,6 +7,7 @@ import {
   ListChecks,
   Loader2,
   Save,
+  Video,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { FieldLabel } from "@/components/common/forms/field-label";
@@ -39,6 +40,7 @@ type Props = {
 
 const aiFeatureOrder: AiFeatureConfiguration["feature"][] = [
   "SUMMARY",
+  "VIDEO_SUMMARY",
   "QUIZ",
   "FLASHCARD",
   "TEST",
@@ -46,6 +48,7 @@ const aiFeatureOrder: AiFeatureConfiguration["feature"][] = [
 
 const aiFeatureIcons = {
   SUMMARY: BookOpenText,
+  VIDEO_SUMMARY: Video,
   QUIZ: ListChecks,
   FLASHCARD: Layers3,
   TEST: ClipboardCheck,
@@ -111,9 +114,11 @@ export function ModelConfigurationsTab({ data, isSaving, onSave }: Props) {
                   >
                     <div>
                       <h3 className="text-sm font-extrabold uppercase tracking-wide text-[var(--theme-text-strong)]">
-                        {configuration.purpose === "TEXT"
-                          ? "Phase 1 · Tạo nội dung"
-                          : "Phase 2 · Tạo hình"}
+                        {configuration.feature === "VIDEO_SUMMARY"
+                          ? "Tạo nội dung tóm tắt"
+                          : configuration.purpose === "TEXT"
+                            ? "Phase 1 · Tạo nội dung"
+                            : "Phase 2 · Tạo hình"}
                       </h3>
                     </div>
 

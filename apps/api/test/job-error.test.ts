@@ -91,6 +91,22 @@ describe("background job provider errors", () => {
       }),
     );
   });
+
+  it("does not classify a database constraint error as a provider outage", () => {
+    const databaseError = Object.assign(
+      new Error(
+        'new row for relation "provider_usage_events" violates check constraint',
+      ),
+      { name: "DriverAdapterError", code: "23514" },
+    );
+
+    expect(normalizeJobError(databaseError, "OPENAI")).toEqual(
+      expect.objectContaining({
+        code: jobFailureCodes.JOB_FAILED,
+        provider: null,
+      }),
+    );
+  });
 });
 
 describe("provider environment placeholders", () => {

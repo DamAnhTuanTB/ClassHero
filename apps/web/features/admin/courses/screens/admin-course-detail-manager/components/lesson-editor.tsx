@@ -11,7 +11,7 @@ import {
   Video,
 } from "lucide-react";
 import type { FormEvent } from "react";
-import type { UseFormReturn } from "react-hook-form";
+import { Controller, type UseFormReturn } from "react-hook-form";
 import { CheckboxField } from "@/components/common/forms/checkbox-field";
 import { FieldLabel } from "@/components/common/forms/field-label";
 import { OptionField } from "@/components/common/forms/option-field";
@@ -30,6 +30,11 @@ import type {
   AdminSourceDocumentPageApi,
 } from "@/features/admin/courses/types/admin-course-document-types";
 import { cn } from "@/lib/utils";
+import { QuizRichContentEditor } from "@/features/admin/quiz/components/quiz-rich-content-editor";
+import {
+  createEmptyTiptapDocument,
+  getTiptapDocumentText,
+} from "@/lib/tiptap-rich-content";
 
 export function LessonEditor({
   mode,
@@ -147,30 +152,30 @@ export function LessonEditor({
               label="Tổng quan buổi học"
               isOptional
             />
-            <textarea
-              id="admin-lesson-description"
-              rows={4}
-              placeholder="Ví dụ: Nội dung chính, dạng bài trọng tâm hoặc ghi chú cho buổi học."
-              className={cn(
-                "theme-form-control mt-2 min-h-28 w-full resize-y rounded-xl px-4 py-3 text-base font-semibold leading-6 outline-none transition disabled:cursor-not-allowed lg:text-sm",
-              )}
-              disabled={disabled || isSaving}
-              aria-invalid={form.formState.errors.shortDescription ? "true" : "false"}
-              aria-describedby={
-                form.formState.errors.shortDescription
-                  ? "admin-lesson-description-error"
-                  : undefined
-              }
-              {...form.register("shortDescription")}
-            />
-            {form.formState.errors.shortDescription ? (
-              <p
-                id="admin-lesson-description-error"
-                className="mt-1.5 text-sm leading-5 text-[var(--theme-error-text)]"
-              >
-                {form.formState.errors.shortDescription.message}
-              </p>
-            ) : null}
+            <div className="mt-2">
+              <Controller
+                control={form.control}
+                name="overviewContentJson"
+                render={({ field }) => (
+                  <QuizRichContentEditor
+                    ariaLabel="Tổng quan buổi học"
+                    compact
+                    disabled={disabled || isSaving}
+                    placeholder="Nhập nội dung chính, dạng bài trọng tâm hoặc ghi chú cho buổi học..."
+                    value={field.value ?? createEmptyTiptapDocument()}
+                    onBlur={field.onBlur}
+                    onChange={(value) => {
+                      field.onChange(value);
+                      form.setValue(
+                        "shortDescription",
+                        getTiptapDocumentText(value).slice(0, 500),
+                        { shouldDirty: true, shouldValidate: true },
+                      );
+                    }}
+                  />
+                )}
+              />
+            </div>
           </div>
           <TextField
             id="admin-lesson-video-url"

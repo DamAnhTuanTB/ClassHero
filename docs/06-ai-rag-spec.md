@@ -2935,7 +2935,10 @@ Không gọi AI blocking trong request-new.
 - Ưu tiên cache lời giải.
 - Ưu tiên dùng bộ dự phòng trước khi gọi AI tạo mới.
 - Không gửi toàn bộ tài liệu hoặc toàn bộ lịch sử chat vào AI.
-- Với smart video `M15`, không gửi toàn bộ transcript mỗi lần; chỉ dùng chapter, cửa sổ cue lân cận và retrieved chunks cần thiết.
+- Với contextual smart video `M15.4`, không gửi toàn bộ transcript mỗi lần; chỉ
+  dùng chapter, cửa sổ cue lân cận và retrieved chunks cần thiết. Whole-video
+  summary `M15.9` là ngoại lệ có chủ đích: gửi normalized transcript packet của
+  đúng lesson một lần theo immutable preview draft, không kèm PDF/watch events.
 
 ASSUMPTION:
 
@@ -2947,7 +2950,8 @@ ASSUMPTION:
 
 ## 12.1. Smart video AI context
 
-Các action `Hỏi đoạn này`, `Em chưa hiểu`, chapter summary, flashcard từ video và semantic search thuộc `M15`.
+Các action `Hỏi đoạn này`, `Em chưa hiểu`, chapter summary, whole-video summary,
+flashcard từ video và semantic search thuộc `M15`.
 
 Context tối thiểu:
 
@@ -2971,6 +2975,44 @@ Rules:
 - Cache contextual explanation theo lesson, time window, normalized question và các version liên quan.
 - Recommendation/difficulty không được giao hoàn toàn cho model từ raw event stream. Backend tạo feature tổng hợp, áp rule giải thích được; AI chỉ hỗ trợ diễn đạt hoặc xếp hạng trong phạm vi an toàn.
 - Mọi action student phải áp rate limit/budget guard và không làm blocking player.
+
+Whole-video summary admin `M15.9`:
+
+- Sở hữu prompt/schema/mapper/validator riêng theo `MATH | PHYSICS | CHEMISTRY |
+GENERAL`; không import private Lesson Summary core. Chỉ tái sử dụng hạ tầng
+  trung lập như provider, model routing, queue, budget, usage và rich-text render.
+- Input authority là video metadata/cut settings, chapter timeline tùy chọn và
+  transcript đã lưu của đúng lesson. Client không được truyền raw source.
+- Output structured dùng `title`, `objectives[]`, `sections[]` và blocks tương
+  thích document `lesson_summary_blocks`. `objectives` hiển thị dưới nhãn
+  `Các kiến thức sẽ học`, đúng một ý chính cho mỗi section. Mỗi section có
+  `startSeconds`; `knowledge` có `title`, `content`, `startSeconds`; `example` có đủ
+  `problem`, `solution`, `answer`, `startSeconds`; các block giữ đúng thứ tự xuất
+  hiện trong video. `summary` là block cuối, nêu kiến thức và kĩ năng người học
+  có thể vận dụng sau khi xem; không có `title` riêng vì UI đã hiển thị nhãn
+  `Tổng kết` và chỉ gồm bullet các dạng bài/nhiệm vụ có thể giải quyết. Example
+  phụ thuộc hình/ảnh/bảng/biểu đồ không thể tự đủ dữ kiện bằng text phải bị loại.
+  Văn phong, quy tắc LaTeX và quy tắc trình bày lời
+  giải dùng cùng invariant đã áp dụng cho Sinh kiến thức.
+- Không bắt buộc có `example` nếu transcript không chứa ví dụ/bài tập; model
+  không được tự tạo ví dụ để lấp cấu trúc. Khi có chapter, ưu tiên bám các ranh
+  giới lớn; chỉ dùng timestamp có trong nguồn và không tự bịa kiến thức.
+- Prose phải mạch lạc, paragraph/list tách đúng vai trò. Công thức dùng LaTeX
+  canonical tương thích KaTeX/mhchem; không sinh TikZ/STEM figure ở task này.
+- Prompt preview và execute dùng cùng serializer/draft/hash. Nếu transcript vượt
+  input limit đã cấu hình, preflight chặn thân thiện; không cắt im lặng hoặc gọi
+  provider nhiều lần ngoài ước tính chi phí đã hiển thị.
+- Cache/stale key gồm video URL, transcript, chapter, player cut settings,
+  prompt/schema version và generation configuration.
+- Default prompt `video-summary-v6`, schema version 5 phân vai giống flow Sinh kiến thức:
+  stable system prompt sở hữu quy tắc bám nguồn, cấu trúc
+  `objectives -> knowledge/example -> summary`, timestamp cue cho section/block,
+  example tự đủ dữ kiện, bullet kết quả học tập, văn phong và quy ước riêng
+  cho `MATH | PHYSICS | CHEMISTRY | GENERAL`; user prompt chỉ chứa metadata
+  buổi học cùng các lựa chọn theo lần chạy: cách trình bày,
+  độ dài, số lượng từ và yêu cầu bổ sung. Khi Số lượng từ
+  để trống, prompt ghi rõ không đặt giới hạn riêng thay vì tự gán
+  350 từ. Custom system/user prompt tiếp tục là full override.
 
 ---
 

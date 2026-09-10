@@ -9,6 +9,7 @@ import {
   IsEnum,
   IsInt,
   IsNumber,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -69,6 +70,17 @@ export class CreateLessonDto {
   @IsString()
   @MaxLength(500)
   shortDescription?: string;
+
+  @ApiPropertyOptional({
+    description: "Nội dung Tiptap của Tổng quan buổi học",
+    example: {
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "text", text: "Nội dung" }] }],
+    },
+  })
+  @IsOptional()
+  @IsObject()
+  overviewContentJson?: Record<string, unknown>;
 
   @ApiPropertyOptional({ enum: LessonType, example: LessonType.BASIC })
   @IsOptional()

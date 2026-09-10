@@ -8,6 +8,7 @@ import type {
   AdminAiGenerationType,
   AdminLessonSummaryReviewStatus,
 } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
+import { adminAssessmentQueryKeys } from "@/features/admin/assessments/hooks/use-admin-assessment";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { cn } from "@/lib/utils";
@@ -46,6 +47,16 @@ export function AdminGeneratedSetReviewActions({
         queryClient.invalidateQueries({ queryKey: ["admin", "quiz"] }),
         queryClient.invalidateQueries({ queryKey: ["admin", "flashcards"] }),
         queryClient.invalidateQueries({ queryKey: ["admin", "tests"] }),
+        ...(isAssessment
+          ? [
+              queryClient.invalidateQueries({
+                queryKey: adminAssessmentQueryKeys.sets(
+                  type === "TEST" ? "test" : "quiz",
+                  lessonId,
+                ),
+              }),
+            ]
+          : []),
         queryClient.invalidateQueries({
           queryKey: ["admin", "lessons", lessonId, "ai-generation-panel"],
         }),

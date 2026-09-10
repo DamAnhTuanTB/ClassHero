@@ -47,6 +47,11 @@ Index:
 - `background_job_id`.
 - `(target_type, target_id)`.
 
+`M15.9` bổ sung `AiGenerationType.VIDEO_SUMMARY` và target
+`LESSON_VIDEO_SUMMARY`. Usage/accounting, background job và target context dùng
+type riêng; không ghi nhận lượt này thành `SUMMARY`, vì Summary kiến thức từ PDF
+và Video Summary có source/prompt/schema/persistence khác nhau.
+
 ### 11.2. `ai_explanations`
 
 Cache lời giải AI ở cấp item.

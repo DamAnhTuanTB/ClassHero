@@ -22,7 +22,10 @@ docs/implementation/dependency-graph.md
 docs/implementation/feature-coverage-matrix.md
 ```
 
-Khi làm task, Codex đọc file index này trước. Sau khi xác định mã subtask, mở đúng file milestone tương ứng. Ví dụ `M8.3` thì đọc `docs/implementation/M8.md`.
+Khi task chưa có mã hoặc cần chọn thứ tự/phụ thuộc, Codex tra file index này. Khi
+owner đã giao mã rõ, không cần đọc toàn file: tìm entry của mã nếu cần rồi mở đúng
+block trong file milestone tương ứng. Ví dụ `M8.3` đọc block `M8.3` trong
+`docs/implementation/M8.md`.
 
 `Mode` dùng để chọn phạm vi kỹ thuật của subtask:
 
@@ -46,60 +49,20 @@ Chỉ tách `/task-ui` trước rồi `/task-connect` khi:
 
 ---
 
-## 1. Nguyên tắc triển khai
+## 1. Cách dùng
 
-- Không làm tính năng ngoài MVP.
-- Không đổi stack công nghệ đã chốt.
-- Mỗi lần owner giao task mặc định chỉ làm một subtask.
-- Với subtask đã rõ scope, ưu tiên `/task-full` để hoàn thành một lát dọc có thể kiểm tra được.
-- Không chia nhỏ UI/API/DB một cách máy móc nếu việc làm trọn task giúp kiểm tra flow nhanh và an toàn hơn.
-- Dùng `/task-ui` trước chỉ khi cần chốt giao diện/mock UI; sau khi UI ổn mới dùng `/task-connect` để code API đầy đủ và nối dữ liệu thật.
-- Nếu task ngắn chưa ghi rõ subtask, Codex map vào subtask gần nhất rồi nêu giả định.
-- Nếu task có thể thuộc nhiều subtask, hỏi lại hoặc ghi `ASSUMPTION` trước khi code.
-- Nếu một subtask quá lớn, đề xuất chia nhỏ hơn trước khi code.
-- Database/API/AI/env/UI behavior đổi phải cập nhật docs liên quan theo `AGENTS.md`.
-- Task có sửa code phải đọc `docs/14-source-code-structure.md` trước khi tạo file mới hoặc di chuyển file, để chọn đúng shared/feature/domain layer và tránh gom component/helper/service vào một chỗ.
-- Không cập nhật changelog trong task thường; changelog chỉ ghi trong workflow `/commit`.
+- File này chỉ trả lời thứ tự khuyến nghị; workflow/safety nằm trong `AGENTS.md`
+  và skill đang chạy.
+- Khi đã có mã, đọc trọn block `Mx.y` trong file milestone. Không đọc toàn index
+  này nếu không có câu hỏi về thứ tự hoặc dependency.
+- Task chưa có mã: search tên/feature trong index và milestone, chọn subtask/Mode
+  gần nhất; hỏi lại nếu nhiều cách hiểu làm đổi scope.
+- `/task-full` làm lát dọc hoàn chỉnh; chỉ tách `/task-ui` → `/task-connect` khi
+  owner muốn duyệt UI/mock trước.
 
 ---
 
-## 2. Cách dùng với Codex
-
-### Khi owner giao task rõ mã
-
-Ví dụ:
-
-```txt
-/task-full M8.3
-```
-
-Codex phải:
-
-1. Đọc `AGENTS.md`.
-2. Đọc file index này.
-3. Đọc subtask tương ứng trong file milestone, ví dụ `M8.3` đọc `docs/implementation/M8.md`.
-4. Đọc dòng `Mode` của subtask để xác định task có UI/API/DB/worker/docs hay không.
-5. Nếu task có sửa code, đọc `docs/14-source-code-structure.md` để xác định route/feature/shared/domain layer, alias import và boundary tách file.
-6. Nếu subtask có UI, đọc thêm bảng screen coverage trong `docs/08-ui-pages-and-components.md` để biết task UI/API/DB/worker liên quan.
-7. Đọc docs liên quan theo `Task routing map` trong `AGENTS.md`.
-8. Nêu kế hoạch ngắn, gồm cả cấu trúc file/layer dự kiến và phần sẽ tái sử dụng thay vì tạo mới.
-9. Code đúng phạm vi subtask và đúng chiến lược owner chọn:
-   - `/task-full`: làm đủ lát dọc trong scope subtask.
-   - `/task-ui`: chỉ UI/mock data.
-   - `/task-connect`: code API đầy đủ nếu thiếu rồi nối UI đã có với dữ liệu thật.
-10. Chạy check phù hợp. Changelog chỉ được ghi nếu owner yêu cầu `/commit`.
-
-### Khi owner giao task ngắn
-
-Codex không code ngay nếu phạm vi chưa rõ. Cần:
-
-1. Tự map vào milestone/subtask gần nhất.
-2. Nêu subtask đề xuất và mode phù hợp: `/task-ui`, `/task-connect`, hoặc `/task-full`.
-3. Chỉ code khi phạm vi đủ rõ.
-
----
-
-## 3. Thứ tự subtask khuyến nghị
+## 2. Thứ tự subtask khuyến nghị
 
 Thứ tự này ưu tiên nền tảng trước tính năng sau. Nếu `.codex/plans/codex-execution-plan.md` có cập nhật mới hơn, dùng file đó để kiểm tra phụ thuộc, nhưng vẫn không thay thế docs gốc.
 
@@ -231,7 +194,7 @@ Ghi chú:
 
 ---
 
-## 4. Phụ thuộc chính
+## 3. Phụ thuộc chính
 
 ### Nền tảng
 
@@ -360,6 +323,9 @@ Ghi chú:
 - `M15.6` phụ thuộc `M3.8`, `M5.2`, `M5.3`, `M5.4`.
 - `M15.7` phụ thuộc `M7.2-M7.4`, `M15.1`, `M15.3`, `M15.4`.
 - `M15.8` phụ thuộc `M15.1`, `M15.3`, `M15.7`.
+- `M15.9` phụ thuộc `M3.8`, `M4.3`, `M9.1`, `M9.9-M9.12`, `M9.20`, `M9.32`;
+  độc lập với `M15.1-M15.8` và có thể triển khai ngay khi transcript + AI/job
+  foundation sẵn sàng.
 
 ### Notification/parent/report/gamification/testing
 
@@ -376,7 +342,7 @@ Ghi chú:
 
 ---
 
-## 5. Khi nào đọc file milestone
+## 4. Khi nào đọc file milestone
 
 Đọc file milestone tương ứng trong `docs/implementation/` khi:
 

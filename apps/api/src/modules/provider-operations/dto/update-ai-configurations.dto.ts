@@ -76,7 +76,7 @@ export class UpdateAiFeatureConfigurationItemDto {
 export class UpdateAiConfigurationsDto {
   @IsArray()
   @ArrayMinSize(1)
-  @ArrayMaxSize(8)
+  @ArrayMaxSize(9)
   @ValidateNested({ each: true })
   @Type(() => UpdateAiFeatureConfigurationItemDto)
   configurations!: UpdateAiFeatureConfigurationItemDto[];

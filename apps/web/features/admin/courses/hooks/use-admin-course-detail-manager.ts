@@ -284,14 +284,12 @@ export function useAdminCourseDetailManager(
 
     try {
       let referenceUploadError: unknown = null;
-
       if (targetEditorMode === "create") {
         const createdLesson = await mutations.createLesson.mutateAsync({
           chapterId: targetChapterId,
           pathId: path.id,
           values,
         });
-
         try {
           await uploadLessonReferenceDocuments(createdLesson.id, values);
         } catch (error) {
@@ -382,7 +380,7 @@ export function useAdminCourseDetailManager(
       if (targetLesson) {
         mutations.invalidateAiPanel(targetLesson.id);
       }
-      
+
       if (referenceUploadError) {
         toast.warning(
           targetEditorMode === "create" ? "Đã thêm buổi học" : "Đã lưu buổi học",
@@ -560,7 +558,7 @@ export function useAdminCourseDetailManager(
           ? "Không thể đặt buổi học ở vị trí này"
           : "Chưa di chuyển được buổi học",
         {
-        description: getErrorMessage(error),
+          description: getErrorMessage(error),
         },
       );
       return false;
@@ -574,10 +572,9 @@ export function useAdminCourseDetailManager(
   const queryRenderState = getQueryRenderState(learningPathQuery);
   const canUseServerDataBeforeAuthHydration =
     !isAuthHydrated && initialLearningPath !== undefined;
-  const viewState: ViewState =
-    canUseServerDataBeforeAuthHydration
-      ? queryRenderState
-      : !isAuthHydrated || !hasAdminAccess
+  const viewState: ViewState = canUseServerDataBeforeAuthHydration
+    ? queryRenderState
+    : !isAuthHydrated || !hasAdminAccess
       ? "loading"
       : queryRenderState === "loading"
         ? "loading"

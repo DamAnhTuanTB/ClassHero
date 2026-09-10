@@ -43,7 +43,7 @@ Nếu chỉ làm `/task-ui` mock data, dùng API docs để hiểu data shape, k
 | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Envelope, pagination, status, error code, security rule                                                | `docs/api/conventions-errors-security.md`                                                                                                                                                             |
 | Register, login, refresh, logout, forgot/reset, current user/profile                                   | `docs/api/auth-profile.md`                                                                                                                                                                            |
-| Public/admin learning path, chapter, lesson, Summary, STEM figure review/raster cleanup, file/material | `docs/api/learning-paths-lessons.md`                                                                                                                                                                  |
+| Public/admin learning path, chapter, lesson, Summary, video summary, STEM figure review/raster cleanup, file/material | `docs/api/learning-paths-lessons.md`                                                                                                                                                                  |
 | Student lesson content, notes, comments, favorites                                                     | `docs/api/student-learning.md`                                                                                                                                                                        |
 | Quiz, flashcard, test, attempts                                                                        | `docs/api/quiz-flashcard-tests.md` — M6.6 giữ route Test tương thích nhưng Admin Test dùng shared Quiz/Assessment contract; `durationSeconds` chỉ thuộc TestSet, không thuộc AI modal/prompt payload. |
 | AI explanation, chat, generated content                                                                | `docs/api/ai-chat.md`                                                                                                                                                                                 |
@@ -74,7 +74,7 @@ Nếu chỉ làm `/task-ui` mock data, dùng API docs để hiểu data shape, k
 | `M12.x`   | `report-news`, `conventions-errors-security`                                                                                         |
 | `M13.x`   | `leaderboard`, `auth-profile`, `conventions-errors-security`                                                                         |
 | `M14.x`   | File API liên quan đến flow được test/harden/deploy                                                                                  |
-| `M15.x`   | `student-learning`, `ai-chat`, `quiz-flashcard-tests`, `conventions-errors-security`; admin analytics có thể tách file khi implement |
+| `M15.x`   | `student-learning`, `ai-chat`, `learning-paths-lessons`, `jobs`, `provider-operations`, `quiz-flashcard-tests`, `conventions-errors-security`; admin analytics có thể tách file khi implement |
 
 ---
 

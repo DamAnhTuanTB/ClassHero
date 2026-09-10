@@ -45,11 +45,12 @@ import { LessonSummaryExerciseCard } from "@/components/common/content/lesson-su
 import type { LessonSummaryFigureRenderer } from "@/components/common/content/lesson-summary-problem-content";
 import {
   getLessonSummarySectionAnchorId,
-  LESSON_SUMMARY_OBJECTIVES_ANCHOR_ID,
+  getLessonSummaryObjectivesAnchorId,
   LessonSummaryTableOfContents,
 } from "@/components/common/content/lesson-summary-table-of-contents";
 import { DeleteConfirmDialog } from "@/components/admin/courses/delete-confirm-dialog";
 import { ImmediateTooltip } from "@/components/common/ui/immediate-tooltip";
+import { VideoStartTimeBadge } from "@/components/common/content/video-start-time-badge";
 
 // Define a type for any generic block (loose typing since it comes from JSON)
 type BlockData = any;
@@ -115,6 +116,7 @@ interface SummaryBlockRendererProps {
       order: number;
       sourceHeading?: string;
       displayHeading: string;
+      startSeconds?: number;
       blocks: BlockData[];
     }[];
   };
@@ -154,7 +156,11 @@ interface SummaryBlockRendererProps {
   showTableOfContents?: boolean;
   hideObjectives?: boolean;
   hideSectionHeadings?: boolean;
+  objectivesLabel?: string;
+  onVideoSeek?: (seconds: number) => void;
+  anchorPrefix?: string;
   className?: string;
+  alwaysShowEditingActions?: boolean;
 }
 
 const BLOCK_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
@@ -165,6 +171,7 @@ const BLOCK_CONFIG: Record<string, { label: string; color: string; icon: any }> 
 
   example: { label: "Ví dụ", color: "blue", icon: PlayCircle },
   exercise: { label: "Bài tập", color: "cyan", icon: NotebookPen },
+  summary: { label: "Tổng kết", color: "green", icon: FileCheck2 },
 };
 
 const CONVERTIBLE_BLOCK_TYPES: ConvertibleBlockType[] = [
@@ -279,7 +286,11 @@ export function SummaryBlockRenderer({
   renderStemFigure,
   hideObjectives = false,
   hideSectionHeadings = false,
+  objectivesLabel = "Mục tiêu học tập",
+  onVideoSeek,
+  anchorPrefix,
   className,
+  alwaysShowEditingActions = false,
 }: SummaryBlockRendererProps) {
   const isReadOnly = !onChange;
   const [draggedItem, setDraggedItem] = React.useState<{
@@ -496,6 +507,8 @@ export function SummaryBlockRenderer({
                   desktopBorderless
                   hasObjectives={Boolean(data.objectives?.length)}
                   sections={data.sections ?? []}
+                  objectivesLabel={objectivesLabel}
+                  anchorPrefix={anchorPrefix}
                 />
               ) : (
                 <span aria-hidden="true" />
@@ -545,7 +558,14 @@ export function SummaryBlockRenderer({
             </div>
 
             {!isReadOnly && viewMode === "UI_ONLY" && (
-              <div className="absolute right-0 top-0 hidden justify-end opacity-0 transition-opacity group-hover/title:opacity-100 sm:flex">
+              <div
+                className={cn(
+                  "absolute right-0 top-0 justify-end transition-opacity",
+                  alwaysShowEditingActions
+                    ? "flex opacity-100"
+                    : "hidden opacity-0 group-hover/title:opacity-100 sm:flex",
+                )}
+              >
                 <button
                   type="button"
                   onClick={() => {
@@ -609,17 +629,19 @@ export function SummaryBlockRenderer({
               desktopBorderless
               hasObjectives
               sections={data.sections ?? []}
+              objectivesLabel={objectivesLabel}
+              anchorPrefix={anchorPrefix}
             />
           ) : null}
 
           <div
-            id={LESSON_SUMMARY_OBJECTIVES_ANCHOR_ID}
+            id={getLessonSummaryObjectivesAnchorId(anchorPrefix)}
             className={`relative scroll-mt-24 group/obj ${isObjectivesEditing ? "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" : ""}`}
           >
             <div className="rounded-xl bg-blue-50 p-3 sm:p-5 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 relative">
               <h3 className="font-bold text-blue-800 dark:text-blue-300 mb-2 flex items-center gap-2">
                 <BookOpen className="w-5 h-5" />
-                Mục tiêu học tập
+                {objectivesLabel}
               </h3>
               <ul className="list-disc pl-5 space-y-1 text-slate-700 dark:text-slate-300">
                 {data.objectives.map((obj, i) => (
@@ -634,10 +656,19 @@ export function SummaryBlockRenderer({
             </div>
 
             {!isReadOnly && viewMode === "UI_ONLY" && !isObjectivesEditing && (
-              <div className="absolute right-2 top-2 z-10 opacity-0 transition-opacity group-hover/obj:opacity-100 focus-within:opacity-100">
-                <ImmediateTooltip content="Chỉnh sửa mục tiêu học tập">
+              <div
+                className={cn(
+                  "absolute right-2 top-2 z-10 transition-opacity focus-within:opacity-100",
+                  alwaysShowEditingActions
+                    ? "opacity-100"
+                    : "opacity-0 group-hover/obj:opacity-100",
+                )}
+              >
+                <ImmediateTooltip
+                  content={`Chỉnh sửa ${objectivesLabel.toLocaleLowerCase("vi")}`}
+                >
                   <button
-                    aria-label="Chỉnh sửa mục tiêu học tập"
+                    aria-label={`Chỉnh sửa ${objectivesLabel.toLocaleLowerCase("vi")}`}
                     type="button"
                     onClick={() => toggleEdit("objectives")}
                     className="rounded border border-slate-200 bg-white p-1.5 text-slate-500 shadow-sm transition-colors hover:text-blue-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400"
@@ -891,7 +922,7 @@ export function SummaryBlockRenderer({
         return (
           <div
             key={idx}
-            id={getLessonSummarySectionAnchorId(idx)}
+            id={getLessonSummarySectionAnchorId(idx, anchorPrefix)}
             className={`scroll-mt-24 space-y-3 transition-all rounded-2xl ${
               draggedSection === idx
                 ? "opacity-50 ring-2 ring-blue-500 ring-offset-4 ring-offset-white dark:ring-offset-slate-900"
@@ -1000,13 +1031,25 @@ export function SummaryBlockRenderer({
                         />
                         <span className="absolute bottom-0 left-0 w-12 h-1 bg-blue-500/20 dark:bg-blue-400/20 rounded-full group-hover:w-full transition-all duration-500 ease-out"></span>
                       </span>
+                      <VideoStartTimeBadge
+                        seconds={section.startSeconds}
+                        onSeek={onVideoSeek}
+                      />
                     </h3>
                   )}
 
                   {/* Tool Bar Section */}
                   {!isReadOnly && (
                     <div
-                      className={`flex flex-col items-end gap-2 ${viewMode === "SPLIT" ? "w-full" : "z-10 w-full flex-none opacity-100 transition-opacity sm:w-auto sm:opacity-0 sm:group-hover/header:opacity-100"}`}
+                      className={cn(
+                        "flex flex-col items-end gap-2",
+                        viewMode === "SPLIT"
+                          ? "w-full"
+                          : "z-10 w-full flex-none opacity-100 transition-opacity sm:w-auto",
+                        viewMode !== "SPLIT" &&
+                          !alwaysShowEditingActions &&
+                          "sm:opacity-0 sm:group-hover/header:opacity-100",
+                      )}
                     >
                       {viewMode === "UI_ONLY" && (
                         <div className="relative flex w-full flex-wrap justify-end gap-2">
@@ -1059,7 +1102,7 @@ export function SummaryBlockRenderer({
               </div>
             )}
 
-            <div className="space-y-4">
+            <div className={alwaysShowEditingActions ? "space-y-3" : "space-y-4"}>
               {section.blocks?.map((block, bIdx) => {
                 const blockPath = `sections.${idx}.blocks.${bIdx}`;
                 const phaseOneBlockJson = phaseOneBlockJsonByPath?.[blockPath];
@@ -1214,7 +1257,11 @@ export function SummaryBlockRenderer({
                   <div
                     key={bIdx}
                     id={`block-${idx}-${bIdx}`}
-                    className={`relative transition-all group/block ${isBlockEditing ? "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" : ""} ${
+                    className={`relative transition-all group/block ${
+                      isBlockEditing
+                        ? "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start"
+                        : ""
+                    } ${
                       draggedItem?.sectionIdx === idx && draggedItem?.blockIdx === bIdx
                         ? `opacity-50 ring-2 ${blockColorClass} rounded-xl`
                         : ""
@@ -1288,11 +1335,18 @@ export function SummaryBlockRenderer({
                       }
                     }}
                   >
-                    <div className="relative">
+                    <div
+                      className={cn(
+                        "relative",
+                        alwaysShowEditingActions &&
+                          "[&>div:first-child]:!pt-9 [&_[data-video-start-seconds]]:hidden sm:[&>div:first-child]:!pt-9",
+                      )}
+                    >
                       <BlockItem
                         block={blockToRender}
                         renderStemFigure={renderStemFigure}
                         showEditorialMetadata={showEditorialMetadata}
+                        onVideoSeek={onVideoSeek}
                       />
                       {!isReadOnly &&
                       (viewMode === "SPLIT" || isBlockEditing) &&
@@ -1316,152 +1370,176 @@ export function SummaryBlockRenderer({
                       <div className="flex flex-col items-end gap-2 w-full h-full">
                         {/* Toolbar for UI_ONLY mode (Floating on the UI Block) */}
                         {!isBlockEditing && (
-                          <div className="absolute top-2 right-2 z-10 flex items-center gap-1 rounded-md border border-slate-200 bg-white/90 px-1 py-0.5 opacity-100 shadow-sm transition-opacity focus-within:opacity-100 dark:border-slate-700 dark:bg-slate-800/90 sm:opacity-0 sm:group-hover/block:opacity-100">
-                            {renderBlockSourceAction?.({
-                              blockPath,
-                              block: blockToRender,
-                            })}
-                            {renderBlockImageActions?.({
-                              blockPath,
-                              block: blockToRender,
-                            })}
-                            {onBlockTypeChange &&
-                            CONVERTIBLE_BLOCK_TYPES.includes(
-                              blockToRender.type as ConvertibleBlockType,
-                            ) ? (
-                              <BlockTypeConversionMenu
-                                currentType={blockToRender.type as ConvertibleBlockType}
-                                onConvert={(targetType) =>
-                                  onBlockTypeChange(blockPath, targetType)
-                                }
+                          <div
+                            className={cn(
+                              "absolute right-2 top-1 z-10 flex items-center transition-opacity focus-within:opacity-100",
+                              alwaysShowEditingActions
+                                ? "gap-2 opacity-100"
+                                : "gap-1 rounded-md border border-slate-200 bg-white/90 px-1 py-0.5 opacity-100 shadow-sm dark:border-slate-700 dark:bg-slate-800/90 sm:opacity-0 sm:group-hover/block:opacity-100",
+                            )}
+                          >
+                            {alwaysShowEditingActions ? (
+                              <VideoStartTimeBadge
+                                seconds={blockToRender.startSeconds}
+                                onSeek={onVideoSeek}
                               />
                             ) : null}
-                            {viewMode === "UI_ONLY" && onBlockEdit ? (
-                              <ImmediateTooltip content="Chỉnh sửa khối bằng Tiptap">
+                            <div
+                              className={cn(
+                                alwaysShowEditingActions
+                                  ? "flex items-center gap-1 rounded-md border border-slate-200 bg-white/90 px-1 py-0.5 shadow-sm dark:border-slate-700 dark:bg-slate-800/90"
+                                  : "contents",
+                              )}
+                            >
+                              {renderBlockSourceAction?.({
+                                blockPath,
+                                block: blockToRender,
+                              })}
+                              {renderBlockImageActions?.({
+                                blockPath,
+                                block: blockToRender,
+                              })}
+                              {onBlockTypeChange &&
+                              CONVERTIBLE_BLOCK_TYPES.includes(
+                                blockToRender.type as ConvertibleBlockType,
+                              ) ? (
+                                <BlockTypeConversionMenu
+                                  currentType={blockToRender.type as ConvertibleBlockType}
+                                  onConvert={(targetType) =>
+                                    onBlockTypeChange(blockPath, targetType)
+                                  }
+                                />
+                              ) : null}
+                              {viewMode === "UI_ONLY" && onBlockEdit ? (
+                                <ImmediateTooltip content="Chỉnh sửa khối bằng Tiptap">
+                                  <button
+                                    aria-label="Chỉnh sửa khối bằng Tiptap"
+                                    type="button"
+                                    onClick={() =>
+                                      onBlockEdit({ blockPath, block: blockToRender })
+                                    }
+                                    className="rounded p-1.5 text-slate-500 transition-colors hover:text-blue-600 dark:text-slate-400"
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                                  </button>
+                                </ImmediateTooltip>
+                              ) : null}
+                              {viewMode === "UI_ONLY" && (
+                                <ImmediateTooltip content="Chỉnh sửa nội dung khối">
+                                  <button
+                                    aria-label="Chỉnh sửa nội dung khối"
+                                    type="button"
+                                    onClick={() => toggleEdit(`block-${idx}-${bIdx}`)}
+                                    className="mr-1 rounded p-1.5 text-slate-500 transition-colors hover:text-blue-600 dark:text-slate-400"
+                                  >
+                                    <PenTool className="h-3.5 w-3.5" aria-hidden="true" />
+                                  </button>
+                                </ImmediateTooltip>
+                              )}
+                              <ImmediateTooltip
+                                content={
+                                  bIdx === 0 && idx === 0
+                                    ? "Khối đã ở vị trí đầu tiên"
+                                    : "Đưa khối lên trước"
+                                }
+                              >
+                                <span className="inline-flex">
+                                  <button
+                                    aria-label="Đưa khối lên trước"
+                                    type="button"
+                                    onClick={handleMoveUp}
+                                    disabled={bIdx === 0 && idx === 0}
+                                    className="p-1.5 text-slate-500 transition-colors hover:text-blue-600 disabled:opacity-30 disabled:hover:text-slate-500 dark:text-slate-400"
+                                  >
+                                    <ArrowUp className="h-3.5 w-3.5" aria-hidden="true" />
+                                  </button>
+                                </span>
+                              </ImmediateTooltip>
+                              <ImmediateTooltip
+                                content={
+                                  bIdx === (section.blocks?.length || 0) - 1 &&
+                                  idx === (data.sections?.length || 0) - 1
+                                    ? "Khối đã ở vị trí cuối cùng"
+                                    : "Đưa khối xuống sau"
+                                }
+                              >
+                                <span className="inline-flex">
+                                  <button
+                                    aria-label="Đưa khối xuống sau"
+                                    type="button"
+                                    onClick={handleMoveDown}
+                                    disabled={
+                                      bIdx === (section.blocks?.length || 0) - 1 &&
+                                      idx === (data.sections?.length || 0) - 1
+                                    }
+                                    className="p-1.5 text-slate-500 transition-colors hover:text-blue-600 disabled:opacity-30 disabled:hover:text-slate-500 dark:text-slate-400"
+                                  >
+                                    <ArrowDown
+                                      className="h-3.5 w-3.5"
+                                      aria-hidden="true"
+                                    />
+                                  </button>
+                                </span>
+                              </ImmediateTooltip>
+                              <ImmediateTooltip content="Tạo một bản sao của khối">
                                 <button
-                                  aria-label="Chỉnh sửa khối bằng Tiptap"
+                                  aria-label="Tạo bản sao của khối"
+                                  type="button"
+                                  onClick={() => {
+                                    const newData = { ...data };
+                                    if (newData.sections?.[idx]?.blocks) {
+                                      const blocks = [...newData.sections[idx].blocks];
+                                      const copiedBlock = JSON.parse(
+                                        JSON.stringify(blocks[bIdx]),
+                                      );
+                                      blocks.splice(bIdx + 1, 0, copiedBlock);
+                                      newData.sections[idx].blocks = blocks;
+                                      onChange(newData);
+                                    }
+                                  }}
+                                  className="p-1.5 text-slate-500 transition-colors hover:text-blue-600 dark:text-slate-400"
+                                >
+                                  <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+                                </button>
+                              </ImmediateTooltip>
+                              <ImmediateTooltip content="Xóa khối nội dung này">
+                                <button
+                                  aria-label="Xóa khối nội dung"
                                   type="button"
                                   onClick={() =>
-                                    onBlockEdit({ blockPath, block: blockToRender })
+                                    setPendingDeleteTarget({
+                                      kind: "BLOCK",
+                                      blockIndex: bIdx,
+                                      itemName:
+                                        BLOCK_CONFIG[blockToRender.type]?.label ??
+                                        "Khối nội dung",
+                                      sectionIndex: idx,
+                                    })
                                   }
-                                  className="rounded p-1.5 text-slate-500 transition-colors hover:text-blue-600 dark:text-slate-400"
+                                  className="p-1.5 text-slate-500 transition-colors hover:text-red-600 dark:text-slate-400"
                                 >
-                                  <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                                 </button>
                               </ImmediateTooltip>
-                            ) : null}
-                            {viewMode === "UI_ONLY" && (
-                              <ImmediateTooltip content="Chỉnh sửa nội dung khối">
-                                <button
-                                  aria-label="Chỉnh sửa nội dung khối"
-                                  type="button"
-                                  onClick={() => toggleEdit(`block-${idx}-${bIdx}`)}
-                                  className="mr-1 rounded p-1.5 text-slate-500 transition-colors hover:text-blue-600 dark:text-slate-400"
+                              <div className="mx-0.5 h-4 w-px bg-slate-200 dark:bg-slate-700"></div>
+                              <ImmediateTooltip content="Kéo để sắp xếp vị trí khối">
+                                <div
+                                  aria-label="Kéo để sắp xếp vị trí khối"
+                                  draggable
+                                  onDragStart={(e) => {
+                                    e.dataTransfer.effectAllowed = "move";
+                                    setDraggedItem({ sectionIdx: idx, blockIdx: bIdx });
+                                  }}
+                                  onDragEnd={() => setDraggedItem(null)}
+                                  className="cursor-grab p-1.5 text-slate-400 transition-colors hover:text-slate-700 active:cursor-grabbing"
                                 >
-                                  <PenTool className="h-3.5 w-3.5" aria-hidden="true" />
-                                </button>
+                                  <GripVertical
+                                    className="h-3.5 w-3.5"
+                                    aria-hidden="true"
+                                  />
+                                </div>
                               </ImmediateTooltip>
-                            )}
-                            <ImmediateTooltip
-                              content={
-                                bIdx === 0 && idx === 0
-                                  ? "Khối đã ở vị trí đầu tiên"
-                                  : "Đưa khối lên trước"
-                              }
-                            >
-                              <span className="inline-flex">
-                                <button
-                                  aria-label="Đưa khối lên trước"
-                                  type="button"
-                                  onClick={handleMoveUp}
-                                  disabled={bIdx === 0 && idx === 0}
-                                  className="p-1.5 text-slate-500 transition-colors hover:text-blue-600 disabled:opacity-30 disabled:hover:text-slate-500 dark:text-slate-400"
-                                >
-                                  <ArrowUp className="h-3.5 w-3.5" aria-hidden="true" />
-                                </button>
-                              </span>
-                            </ImmediateTooltip>
-                            <ImmediateTooltip
-                              content={
-                                bIdx === (section.blocks?.length || 0) - 1 &&
-                                idx === (data.sections?.length || 0) - 1
-                                  ? "Khối đã ở vị trí cuối cùng"
-                                  : "Đưa khối xuống sau"
-                              }
-                            >
-                              <span className="inline-flex">
-                                <button
-                                  aria-label="Đưa khối xuống sau"
-                                  type="button"
-                                  onClick={handleMoveDown}
-                                  disabled={
-                                    bIdx === (section.blocks?.length || 0) - 1 &&
-                                    idx === (data.sections?.length || 0) - 1
-                                  }
-                                  className="p-1.5 text-slate-500 transition-colors hover:text-blue-600 disabled:opacity-30 disabled:hover:text-slate-500 dark:text-slate-400"
-                                >
-                                  <ArrowDown className="h-3.5 w-3.5" aria-hidden="true" />
-                                </button>
-                              </span>
-                            </ImmediateTooltip>
-                            <ImmediateTooltip content="Tạo một bản sao của khối">
-                              <button
-                                aria-label="Tạo bản sao của khối"
-                                type="button"
-                                onClick={() => {
-                                  const newData = { ...data };
-                                  if (newData.sections?.[idx]?.blocks) {
-                                    const blocks = [...newData.sections[idx].blocks];
-                                    const copiedBlock = JSON.parse(
-                                      JSON.stringify(blocks[bIdx]),
-                                    );
-                                    blocks.splice(bIdx + 1, 0, copiedBlock);
-                                    newData.sections[idx].blocks = blocks;
-                                    onChange(newData);
-                                  }
-                                }}
-                                className="p-1.5 text-slate-500 transition-colors hover:text-blue-600 dark:text-slate-400"
-                              >
-                                <Copy className="h-3.5 w-3.5" aria-hidden="true" />
-                              </button>
-                            </ImmediateTooltip>
-                            <ImmediateTooltip content="Xóa khối nội dung này">
-                              <button
-                                aria-label="Xóa khối nội dung"
-                                type="button"
-                                onClick={() =>
-                                  setPendingDeleteTarget({
-                                    kind: "BLOCK",
-                                    blockIndex: bIdx,
-                                    itemName:
-                                      BLOCK_CONFIG[blockToRender.type]?.label ??
-                                      "Khối nội dung",
-                                    sectionIndex: idx,
-                                  })
-                                }
-                                className="p-1.5 text-slate-500 transition-colors hover:text-red-600 dark:text-slate-400"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                              </button>
-                            </ImmediateTooltip>
-                            <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-0.5"></div>
-                            <ImmediateTooltip content="Kéo để sắp xếp vị trí khối">
-                              <div
-                                aria-label="Kéo để sắp xếp vị trí khối"
-                                draggable
-                                onDragStart={(e) => {
-                                  e.dataTransfer.effectAllowed = "move";
-                                  setDraggedItem({ sectionIdx: idx, blockIdx: bIdx });
-                                }}
-                                onDragEnd={() => setDraggedItem(null)}
-                                className="cursor-grab p-1.5 text-slate-400 transition-colors hover:text-slate-700 active:cursor-grabbing"
-                              >
-                                <GripVertical
-                                  className="h-3.5 w-3.5"
-                                  aria-hidden="true"
-                                />
-                              </div>
-                            </ImmediateTooltip>
+                            </div>
                           </div>
                         )}
 
@@ -1776,10 +1854,12 @@ function BlockItem({
   block,
   renderStemFigure,
   showEditorialMetadata,
+  onVideoSeek,
 }: {
   block: BlockData;
   renderStemFigure?: LessonSummaryFigureRenderer;
   showEditorialMetadata: boolean;
+  onVideoSeek?: (seconds: number) => void;
 }) {
   switch (block.type) {
     case "example":
@@ -1788,6 +1868,7 @@ function BlockItem({
           block={block}
           renderStemFigure={renderStemFigure}
           showEditorialMetadata={showEditorialMetadata}
+          onVideoSeek={onVideoSeek}
         />
       );
     case "exercise":
@@ -1802,7 +1883,14 @@ function BlockItem({
     case "property":
     case "theorem":
     case "note":
-      return <CalloutBlock block={block} renderStemFigure={renderStemFigure} />;
+    case "summary":
+      return (
+        <CalloutBlock
+          block={block}
+          renderStemFigure={renderStemFigure}
+          onVideoSeek={onVideoSeek}
+        />
+      );
     default:
       return (
         <div className="p-3 border border-slate-200 rounded text-sm text-slate-500 overflow-auto">
@@ -1931,9 +2019,11 @@ const COLOR_STYLES: Record<string, any> = {
 function BaseBlockContainer({
   block,
   children,
+  onVideoSeek,
 }: {
   block: BlockData;
   children: React.ReactNode;
+  onVideoSeek?: (seconds: number) => void;
 }) {
   const config = BLOCK_CONFIG[block.type] || {
     label: block.type,
@@ -1943,16 +2033,19 @@ function BaseBlockContainer({
   const styles = COLOR_STYLES[config.color] || COLOR_STYLES.slate;
   const Icon = config.icon;
 
-  const hideTitleTypes = ["note", "example"];
+  const hideTitleTypes = ["note", "example", "summary"];
   const shouldShowTitle = block.title && !hideTitleTypes.includes(block.type);
 
   return (
     <div className={`rounded-xl border p-3 sm:p-5 ${styles.bg} ${styles.border}`}>
       <div
-        className={`flex items-center gap-1.5 text-[13px] font-black uppercase tracking-wider mb-1 ${styles.label}`}
+        className={`mb-1 flex items-center gap-2 text-[13px] font-black uppercase tracking-wider ${styles.label}`}
       >
-        <Icon className="w-4 h-4" />
-        {config.label} {block.displayNumber ? block.displayNumber : ""}
+        <span className="inline-flex min-w-0 items-center gap-1.5">
+          <Icon className="h-4 w-4 shrink-0" />
+          {config.label} {block.displayNumber ? block.displayNumber : ""}
+        </span>
+        <VideoStartTimeBadge seconds={block.startSeconds} onSeek={onVideoSeek} />
       </div>
       {shouldShowTitle && (
         <div className={`font-bold ${styles.text}`}>
@@ -1972,16 +2065,18 @@ function BaseBlockContainer({
 function CalloutBlock({
   block,
   renderStemFigure,
+  onVideoSeek,
 }: {
   block: BlockData;
   renderStemFigure?: LessonSummaryFigureRenderer;
+  onVideoSeek?: (seconds: number) => void;
 }) {
   const content =
     block.type === "note"
       ? normalizeLessonSummaryNoteContent(block.content ?? "")
       : block.content;
   return (
-    <BaseBlockContainer block={block}>
+    <BaseBlockContainer block={block} onVideoSeek={onVideoSeek}>
       {content && (
         <MathpixMarkdownRenderer content={normalizeBlockMath(content, block)} />
       )}
@@ -2012,10 +2107,12 @@ function ExampleBlock({
   block,
   renderStemFigure,
   showEditorialMetadata,
+  onVideoSeek,
 }: {
   block: BlockData;
   renderStemFigure?: LessonSummaryFigureRenderer;
   showEditorialMetadata: boolean;
+  onVideoSeek?: (seconds: number) => void;
 }) {
   return (
     <LessonSummaryExampleCard
@@ -2024,6 +2121,7 @@ function ExampleBlock({
       displayNumber={block.displayNumber}
       renderFigure={renderStemFigure}
       showEditorialWarning={showEditorialMetadata}
+      onVideoSeek={onVideoSeek}
     />
   );
 }

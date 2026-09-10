@@ -354,6 +354,10 @@ Rules:
 - Analytics/difficulty dùng aggregate theo time bucket. Không query hoặc trả raw event stream trên lesson page.
 - Semantic search/AI context lazy-load khi học sinh mở panel; không đưa embedding/search/AI bundle vào đường tải player ban đầu nếu chưa dùng.
 - Đo riêng player start latency, heartbeat error rate, interval merge duration, smart-resume latency và contextual AI latency.
+- `M15.9` whole-video summary chỉ lazy-load preview/modal khi admin mở. Preview
+  count token và ước tính chi phí từ normalized transcript packet nhưng không
+  gọi provider; execute dùng một background job, idempotency/draft hash và không
+  poll khi modal đóng trừ query trạng thái tối thiểu của lesson detail.
 
 ---
 
@@ -486,6 +490,10 @@ AI là phần dễ tạo độ trễ và chi phí cao, nên Codex phải:
   chỉ polling khi đang mở, query theo `aiGenerationId`, phân trang và dùng aggregate
   server-side thay vì tải toàn bộ event về client để cộng.
 - Khi test runtime với provider trả phí, ưu tiên cache/sample trước; forced/full run phải có ước tính usage/chi phí và xác nhận rõ của owner trước khi chạy.
+- Video Summary không cắt transcript im lặng. Preflight so input estimate với
+  limit route/model, trả lỗi thân thiện trước reservation/provider call nếu vượt;
+  log source cue/chapter count, input/output token, latency, schema failure và
+  stale-source rejection nhưng không log raw transcript/prompt/output.
 
 ---
 

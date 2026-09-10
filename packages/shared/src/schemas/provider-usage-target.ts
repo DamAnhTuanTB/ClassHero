@@ -5,6 +5,7 @@ export const providerUsageTargetContextSchema = z
     version: z.literal(1),
     kind: z.enum([
       "LESSON_SUMMARY",
+      "VIDEO_SUMMARY",
       "SUMMARY_BLOCK",
       "QUIZ_SET",
       "QUIZ_QUESTION",

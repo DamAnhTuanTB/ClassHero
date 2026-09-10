@@ -43,11 +43,34 @@ import {
 
 const MANAGED_AI_FEATURES = [
   AiGenerationType.SUMMARY,
+  AiGenerationType.VIDEO_SUMMARY,
   AiGenerationType.QUIZ,
   AiGenerationType.FLASHCARD,
   AiGenerationType.TEST,
 ] as const;
 const MANAGED_AI_PURPOSES = [AiModelPurpose.TEXT, AiModelPurpose.IMAGE] as const;
+const MANAGED_AI_CONFIGURATION_KEYS: ReadonlyArray<{
+  feature: AiGenerationType;
+  purpose: AiModelPurpose;
+}> = [
+  ...MANAGED_AI_PURPOSES.map((purpose) => ({
+    feature: AiGenerationType.SUMMARY,
+    purpose,
+  })),
+  { feature: AiGenerationType.VIDEO_SUMMARY, purpose: AiModelPurpose.TEXT },
+  ...MANAGED_AI_PURPOSES.map((purpose) => ({
+    feature: AiGenerationType.QUIZ,
+    purpose,
+  })),
+  ...MANAGED_AI_PURPOSES.map((purpose) => ({
+    feature: AiGenerationType.FLASHCARD,
+    purpose,
+  })),
+  ...MANAGED_AI_PURPOSES.map((purpose) => ({
+    feature: AiGenerationType.TEST,
+    purpose,
+  })),
+];
 
 @Injectable()
 export class ProviderOperationsAdminService {
@@ -374,29 +397,26 @@ export class ProviderOperationsAdminService {
     });
 
     return {
-      configurations: MANAGED_AI_FEATURES.flatMap((feature) =>
-        MANAGED_AI_PURPOSES.map((purpose) => {
-          const config = configurations.find(
-            (candidate) =>
-              candidate.feature === feature && candidate.purpose === purpose,
-          );
-          return {
-            feature,
-            purpose,
-            primaryCatalogItemId: config?.primaryCatalogItemId ?? null,
-            fallbackCatalogItemId: config?.fallbackCatalogItemId ?? null,
-            temperature: config?.temperature?.toNumber() ?? null,
-            reasoningEffort: config?.reasoningEffort ?? null,
-            maxInputTokens: config?.maxInputTokens ?? null,
-            maxOutputTokens: config?.maxOutputTokens ?? null,
-            fallbackTemperature: config?.fallbackTemperature?.toNumber() ?? null,
-            fallbackReasoningEffort: config?.fallbackReasoningEffort ?? null,
-            fallbackMaxOutputTokens: config?.fallbackMaxOutputTokens ?? null,
-            version: config?.version ?? 0,
-            updatedAt: config?.updatedAt ?? new Date(),
-          };
-        }),
-      ),
+      configurations: MANAGED_AI_CONFIGURATION_KEYS.map(({ feature, purpose }) => {
+        const config = configurations.find(
+          (candidate) => candidate.feature === feature && candidate.purpose === purpose,
+        );
+        return {
+          feature,
+          purpose,
+          primaryCatalogItemId: config?.primaryCatalogItemId ?? null,
+          fallbackCatalogItemId: config?.fallbackCatalogItemId ?? null,
+          temperature: config?.temperature?.toNumber() ?? null,
+          reasoningEffort: config?.reasoningEffort ?? null,
+          maxInputTokens: config?.maxInputTokens ?? null,
+          maxOutputTokens: config?.maxOutputTokens ?? null,
+          fallbackTemperature: config?.fallbackTemperature?.toNumber() ?? null,
+          fallbackReasoningEffort: config?.fallbackReasoningEffort ?? null,
+          fallbackMaxOutputTokens: config?.fallbackMaxOutputTokens ?? null,
+          version: config?.version ?? 0,
+          updatedAt: config?.updatedAt ?? new Date(),
+        };
+      }),
       models: catalog.map((item) => ({
         id: item.id,
         provider: item.provider,
@@ -417,17 +437,16 @@ export class ProviderOperationsAdminService {
       configurationKeys.size !== dto.configurations.length ||
       dto.configurations.some(
         (item) =>
-          !MANAGED_AI_FEATURES.includes(
-            item.feature as (typeof MANAGED_AI_FEATURES)[number],
-          ) ||
-          !MANAGED_AI_PURPOSES.includes(
-            item.purpose as (typeof MANAGED_AI_PURPOSES)[number],
+          !MANAGED_AI_CONFIGURATION_KEYS.some(
+            (configuration) =>
+              configuration.feature === item.feature &&
+              configuration.purpose === item.purpose,
           ),
       )
     ) {
       throwBadRequest(
         "AI_CONFIGURATION_FEATURE_INVALID",
-        "Chỉ được cấu hình tóm tắt, quiz, flashcard và bài kiểm tra.",
+        "Chỉ được cấu hình Sinh kiến thức, Tóm tắt video, Quiz, Flashcard và Bài kiểm tra theo phase được hỗ trợ.",
       );
     }
 
@@ -1251,12 +1270,19 @@ function serializePriceVersion(version: {
 }
 
 function hasCapability(value: Prisma.JsonValue | null, feature: AiGenerationType) {
+  const acceptedFeatures =
+    feature === AiGenerationType.VIDEO_SUMMARY
+      ? [AiGenerationType.VIDEO_SUMMARY, AiGenerationType.SUMMARY]
+      : [feature];
   if (Array.isArray(value)) {
-    return value.includes(feature);
+    return acceptedFeatures.some((acceptedFeature) => value.includes(acceptedFeature));
   }
   if (value && typeof value === "object" && !Array.isArray(value)) {
     const features = (value as Record<string, unknown>).features;
-    return Array.isArray(features) && features.includes(feature);
+    return (
+      Array.isArray(features) &&
+      acceptedFeatures.some((acceptedFeature) => features.includes(acceptedFeature))
+    );
   }
   return false;
 }

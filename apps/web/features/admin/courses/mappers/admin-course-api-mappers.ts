@@ -1,3 +1,4 @@
+import { tiptapTextDocumentSchema } from "@learning-path/shared";
 import type {
   AdminChapter,
   AdminLearningPath,
@@ -81,6 +82,7 @@ export function mapLesson(lesson: AdminLessonApi): AdminLesson {
     orderIndex: lesson.orderIndex,
     title: lesson.title,
     shortDescription: lesson.shortDescription ?? "",
+    overviewContentJson: parseLessonOverviewContent(lesson.overviewContentJson),
     lessonType: lesson.lessonType,
     liveUrl: lesson.liveUrl ?? "",
     scheduledAt: toDateTimeLocalValue(lesson.scheduledAt),
@@ -92,6 +94,11 @@ export function mapLesson(lesson: AdminLessonApi): AdminLesson {
     hasStudentCompletion: lesson.hasStudentCompletion ?? false,
     customVideoSettings: lesson.customVideoSettings,
   };
+}
+
+function parseLessonOverviewContent(value: unknown) {
+  const parsed = tiptapTextDocumentSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
 }
 
 function descriptionJsonToText(value: unknown) {

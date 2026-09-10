@@ -71,6 +71,12 @@ export function useAdminAiGenerationPanel(
       const data = query.state.data;
       if (!data) return false;
       if (options?.pollUsage) return 1_500;
+      if (
+        data.videoSummaryJob &&
+        ["QUEUED", "RUNNING"].includes(data.videoSummaryJob.status)
+      ) {
+        return 1_500;
+      }
       return data.documents.some((doc) => doc.status === "PROCESSING") ? 5_000 : false;
     },
     refetchIntervalInBackground: false,

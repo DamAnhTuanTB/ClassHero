@@ -22,6 +22,11 @@ const PANEL_GENERATION_TYPES = [
   AiGenerationType.TEST,
 ] as const;
 
+const TRACKED_GENERATION_TYPES = [
+  ...PANEL_GENERATION_TYPES,
+  AiGenerationType.VIDEO_SUMMARY,
+] as const;
+
 const panelGenerationSelect = {
   id: true,
   type: true,
@@ -53,6 +58,7 @@ const panelGenerationSelect = {
   quizSets: { take: 1, select: { reviewStatus: true } },
   flashcardSets: { take: 1, select: { reviewStatus: true } },
   testSets: { take: 1, select: { reviewStatus: true } },
+  videoSummaries: { take: 1, select: { reviewStatus: true } },
 } satisfies Prisma.AiGenerationSelect;
 
 type PanelGenerationRecord = Prisma.AiGenerationGetPayload<{
@@ -79,6 +85,7 @@ export class LessonAiGenerationPanelService {
       testFigureRoute,
       flashcardRoute,
       flashcardFigureRoute,
+      videoSummaryRoute,
       activeModels,
       ...generations
     ] = await Promise.all([
@@ -136,8 +143,9 @@ export class LessonAiGenerationPanelService {
       this.modelRouting.resolve(AiGenerationType.TEST, AiModelPurpose.IMAGE),
       this.modelRouting.resolve(AiGenerationType.FLASHCARD, AiModelPurpose.TEXT),
       this.modelRouting.resolve(AiGenerationType.FLASHCARD, AiModelPurpose.IMAGE),
+      this.modelRouting.resolve(AiGenerationType.VIDEO_SUMMARY, AiModelPurpose.TEXT),
       this.modelRouting.getAllActiveModels(),
-      ...PANEL_GENERATION_TYPES.map((type) =>
+      ...TRACKED_GENERATION_TYPES.map((type) =>
         this.prisma.aiGeneration.findFirst({
           where: { lessonId, type },
           orderBy: [{ createdAt: "desc" }, { id: "desc" }],
@@ -268,6 +276,10 @@ export class LessonAiGenerationPanelService {
     const resolvedFlashcardFigureCandidate =
       flashcardFigureRoute.candidates.find((candidate) => candidate.available) ??
       flashcardFigureRoute.candidates[0] ??
+      null;
+    const resolvedVideoSummaryCandidate =
+      videoSummaryRoute.candidates.find((candidate) => candidate.available) ??
+      videoSummaryRoute.candidates[0] ??
       null;
 
     return {
@@ -413,11 +425,29 @@ export class LessonAiGenerationPanelService {
           capabilities: candidate.capabilitiesJson,
         })),
       },
+      videoSummaryConfiguration: {
+        isDefaultConfigured: videoSummaryRoute.hasConfiguration,
+        resolvedProvider: resolvedVideoSummaryCandidate?.provider ?? null,
+        resolvedModel: resolvedVideoSummaryCandidate?.model ?? null,
+        temperature: videoSummaryRoute.temperature,
+        reasoningEffort: videoSummaryRoute.reasoningEffort,
+        maxOutputTokens: videoSummaryRoute.maxOutputTokens,
+        modelOptions: activeModels.map((candidate) => ({
+          provider: candidate.provider,
+          model: candidate.model,
+          available: candidate.available,
+          capabilities: candidate.capabilitiesJson,
+        })),
+      },
       jobs: Object.fromEntries(
         PANEL_GENERATION_TYPES.map((type) => [
           type,
           serializeLatestGeneration(type, latestByType.get(type)),
         ]),
+      ),
+      videoSummaryJob: serializeLatestGeneration(
+        AiGenerationType.VIDEO_SUMMARY,
+        latestByType.get(AiGenerationType.VIDEO_SUMMARY),
       ),
     };
   }
@@ -535,7 +565,7 @@ function getQuizPacketDocumentUnavailableReason(document: {
 }
 
 function serializeLatestGeneration(
-  type: (typeof PANEL_GENERATION_TYPES)[number],
+  type: (typeof TRACKED_GENERATION_TYPES)[number],
   generation: PanelGenerationRecord | undefined,
 ) {
   if (!generation) {
@@ -572,7 +602,7 @@ function serializeLatestGeneration(
 }
 
 function getGeneratedReviewStatus(
-  type: (typeof PANEL_GENERATION_TYPES)[number],
+  type: (typeof TRACKED_GENERATION_TYPES)[number],
   generation: PanelGenerationRecord,
 ) {
   if (type === AiGenerationType.SUMMARY) {
@@ -583,6 +613,9 @@ function getGeneratedReviewStatus(
   }
   if (type === AiGenerationType.FLASHCARD) {
     return generation.flashcardSets[0]?.reviewStatus ?? null;
+  }
+  if (type === AiGenerationType.VIDEO_SUMMARY) {
+    return generation.videoSummaries[0]?.reviewStatus ?? null;
   }
   return generation.testSets[0]?.reviewStatus ?? null;
 }

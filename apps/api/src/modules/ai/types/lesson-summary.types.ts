@@ -64,7 +64,7 @@ export const lessonSummaryStyleSchema = z.enum([
 ]);
 export const lessonSummaryLengthSchema = z.enum(["short", "standard", "detailed"]);
 const nonEmptyText = (maxLength: number) => z.string().trim().min(1).max(maxLength);
-const LESSON_SUMMARY_SEMANTIC_LAYOUT_DESCRIPTION =
+export const LESSON_SUMMARY_SEMANTIC_LAYOUT_DESCRIPTION =
   "Không coi ngắt dòng do dàn trang là ranh giới ngữ nghĩa. Bảo toàn câu, đoạn, danh sách, hệ điều kiện, dấu câu dẫn và cấu trúc công thức theo chức năng trong nguồn; chọn inline hay display theo vai trò và độ phức tạp, không theo vị trí xuống dòng trong ảnh PDF.";
 export const LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION = [
   "QUY TẮC CỨNG VỀ CHUỖI DẤU BẰNG: trước khi trả structured output, phải quét riêng từng field `content`, `problem`, `solution`, `answer` và từng công thức display trong field đó.",
@@ -241,7 +241,7 @@ export type LessonSummaryMvpBlock = z.infer<typeof lessonSummaryMvpBlockSchema>;
 
 const LESSON_SUMMARY_PROVIDER_SOLUTION_OWNERSHIP_DESCRIPTION =
   "Chỉ chứa thân lời giải; không chứa tiêu đề do UI sở hữu, không lặp lại answer hoặc dữ liệu cấu trúc đã được tách sang field riêng.";
-const LESSON_SUMMARY_PROVIDER_SOLUTION_DESCRIPTION = `${LESSON_SUMMARY_PROVIDER_SOLUTION_OWNERSHIP_DESCRIPTION} Lời giải phải đầy đủ theo phong cách sách giáo khoa: không làm tắt, không bỏ bước biến đổi hoặc suy luận cần thiết để người học theo dõi. Tuân theo cách lập luận của hồ sơ môn học trong system prompt, giữ đúng thứ tự suy luận và không biến toàn bộ lời giải thành checklist rời rạc. Bảo toàn ký hiệu tương đương và hệ ngoặc nhóm có ý nghĩa. ${LESSON_SUMMARY_SEMANTIC_LAYOUT_DESCRIPTION}`;
+export const LESSON_SUMMARY_PROVIDER_SOLUTION_DESCRIPTION = `${LESSON_SUMMARY_PROVIDER_SOLUTION_OWNERSHIP_DESCRIPTION} Lời giải phải đầy đủ theo phong cách sách giáo khoa: không làm tắt, không bỏ bước biến đổi hoặc suy luận cần thiết để người học theo dõi. Tuân theo cách lập luận của hồ sơ môn học trong system prompt, giữ đúng thứ tự suy luận và không biến toàn bộ lời giải thành checklist rời rạc. Bảo toàn ký hiệu tương đương và hệ ngoặc nhóm có ý nghĩa. ${LESSON_SUMMARY_SEMANTIC_LAYOUT_DESCRIPTION}`;
 const LESSON_SUMMARY_PROVIDER_GEOMETRY_STATEMENT_OWNERSHIP_DESCRIPTION =
   "Bắt buộc khác null cho bài Hình học lớp 7–9 và phải chứa bảng Giả thiết–Kết luận; Hình học lớp 10–12 và nội dung không phải Hình học phải trả null. Khi có giá trị, không chép lại bảng này vào solution.";
 const LESSON_SUMMARY_PROVIDER_GEOMETRY_STATEMENT_DESCRIPTION = `${LESSON_SUMMARY_PROVIDER_GEOMETRY_STATEMENT_OWNERSHIP_DESCRIPTION} hypotheses chỉ chứa dữ kiện có sẵn trong đề và conclusions ghi đúng điều cần kết luận.`;

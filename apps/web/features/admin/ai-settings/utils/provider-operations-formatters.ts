@@ -8,6 +8,7 @@ import type {
 
 export const aiFeatureLabels: Record<AiFeature, string> = {
   SUMMARY: "Sinh Kiến thức",
+  VIDEO_SUMMARY: "Tóm tắt video bằng AI",
   QUIZ: "Sinh câu hỏi ôn tập",
   FLASHCARD: "Sinh thẻ ghi nhớ",
   TEST: "Sinh bài kiểm tra",
@@ -41,6 +42,7 @@ const usagePurposeLabelsByResourceType: Record<string, string> = {
 
 const usageOperationLabels: Record<ProviderUsageOperation, string> = {
   SUMMARY_GENERATION: "Sinh kiến thức",
+  VIDEO_SUMMARY_GENERATION: "Tóm tắt Video",
   QUIZ_GENERATION: "Tạo bộ Quiz",
   FLASHCARD_GENERATION: "Tạo bộ Flashcard",
   TEST_GENERATION: "Tạo bài kiểm tra",

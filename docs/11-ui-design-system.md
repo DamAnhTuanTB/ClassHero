@@ -218,6 +218,9 @@ Spacing/radius mặc định:
 ## 7. Component rules
 
 - Button dùng shadcn/ui `Button`.
+- Với action quay về ở màn kết quả học tập, dùng nút bo góc gọn (`rounded-xl`)
+  có icon kèm nhãn ngắn, cùng hệ với header; không đặt icon tròn đơn lẻ tách
+  khỏi nhóm action. Nút phải có `aria-label` mô tả đích quay về.
 - Text trong button không được xuống dòng trong mọi viewport. Button phải có `white-space: nowrap`/`whitespace-nowrap`; khi nhãn dài hoặc màn hẹp, ưu tiên chỉnh layout, độ rộng, padding, font size hoặc copy ngắn hơn thay vì cho chữ wrap.
 - Mọi nút bấm và đường link có thể click được phải hiển thị `cursor: pointer`. Trạng thái không click được như disabled/loading phải dùng cursor đúng trạng thái (`not-allowed`, `wait`, `default` hoặc tương đương), không để người dùng hiểu nhầm là có thể bấm.
 - Nếu action ngay lập tức mở một loading/transition surface lớn hoặc toàn màn

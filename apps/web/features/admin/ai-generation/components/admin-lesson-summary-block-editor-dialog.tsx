@@ -80,6 +80,7 @@ const lessonSummaryBlockFormSchema = z
       "note",
       "example",
       "exercise",
+      "summary",
     ]),
     title: editorDocumentSchema,
     content: editorDocumentSchema,

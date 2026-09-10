@@ -33,6 +33,8 @@ import {
 import { LessonVideoSettingsForm } from "../../components/lesson-video-settings-form";
 import { LessonVideoChaptersForm } from "../../components/lesson-video-chapters-form";
 import { LessonVideoTranscriptPanel } from "@/features/admin/lessons/components/lesson-video-transcript-panel";
+import { VideoSummaryDialog } from "@/features/admin/lessons/components/video-summary-dialog";
+import { LessonOverviewSection } from "@/features/admin/lessons/screens/admin-lesson-detail/components/lesson-overview-section";
 import { useThemeStore, type AppThemeMode } from "@/lib/theme-store";
 import {
   adminSidebarCollapsedDatasetKey,
@@ -129,14 +131,12 @@ export function AdminLessonDetailManager({
   const [requestedGeneration, setRequestedGeneration] =
     useState<AdminAiGenerationDialogRequest | null>(null);
   const lessonContentPanelId = `admin-lesson-tab-panel-${lessonId}`;
-  const [tabPanelMinHeight, setTabPanelMinHeight] = useState(400);
   const [isLessonEditorOpen, setIsLessonEditorOpen] = useState(false);
   const [previewSettings, setPreviewSettings] = useState<CustomVideoSettings | null>(
     null,
   );
   const videoPlayerRef = useRef<CustomYoutubePlayerHandle>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
-  const tabPanelRef = useRef<HTMLDivElement>(null);
   const latestPlaybackTimeRef = useRef(0);
   const hasPlaybackTimeRef = useRef(false);
   const transcriptPlaybackListenerRef = useRef<((timeInSeconds: number) => void) | null>(
@@ -151,13 +151,6 @@ export function AdminLessonDetailManager({
         setActiveTab(tab);
       }
     }
-  }, []);
-
-  useEffect(() => {
-    const resetTabPanelMinHeight = () => setTabPanelMinHeight(400);
-    window.addEventListener("resize", resetTabPanelMinHeight);
-
-    return () => window.removeEventListener("resize", resetTabPanelMinHeight);
   }, []);
 
   useEffect(() => {
@@ -191,12 +184,6 @@ export function AdminLessonDetailManager({
         return;
       }
 
-      const currentPanelHeight = tabPanelRef.current?.getBoundingClientRect().height;
-      if (currentPanelHeight) {
-        setTabPanelMinHeight((currentMinHeight) =>
-          Math.max(currentMinHeight, Math.ceil(currentPanelHeight)),
-        );
-      }
       setActiveTab(nextTab);
 
       if (typeof window !== "undefined") {
@@ -506,15 +493,25 @@ export function AdminLessonDetailManager({
                     </div>
                   </div>
 
-                  {/* Description Section */}
-                  <div className="rounded-xl border border-[var(--theme-border)] bg-white dark:bg-slate-950 overflow-hidden shadow-sm">
-                    <div className="px-4 py-3 border-b border-[var(--theme-border)] bg-[var(--theme-bg-subtle)] font-bold text-sm text-[var(--theme-text-strong)]">
-                      Mô tả buổi học
-                    </div>
-                    <div className="p-4 text-sm text-[var(--theme-text)] whitespace-pre-wrap leading-relaxed">
-                      {lesson.shortDescription || "-"}
-                    </div>
-                  </div>
+                  <LessonOverviewSection
+                    content={lesson.overviewContentJson ?? null}
+                    fallbackText={lesson.shortDescription}
+                    lessonId={lessonId}
+                    onSaved={handleLessonSaved}
+                  />
+
+                  <VideoSummaryDialog
+                    lessonId={lessonId}
+                    onVideoSeek={handlePlayTranscriptSegment}
+                    disabled={
+                      !lesson.videoUrl || !lessonVideoSettings?.transcript?.length
+                    }
+                    disabledReason={
+                      !lesson.videoUrl
+                        ? "Cần có video để tóm tắt."
+                        : "Cần lưu bản chép lời video trước khi tóm tắt."
+                    }
+                  />
                 </div>
 
                 <div className="space-y-6">
@@ -629,11 +626,9 @@ export function AdminLessonDetailManager({
               />
 
               <div
-                ref={tabPanelRef}
                 id={lessonContentPanelId}
                 role="tabpanel"
                 className="min-h-[400px] overflow-hidden bg-transparent sm:rounded-xl sm:border sm:border-[var(--theme-border)] sm:bg-[var(--theme-bg-subtle)]"
-                style={{ minHeight: tabPanelMinHeight }}
               >
                 {activeTab === "documents" &&
                 !isLessonEditorOpen &&

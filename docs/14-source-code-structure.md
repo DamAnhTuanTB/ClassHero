@@ -2,7 +2,8 @@
 
 Tài liệu này là contract tổ chức source code cho front-end và back-end. Mục tiêu là tránh file phình to, component/helper bị viết dồn, UI không đồng nhất, import rối và module khó bảo trì khi dự án lớn dần.
 
-Khi làm task có sửa code, Codex phải đọc file này cùng `AGENTS.md`, docs milestone và docs domain liên quan.
+Khi làm task có sửa code, Codex đọc mục 1 và phần front-end, back-end hoặc shared
+tương ứng với bề mặt sửa; không cần đọc toàn file nếu task chỉ chạm một layer.
 
 ---
 

@@ -46,7 +46,10 @@ export function rewriteOcrPreviewImageUrls(
   }
 
   const imageUrlByFilename = new Map(
-    images.map((image) => [getFilename(image.objectKey), image.url]),
+    images.map((image) => [
+      getFilename(image.objectKey),
+      escapeMathpixUrlColumnSeparators(image.url),
+    ]),
   );
 
   const rewrittenContent = content.replace(
@@ -58,6 +61,15 @@ export function rewriteOcrPreviewImageUrls(
     /https?:\/\/[^\s<>"'{}()[\]]+/gu,
     (rawUrl) => resolvePreviewImageUrl(rawUrl, imageUrlByFilename) ?? rawUrl,
   );
+}
+
+/**
+ * Mathpix uses `&` as a LaTeX tabular column separator, including inside image
+ * destinations. Escaping signed-URL separators keeps the URL in one table cell;
+ * the renderer converts `\&` back to a literal ampersand in the image `src`.
+ */
+function escapeMathpixUrlColumnSeparators(url: string) {
+  return url.replace(/\\?&/gu, "\\&");
 }
 
 function toPreviewImage(

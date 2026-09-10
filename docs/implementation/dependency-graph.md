@@ -27,6 +27,9 @@ M3.8 transcript/chapter + M7 student learning + M5 retrieval + M9 AI
     -> contextual AI/semantic search/adaptive review
     -> aggregate admin video analytics
 
+M3.8 transcript/chapter + M4.3 jobs + M9 provider/routing/budget/target context
+  -> M15.9 admin whole-video summary
+
 M3 course/chapter/lesson + M8 payment/enrollment
   -> full paid enrollment access and payment CTA after M8.4
   -> M3.6 private personalized clone
@@ -62,7 +65,7 @@ M14 testing/hardening/deploy
 | `M12`     | Report/news models, auth, content modules                           | Report moderation, news/events                                          |
 | `M13`     | Progress/attempt/profile/file models                                | XP, leaderboard, profile, admin dashboard                               |
 | `M14`     | Implemented sensitive flows                                         | Tests, hardening, deploy, operations                                    |
-| `M15`     | `M3.8`, core `M7.1-M7.5`; AI tasks additionally need `M5.x`, `M9.x` | Smart video progress, contextual learning, adaptive review và analytics |
+| `M15`     | `M3.8`, core `M7.1-M7.5`; AI tasks additionally need `M5.x`, `M9.x`; `M15.9` chỉ cần transcript + job/provider foundation | Smart video progress, contextual learning, adaptive review, video summary và analytics |
 
 ## 3. Phụ thuộc cần nhớ khi chọn task
 
@@ -133,6 +136,9 @@ M14 testing/hardening/deploy
 - `M15.1-M15.3` được ưu tiên sau khi student lesson/quiz/test/completion ở `M7.1-M7.5` sẵn sàng; `M15.2` cần thêm notes `M7.6`.
 - `M15.4-M15.6` không được chạy trước nền transcript `M3.8`, retrieval `M5.x` và AI `M9.x` tương ứng.
 - `M15.7` chỉ suy luận difficulty từ nhiều tín hiệu học tập; `M15.8` chỉ hiển thị analytics tổng hợp có ngưỡng riêng tư.
+- `M15.9` độc lập với tracking/student surface `M15.1-M15.8`; task dùng saved
+  transcript toàn video, exact preview draft và text-only worker, không tái sử
+  dụng private Lesson Summary core.
 - M15 không thay đổi rule completed của `M7.5`; watched percent/chapter mastery chỉ là tín hiệu hỗ trợ.
 - `M14.8` phụ thuộc các screen/query đã được implement ở từng feature; phần
   regression Playwright dùng nền `M14.3`, không chặn feature chưa có UI.

@@ -7,6 +7,7 @@ export const lessonSelect = {
   orderIndex: true,
   title: true,
   shortDescription: true,
+  overviewContentJson: true,
   lessonType: true,
   liveUrl: true,
   scheduledAt: true,

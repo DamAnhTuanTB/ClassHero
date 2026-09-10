@@ -11,15 +11,21 @@ const PROTECTED_MARKDOWN_OR_MATH_PATTERN =
   /```[\s\S]*?```|~~~[\s\S]*?~~~|```[\s\S]*$|~~~[\s\S]*$|``[^\r\n]*?``|`[^`\r\n]*`|`[^`\r\n]*$|\\begin\{([A-Za-z*]+)\}[\s\S]*?\\end\{\1\}|\\begin\{[A-Za-z*]+\}[\s\S]*$|(?<!\\)\$\$[\s\S]*?(?<!\\)\$\$|\\\[[\s\S]*?\\\]|\\\([\s\S]*?\\\)|(?<!\\)\$(?:\\.|[^$\\\r\n])+(?<!\\)\$/gu;
 
 export function normalizeInlineSubpartBreaks(value: string) {
-  const maskedValue = maskProtectedMarkdownAndMath(value);
+  const joinedReferenceLabels = value.replace(
+    /(Khẳng định|Đáp án|Kết quả|Mệnh đề)\s*(?:(?:\r\n)|[\r\n\u2028\u2029])+\s*([a-h]\))/giu,
+    "$1 $2",
+  );
+  const maskedValue = maskProtectedMarkdownAndMath(joinedReferenceLabels);
   const subpartMarkers = [...maskedValue.matchAll(SUBPART_MARKER_PATTERN)].map((match) =>
     match[1]!.toLocaleLowerCase("vi"),
   );
 
-  if (!hasSequentialSubpartPair(subpartMarkers)) return value;
+  if (!hasSequentialSubpartPair(subpartMarkers)) return joinedReferenceLabels;
 
   const replacements = [...maskedValue.matchAll(INLINE_SUBPART_SPACING_PATTERN)].filter(
-    (match) => !isLineLeadingIndentationOrListPrefix(maskedValue, match.index),
+    (match) =>
+      !isLineLeadingIndentationOrListPrefix(maskedValue, match.index) &&
+      !isReferencedSubpartLabel(maskedValue, match.index),
   );
 
   const normalizedValue = replacements.reduceRight((result, match) => {
@@ -27,7 +33,7 @@ export function normalizeInlineSubpartBreaks(value: string) {
     const listPrefix = match[1] ?? "";
     const paragraphBreak = listPrefix ? "\n" : "\n\n";
     return `${result.slice(0, start)}${paragraphBreak}${listPrefix}${result.slice(start + match[0].length)}`;
-  }, value);
+  }, joinedReferenceLabels);
 
   const standaloneLineBreaks = [
     ...maskProtectedMarkdownAndMath(normalizedValue).matchAll(
@@ -73,5 +79,11 @@ function isLineLeadingIndentationOrListPrefix(value: string, index: number) {
   const linePrefix = value.slice(lineStart, index);
   return /^[^\S\r\n\u2028\u2029]*(?:(?:[-+*]|\d+[.)])[^\S\r\n\u2028\u2029]*)?$/u.test(
     linePrefix,
+  );
+}
+
+function isReferencedSubpartLabel(value: string, index: number) {
+  return /(?:Khẳng định|Đáp án|Kết quả|Mệnh đề)$/iu.test(
+    value.slice(Math.max(0, index - 24), index).trimEnd(),
   );
 }

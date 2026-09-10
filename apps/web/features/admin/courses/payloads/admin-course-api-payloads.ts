@@ -67,6 +67,9 @@ export function toLessonApiPayload(
     ...(values.shortDescription !== undefined
       ? { shortDescription: values.shortDescription?.trim() || null }
       : {}),
+    ...(values.overviewContentJson !== undefined
+      ? { overviewContentJson: values.overviewContentJson }
+      : {}),
     ...(values.lessonType !== undefined ? { lessonType: values.lessonType } : {}),
     ...(values.lessonType !== undefined || values.liveUrl !== undefined
       ? {

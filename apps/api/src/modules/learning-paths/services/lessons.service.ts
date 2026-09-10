@@ -1,5 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { LessonType, Prisma, PublishStatus } from "@prisma/client";
+import { tiptapTextDocumentSchema } from "@learning-path/shared";
 import { throwBadRequest } from "#api/common/errors/api-exception";
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import { CreateLessonDto } from "#api/modules/learning-paths/dto/create-lesson.dto";
@@ -162,6 +163,13 @@ export class LessonsService {
             orderIndex: temporaryOrderIndex,
             title: normalizedTitle,
             shortDescription: normalizeOptionalText(dto.shortDescription),
+            ...(dto.overviewContentJson !== undefined
+              ? {
+                  overviewContentJson: parseLessonOverviewContent(
+                    dto.overviewContentJson,
+                  ),
+                }
+              : {}),
             lessonType,
             liveUrl,
             scheduledAt: dto.scheduledAt ?? null,
@@ -297,6 +305,14 @@ export class LessonsService {
             ...(normalizedTitle !== undefined ? { title: normalizedTitle } : {}),
             ...(dto.shortDescription !== undefined
               ? { shortDescription: normalizeOptionalText(dto.shortDescription) }
+              : {}),
+            ...(dto.overviewContentJson !== undefined
+              ? {
+                  overviewContentJson:
+                    dto.overviewContentJson === null
+                      ? Prisma.DbNull
+                      : parseLessonOverviewContent(dto.overviewContentJson),
+                }
               : {}),
             ...(dto.lessonType !== undefined ? { lessonType } : {}),
             ...(dto.lessonType !== undefined || dto.liveUrl !== undefined
@@ -704,4 +720,18 @@ export class LessonsService {
       throwDuplicatedLessonTitle();
     }
   }
+}
+
+function parseLessonOverviewContent(
+  value: Record<string, unknown>,
+): Prisma.InputJsonValue {
+  const parsed = tiptapTextDocumentSchema.safeParse(value);
+  if (!parsed.success) {
+    throwBadRequest(
+      "VALIDATION_ERROR",
+      "Tổng quan buổi học phải là tài liệu Tiptap hợp lệ",
+    );
+  }
+
+  return parsed.data as Prisma.InputJsonValue;
 }

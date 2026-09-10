@@ -14,6 +14,7 @@ import {
   supportsReasoningEffort,
   supportsTemperature,
 } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
+import { replaceOpenAiRequestPrompts } from "@/features/admin/ai-generation/utils/openai-request-preview";
 import { cn } from "@/lib/utils";
 
 type PromptTab = "system" | "user" | "input";
@@ -108,14 +109,13 @@ export function AdminSummaryPromptPreview({
     ? resolveRequestTemperature(temperature, previewTemperature)
     : undefined;
   const fullInputData = {
-    ...baseOpenAiRequest,
+    ...replaceOpenAiRequestPrompts(baseOpenAiRequest, {
+      previewSystemPrompt: preview.systemPrompt,
+      previewUserPrompt: preview.userPrompt,
+      systemPrompt: effectiveSystemInstructions,
+      userPrompt: effectiveUserPrompt,
+    }),
     model: effectiveModel,
-    instructions: effectiveSystemInstructions,
-    input: replacePreviewUserPrompt(
-      preview.openAiRequest.input,
-      effectiveUserPrompt,
-      preview.userPrompt,
-    ),
     ...(effectiveReasoningEffort
       ? { reasoning: { effort: effectiveReasoningEffort } }
       : effectiveTemperature === undefined
@@ -430,35 +430,6 @@ function resolveRequestTemperature(
     ? Number(selectedTemperature)
     : previewTemperature;
   return value !== undefined && Number.isFinite(value) ? value : undefined;
-}
-
-function replacePreviewUserPrompt(
-  input: unknown,
-  userPrompt: string,
-  previewUserPrompt: string,
-): unknown {
-  if (typeof input === "string") {
-    if (!previewUserPrompt) return userPrompt;
-    const promptIndex = input.indexOf(previewUserPrompt);
-    if (promptIndex < 0) return input;
-    return `${input.slice(0, promptIndex)}${userPrompt}${input.slice(promptIndex + previewUserPrompt.length)}`;
-  }
-  if (!Array.isArray(input)) return input;
-  return input.map((message) => {
-    if (!message || typeof message !== "object" || Array.isArray(message)) return message;
-    const record = message as Record<string, unknown>;
-    if (!Array.isArray(record.content)) return message;
-    return {
-      ...record,
-      content: record.content.map((item) => {
-        if (!item || typeof item !== "object" || Array.isArray(item)) return item;
-        const content = item as Record<string, unknown>;
-        return content.id === "user_prompt" || content.text === previewUserPrompt
-          ? { ...content, text: userPrompt }
-          : item;
-      }),
-    };
-  });
 }
 
 function formatBytes(value: number) {

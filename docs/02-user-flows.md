@@ -179,6 +179,63 @@ Acceptance Criteria:
 
 ---
 
+## 5.2. Admin tạo bản tóm tắt video bằng AI
+
+Actor: Admin.
+
+Các bước:
+
+1. Admin mở chi tiết một buổi học và xem section `Tổng quan buổi học`.
+2. Nút `Tóm tắt Video` chỉ được bật khi buổi học có video và transcript đã lưu
+   có ít nhất một cue hợp lệ. Chapter/mốc thời gian là nguồn ưu tiên nhưng không
+   bắt buộc; transcript đang sửa dở chưa lưu không được dùng.
+3. Admin mở modal, chọn phong cách, độ dài/số từ mục tiêu, model và thông số
+   model tương tự modal `Tạo Kiến thức bằng AI`/`Tạo Quiz bằng AI`; có thể thêm
+   yêu cầu riêng.
+4. Khi admin bấm `Xem dữ liệu`, backend dựng immutable preview từ đúng video,
+   cấu hình cắt, chapter và transcript đang lưu của lesson. Modal hiển thị system
+   prompt, user prompt, dữ liệu nguồn/request và ước tính token/chi phí; thao tác
+   preview không gọi provider.
+5. Admin bấm `Tạo tóm tắt video`; backend kiểm tra preview chưa stale, reserve
+   budget rồi enqueue background job. Ngay khi API nhận job, modal đóng và
+   section `Tổng quan buổi học` hiển thị trạng thái đang tạo cùng đồng hồ thời
+   gian thực. Tải lại trang vẫn khôi phục job đang chạy và không tự tạo thêm lượt gọi.
+6. Worker tạo output theo đúng contract/renderer Sinh kiến thức: `Các kiến thức
+   sẽ học` ở đầu, đúng một ý chính cho mỗi section; các khối Kiến thức/Ví dụ bám đúng trình tự video; Ví dụ đủ
+   Đề bài/Lời giải/Kết luận; khối Tổng kết dạng bullet ở cuối. Mỗi khối Kiến
+   thức/Ví dụ và mỗi section hiển thị thời điểm bắt đầu lấy từ cue transcript
+   thật; bấm mốc sẽ tua/phát video. Ví dụ phụ thuộc hình mà không tự đủ dữ kiện
+   bằng text bị loại. Khối Tổng kết chỉ gồm bullet các dạng bài/nhiệm vụ có thể
+   giải quyết. Nếu nguồn không có ví dụ thì không tự bịa khối Ví dụ. Worker validate rồi lưu bản
+   tóm tắt ở trạng thái `NEEDS_REVIEW`. Khi hoàn tất, bản tóm tắt thay nội dung cũ trong chính section
+   `Tổng quan buổi học`; UI hiển thị model, Temperature hoặc Reasoning Effort,
+   chi phí thực tế và tổng thời gian tạo. Dữ liệu này không ghi vào Summary kiến
+   thức sinh từ PDF.
+7. Admin xem, chỉnh sửa rồi lưu/phát hành/thu hồi bản tóm tắt. Modal chỉnh sửa có
+   ba chế độ UI/JSON/Song song và đầy đủ thao tác khối/đề mục như Sinh kiến thức;
+   thay đổi chỉ persist khi bấm `Lưu nội dung`. Nếu video URL, transcript, chapter
+   hoặc cấu hình cắt thay đổi, UI đánh dấu bản hiện tại đã cũ và yêu cầu sinh lại.
+8. Nút `Chỉnh sửa` của section mở Tiptap editor. Trường `Tổng quan buổi học`
+   trong modal thêm/sửa lesson cũng dùng cùng editor và cùng bản nội dung; mô tả
+   text ngắn chỉ còn là fallback/preview tương thích cho dữ liệu cũ.
+
+Acceptance Criteria:
+
+- Client không được gửi raw transcript/chapter tùy ý; backend tự resolve toàn bộ
+  nguồn từ `lessonId` và khóa hash nguồn giữa preview với execute.
+- Output bắt đầu bằng Các kiến thức sẽ học, theo sau bởi các khối Kiến thức/Ví dụ
+  dùng cùng UI, màu sắc và quy tắc nội dung của Sinh kiến thức, rồi kết thúc bằng
+  Tổng kết; thứ tự và `startSeconds` của section/block phải bám cue transcript thật.
+- Đoạn văn, heading, danh sách và khoảng trắng mạch lạc; công thức Toán/Lý/Hóa
+  dùng rich-text/LaTeX canonical để cùng renderer hiện có hiển thị đúng.
+- Video hoặc transcript thiếu/rỗng trả trạng thái disabled/lỗi thân thiện trước
+  provider call; chapter rỗng không chặn generation.
+- Preview stale, output schema sai, budget không đủ hoặc provider lỗi không được
+  ghi đè bản tóm tắt hợp lệ hiện hành.
+- Flow là admin-only trong `M15.9`; chưa tự mở thêm surface cho student.
+
+---
+
 ## 6. Admin upload tài liệu/PDF cho buổi học
 
 Actor: Admin.

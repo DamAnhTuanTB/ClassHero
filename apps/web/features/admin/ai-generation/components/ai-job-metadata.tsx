@@ -62,16 +62,19 @@ export function AiJobMetadata({ job }: { job: AdminAiPanelJob | null }) {
           {`${job.estimatedCostVnd.toLocaleString("vi-VN")} VNĐ`}
         </button>
       ) : null}
-      {job.inputMetaJson?.temperature !== undefined && (
+      {typeof job.inputMetaJson?.temperature === "number" &&
+        !(typeof job.inputMetaJson?.reasoningEffort === "string" &&
+          job.inputMetaJson.reasoningEffort.trim()) && (
         <span className="flex items-center gap-1.5" title="Độ sáng tạo (Temperature)">
           Temp: {job.inputMetaJson.temperature}
         </span>
-      )}
-      {job.inputMetaJson?.reasoningEffort !== undefined && (
+        )}
+      {typeof job.inputMetaJson?.reasoningEffort === "string" &&
+        job.inputMetaJson.reasoningEffort.trim() && (
         <span className="flex items-center gap-1.5" title="Reasoning effort">
           Effort: {job.inputMetaJson.reasoningEffort}
         </span>
-      )}
+        )}
       <AdminAiGenerationUsageDialog
         aiGenerationId={job.aiGenerationId}
         isOpen={isUsageDialogOpen}

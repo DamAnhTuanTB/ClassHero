@@ -11,6 +11,7 @@ import { LessonSummaryGenerationService } from "#api/workers/services/lesson-sum
 import { LessonContentGenerationService } from "#api/workers/services/lesson-content-generation.service";
 import { QuizGenerationService } from "#api/workers/services/quiz-generation.service";
 import { FlashcardGenerationService } from "#api/workers/services/flashcard-generation.service";
+import { VideoSummaryGenerationService } from "#api/workers/services/video-summary-generation.service";
 
 /**
  * Dispatch boundary for M9 generation handlers.
@@ -27,6 +28,8 @@ export class AiGenerationExecutionService {
     private readonly quizGeneration: QuizGenerationService,
     @Inject(FlashcardGenerationService)
     private readonly flashcardGeneration: FlashcardGenerationService,
+    @Inject(VideoSummaryGenerationService)
+    private readonly videoSummaryGeneration: VideoSummaryGenerationService,
   ) {}
 
   async generate(
@@ -34,6 +37,9 @@ export class AiGenerationExecutionService {
   ): Promise<AiGenerationPreparedOutput> {
     if (context.type === AiGenerationType.SUMMARY) {
       return this.lessonSummaryGeneration.generate(context);
+    }
+    if (context.type === AiGenerationType.VIDEO_SUMMARY) {
+      return this.videoSummaryGeneration.generate(context);
     }
     if (context.type === AiGenerationType.QUIZ) {
       return this.quizGeneration.generate(context);
@@ -58,6 +64,9 @@ export class AiGenerationExecutionService {
   ): Promise<AiGenerationPersistenceResult> {
     if (context.type === AiGenerationType.SUMMARY) {
       return this.lessonSummaryGeneration.persist(context, prepared);
+    }
+    if (context.type === AiGenerationType.VIDEO_SUMMARY) {
+      return this.videoSummaryGeneration.persist(context, prepared);
     }
     if (context.type === AiGenerationType.QUIZ) {
       return this.quizGeneration.persist(context, prepared);

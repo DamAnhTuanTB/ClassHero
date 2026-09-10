@@ -8,6 +8,7 @@ import {
   type LessonSummaryFigureRenderer,
   type LessonSummaryProblemBlockData,
 } from "@/components/common/content/lesson-summary-problem-content";
+import { VideoStartTimeBadge } from "@/components/common/content/video-start-time-badge";
 
 export type LessonSummaryExampleBlockData = LessonSummaryProblemBlockData & {
   type: "example";
@@ -58,6 +59,7 @@ export function LessonSummaryExampleCard({
   showEditorialWarning = false,
   showProblem = true,
   renderFigure,
+  onVideoSeek,
 }: {
   answerLabel?: string;
   block: LessonSummaryExampleBlockData;
@@ -66,17 +68,21 @@ export function LessonSummaryExampleCard({
   showEditorialWarning?: boolean;
   showProblem?: boolean;
   renderFigure?: LessonSummaryFigureRenderer;
+  onVideoSeek?: (seconds: number) => void;
 }) {
   return (
     <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-3 dark:border-blue-900/50 dark:bg-blue-900/10 sm:p-5">
-      <div className="mb-1 flex items-center gap-1.5 text-[13px] font-black uppercase tracking-wider text-blue-600/70 dark:text-blue-400/70">
-        <PlayCircle className="h-4 w-4" aria-hidden="true" />
-        {label} {displayNumber ?? ""}
-        {block.origin === "AI_AUTHORED" && (
-          <span className="ml-1 rounded bg-blue-500/20 px-1.5 py-[1px] text-[9px] font-bold text-blue-700 dark:bg-blue-500/30 dark:text-blue-300">
-            NEW
-          </span>
-        )}
+      <div className="mb-1 flex items-center gap-2 text-[13px] font-black uppercase tracking-wider text-blue-600/70 dark:text-blue-400/70">
+        <span className="inline-flex min-w-0 items-center gap-1.5">
+          <PlayCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+          {label} {displayNumber ?? ""}
+          {block.origin === "AI_AUTHORED" && (
+            <span className="ml-1 rounded bg-blue-500/20 px-1.5 py-[1px] text-[9px] font-bold text-blue-700 dark:bg-blue-500/30 dark:text-blue-300">
+              NEW
+            </span>
+          )}
+        </span>
+        <VideoStartTimeBadge seconds={block.startSeconds} onSeek={onVideoSeek} />
       </div>
       <div className="learning-content-text space-y-2 leading-relaxed text-slate-800 opacity-90 dark:text-slate-200">
         <LessonSummaryProblemContent

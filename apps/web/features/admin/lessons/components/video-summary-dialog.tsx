@@ -1,0 +1,791 @@
+"use client";
+
+import { useEffect, useState, type ComponentProps } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { isAiReasoningEffort } from "@learning-path/shared";
+import { toast } from "sonner";
+import {
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  CircleAlert,
+  LoaderCircle,
+  Pencil,
+  RefreshCw,
+  Sparkles,
+  Trash2,
+} from "lucide-react";
+import { EditorDialogShell } from "@/components/admin/courses/editor-dialog-shell";
+import { OptionField } from "@/components/common/forms/option-field";
+import { TextField } from "@/components/common/forms/text-field";
+import { TextareaField } from "@/components/common/forms/textarea-field";
+import { TiptapContentView } from "@/components/common/content/tiptap-content-view";
+import { SummaryBlockRenderer } from "@/features/student/lessons/screens/student-lesson-screen/components/summary-block-renderer";
+import { getAdminAiJob } from "@/features/admin/ai-generation/api/admin-ai-generation-api";
+import { AiJobMetadata } from "@/features/admin/ai-generation/components/ai-job-metadata";
+import { AiJobTimer } from "@/features/admin/ai-generation/components/ai-job-timer";
+import {
+  adminAiGenerationQueryKeys,
+  useAdminAiGenerationPanel,
+} from "@/features/admin/ai-generation/hooks/use-admin-ai-generation";
+import { buildAiReasoningEffortOptions } from "@/lib/ai-reasoning-effort";
+import {
+  supportsReasoningEffort,
+  supportsTemperature,
+  type AdminAiModelConfiguration,
+} from "@/features/admin/ai-generation/types/admin-ai-generation.types";
+import { useAuthSessionStore } from "@/features/auth/session/auth-session";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
+import {
+  deleteAdminVideoSummary,
+  generateAdminVideoSummary,
+  getAdminVideoSummary,
+  previewAdminVideoSummary,
+  updateAdminVideoSummary,
+  type VideoSummary,
+  type VideoSummaryPreview,
+  type VideoSummaryRequest,
+} from "@/features/admin/lessons/api/admin-video-summary-api";
+import { VideoSummaryPromptPreview } from "@/features/admin/lessons/components/video-summary-prompt-preview";
+import { VideoSummaryEditorDialog } from "@/features/admin/lessons/components/video-summary-editor-dialog";
+import { AdminLessonSummaryPublishActions } from "@/features/admin/ai-generation/components/admin-lesson-summary-publish-actions";
+import { createTextTiptapDocument } from "@/lib/tiptap-rich-content";
+
+const initialRequest: VideoSummaryRequest = {
+  style: "student_friendly",
+  styleInstructions: "Dễ hiểu, gần gũi và phù hợp với người học của khóa học.",
+  length: "standard",
+};
+const styleOptions = [
+  { value: "student_friendly", label: "Dễ hiểu, gần gũi" },
+  { value: "concise", label: "Cô đọng, vào trọng tâm" },
+  { value: "academic", label: "Học thuật, chặt chẽ" },
+];
+const lengthOptions = [
+  { value: "short", label: "Ngắn gọn" },
+  { value: "standard", label: "Tiêu chuẩn" },
+  { value: "detailed", label: "Chi tiết" },
+];
+
+export function VideoSummaryDialog({
+  lessonId,
+  disabled,
+  disabledReason,
+  onVideoSeek,
+}: {
+  lessonId: string;
+  disabled: boolean;
+  disabledReason: string;
+  onVideoSeek?: (seconds: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [request, setRequest] = useState(initialRequest);
+  const [preview, setPreview] = useState<VideoSummaryPreview | null>(null);
+  const [shouldPrepareInitialPreview, setShouldPrepareInitialPreview] = useState(false);
+  const [promptsAreDirty, setPromptsAreDirty] = useState(false);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [jobQueuedAt, setJobQueuedAt] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const token = useAuthSessionStore((state) => state.session?.accessToken ?? "");
+  const summary = useQuery({
+    queryKey: ["admin-video-summary", lessonId],
+    queryFn: () => getAdminVideoSummary(lessonId, token),
+    enabled: Boolean(token),
+  });
+  const modelConfigurationQuery = useAdminAiGenerationPanel(lessonId);
+  const modelConfiguration =
+    modelConfigurationQuery.data?.videoSummaryConfiguration ??
+    modelConfigurationQuery.data?.summaryConfiguration;
+  const targetGrade = modelConfigurationQuery.data?.lesson.targetGrade ?? null;
+  const resolvedModel = request.model ?? modelConfiguration?.resolvedModel ?? "";
+  const selectedModel = modelConfiguration?.modelOptions.find(
+    (option) => option.model === resolvedModel,
+  );
+  const aiConfiguration = selectedModel?.capabilities?.aiConfiguration;
+  const showTemperature = supportsTemperature(resolvedModel, aiConfiguration);
+  const showReasoningEffort = supportsReasoningEffort(resolvedModel, aiConfiguration);
+  useEffect(() => {
+    if (!open || request.model || !modelConfiguration?.resolvedModel) return;
+    const model = modelConfiguration.resolvedModel;
+    setRequest((current) =>
+      current.model
+        ? current
+        : {
+            ...current,
+            model,
+            temperature: resolveModelTemperature(modelConfiguration, model),
+            reasoningEffort: resolveModelReasoningEffort(modelConfiguration, model),
+            maxOutputTokens: modelConfiguration.maxOutputTokens ?? 1200,
+          },
+    );
+  }, [modelConfiguration, open, request.model]);
+  const job = useQuery({
+    queryKey: ["admin-video-summary-job", jobId],
+    queryFn: () => getAdminAiJob(jobId ?? "", token),
+    enabled: Boolean(jobId && token),
+    refetchInterval: (query) =>
+      ["SUCCEEDED", "FAILED"].includes(query.state.data?.status ?? "") ? false : 1500,
+  });
+  useEffect(() => {
+    if (!jobId || !["SUCCEEDED", "FAILED"].includes(job.data?.status ?? "")) return;
+    void Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["admin-video-summary", lessonId] }),
+      queryClient.invalidateQueries({
+        queryKey: adminAiGenerationQueryKeys.panel(lessonId),
+      }),
+    ]);
+  }, [job.data?.status, jobId, lessonId, queryClient]);
+  const previewMutation = useMutation({
+    mutationFn: () => previewAdminVideoSummary(lessonId, request, token),
+    onSuccess: (data) => {
+      setPreview(data);
+      setRequest((current) => ({
+        ...current,
+        systemInstructions: data.systemPrompt,
+        userPrompt: data.userPrompt,
+      }));
+      setPromptsAreDirty(false);
+      setShouldPrepareInitialPreview(false);
+    },
+    onError: () => setShouldPrepareInitialPreview(false),
+  });
+  useEffect(() => {
+    if (
+      !open ||
+      !shouldPrepareInitialPreview ||
+      !request.model ||
+      previewMutation.isPending
+    ) {
+      return;
+    }
+    previewMutation.mutate();
+  }, [open, previewMutation, request.model, shouldPrepareInitialPreview]);
+  const generateMutation = useMutation({
+    mutationFn: () =>
+      generateAdminVideoSummary(
+        lessonId,
+        {
+          ...request,
+          requestDraftId: preview?.requestDraftId,
+          requestHash: preview?.requestHash,
+        },
+        token,
+      ),
+    onSuccess: (data) => {
+      setJobId(data.jobId);
+      setJobQueuedAt(new Date().toISOString());
+      setOpen(false);
+      void queryClient.invalidateQueries({
+        queryKey: adminAiGenerationQueryKeys.panel(lessonId),
+      });
+    },
+  });
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteAdminVideoSummary(lessonId, token),
+    onSuccess: () =>
+      void queryClient.invalidateQueries({ queryKey: ["admin-video-summary", lessonId] }),
+  });
+  const editMutation = useMutation({
+    mutationFn: ({
+      action,
+      contentJson,
+    }: {
+      action: "SAVE" | "PUBLISH" | "WITHDRAW";
+      contentJson: VideoSummary["contentJson"];
+    }) => {
+      if (!summary.data && action === "WITHDRAW") {
+        throw new Error("Chưa có tóm tắt video để thu hồi");
+      }
+      const reviewStatus =
+        action === "PUBLISH"
+          ? "APPROVED"
+          : action === "WITHDRAW"
+            ? "HIDDEN"
+            : (summary.data?.reviewStatus ?? "NEEDS_REVIEW");
+      return updateAdminVideoSummary(
+        lessonId,
+        {
+          contentJson:
+            action === "SAVE" || !summary.data ? contentJson : summary.data.contentJson,
+          source: action === "SAVE" || !summary.data ? "ADMIN" : summary.data.source,
+          reviewStatus,
+        },
+        token,
+      );
+    },
+    onSuccess: (_data, variables) => {
+      setEditorOpen(false);
+      toast.success(
+        variables.action === "SAVE"
+          ? "Đã lưu nội dung chỉnh sửa"
+          : variables.action === "PUBLISH"
+            ? "Đã phát hành Tổng quan video"
+            : "Đã thu hồi phát hành Tổng quan video",
+      );
+      void Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-video-summary", lessonId] }),
+        queryClient.invalidateQueries({
+          queryKey: adminAiGenerationQueryKeys.panel(lessonId),
+        }),
+      ]);
+    },
+  });
+  const isBusy = previewMutation.isPending || generateMutation.isPending;
+  const close = () => {
+    if (!isBusy) setOpen(false);
+  };
+  const openDialog = () => {
+    const model = modelConfiguration?.resolvedModel ?? undefined;
+    setRequest({
+      ...initialRequest,
+      model,
+      temperature: model ? resolveModelTemperature(modelConfiguration, model) : undefined,
+      reasoningEffort: model
+        ? resolveModelReasoningEffort(modelConfiguration, model)
+        : undefined,
+      maxOutputTokens: modelConfiguration?.maxOutputTokens ?? 1200,
+    });
+    setPreview(null);
+    setPromptsAreDirty(false);
+    previewMutation.reset();
+    setShouldPrepareInitialPreview(true);
+    setOpen(true);
+  };
+
+  const panelJob = modelConfigurationQuery.data?.videoSummaryJob ?? null;
+  const activeJobStatus = jobId ? (job.data?.status ?? "QUEUED") : panelJob?.status;
+  const activeJobCreatedAt = jobId
+    ? (job.data?.createdAt ?? jobQueuedAt)
+    : panelJob?.createdAt;
+  const isGenerating = activeJobStatus === "QUEUED" || activeJobStatus === "RUNNING";
+  const failedJob = activeJobStatus === "FAILED";
+  const completedJob =
+    summary.data?.aiGenerationId &&
+    panelJob?.aiGenerationId === summary.data.aiGenerationId
+      ? panelJob
+      : null;
+  const currentSummaryContent = summary.data?.contentJson;
+  const hasCurrentBlocksDocument =
+    currentSummaryContent?.type === "lesson_summary_blocks" &&
+    currentSummaryContent.version === 5;
+  const editorInitialContent =
+    hasCurrentBlocksDocument || currentSummaryContent?.type === "doc"
+      ? currentSummaryContent
+      : createTextTiptapDocument("");
+
+  return (
+    <>
+      <section className="overflow-hidden rounded-xl border border-[var(--theme-border)] bg-white shadow-sm dark:bg-slate-950">
+        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--theme-border)] bg-[var(--theme-bg-subtle)] px-4 py-3">
+          <span className="inline-flex items-center gap-1 text-sm font-bold text-[var(--theme-text-strong)]">
+            Tổng quan video
+            <button
+              type="button"
+              aria-expanded={!isCollapsed}
+              aria-label={isCollapsed ? "Mở Tổng quan video" : "Thu gọn Tổng quan video"}
+              title={isCollapsed ? "Mở Tổng quan video" : "Thu gọn Tổng quan video"}
+              onClick={() => setIsCollapsed((current) => !current)}
+              className="grid h-8 w-8 place-items-center rounded-lg text-[var(--theme-text-muted)] transition hover:bg-[var(--theme-bg-hover)] hover:text-[var(--theme-text-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-primary)]"
+            >
+              {isCollapsed ? (
+                <ChevronDown className="h-4 w-4" aria-hidden="true" />
+              ) : (
+                <ChevronUp className="h-4 w-4" aria-hidden="true" />
+              )}
+            </button>
+          </span>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setEditorOpen(true)}
+              className="theme-button-neutral inline-flex min-h-9 items-center gap-2 rounded-lg px-3 text-sm font-bold whitespace-nowrap"
+            >
+              <Pencil className="h-4 w-4" aria-hidden="true" />
+              Chỉnh sửa
+            </button>
+            <button
+              type="button"
+              disabled={disabled || isGenerating}
+              title={disabled ? disabledReason : undefined}
+              onClick={openDialog}
+              className="theme-button-primary-subtle inline-flex min-h-9 items-center gap-2 rounded-lg px-3 text-sm font-bold whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isGenerating ? (
+                <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <Sparkles className="h-4 w-4" aria-hidden="true" />
+              )}
+              {isGenerating ? "Đang tạo" : "Tóm tắt Video"}
+            </button>
+          </div>
+        </header>
+
+        {!isCollapsed && isGenerating && activeJobCreatedAt ? (
+          <div
+            className="flex items-center gap-2 border-b border-[var(--theme-primary-border)] bg-[var(--theme-primary-soft)] px-4 py-3 text-sm font-bold text-[var(--theme-primary)]"
+            role="status"
+          >
+            <LoaderCircle className="h-4 w-4 shrink-0 animate-spin" aria-hidden="true" />
+            <AiJobTimer
+              createdAt={activeJobCreatedAt}
+              prefix="AI đang tạo tóm tắt ("
+              suffix=")"
+            />
+          </div>
+        ) : null}
+
+        {!isCollapsed && failedJob ? (
+          <div
+            className="flex items-center justify-between gap-3 border-b border-[var(--theme-error-border)] bg-[var(--theme-error-bg)] px-4 py-3 text-sm font-semibold text-[var(--theme-error-text)]"
+            role="alert"
+          >
+            <span className="flex items-center gap-2">
+              <CircleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
+              {job.data?.error ?? panelJob?.error ?? "Chưa thể tạo tóm tắt video."}
+            </span>
+            <button
+              type="button"
+              onClick={openDialog}
+              className="theme-button-neutral min-h-9 rounded-lg px-3 text-sm font-bold whitespace-nowrap"
+            >
+              Thử lại
+            </button>
+          </div>
+        ) : null}
+
+        {!isCollapsed ? (
+          <div className="p-4 text-sm leading-relaxed text-[var(--theme-text)]">
+            {summary.data ? (
+              <>
+                <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--theme-success-text)]">
+                      <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                      {summary.data.reviewStatus === "APPROVED"
+                        ? "Đã phát hành"
+                        : summary.data.reviewStatus === "HIDDEN"
+                          ? "Đã thu hồi"
+                          : "Bản nháp"}
+                    </span>
+                    <AiJobMetadata job={completedJob} />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <AdminLessonSummaryPublishActions
+                      compact
+                      figureActionsBlocked={false}
+                      isPending={editMutation.isPending || deleteMutation.isPending}
+                      reviewStatus={summary.data.reviewStatus}
+                      showSaveAction={false}
+                      onSave={(action) =>
+                        editMutation.mutate({
+                          action,
+                          contentJson: summary.data!.contentJson,
+                        })
+                      }
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (window.confirm("Xóa bản tóm tắt video này?")) {
+                          deleteMutation.mutate();
+                        }
+                      }}
+                      disabled={deleteMutation.isPending || editMutation.isPending}
+                      className="theme-button-danger inline-flex min-h-10 items-center gap-1 rounded-lg px-3 text-xs font-bold disabled:opacity-60"
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      Xóa
+                    </button>
+                  </div>
+                </div>
+                {summary.data.contentJson.type === "lesson_summary_blocks" &&
+                summary.data.contentJson.version === 5 &&
+                summary.data.contentJson.data ? (
+                  <SummaryBlockRenderer
+                    className="mt-0"
+                    data={
+                      summary.data.contentJson.data as ComponentProps<
+                        typeof SummaryBlockRenderer
+                      >["data"]
+                    }
+                    objectivesLabel="Các kiến thức sẽ học"
+                    anchorPrefix="video-summary"
+                    onVideoSeek={onVideoSeek}
+                    showTableOfContents
+                    viewMode="UI_ONLY"
+                  />
+                ) : (
+                  <TiptapContentView
+                    content={
+                      summary.data.contentJson.type === "doc"
+                        ? summary.data.contentJson
+                        : undefined
+                    }
+                    contentAlignment="left"
+                  />
+                )}
+              </>
+            ) : (
+              <p className="text-[var(--theme-text-muted)]">Chưa có Tổng quan video.</p>
+            )}
+          </div>
+        ) : null}
+      </section>
+
+      <VideoSummaryEditorDialog
+        initialContent={editorInitialContent}
+        isOpen={editorOpen}
+        isSaving={editMutation.isPending}
+        lessonId={lessonId}
+        reviewStatus={summary.data?.reviewStatus}
+        subjectKey={modelConfigurationQuery.data?.lesson.subjectKey ?? null}
+        onClose={() => setEditorOpen(false)}
+        onSave={(action, content) =>
+          editMutation.mutate({ action, contentJson: content })
+        }
+        onVideoSeek={(seconds) => {
+          setEditorOpen(false);
+          window.requestAnimationFrame(() => onVideoSeek?.(seconds));
+        }}
+      />
+      <EditorDialogShell
+        isOpen={open}
+        onClose={close}
+        ariaLabel="Tóm tắt Video bằng AI"
+        panelClassName="max-w-3xl"
+      >
+        <div className="flex min-h-0 flex-1 flex-col">
+          <header className="theme-dialog-header flex min-h-16 shrink-0 items-center px-4 py-3 pr-20 sm:px-5">
+            <h2 className="text-lg font-extrabold text-[var(--theme-text-strong)]">
+              Tóm tắt Video bằng AI
+            </h2>
+          </header>
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
+            <section className="space-y-4">
+              <fieldset className="space-y-2">
+                <TextareaField
+                  id="video-summary-style"
+                  label="Cách trình bày"
+                  className="min-h-24"
+                  value={request.styleInstructions ?? ""}
+                  helperText="Chọn một gợi ý để tự động điền, sau đó có thể sửa tùy ý."
+                  onChange={(event) => {
+                    setPreview(null);
+                    setRequest({
+                      ...request,
+                      styleInstructions: event.currentTarget.value,
+                    });
+                  }}
+                />
+                <div
+                  className="flex flex-wrap gap-2"
+                  aria-label="Mẫu trình bày thiết lập sẵn"
+                >
+                  {styleOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => {
+                        setPreview(null);
+                        setRequest({
+                          ...request,
+                          style: option.value as VideoSummaryRequest["style"],
+                          styleInstructions: getPresentationPreset(
+                            option.value,
+                            targetGrade,
+                          ),
+                        });
+                      }}
+                      className="theme-button-primary-subtle min-h-9 rounded-lg px-3 text-xs font-extrabold whitespace-nowrap"
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <OptionField
+                  id="video-summary-length"
+                  label="Độ dài Tóm tắt"
+                  value={request.length}
+                  options={lengthOptions}
+                  icon={null}
+                  onChange={(value) => {
+                    setPreview(null);
+                    setRequest({
+                      ...request,
+                      length: value as VideoSummaryRequest["length"],
+                    });
+                  }}
+                />
+                <TextField
+                  id="video-summary-word-count"
+                  label="Số lượng từ"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={request.targetWordCount ?? ""}
+                  placeholder="Để trống nếu không giới hạn"
+                  helperText="Từ 80 đến 2.000 từ"
+                  isOptional
+                  icon={null}
+                  onChange={(event) => {
+                    const value = event.target.value.replace(/\D/g, "");
+                    setPreview(null);
+                    setRequest({
+                      ...request,
+                      targetWordCount: value ? Number(value) : undefined,
+                    });
+                  }}
+                />
+              </div>
+
+              <TextareaField
+                id="video-summary-instructions"
+                label="Yêu cầu bổ sung"
+                value={request.extraInstructions ?? ""}
+                placeholder="Ví dụ: Dùng câu ngắn, nhấn mạnh công thức, ứng dụng thực tế hoặc lỗi thường gặp"
+                isOptional
+                onChange={(event) => {
+                  setPreview(null);
+                  setRequest({ ...request, extraInstructions: event.target.value });
+                }}
+              />
+
+              <div className="grid gap-4 border-t border-[var(--theme-border)] pt-4 sm:grid-cols-2">
+                <OptionField
+                  id="video-summary-model"
+                  label="Model"
+                  value={request.model ?? ""}
+                  placeholder="Chọn model"
+                  options={(modelConfiguration?.modelOptions ?? [])
+                    .filter((option) => option.available)
+                    .map((option) => ({
+                      value: option.model,
+                      label: `${formatProviderLabel(option.provider)} · ${option.model}`,
+                    }))}
+                  icon={null}
+                  disabled={modelConfigurationQuery.isLoading}
+                  onChange={(value) => {
+                    setPreview(null);
+                    setRequest({
+                      ...request,
+                      model: value,
+                      temperature: resolveModelTemperature(modelConfiguration, value),
+                      reasoningEffort: resolveModelReasoningEffort(
+                        modelConfiguration,
+                        value,
+                      ),
+                    });
+                  }}
+                />
+                {showTemperature ? (
+                  <TextField
+                    id="video-summary-temperature"
+                    label="Temperature"
+                    type="text"
+                    inputMode="decimal"
+                    value={
+                      request.temperature === undefined
+                        ? String(modelConfiguration?.temperature ?? 0.1)
+                        : String(request.temperature)
+                    }
+                    icon={null}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      const parsed = Number(value);
+                      if (
+                        value !== "" &&
+                        (!Number.isFinite(parsed) || parsed < 0 || parsed > 1)
+                      ) {
+                        return;
+                      }
+                      setPreview(null);
+                      setRequest({
+                        ...request,
+                        temperature: value === "" ? undefined : parsed,
+                        reasoningEffort: undefined,
+                      });
+                    }}
+                  />
+                ) : showReasoningEffort ? (
+                  <OptionField
+                    id="video-summary-reasoning-effort"
+                    label="Reasoning Effort"
+                    value={
+                      request.reasoningEffort ?? modelConfiguration?.reasoningEffort ?? ""
+                    }
+                    options={buildAiReasoningEffortOptions(
+                      selectedModel?.capabilities?.reasoningEffortLevels,
+                      modelConfiguration?.reasoningEffort,
+                    )}
+                    icon={null}
+                    onChange={(value) => {
+                      setPreview(null);
+                      setRequest({
+                        ...request,
+                        temperature: undefined,
+                        reasoningEffort: isAiReasoningEffort(value) ? value : undefined,
+                      });
+                    }}
+                  />
+                ) : (
+                  <div className="hidden sm:block" aria-hidden="true" />
+                )}
+                <TextField
+                  id="video-summary-max-output-tokens"
+                  label="Giới hạn token đầu ra"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={request.maxOutputTokens ?? ""}
+                  icon={null}
+                  wrapperClassName="sm:col-span-2"
+                  onChange={(event) => {
+                    const value = event.target.value.replace(/\D/g, "");
+                    setPreview(null);
+                    setRequest({
+                      ...request,
+                      maxOutputTokens: value ? Number(value) : undefined,
+                    });
+                  }}
+                />
+              </div>
+            </section>
+
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm font-semibold text-[var(--theme-text-muted)]">
+                {promptsAreDirty
+                  ? "Prompt đã thay đổi. Hãy cập nhật lại dữ liệu trước khi tạo."
+                  : "Xem lại dữ liệu theo các lựa chọn hiện tại."}
+              </p>
+              <button
+                type="button"
+                disabled={previewMutation.isPending || isBusy || !request.model}
+                onClick={() => previewMutation.mutate()}
+                className="theme-button-primary-subtle inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-extrabold whitespace-nowrap disabled:opacity-60"
+              >
+                <RefreshCw
+                  className={`h-4 w-4 ${previewMutation.isPending ? "animate-spin" : ""}`}
+                  aria-hidden="true"
+                />
+                {previewMutation.isPending
+                  ? "Đang dựng dữ liệu"
+                  : "Cập nhật dữ liệu gửi AI"}
+              </button>
+            </div>
+
+            {previewMutation.isPending && !preview ? (
+              <div className="mt-4 flex min-h-32 items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--theme-border)] text-sm font-semibold text-[var(--theme-text-muted)]">
+                <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+                Đang tải dữ liệu...
+              </div>
+            ) : null}
+
+            {preview ? (
+              <VideoSummaryPromptPreview
+                preview={preview}
+                systemInstructions={request.systemInstructions ?? preview.systemPrompt}
+                userPrompt={request.userPrompt ?? preview.userPrompt}
+                onSystemInstructionsChange={(value) => {
+                  setRequest((current) => ({
+                    ...current,
+                    systemInstructions: value,
+                  }));
+                  setPromptsAreDirty(true);
+                }}
+                onUserPromptChange={(value) => {
+                  setRequest((current) => ({ ...current, userPrompt: value }));
+                  setPromptsAreDirty(true);
+                }}
+              />
+            ) : null}
+            {previewMutation.isError ? (
+              <div
+                role="alert"
+                className="mt-4 rounded-xl border border-[var(--theme-error-border)] bg-[var(--theme-error-bg)] p-3 text-sm font-semibold text-[var(--theme-error-text)]"
+              >
+                {getUserFacingErrorMessage(
+                  previewMutation.error,
+                  "Chưa thể chuẩn bị dữ liệu gửi AI. Vui lòng thử lại.",
+                )}
+              </div>
+            ) : null}
+          </div>
+          <footer className="theme-dialog-footer grid shrink-0 grid-cols-2 gap-2 p-3 sm:flex sm:justify-end sm:p-4">
+            <button
+              type="button"
+              onClick={close}
+              disabled={isBusy}
+              className="theme-button-neutral min-h-11 rounded-lg px-4 text-sm font-extrabold whitespace-nowrap sm:w-auto"
+            >
+              Hủy
+            </button>
+            <button
+              type="button"
+              onClick={() => generateMutation.mutate()}
+              disabled={isBusy || isGenerating || !preview || promptsAreDirty}
+              className="theme-button-primary inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-5 text-sm font-extrabold whitespace-nowrap disabled:opacity-60 sm:w-auto"
+            >
+              {generateMutation.isPending ? (
+                <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <Sparkles className="h-4 w-4" aria-hidden="true" />
+              )}
+              {generateMutation.isPending ? "Đang gửi yêu cầu" : "Bắt đầu tạo"}
+            </button>
+          </footer>
+        </div>
+      </EditorDialogShell>
+    </>
+  );
+}
+
+function resolveModelTemperature(
+  configuration: AdminAiModelConfiguration | undefined,
+  model: string,
+) {
+  if (!model) return undefined;
+  const selected = configuration?.modelOptions.find((option) => option.model === model);
+  if (!supportsTemperature(model, selected?.capabilities?.aiConfiguration))
+    return undefined;
+  return selected?.model === configuration?.resolvedModel
+    ? (configuration?.temperature ?? 0.1)
+    : 0.1;
+}
+
+function formatProviderLabel(provider: string) {
+  const normalized = provider.trim().toLowerCase();
+  if (normalized === "openai") return "OpenAI";
+  if (normalized === "gemini") return "Gemini";
+  return provider;
+}
+
+function getPresentationPreset(style: string, targetGrade: number | null) {
+  if (style === "concise") {
+    return "Cô đọng, đi thẳng vào kiến thức trọng tâm và dễ quét nhanh.";
+  }
+  if (style === "academic") {
+    return "Học thuật, chặt chẽ, có cấu trúc rõ ràng và dùng thuật ngữ chính xác.";
+  }
+  return targetGrade
+    ? "Dễ hiểu, gần gũi, sử dụng cách diễn đạt và mức độ chi tiết phù hợp lứa tuổi."
+    : "Dễ hiểu, gần gũi và phù hợp với người học của khóa học.";
+}
+
+function resolveModelReasoningEffort(
+  configuration: AdminAiModelConfiguration | undefined,
+  model: string,
+) {
+  if (!model) return undefined;
+  const selected = configuration?.modelOptions.find((option) => option.model === model);
+  const configured = configuration?.reasoningEffort;
+  return selected?.model === configuration?.resolvedModel &&
+    isAiReasoningEffort(configured) &&
+    selected?.capabilities?.reasoningEffortLevels?.includes(configured)
+    ? configured
+    : undefined;
+}

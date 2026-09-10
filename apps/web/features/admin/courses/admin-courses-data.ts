@@ -1,3 +1,5 @@
+import type { TiptapTextDocument } from "@learning-path/shared";
+
 export type AdminSubject = string;
 export type AdminPublishStatus = "DRAFT" | "PUBLISHED" | "HIDDEN" | "ARCHIVED";
 export type AdminEditableStatus = Exclude<AdminPublishStatus, "ARCHIVED">;
@@ -12,6 +14,7 @@ export type AdminLesson = {
   orderIndex: number;
   title: string;
   shortDescription: string;
+  overviewContentJson?: TiptapTextDocument | null;
   lessonType: AdminLessonType;
   liveUrl: string;
   scheduledAt: string;
@@ -35,8 +38,7 @@ export type AdminChapter = {
 };
 
 export type AdminCourseStructureItem =
-  | ({ type: "CHAPTER" } & AdminChapter)
-  | ({ type: "LESSON" } & AdminLesson);
+  ({ type: "CHAPTER" } & AdminChapter) | ({ type: "LESSON" } & AdminLesson);
 
 export type AdminLearningPath = {
   id: string;

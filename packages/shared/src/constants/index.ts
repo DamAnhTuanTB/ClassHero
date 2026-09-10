@@ -31,6 +31,7 @@ export function normalizeAiReasoningEffortLevels(
 
 export const PROVIDER_USAGE_OPERATIONS = [
   "SUMMARY_GENERATION",
+  "VIDEO_SUMMARY_GENERATION",
   "QUIZ_GENERATION",
   "FLASHCARD_GENERATION",
   "TEST_GENERATION",

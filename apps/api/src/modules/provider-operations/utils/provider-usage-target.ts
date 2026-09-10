@@ -10,6 +10,7 @@ export function buildWholeFeatureUsageTarget(
 ): ProviderUsageTargetContext {
   const kindByFeature = {
     SUMMARY: "LESSON_SUMMARY",
+    VIDEO_SUMMARY: "VIDEO_SUMMARY",
     QUIZ: "QUIZ_SET",
     FLASHCARD: "FLASHCARD_SET",
     TEST: "TEST_SET",
@@ -77,6 +78,8 @@ export function formatProviderUsageTargetLabel(value: unknown): string {
   switch (target.kind) {
     case "LESSON_SUMMARY":
       return "Bài học · Toàn bài";
+    case "VIDEO_SUMMARY":
+      return "Video · Tóm tắt";
     case "QUIZ_SET":
       return "Quiz · Cả bộ";
     case "FLASHCARD_SET":

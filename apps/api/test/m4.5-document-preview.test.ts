@@ -142,6 +142,33 @@ describe("M4.5 private document previews", () => {
     );
   });
 
+  it("escapes signed URL separators so Mathpix tables keep the image in one cell", () => {
+    const content = String.raw`\begin{tabular}{|c|c|c|}
+A & ![](./images/table-image.jpg) & Z \\
+\end{tabular}`;
+    const signedUrl =
+      "http://localhost:9100/private/table-image.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=test";
+
+    const rewritten = rewriteOcrPreviewImageUrls(content, [
+      {
+        caption: null,
+        imageId: "table-image",
+        kind: "image",
+        mimeType: "image/jpeg",
+        objectKey: "document-images/source-1/page-001/table-image.jpg",
+        orderInPage: 1,
+        url: signedUrl,
+      },
+    ]);
+
+    expect(rewritten).toContain(
+      "X-Amz-Algorithm=AWS4-HMAC-SHA256\\&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD\\&X-Amz-Credential=test",
+    );
+    expect(rewritten).not.toContain(
+      "X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256",
+    );
+  });
+
   it("keeps the Mathpix lines.json conversion-output sequence per page", () => {
     const [page] = normalizeOcrPages(
       {

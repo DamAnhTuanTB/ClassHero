@@ -268,10 +268,23 @@ function isProviderShapedError(
 ) {
   if (error instanceof ProviderRequestError || status !== null) return true;
   const name = readString(error, "name")?.toLowerCase() ?? "";
+  const hasProviderErrorCode = [
+    "missing",
+    "invalid_api_key",
+    "authentication",
+    "insufficient_quota",
+    "quota_exceeded",
+    "rate_limit",
+    "timeout",
+    "econnreset",
+    "econnrefused",
+    "enotfound",
+    "eai_again",
+  ].some((code) => normalizedCode.includes(code));
   return (
-    normalizedCode.length > 0 ||
+    hasProviderErrorCode ||
     /api|provider|connection|rate.?limit|timeout/u.test(name) ||
-    /api key|provider|quota|rate.?limit|timeout|timed out|connection/u.test(
+    /api key|provider (?:request|response|service)|quota|rate.?limit|timeout|timed out|connection/u.test(
       normalizedMessage,
     )
   );

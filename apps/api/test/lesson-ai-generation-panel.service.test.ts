@@ -159,7 +159,8 @@ describe("LessonAiGenerationPanelService", () => {
 
     const panel = await service.getForAdmin("lesson-1");
 
-    expect(prisma.aiGeneration.findFirst).toHaveBeenCalledTimes(4);
+    expect(prisma.aiGeneration.findFirst).toHaveBeenCalledTimes(5);
+    expect(panel.videoSummaryJob).toBeNull();
     expect(panel.documents[0]?.pageRange).toEqual({ pageStart: 29, pageEnd: 40 });
     expect(panel.documents[1]).toMatchObject({
       title: "Phiếu mua hàng",

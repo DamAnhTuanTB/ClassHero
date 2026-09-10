@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
 import { AdminDataErrorState } from "@/components/admin/admin-data-error-state";
 import { EditorDialogShell } from "@/components/admin/courses/editor-dialog-shell";
+import { findLessonMatch } from "@/features/admin/courses/admin-courses-utils";
 import { useAdminCourseDetailManager } from "@/features/admin/courses/hooks/use-admin-course-detail-manager";
 import { LessonEditorDialog } from "@/features/admin/courses/screens/admin-course-detail-manager/components/lesson-editor-dialog";
 
@@ -20,63 +20,12 @@ export function LessonDetailEditorDialog({
   onClose: () => void;
   onSaved: () => void | Promise<void>;
 }) {
-  const {
-    actions,
-    isLessonEditorOpen,
-    isSavingLesson,
-    path,
-    selectedChapter,
-    selectedLesson,
-    viewState,
-  } = useAdminCourseDetailManager(learningPathId);
-  const openingLessonIdRef = useRef<string | null>(null);
-  const wasEditorOpenRef = useRef(false);
+  const { actions, isSavingLesson, path, viewState } =
+    useAdminCourseDetailManager(learningPathId);
+  const selectedLesson = findLessonMatch(path, lessonId)?.lesson ?? null;
+  const isLessonMissingFromPath = viewState === "ready" && path && !selectedLesson;
 
-  useEffect(() => {
-    if (!isOpen) {
-      openingLessonIdRef.current = null;
-      wasEditorOpenRef.current = false;
-      return;
-    }
-
-    if (viewState !== "ready" || !path || openingLessonIdRef.current === lessonId) {
-      return;
-    }
-
-    openingLessonIdRef.current = lessonId;
-    actions.startEditLesson(lessonId);
-  }, [actions, isOpen, lessonId, path, viewState]);
-
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    if (isLessonEditorOpen) {
-      wasEditorOpenRef.current = true;
-      return;
-    }
-
-    if (wasEditorOpenRef.current && !isSavingLesson) {
-      wasEditorOpenRef.current = false;
-      void onSaved();
-      onClose();
-    }
-  }, [isLessonEditorOpen, isOpen, isSavingLesson, onClose, onSaved]);
-
-  function closeEditor() {
-    wasEditorOpenRef.current = false;
-    actions.closeLessonEditor();
-    onClose();
-  }
-
-  if (
-    viewState === "ready" &&
-    path &&
-    selectedChapter &&
-    selectedLesson &&
-    isLessonEditorOpen
-  ) {
+  if (viewState === "ready" && path && selectedLesson) {
     return (
       <LessonEditorDialog
         mode="edit"
@@ -85,8 +34,18 @@ export function LessonDetailEditorDialog({
         learningPath={path}
         selectedLesson={selectedLesson}
         disabled={false}
-        onSubmit={actions.saveLesson}
-        onClose={closeEditor}
+        onSubmit={async (values, documentsManager) => {
+          const didSave = await actions.saveLesson(values, documentsManager, {
+            closeEditor: false,
+            lessonId,
+          });
+
+          if (didSave) {
+            await onSaved();
+            onClose();
+          }
+        }}
+        onClose={onClose}
       />
     );
   }
@@ -95,7 +54,7 @@ export function LessonDetailEditorDialog({
     <EditorDialogShell
       ariaLabel="Sửa buổi học"
       isOpen={isOpen}
-      onClose={closeEditor}
+      onClose={onClose}
       panelClassName="max-w-4xl"
     >
       <div className="flex min-h-64 min-w-0 flex-1 flex-col">
@@ -106,12 +65,20 @@ export function LessonDetailEditorDialog({
         </header>
 
         <div className="flex min-h-48 flex-1 items-center justify-center p-5">
-          {viewState === "error" ? (
+          {viewState === "error" || isLessonMissingFromPath ? (
             <AdminDataErrorState
-              description="Vui lòng thử lại để mở đầy đủ nội dung chỉnh sửa."
+              description={
+                isLessonMissingFromPath
+                  ? "Buổi học này không còn trong dữ liệu khóa học. Vui lòng tải lại để thử lại."
+                  : "Vui lòng thử lại để mở đầy đủ nội dung chỉnh sửa."
+              }
               headingLevel={3}
               onRetry={actions.retryLoad}
-              title="Không tải được thông tin khóa học"
+              title={
+                isLessonMissingFromPath
+                  ? "Không tìm thấy buổi học trong khóa học"
+                  : "Không tải được thông tin khóa học"
+              }
               variant="compact"
             />
           ) : (

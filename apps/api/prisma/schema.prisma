@@ -216,6 +216,7 @@ enum AiProviderName {
 
 enum AiGenerationType {
   SUMMARY
+  VIDEO_SUMMARY
   QUIZ
   FLASHCARD
   TEST
@@ -534,6 +535,8 @@ model User {
   updatedLessons                  Lesson[]                  @relation("LessonUpdatedBy")
   createdLessonSummaries          LessonSummary[]           @relation("LessonSummaryCreatedBy")
   updatedLessonSummaries          LessonSummary[]           @relation("LessonSummaryUpdatedBy")
+  createdLessonVideoSummaries     LessonVideoSummary[]      @relation("LessonVideoSummaryCreatedBy")
+  updatedLessonVideoSummaries     LessonVideoSummary[]      @relation("LessonVideoSummaryUpdatedBy")
   createdStemFigures              StemFigure[]              @relation("StemFigureCreatedBy")
   createdStemFigureRevisions      StemFigureRevision[]      @relation("StemFigureRevisionCreatedBy")
   createdQuizFigures              QuizFigure[]              @relation("QuizFigureCreatedBy")
@@ -842,65 +845,68 @@ model LearningPathChapter {
 }
 
 model Lesson {
-  id                     String                            @id @default(uuid()) @db.Uuid
-  sourceLessonId         String?                           @map("source_lesson_id") @db.Uuid
-  sourceLesson           Lesson?                           @relation("PersonalLearningPathLessonSource", fields: [sourceLessonId], references: [id], onDelete: Restrict)
-  personalizedCopies     Lesson[]                          @relation("PersonalLearningPathLessonSource")
-  learningPathId         String                            @map("learning_path_id") @db.Uuid
-  learningPath           LearningPath                      @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
-  chapterId              String?                           @map("chapter_id") @db.Uuid
-  chapter                LearningPathChapter?              @relation(fields: [chapterId], references: [id], onDelete: Cascade)
-  orderIndex             Int                               @map("order_index")
-  title                  String
-  shortDescription       String?                           @map("short_description")
-  lessonType             LessonType                        @default(BASIC) @map("lesson_type")
-  liveUrl                String?                           @map("live_url")
-  prepMaterialJson       Json?                             @map("prep_material_json")
-  scheduledAt            DateTime?                         @map("scheduled_at")
-  examOpenAt             DateTime?                         @map("exam_open_at")
-  videoUrl               String?                           @map("video_url")
-  customVideoSettings    Json?                             @map("custom_video_settings")
-  completionMinScore     Decimal                           @default(7) @map("completion_min_score") @db.Decimal(5, 2)
-  trialEnabled           Boolean                           @default(false) @map("trial_enabled")
-  status                 PublishStatus                     @default(DRAFT)
-  createdById            String?                           @map("created_by_id") @db.Uuid
-  createdBy              User?                             @relation("LessonCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  updatedById            String?                           @map("updated_by_id") @db.Uuid
-  updatedBy              User?                             @relation("LessonUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
-  createdAt              DateTime                          @default(now()) @map("created_at")
-  updatedAt              DateTime                          @updatedAt @map("updated_at")
-  deletedAt              DateTime?                         @map("deleted_at")
-  materials              LessonMaterial[]
-  documents              LessonDocument[]
-  documentPageRanges     LessonDocumentPageRange[]
-  documentChunks         DocumentChunk[]
-  summary                LessonSummary?
-  progressEntries        LessonProgress[]
-  quizSets               QuizSet[]
-  quizQuestions          QuizQuestion[]
-  quizAttempts           QuizAttempt[]
-  flashcardSets          FlashcardSet[]
-  flashcards             Flashcard[]
-  flashcardFigures       FlashcardFigure[]
-  flashcardProgress      FlashcardProgress[]
-  flashcardStudySessions FlashcardStudySession[]
-  testSets               TestSet[]
-  testQuestions          TestQuestion[]
-  testAttempts           TestAttempt[]
-  studentNotes           StudentNote[]
-  videoComments          LessonVideoComment[]
-  favorites              Favorite[]
-  backgroundJobs         BackgroundJob[]                   @relation("BackgroundJobLesson")
-  reports                Report[]
-  aiGenerations          AiGeneration[]                    @relation("AiGenerationLesson")
-  aiExplanations         AiExplanation[]
-  stemFigures            StemFigure[]
-  summaryRequestDrafts   LessonSummaryRequestDraft[]
-  quizRequestDrafts      QuizGenerationRequestDraft[]
-  flashcardRequestDrafts FlashcardGenerationRequestDraft[]
-  quizFigures            QuizFigure[]
-  aiChatSessions         AiChatSession[]
-  xpEvents               XpEvent[]
+  id                        String                            @id @default(uuid()) @db.Uuid
+  sourceLessonId            String?                           @map("source_lesson_id") @db.Uuid
+  sourceLesson              Lesson?                           @relation("PersonalLearningPathLessonSource", fields: [sourceLessonId], references: [id], onDelete: Restrict)
+  personalizedCopies        Lesson[]                          @relation("PersonalLearningPathLessonSource")
+  learningPathId            String                            @map("learning_path_id") @db.Uuid
+  learningPath              LearningPath                      @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
+  chapterId                 String?                           @map("chapter_id") @db.Uuid
+  chapter                   LearningPathChapter?              @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  orderIndex                Int                               @map("order_index")
+  title                     String
+  shortDescription          String?                           @map("short_description")
+  overviewContentJson       Json?                             @map("overview_content_json")
+  lessonType                LessonType                        @default(BASIC) @map("lesson_type")
+  liveUrl                   String?                           @map("live_url")
+  prepMaterialJson          Json?                             @map("prep_material_json")
+  scheduledAt               DateTime?                         @map("scheduled_at")
+  examOpenAt                DateTime?                         @map("exam_open_at")
+  videoUrl                  String?                           @map("video_url")
+  customVideoSettings       Json?                             @map("custom_video_settings")
+  completionMinScore        Decimal                           @default(7) @map("completion_min_score") @db.Decimal(5, 2)
+  trialEnabled              Boolean                           @default(false) @map("trial_enabled")
+  status                    PublishStatus                     @default(DRAFT)
+  createdById               String?                           @map("created_by_id") @db.Uuid
+  createdBy                 User?                             @relation("LessonCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedById               String?                           @map("updated_by_id") @db.Uuid
+  updatedBy                 User?                             @relation("LessonUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt                 DateTime                          @default(now()) @map("created_at")
+  updatedAt                 DateTime                          @updatedAt @map("updated_at")
+  deletedAt                 DateTime?                         @map("deleted_at")
+  materials                 LessonMaterial[]
+  documents                 LessonDocument[]
+  documentPageRanges        LessonDocumentPageRange[]
+  documentChunks            DocumentChunk[]
+  summary                   LessonSummary?
+  videoSummary              LessonVideoSummary?
+  progressEntries           LessonProgress[]
+  quizSets                  QuizSet[]
+  quizQuestions             QuizQuestion[]
+  quizAttempts              QuizAttempt[]
+  flashcardSets             FlashcardSet[]
+  flashcards                Flashcard[]
+  flashcardFigures          FlashcardFigure[]
+  flashcardProgress         FlashcardProgress[]
+  flashcardStudySessions    FlashcardStudySession[]
+  testSets                  TestSet[]
+  testQuestions             TestQuestion[]
+  testAttempts              TestAttempt[]
+  studentNotes              StudentNote[]
+  videoComments             LessonVideoComment[]
+  favorites                 Favorite[]
+  backgroundJobs            BackgroundJob[]                   @relation("BackgroundJobLesson")
+  reports                   Report[]
+  aiGenerations             AiGeneration[]                    @relation("AiGenerationLesson")
+  aiExplanations            AiExplanation[]
+  stemFigures               StemFigure[]
+  summaryRequestDrafts      LessonSummaryRequestDraft[]
+  videoSummaryRequestDrafts LessonVideoSummaryRequestDraft[]
+  quizRequestDrafts         QuizGenerationRequestDraft[]
+  flashcardRequestDrafts    FlashcardGenerationRequestDraft[]
+  quizFigures               QuizFigure[]
+  aiChatSessions            AiChatSession[]
+  xpEvents                  XpEvent[]
 
   @@unique([chapterId, orderIndex])
   @@index([sourceLessonId])
@@ -1257,6 +1263,57 @@ model LessonSummary {
   @@index([createdById])
   @@index([updatedById])
   @@map("lesson_summaries")
+}
+
+model LessonVideoSummaryRequestDraft {
+  id                 String    @id @default(uuid()) @db.Uuid
+  lessonId           String    @map("lesson_id") @db.Uuid
+  lesson             Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  createdById        String?   @map("created_by_id") @db.Uuid
+  requestHash        String    @map("request_hash")
+  sourceSnapshotJson Json      @map("source_snapshot_json")
+  systemInstructions String    @map("system_instructions") @db.Text
+  userPrompt         String    @map("user_prompt") @db.Text
+  schemaName         String    @map("schema_name")
+  schemaVersion      String    @map("schema_version")
+  schemaHash         String    @map("schema_hash")
+  schemaJson         Json      @map("schema_json")
+  modelConfigJson    Json      @map("model_config_json")
+  costEstimateJson   Json?     @map("cost_estimate_json")
+  expiresAt          DateTime  @map("expires_at")
+  consumedAt         DateTime? @map("consumed_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+
+  @@index([lessonId, createdAt(sort: Desc)])
+  @@index([requestHash])
+  @@index([expiresAt])
+  @@map("lesson_video_summary_request_drafts")
+}
+
+model LessonVideoSummary {
+  id                       String        @id @default(uuid()) @db.Uuid
+  lessonId                 String        @unique @map("lesson_id") @db.Uuid
+  lesson                   Lesson        @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  contentJson              Json          @map("content_json")
+  source                   ContentSource @default(ADMIN)
+  reviewStatus             ReviewStatus  @default(APPROVED) @map("review_status")
+  aiGenerationId           String?       @map("ai_generation_id") @db.Uuid
+  aiGeneration             AiGeneration? @relation("LessonVideoSummaryAiGeneration", fields: [aiGenerationId], references: [id], onDelete: SetNull)
+  sourceVideoUrlHash       String?       @map("source_video_url_hash")
+  sourceTranscriptHash     String?       @map("source_transcript_hash")
+  sourceChaptersHash       String?       @map("source_chapters_hash")
+  sourcePlayerSettingsHash String?       @map("source_player_settings_hash")
+  staleAt                  DateTime?     @map("stale_at")
+  createdById              String?       @map("created_by_id") @db.Uuid
+  createdBy                User?         @relation("LessonVideoSummaryCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedById              String?       @map("updated_by_id") @db.Uuid
+  updatedBy                User?         @relation("LessonVideoSummaryUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt                DateTime      @default(now()) @map("created_at")
+  updatedAt                DateTime      @updatedAt @map("updated_at")
+  deletedAt                DateTime?     @map("deleted_at")
+
+  @@index([aiGenerationId])
+  @@map("lesson_video_summaries")
 }
 
 model StemFigure {
@@ -2218,6 +2275,7 @@ model AiGeneration {
   createdAt                  DateTime                    @default(now()) @map("created_at")
   updatedAt                  DateTime                    @updatedAt @map("updated_at")
   lessonSummaries            LessonSummary[]             @relation("LessonSummaryAiGeneration")
+  videoSummaries             LessonVideoSummary[]        @relation("LessonVideoSummaryAiGeneration")
   quizSets                   QuizSet[]                   @relation("QuizSetAiGeneration")
   flashcardSets              FlashcardSet[]              @relation("FlashcardSetAiGeneration")
   testSets                   TestSet[]                   @relation("TestSetAiGeneration")

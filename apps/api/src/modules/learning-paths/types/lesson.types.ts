@@ -12,6 +12,7 @@ export type LessonResponse = {
   orderIndex: number;
   title: string;
   shortDescription: string | null;
+  overviewContentJson: Prisma.JsonValue | null;
   lessonType: LessonType;
   liveUrl: string | null;
   scheduledAt: Date | null;

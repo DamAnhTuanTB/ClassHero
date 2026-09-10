@@ -11,6 +11,7 @@ export function AdminLessonSummaryPublishActions({
   figureBlockerTitle,
   isPending,
   reviewStatus,
+  showSaveAction = true,
   onSave,
 }: {
   compact?: boolean;
@@ -18,6 +19,7 @@ export function AdminLessonSummaryPublishActions({
   figureBlockerTitle?: string;
   isPending: boolean;
   reviewStatus?: AdminLessonSummaryReviewStatus;
+  showSaveAction?: boolean;
   onSave: (action: SummarySaveAction) => void;
 }) {
   const saveButtonSize = compact ? "min-h-10 px-3" : "min-h-11 px-4";
@@ -25,20 +27,22 @@ export function AdminLessonSummaryPublishActions({
 
   return (
     <>
-      <button
-        type="button"
-        disabled={isPending || figureActionsBlocked}
-        onClick={() => onSave("SAVE")}
-        title={figureBlockerTitle}
-        className={`theme-button-primary-subtle inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-extrabold disabled:opacity-60 ${saveButtonSize}`}
-      >
-        {isPending ? (
-          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-        ) : (
-          <Save className="h-4 w-4" aria-hidden="true" />
-        )}
-        Lưu nội dung
-      </button>
+      {showSaveAction ? (
+        <button
+          type="button"
+          disabled={isPending || figureActionsBlocked}
+          onClick={() => onSave("SAVE")}
+          title={figureBlockerTitle}
+          className={`theme-button-primary-subtle inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-extrabold disabled:opacity-60 ${saveButtonSize}`}
+        >
+          {isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          ) : (
+            <Save className="h-4 w-4" aria-hidden="true" />
+          )}
+          Lưu nội dung
+        </button>
+      ) : null}
 
       {reviewStatus !== "APPROVED" ? (
         <button

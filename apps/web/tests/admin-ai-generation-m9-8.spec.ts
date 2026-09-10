@@ -1139,6 +1139,10 @@ test.describe("M9.8 admin AI generation panel", () => {
     );
     await expect(reviewAllButton).toBeDisabled();
     expect(mock.quizSetReviewPayloads).toEqual([]);
+
+    await saveButton.click();
+    await expect.poll(() => mock.quizSetReviewPayloads.at(-1)?.action).toBe("SAVE");
+    await expect(page.getByTestId("quiz-unsaved-approved-warning")).toHaveCount(0);
   });
 
   test("hides a generation-level warning after one question in that generation is accepted", async ({

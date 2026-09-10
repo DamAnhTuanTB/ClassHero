@@ -440,12 +440,29 @@ function buildResolvedRequestTrace<TOutput>(input: {
     (total, image) => total + estimateImageInputTokens(image.detail),
     0,
   );
+  const userPrompt = buildAiUserPrompt(input.input);
+  const inputPrompt = [
+    ...(input.input.inputTextItems ?? []).map((item) => item.text),
+    userPrompt,
+  ].join("\n");
   const inputTokenEstimate = estimateAiStructuredInputTokens({
     systemPrompt: input.input.systemPrompt,
-    inputPrompt: buildAiUserPrompt(input.input),
+    inputPrompt,
     structuredTextFormat: textFormat,
     additionalInputTokens: imageInputTokens,
   });
+  const systemInstructionsTokens = Math.max(
+    1,
+    Math.ceil(input.input.systemPrompt.length / 4),
+  );
+  const userPromptTokens = Math.max(1, Math.ceil(input.input.userPrompt.length / 4));
+  const contextTokens = Math.max(
+    0,
+    inputTokenEstimate.textInputTokens -
+      systemInstructionsTokens -
+      userPromptTokens -
+      inputTokenEstimate.schemaTokens,
+  );
   return {
     provider: input.candidate.provider,
     model: input.candidate.model,
@@ -481,9 +498,9 @@ function buildResolvedRequestTrace<TOutput>(input: {
       imageInputTokens,
       estimatedTokens: inputTokenEstimate.estimatedTokens,
       tokenBreakdown: {
-        systemInstructionsTokens: Math.max(1, Math.ceil(input.input.systemPrompt.length / 4)),
-        userPromptTokens: Math.max(1, Math.ceil(input.input.userPrompt.length / 4)),
-        contextTokens: 0,
+        systemInstructionsTokens,
+        userPromptTokens,
+        contextTokens,
         schemaTokens: inputTokenEstimate.schemaTokens,
         textInputTokens: inputTokenEstimate.textInputTokens,
         pdfInputTokens: 0,

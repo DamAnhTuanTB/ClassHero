@@ -8,7 +8,8 @@ Domain này phục vụ màn `/admin/ai-settings` và không lưu secret provide
 - `provider_price_versions` + `provider_price_rates`: bảng giá USD có thời điểm hiệu lực. Giá cũ không bị sửa để usage lịch sử giữ nguyên snapshot.
 - `ai_feature_model_configs`: model chính/dự phòng, temperature, max input token
   và max output token cho từng cặp `(feature, purpose)`, trong đó `feature` là
-  `SUMMARY | QUIZ | FLASHCARD | TEST` và `purpose` là `TEXT | IMAGE`; `version`
+  `SUMMARY | QUIZ | FLASHCARD | TEST | VIDEO_SUMMARY`; bốn feature cũ có
+  `purpose = TEXT | IMAGE`, còn `VIDEO_SUMMARY` chỉ có `TEXT`; `version`
   dùng optimistic concurrency độc lập cho từng cặp. Unique key là
   `(feature, purpose)`, không còn unique riêng `feature`.
 - `provider_usage_events`: một record bất biến cho mỗi provider attempt hoặc OCR cache hit; liên kết được với `ai_generations`, `background_jobs`, `source_documents`; AI event mới lưu thêm `purpose=TEXT|IMAGE` để audit chi phí theo phase.
@@ -59,12 +60,17 @@ Domain này phục vụ màn `/admin/ai-settings` và không lưu secret provide
   price version không sở hữu cấu hình này; metadata
   `provider_price_rates.conditions_json.maxInputTokens` chỉ còn để đọc route
   snapshot/job cũ trong giai đoạn tương thích.
-- Catalog AI mặc định chỉ seed model text/structured-output ổn định dùng được cho `SUMMARY`, `QUIZ`, `FLASHCARD`, `TEST`. Model preview, audio, image và deprecated không xuất hiện trong ô chọn.
+- Catalog AI mặc định chỉ seed model text/structured-output ổn định dùng được
+  cho `SUMMARY`, `QUIZ`, `FLASHCARD`, `TEST`, `VIDEO_SUMMARY`. Model preview,
+  audio, image và deprecated không xuất hiện trong ô chọn.
 - Catalog hiện gồm các họ OpenAI GPT-5.6/GPT-5.4/GPT-4.1 và Gemini 3.6/3.5/3.1/2.5; bảng giá seed lấy từ trang giá chính thức của từng provider và vẫn phải tạo price version mới khi provider đổi giá.
 - Migration sang cấu hình hai phase phải clone cấu hình legacy của mỗi feature
   sang cả `TEXT` và `IMAGE` để hành vi không đổi ngay sau deploy. Job cũ chỉ có
   một `routeSnapshot` tiếp tục được đọc như route text và dùng làm fallback ảnh
   tương thích; job mới bắt buộc snapshot riêng hai route.
+- Migration `M15.9` seed `VIDEO_SUMMARY/TEXT` bằng bản sao cấu hình
+  `SUMMARY/TEXT` hiện hành để flow có default an toàn ngay sau deploy. Sau đó hai
+  route có version/cấu hình độc lập; không tạo `VIDEO_SUMMARY/IMAGE`.
 
 ### Reservation và tính nhất quán ngân sách (`M9.12`)
 

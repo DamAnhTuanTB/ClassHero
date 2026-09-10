@@ -17,9 +17,9 @@ Tất cả endpoint dưới đây yêu cầu Bearer token role `ADMIN`, prefix `
 | `GET`     | `/admin/provider-operations/usage/events`               | Event list phân trang và filter                          |
 | `GET`     | `/admin/provider-operations/audit-history`              | Lịch sử đổi model/giá/budget/accounting                  |
 
-`GET/PUT /ai-configurations` trả/nhận tối đa tám cấu hình, đúng một item cho mỗi
-cặp `feature = SUMMARY | QUIZ | FLASHCARD | TEST` và
-`purpose = TEXT | IMAGE`. Mỗi item có model chính/dự phòng, temperature hoặc
+`GET/PUT /ai-configurations` trả/nhận chín cấu hình: đủ tám cặp của
+`feature = SUMMARY | QUIZ | FLASHCARD | TEST` với `purpose = TEXT | IMAGE`, cộng
+`VIDEO_SUMMARY/TEXT`; không nhận `VIDEO_SUMMARY/IMAGE`. Mỗi item có model chính/dự phòng, temperature hoặc
 reasoning effort, `maxInputTokens`, `maxOutputTokens`, `version`; optimistic
 conflict được kiểm tra theo đúng cặp. Hai giới hạn token là số nguyên dương;
 thiếu một giới hạn thì budget guard fail-closed. Catalog create/update và

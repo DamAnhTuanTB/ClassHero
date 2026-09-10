@@ -391,6 +391,15 @@ Body:
   "chapterId": null,
   "title": "Buổi 1: Số hữu tỉ",
   "shortDescription": "Ôn tập số hữu tỉ và phép tính cơ bản",
+  "overviewContentJson": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [{ "type": "text", "text": "Ôn tập số hữu tỉ" }]
+      }
+    ]
+  },
   "lessonType": "LIVE",
   "liveUrl": "https://meet.google.com/abc-defg-hij",
   "scheduledAt": "2026-08-01T12:00:00.000Z",
@@ -443,7 +452,10 @@ Role: `ADMIN`.
 
 Behavior:
 
-- Trả lesson chưa bị soft delete, gồm `chapterId: string | null`, `chapterTitle: string | null`, `lessonType` và `liveUrl`.
+- Trả lesson chưa bị soft delete, gồm `chapterId: string | null`,
+  `chapterTitle: string | null`, `lessonType`, `liveUrl` và
+  `overviewContentJson`. `overviewContentJson` là Tổng quan buổi học thuộc
+  lesson, không phải nội dung của Video Summary.
 
 ### `PATCH /admin/lessons/:lessonId`
 
@@ -485,6 +497,8 @@ Mỗi đoạn cần `time` là số giây nguồn không âm, `endTime` optional
 Behavior:
 
 - Cho phép đổi `orderIndex`, metadata, `lessonType`, `liveUrl`, thời điểm mở bài thi, video URL, custom video settings/chapters, completion score, `trialEnabled` và `status`.
+- `overviewContentJson` nhận tài liệu Tiptap `type = "doc"`; lưu độc lập với
+  endpoint `/video-summary`. Có thể gửi `null` để xóa nội dung rich text.
 - `shortDescription`, `liveUrl`, `scheduledAt`, `examOpenAt`, `videoUrl` có thể set `null` để clear.
 - Khi đổi `lessonType` về `BASIC`, backend clear `liveUrl` kể cả request không gửi lại field này.
 - Nếu đổi `orderIndex` qua endpoint PATCH cũ, chỉ reorder trong container hiện tại để tương thích; chuyển container phải dùng endpoint `move`.
@@ -1242,6 +1256,74 @@ Behavior:
 - Trả Summary đã được phép xem. Mỗi `TEX_FIGURE` chỉ được hydrate khi figure
   có current revision `SUCCEEDED` kèm delivery asset; response có `assetUrl`,
   alt/caption và không có source/preview.
+
+---
+
+## 9.1. Admin video summary API (`M15.9`, planned)
+
+### `GET /admin/lessons/:lessonId/video-summary`
+
+Role: `ADMIN`.
+
+- Trả video summary hiện hành hoặc `data: null`, review status, source hashes và
+  `staleAt`. Job mới nhất của type `VIDEO_SUMMARY` được trả cùng AI generation
+  panel để UI polling và hiển thị metadata thống nhất với Sinh kiến thức.
+- Trả readiness `{ hasVideo, hasSavedTranscript, canGenerate, reason }`; chapter
+  rỗng không làm `canGenerate=false`.
+
+### `POST /admin/lessons/:lessonId/video-summary/prompt-preview`
+
+Role: `ADMIN`.
+
+Body chỉ chứa cấu hình generation: `style`, `styleInstructions`, `length`,
+`targetWordCount`, optional `additionalInstructions`, `systemInstructions`,
+`userPrompt`, `model`, `temperature`
+hoặc `reasoningEffort`, và `maxOutputTokens`. `styleInstructions` dùng cùng logic
+với modal Sinh kiến thức: chọn preset để điền nhanh rồi admin có thể sửa tự do.
+Client không gửi raw video URL, chapter hoặc transcript.
+
+- Backend resolve lesson + saved `customVideoSettings`, chuẩn hóa timeline sau
+  cắt, dựng exact system/user prompt và structured schema riêng của Video Summary.
+- Structured schema version 5 trả `title`, `objectives[]`, `sections[]` và các
+  block tương thích `lesson_summary_blocks`: Knowledge có
+  `title/content/startSeconds`; Example có
+  `problem/solution/answer/startSeconds`; mỗi section cũng có `startSeconds`;
+  Summary chỉ có `content` dạng bullet và chỉ xuất hiện ở cuối. Validator buộc
+  số objectives bằng số sections, section order liên tục, timestamp section/
+  Knowledge/Example không giảm và từng `startSeconds` phải khớp cue transcript
+  thật. Example không bắt buộc và example phụ thuộc visual thiếu dữ kiện bị loại.
+- Response trả `requestDraftId`, `requestHash`, source hashes, prompt/schema,
+  normalized source packet, request JSON, token estimate và estimated cost.
+- Không gọi AI provider, không enqueue job và không ghi video summary.
+
+### `POST /admin/lessons/:lessonId/video-summary/generate-ai`
+
+Role: `ADMIN`. Response: `202 Accepted` với `jobId`.
+
+- Bắt buộc `requestDraftId + requestHash`; draft phải fresh, chưa consume và
+  khớp source/config hiện hành.
+- Thiếu video hoặc transcript đã lưu trả `409 VIDEO_SUMMARY_SOURCE_NOT_READY`.
+  Source đổi sau preview trả `409 VIDEO_SUMMARY_SOURCE_CHANGED`.
+- Reserve budget fail-closed, snapshot route/prompt/schema/target context rồi
+  enqueue một job idempotent `AI_GENERATE_VIDEO_SUMMARY`.
+
+### `PUT /admin/lessons/:lessonId/video-summary`
+
+Role: `ADMIN`.
+
+- Validate `contentJson` rồi lưu chỉnh sửa/review status
+  `NEEDS_REVIEW | APPROVED | HIDDEN`; endpoint cho phép lưu
+  Tổng quan video thủ công cả khi lesson chưa có video/transcript. Khi sửa bản AI,
+  giữ `aiGenerationId` và source hashes để không mất provenance. Endpoint này
+  không đọc hoặc ghi `lessons.overview_content_json`.
+
+### `DELETE /admin/lessons/:lessonId/video-summary`
+
+Role: `ADMIN`. Xóa bản tóm tắt hiện hành và ghi audit log; không xóa transcript,
+chapter, video hoặc Lesson Summary.
+
+M15.9 chưa thêm student endpoint. Việc công khai video summary cho học sinh phải
+được owner yêu cầu và ghi thành scope riêng.
 
 ---
 

@@ -105,6 +105,9 @@ Admin có quyền:
 - Tạo, chỉnh sửa, ngừng sử dụng bản lộ trình cá nhân của một enrollment.
 - Quản lý buổi học.
 - Upload tài liệu/PDF/ảnh.
+- Tạo bản tóm tắt video ngắn gọn bằng AI từ mốc thời gian/chapter và bản chép
+  lời đã lưu của đúng buổi học; admin được xem chính xác dữ liệu sẽ gửi, duyệt
+  và chỉnh nội dung trước khi dùng.
 - Tạo hoặc chỉnh sửa tóm tắt bài học.
 - Dùng AI tạo tóm tắt bài học.
 - Chọn theo từng lượt sinh tóm tắt giữa luồng AI vẽ lại hình mặc định và luồng
@@ -396,6 +399,11 @@ Mỗi buổi học gồm:
 - Ngày/giờ diễn ra hoặc ngày/giờ mở bài thi.
 - Link video bài giảng YouTube hoặc Google Drive.
 - Bản chép lời video tùy chọn theo từng mốc thời gian. Với video YouTube, admin có thể thử lấy caption công khai; hệ thống chỉ giữ phần nằm trong khoảng phát thực tế, ánh xạ timestamp về trục phát bắt đầu từ `0:00` sau khi cắt đầu/đuôi, gom các caption ngắn thành cụm dễ đọc, không gom qua ranh giới chapter, hiển thị tên/thời gian chapter, làm nổi bật và tự cuộn theo đoạn đang phát, đồng thời cho phát video từ từng mốc transcript trước khi admin duyệt/chỉnh sửa và lưu.
+- Bản tóm tắt video AI tùy chọn, độc lập với `Tóm tắt bài học`: trình bày ngắn
+  gọn các phần nội dung chính, nội dung của từng phần và những vấn đề người học
+  có thể giải quyết sau khi xem. Output ưu tiên bám chapter đã cấu hình, hỗ trợ
+  công thức Toán/Lý/Hóa đúng rich-text/LaTeX và bị stale khi nguồn video,
+  transcript, chapter hoặc cấu hình cắt thay đổi.
 - PDF tài liệu sách giáo khoa/tài liệu bài học.
 - Tóm tắt bài học.
 - Quiz.
@@ -436,6 +444,8 @@ Phần mở rộng `M15` được triển khai sau luồng học sinh cốt lõi
 - Tua tới cuối không được tính như đã xem toàn bộ.
 - Học sinh có thể tạo ghi chú theo timestamp, bấm để quay lại đoạn video, làm checkpoint trong video và xem chapter mastery.
 - `Hỏi đoạn này`/`Em chưa hiểu` dùng chapter, transcript lân cận và RAG của đúng lesson; không lấy context lesson khác.
+- Admin có thể sinh một bản tóm tắt toàn video từ transcript đã lưu và chapter
+  tùy chọn; flow này không thay thế Summary kiến thức sinh từ PDF.
 - Tóm tắt chapter, flashcard từ video, semantic search và đề xuất ôn tập phải giữ liên kết timestamp nguồn.
 - Difficulty/recommendation phải kết hợp nhiều tín hiệu như watched interval, replay, checkpoint, quiz/test, flashcard và action chủ động; không kết luận từ một lần pause/seek.
 - Admin chỉ xem analytics video tổng hợp có ngưỡng riêng tư, không dùng event thô để giám sát học sinh.

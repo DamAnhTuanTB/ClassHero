@@ -1,6 +1,16 @@
 import { expect, test } from "@playwright/test";
 import { normalizeInlineSubpartBreaks } from "@/components/common/content/lesson-summary-example-content-normalizer";
 
+test("giữ nhãn ý nhỏ liền mạch khi được nhắc trong câu kết luận", () => {
+  expect(
+    normalizeInlineSubpartBreaks(
+      "a) Ta có kết quả thứ nhất. Khẳng định\n\na) đúng.\n\nb) Ta có kết quả thứ hai. Đáp án\n\nb) sai.",
+    ),
+  ).toBe(
+    "a) Ta có kết quả thứ nhất. Khẳng định a) đúng.\n\nb) Ta có kết quả thứ hai. Đáp án b) sai.",
+  );
+});
+
 test("đưa danh sách a)-h) đang cùng dòng về các dòng riêng", () => {
   expect(
     normalizeInlineSubpartBreaks(

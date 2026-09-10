@@ -1,23 +1,40 @@
 # 00. Docs Map - Bản đồ đọc tài liệu
 
-File này là bản đồ nhanh để owner và Codex biết nên đọc tài liệu nào trước. Nó không thay thế `AGENTS.md` hoặc các docs nguồn.
+File này là routing index để owner và Codex mở đúng phần tài liệu, không phải
+checklist đọc toàn bộ. Nó không thay thế `AGENTS.md` hoặc docs nguồn.
+
+## 0. Gói đọc tối thiểu cho một task
+
+Nếu task đã có mã `Mx.y`, mặc định chỉ cần:
+
+1. `AGENTS.md` đã được runtime cung cấp; không mở lại cơ học.
+2. Đúng block `Mx.y` trong `docs/implementation/Mx.md` gồm `Mode`, phạm vi,
+   `Không làm`, `Done khi`.
+3. Đúng section/file domain theo bảng dưới và bề mặt thật sự thay đổi.
+4. Code, call site, test liên quan và `git status --short`.
+
+Không cần đọc toàn `docs/09-implementation-plan.md`, toàn milestone, toàn source
+structure, toàn design system, toàn performance doc hoặc mọi context file trước
+mỗi task. Dùng search/mục lục để tìm section, rồi mở rộng khi task chạm thêm
+contract. Chỉ `/next-task`, onboarding, audit toàn hệ thống, thay đổi scope/kiến
+trúc lớn hoặc task chưa rõ mới cần đọc rộng.
 
 ## 1. Đọc nhanh theo mục tiêu
 
-| Khi muốn                      | Đọc chính                                                                                               | Đọc thêm khi cần                                                                                                                 |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| Hiểu cách repo/Codex làm việc | `README.md`, `AGENTS.md`                                                                                | `.codex/skills/*/SKILL.md`                                                                                                       |
-| Hiểu milestone lớn dễ đọc     | `docs/implementation/milestone-overview.md`                                                             | `docs/09-implementation-plan.md`, `docs/implementation/Mx.md`                                                                     |
-| Chọn task tiếp theo           | `docs/09-implementation-plan.md`                                                                        | `.codex/context/current-context.md`, `docs/implementation/dependency-graph.md`, `docs/implementation/feature-coverage-matrix.md` |
-| Làm một subtask cụ thể        | `AGENTS.md`, `docs/09-implementation-plan.md`, `docs/implementation/Mx.md`                              | Docs domain theo task routing map                                                                                                |
-| Làm UI                        | `docs/08-ui-pages-and-components.md`, `docs/11-ui-design-system.md`, `docs/14-source-code-structure.md` | `docs/ui-references/code-patterns.md` rồi file phù hợp trong `docs/ui-references/code-patterns/`, `docs/ui-references/approved-patterns.md`, `docs/12-performance-and-observability.md`, `docs/13-seo-and-content-discovery.md` |
-| Làm API/backend               | `docs/05-api-contract.md`, file phù hợp trong `docs/api/`, `docs/14-source-code-structure.md`           | `docs/04-database-model.md`, file phù hợp trong `docs/database/`                                                                 |
-| Refactor/tổ chức code         | `docs/14-source-code-structure.md`, `docs/03-technical-architecture.md`, `AGENTS.md`                    | `.codex/context/code-index.md`, skill/task docs liên quan                                                                        |
-| Làm database/schema/seed      | `docs/04-database-model.md`, file phù hợp trong `docs/database/`                                        | `docs/10-seed-data-and-test-cases.md`, `docs/05-api-contract.md` nếu API đổi                                                     |
-| Làm AI/RAG                    | `docs/06-ai-rag-spec.md`                                                                                | `docs/database/ai-rag-chat.md`, `docs/api/ai-chat.md`, `docs/12-performance-and-observability.md`                                |
-| Làm payment                   | `docs/api/payment-discount.md`, `docs/database/payment-discount.md`                                     | `docs/database/progress-enrollment.md`, `docs/07-integration-and-env.md`                                                         |
-| Làm notification/email/Zalo   | `docs/api/notification.md`, `docs/database/notification-report-news.md`                                 | `docs/07-integration-and-env.md`, `docs/12-performance-and-observability.md`                                                     |
-| Sửa scope/feature             | `docs/01-product-scope.md`, `docs/02-user-flows.md`, `docs/09-implementation-plan.md`                   | Domain docs bị ảnh hưởng                                                                                                         |
+| Khi muốn                      | Đọc chính                                                                                                                                  | Chỉ mở thêm khi bề mặt đó đổi                                                                   |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| Hiểu cách repo/Codex làm việc | `README.md`; mục liên quan trong `AGENTS.md`                                                                                               | Skill đang được kích hoạt                                                                       |
+| Hiểu milestone lớn dễ đọc     | Milestone tương ứng trong `docs/implementation/milestone-overview.md`                                                                      | Entry cần tra trong `docs/09-implementation-plan.md`                                            |
+| Chọn task tiếp theo           | `docs/09-implementation-plan.md`, `.codex/context/current-context.md`                                                                      | Dependency graph, coverage matrix và execution plan                                             |
+| Làm một subtask cụ thể        | Block `Mx.y` trong `docs/implementation/Mx.md`                                                                                             | Đúng section domain theo bề mặt thay đổi                                                        |
+| Làm UI                        | Section screen trong `docs/08-ui-pages-and-components.md`; section token/component/responsive cần dùng trong `docs/11-ui-design-system.md` | Phần front-end trong source structure; đúng UI code pattern; performance/SEO khi được kích hoạt |
+| Làm API/backend               | Mapping + file domain trong `docs/05-api-contract.md` và `docs/api/`                                                                       | Phần back-end trong source structure; database docs nếu data/query đổi                          |
+| Refactor/tổ chức code         | Mục 1 + phần front-end/back-end/shared tương ứng trong `docs/14-source-code-structure.md`                                                  | Architecture/domain contract chỉ khi boundary đó liên quan                                      |
+| Làm database/schema/seed      | Mapping + file domain trong `docs/04-database-model.md` và `docs/database/`                                                                | Seed docs; API docs nếu public contract đổi                                                     |
+| Làm AI/RAG                    | `Cách đọc nhanh` + section feature trong `docs/06-ai-rag-spec.md`                                                                          | DB/API/performance section đúng layer bị đổi                                                    |
+| Làm payment                   | Section liên quan trong `docs/api/payment-discount.md` và `docs/database/payment-discount.md`                                              | Enrollment/env chỉ khi flow đó đổi                                                              |
+| Làm notification/email/Zalo   | Section liên quan trong API/database notification docs                                                                                     | Env/performance chỉ khi delivery/worker/latency đổi                                             |
+| Sửa scope/feature             | Section feature trong product scope và user flow                                                                                           | Entry roadmap, dependency, coverage và domain contract bị ảnh hưởng                             |
 
 ## 2. Lệnh owner hay dùng
 
@@ -39,10 +56,10 @@ File này là bản đồ nhanh để owner và Codex biết nên đọc tài li
 ## 3. Quy tắc nhớ nhanh
 
 - Mỗi lần mặc định chỉ làm một subtask.
-- `Mode` của subtask nằm trong `docs/implementation/Mx.md`; đọc mode trước khi code.
-- `docs/04-database-model.md` và `docs/05-api-contract.md` chỉ là index; khi chạm DB/API phải đọc file con tương ứng.
-- UI phải đọc design system; public/indexable page phải đọc SEO docs; list/search/cache/job/AI/latency phải đọc performance docs.
-- Task có sửa code phải đọc `docs/14-source-code-structure.md` để chọn đúng shared/feature/domain layer, alias import và boundary tách file.
+- `Mode` nằm trong block subtask; đọc trọn block đó, không đọc cả milestone.
+- Index chỉ dùng để route tới file/section nguồn; không đọc toàn index và mọi file con.
+- UI đọc đúng screen + rule cần dùng; public/indexable mới mở SEO; list/search/cache/job/AI/latency mới mở đúng performance section.
+- Sửa code đọc mục nguyên tắc và phần front-end/back-end/shared tương ứng trong source structure, không mặc định đọc toàn file.
 - Feature management mặc định là docs/planning-only, chưa sửa production code nếu owner không yêu cầu rõ.
 - Không cập nhật changelog trong task thường; changelog chỉ ghi trong workflow `/commit`.
 

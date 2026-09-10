@@ -117,6 +117,7 @@ source_lesson_id uuid? fk lessons.id
 order_index int
 title string
 short_description string?
+overview_content_json jsonb?
 lesson_type LessonType default BASIC
 live_url string?
 prep_material_json jsonb?
@@ -150,6 +151,10 @@ Rules:
 - Khi tạo chapter/lesson, client không chọn `order_index`; service phải khóa cấu trúc, tự append bản ghi vào cuối container hợp lệ rồi compact/check invariant trước khi commit.
 - Tên lesson active unique không phân biệt hoa/thường trong cùng nhóm đích; lesson ở các chương/nhóm khác nhau có thể trùng tên.
 - `lesson_type` chỉ nhận `BASIC` hoặc `LIVE` và mặc định là `BASIC`.
+- `overview_content_json` lưu tài liệu Tiptap của `Tổng quan buổi học` do admin
+  nhập. Field này thuộc chính lesson và độc lập hoàn toàn với
+  `lesson_video_summaries.content_json`; thao tác tạo/sửa/xóa/phát hành Video
+  Summary không được thay đổi field này.
 - `live_url` là optional cho buổi `LIVE`; buổi `BASIC` luôn lưu `live_url = null`.
 - Admin có thể chuyển lesson tới bất kỳ vị trí nào giữa một chapter, chapter khác trong cùng learning path và top-level. Service phải validate chapter, order/title, dịch các sibling bị ảnh hưởng và cập nhật lesson trong cùng transaction.
 - `custom_video_settings` (field JSON hiện có trong Prisma) có thể lưu transcript đã được admin duyệt ở `transcript: Array<{ time: number; endTime?: number; text: string }>` và ngôn ngữ ở `transcriptLanguage`; transcript là optional nên M3.8 không cần migration riêng. `time`/`endTime` lưu theo timestamp video nguồn với tối đa 3 chữ số thập phân để có thể ánh xạ lại khi cấu hình cắt thay đổi. API bản nháp và form admin hiển thị `playbackTime = sourceTime - startTimeInSeconds`; khi lưu/phát, frontend đổi ngược về source time. `endTime` optional để dữ liệu transcript cũ vẫn tương thích.
@@ -200,5 +205,49 @@ Rules:
   `ai_generation_id`; admin có thể sửa/duyệt bằng cùng record sau đó.
 - Khi admin sửa summary từng được AI tạo, giữ `ai_generation_id` để không mất
   provenance ban đầu.
+
+---
+
+### 5.6. `lesson_video_summaries` (`M15.9`, planned)
+
+```txt
+id uuid pk
+lesson_id uuid unique fk lessons.id
+content_json jsonb
+source ContentSource default AI
+review_status ReviewStatus default NEEDS_REVIEW
+ai_generation_id uuid? fk ai_generations.id
+source_video_url_hash string
+source_transcript_hash string
+source_chapters_hash string
+source_player_settings_hash string
+stale_at timestamp?
+created_by_id uuid? fk users.id
+updated_by_id uuid? fk users.id
+created_at timestamp
+updated_at timestamp
+deleted_at timestamp?
+```
+
+Rules:
+
+- Mỗi lesson có tối đa một video summary active. Bảng này độc lập với
+  `lesson_summaries`, `lessons.overview_content_json` và
+  `lessons.short_description` để không ghi đè Summary kiến thức từ PDF hoặc
+  Tổng quan buổi học do admin nhập.
+- `content_json` dùng contract rich text riêng của Video Summary: overview ngắn,
+  sections theo thứ tự video và learning outcomes/problems solved. Công thức dùng
+  node LaTeX canonical của renderer chung; M15.9 không tạo STEM figure.
+- Bốn source hash được chụp từ dữ liệu backend đã chuẩn hóa. Thay đổi video URL,
+  transcript, chapter hoặc cấu hình cắt đặt `stale_at`; output stale vẫn được giữ
+  cho admin đối chiếu nhưng không được coi là bản mới nhất.
+- Worker chỉ promote bản mới sau khi structured output qua schema/semantic gate;
+  job lỗi không ghi đè bản hiện hành.
+
+`lesson_video_summary_request_drafts` lưu preview immutable gồm lesson/admin,
+request hash, bốn source hash, exact system/user prompt, normalized chapter +
+transcript packet, schema/version, route/model snapshot, token/cost estimate,
+TTL và `consumed_at`. Generate bắt buộc draft chưa hết hạn/chưa consume và còn
+khớp toàn bộ source/config.
 
 ---

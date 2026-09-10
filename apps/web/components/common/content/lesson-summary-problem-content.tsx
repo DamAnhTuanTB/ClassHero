@@ -22,6 +22,7 @@ export interface LessonSummaryProblemBlockData {
   geometryStatement?: LessonSummaryGeometryStatement;
   figures?: StemFigureVisual[];
   origin?: "TEXTBOOK_SOURCE" | "AI_AUTHORED";
+  startSeconds?: number;
 }
 
 export type LessonSummaryFigureRenderer = (visual: StemFigureVisual) => ReactNode;

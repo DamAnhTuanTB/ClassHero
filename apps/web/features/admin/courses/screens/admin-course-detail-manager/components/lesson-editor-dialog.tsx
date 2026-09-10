@@ -21,6 +21,7 @@ import {
 import { toLessonFormValues } from "@/features/admin/courses/admin-courses-utils";
 import { useAdminCourseDocumentsManager } from "@/features/admin/courses/hooks/use-admin-course-documents-manager";
 import { prepareLessonFormValuesForSubmit } from "@/features/admin/courses/utils/prepare-lesson-form-values";
+import { createTextTiptapDocument } from "@/lib/tiptap-rich-content";
 
 export function LessonEditorDialog({
   disabled,
@@ -104,6 +105,7 @@ export function LessonEditorDialog({
     const editorKey = [
       mode,
       selectedLesson?.id ?? "new",
+      JSON.stringify(selectedLesson?.overviewContentJson ?? null),
       ...sourceDocumentExtractions.flatMap((extraction) => [
         ("id" in extraction ? extraction.id : undefined) ?? extraction.clientKey,
         extraction.sourceDocumentId,
@@ -153,6 +155,9 @@ export function LessonEditorDialog({
       mode === "edit" && selectedLesson
         ? {
             ...toLessonFormValues(selectedLesson, existingDocuments),
+            overviewContentJson:
+              selectedLesson.overviewContentJson ??
+              createTextTiptapDocument(selectedLesson.shortDescription ?? ""),
             sourceDocumentExtractions,
             foundationDocumentOrder,
           }

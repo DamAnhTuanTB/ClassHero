@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { tiptapTextDocumentSchema, type TiptapTextDocument } from "@learning-path/shared";
 import type {
   AdminEditableStatus,
   AdminLessonType,
@@ -191,6 +192,7 @@ export const lessonSchema = z.object({
     maxLength: 180,
   }),
   shortDescription: z.string().trim().max(500).optional(),
+  overviewContentJson: tiptapTextDocumentSchema.optional(),
   lessonType: z.enum(["BASIC", "LIVE"]),
   liveUrl: z
     .string()
@@ -421,6 +423,7 @@ export type LearningPathFormValues = {
 export type LessonFormValues = {
   title: string;
   shortDescription?: string;
+  overviewContentJson?: TiptapTextDocument;
   lessonType: AdminLessonType;
   liveUrl?: string;
   scheduledAt?: string;
@@ -485,6 +488,7 @@ export const emptyPathValues: LearningPathFormValues = {
 export const emptyLessonValues: LessonFormValues = {
   title: "",
   shortDescription: "",
+  overviewContentJson: { type: "doc", content: [{ type: "paragraph" }] },
   lessonType: "BASIC",
   liveUrl: "",
   scheduledAt: "",

@@ -1,3 +1,4 @@
+import type { TiptapTextDocument } from "@learning-path/shared";
 import type {
   AdminChapter,
   AdminLessonType,
@@ -101,6 +102,7 @@ export type AdminLessonApi = {
   orderIndex: number;
   title: string;
   shortDescription: string | null;
+  overviewContentJson: unknown;
   lessonType: AdminLessonType;
   liveUrl: string | null;
   scheduledAt: string | null;
@@ -160,6 +162,7 @@ export type AdminLessonPayload = {
   liveUrl?: string | null;
   scheduledAt?: string | null;
   shortDescription?: string | null;
+  overviewContentJson?: TiptapTextDocument | null;
   status?: AdminPublishStatus;
   sourceDocumentExtractions?: Array<{
     id?: string;

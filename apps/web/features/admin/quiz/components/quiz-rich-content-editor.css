@@ -4,7 +4,7 @@
   padding: 0.75rem 1rem;
   color: var(--theme-text-strong);
   font-size: 0.875rem;
-  font-weight: 600;
+  font-weight: 400;
   line-height: 1.65;
   outline: none;
 }
@@ -35,6 +35,10 @@
 
 .quiz-rich-content-editor .quiz-rich-content-prosemirror > * + * {
   margin-top: 0.6rem;
+}
+
+.quiz-rich-content-editor .quiz-rich-content-prosemirror :is(strong, b) {
+  font-weight: 700;
 }
 
 .quiz-rich-content-editor .quiz-rich-content-prosemirror [data-indent="1"] {

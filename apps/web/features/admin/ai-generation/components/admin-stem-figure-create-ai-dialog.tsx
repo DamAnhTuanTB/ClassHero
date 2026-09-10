@@ -29,6 +29,7 @@ import {
   supportsReasoningEffort,
   supportsTemperature,
 } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
+import { replaceOpenAiRequestPrompts } from "@/features/admin/ai-generation/utils/openai-request-preview";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { cn } from "@/lib/utils";
 
@@ -239,6 +240,7 @@ export function AdminStemFigureCreateAiDialog({
   const displayedProviderInput = previewData
     ? buildDisplayedFigureProviderInput({
         providerInput: previewData.providerInput,
+        previewSystemPrompt: previewData.systemPrompt,
         previewUserPrompt: previewData.userPrompt,
         systemPrompt: displayedSystemPrompt,
         userPrompt: displayedUserPrompt,
@@ -278,8 +280,7 @@ export function AdminStemFigureCreateAiDialog({
   const sourceReferenceImages = figure?.sourceReferenceImages ?? [];
   const hasSource = sourceReferenceImages.length > 0;
   const usesFullPageFallback =
-    hasSource &&
-    sourceReferenceImages.every((image) => image.source === "PDF_PAGE");
+    hasSource && sourceReferenceImages.every((image) => image.source === "PDF_PAGE");
   const canEditCurrent =
     Boolean(figure?.hasCurrentAsset) && figure?.currentAssetKind === "AI_TEX";
   const visibleModeOptions = (targetMode ? TARGET_MODE_OPTIONS : MODE_OPTIONS).filter(
@@ -289,9 +290,7 @@ export function AdminStemFigureCreateAiDialog({
       (option.value === "CURRENT_ONLY" && canEditCurrent),
   );
   const selectedReferenceImages =
-    mode === "SOURCE_CROP_ONLY" || mode === "CURRENT_ONLY"
-      ? sourceReferenceImages
-      : [];
+    mode === "SOURCE_CROP_ONLY" || mode === "CURRENT_ONLY" ? sourceReferenceImages : [];
   const dialogTitle = targetMode
     ? targetMode === "QUESTION"
       ? "Tạo hình cho đề bài"
@@ -555,7 +554,9 @@ export function AdminStemFigureCreateAiDialog({
                 ) : displayedProviderInput && previewData ? (
                   <>
                     <AdminAiRequestStatistics
-                      details={buildFigureRequestStatistics(previewData, () => setIsInputBreakdownDialogOpen(true))}
+                      details={buildFigureRequestStatistics(previewData, () =>
+                        setIsInputBreakdownDialogOpen(true),
+                      )}
                       estimatedCost={previewData.estimatedCost}
                       note="Token ảnh được ước tính theo số ảnh và mức detail trước khi gửi; usage provider sau khi xử lý mới là số thực tế."
                     />
@@ -784,8 +785,7 @@ function resolveAvailableMode(
 ): AdminStemFigureReferenceImageMode {
   if (!figure) return "NONE";
   const hasSource = figure.sourceReferenceImages.length > 0;
-  const canEditCurrent =
-    figure.hasCurrentAsset && figure.currentAssetKind === "AI_TEX";
+  const canEditCurrent = figure.hasCurrentAsset && figure.currentAssetKind === "AI_TEX";
   if (targetMode) {
     return requested === "CURRENT_ONLY" && canEditCurrent ? "CURRENT_ONLY" : "NONE";
   }
@@ -828,46 +828,16 @@ function createPreviewTransportKey(input: AdminStemFigureCreateAiInput) {
 
 function buildDisplayedFigureProviderInput(input: {
   providerInput: Record<string, unknown>;
+  previewSystemPrompt: string;
   previewUserPrompt: string;
   systemPrompt: string;
   userPrompt: string;
 }) {
-  return {
-    ...input.providerInput,
-    instructions: input.systemPrompt,
-    input: replaceFigureUserPrompt(
-      input.providerInput.input,
-      input.previewUserPrompt,
-      input.userPrompt,
-    ),
-  };
-}
-
-function replaceFigureUserPrompt(
-  providerInput: unknown,
-  previewUserPrompt: string,
-  userPrompt: string,
-): unknown {
-  if (typeof providerInput === "string") {
-    return providerInput === previewUserPrompt ? userPrompt : providerInput;
-  }
-  if (!Array.isArray(providerInput)) return providerInput;
-  return providerInput.map((message) => {
-    if (!message || typeof message !== "object" || Array.isArray(message)) {
-      return message;
-    }
-    const record = message as Record<string, unknown>;
-    if (!Array.isArray(record.content)) return message;
-    return {
-      ...record,
-      content: record.content.map((item) => {
-        if (!item || typeof item !== "object" || Array.isArray(item)) return item;
-        const content = item as Record<string, unknown>;
-        return content.type === "input_text" && content.text === previewUserPrompt
-          ? { ...content, text: userPrompt }
-          : item;
-      }),
-    };
+  return replaceOpenAiRequestPrompts(input.providerInput, {
+    previewSystemPrompt: input.previewSystemPrompt,
+    previewUserPrompt: input.previewUserPrompt,
+    systemPrompt: input.systemPrompt,
+    userPrompt: input.userPrompt,
   });
 }
 

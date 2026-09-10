@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Loader2, ListOrdered, Plus, Trash2, Wand2 } from "lucide-react";
+import { Check, Loader2, ListOrdered, Plus, Trash2, Wand2, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import {
   useForm as useHookForm,
@@ -254,16 +254,18 @@ export function LessonVideoChaptersForm({
 
   return (
     <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-surface)] overflow-hidden shadow-sm mt-4">
-      <div className="flex items-center justify-between p-4 bg-[var(--theme-surface-sunken)] border-b border-[var(--theme-border)]">
+      <div className="flex items-center justify-between gap-4 p-4 bg-[var(--theme-surface-sunken)] border-b border-[var(--theme-border)]">
         <div className="font-bold text-[var(--theme-text-strong)] flex items-center gap-2">
           <ListOrdered className="w-4 h-4 text-[var(--theme-primary)]" />
           Quản lý Mốc Thời Gian
         </div>
         <button
+          type="button"
           onClick={() => setIsOpen(false)}
-          className="text-xs font-semibold text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]"
+          className="theme-button-neutral flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+          aria-label="Đóng quản lý mốc thời gian"
         >
-          Đóng
+          <X className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
 

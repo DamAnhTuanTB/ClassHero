@@ -76,7 +76,7 @@ export interface AdminAiModelConfiguration {
 
 export interface AdminAiPanelJob {
   aiGenerationId: string;
-  type: AdminAiGenerationType;
+  type: AdminAiGenerationType | "VIDEO_SUMMARY";
   jobId: string | null;
   status: AdminAiJobStatus;
   resourceType: string | null;
@@ -124,7 +124,9 @@ export interface AdminAiGenerationPanelData {
   testFigureConfiguration: AdminAiModelConfiguration;
   flashcardConfiguration: AdminAiModelConfiguration;
   flashcardFigureConfiguration: AdminAiModelConfiguration;
+  videoSummaryConfiguration?: AdminAiModelConfiguration;
   jobs: Record<AdminAiGenerationType, AdminAiPanelJob | null>;
+  videoSummaryJob: AdminAiPanelJob | null;
 }
 
 export interface AdminAiJobData {
@@ -258,7 +260,7 @@ export interface AdminLessonSummaryPromptPreview {
   };
   openAiRequest: {
     model: string | null;
-    instructions: string;
+    instructions?: string;
     input: unknown;
     text: {
       format: Record<string, unknown>;
@@ -267,6 +269,7 @@ export interface AdminLessonSummaryPromptPreview {
     reasoning?: { effort: string };
     max_output_tokens: number;
     prompt_cache_key?: string;
+    prompt_cache_options?: { mode: "explicit"; ttl: "30m" };
     prompt_cache_retention?: "24h";
   };
   context: {
@@ -358,13 +361,14 @@ export interface AdminQuizPromptPreview {
   };
   openAiRequest: {
     model: string | null;
-    instructions: string;
+    instructions?: string;
     input: unknown;
     text: { format: Record<string, unknown> };
     temperature?: number;
     reasoning?: { effort: string };
     max_output_tokens: number;
     prompt_cache_key?: string;
+    prompt_cache_options?: { mode: "explicit"; ttl: "30m" };
     prompt_cache_retention?: "24h";
   };
   context: {

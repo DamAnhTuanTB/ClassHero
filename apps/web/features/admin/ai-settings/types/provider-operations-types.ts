@@ -6,7 +6,7 @@ import type {
 export type { ProviderUsageOperation } from "@learning-path/shared";
 
 export type ProviderCategory = "AI_MODEL" | "OCR_SERVICE";
-export type AiFeature = "SUMMARY" | "QUIZ" | "FLASHCARD" | "TEST";
+export type AiFeature = "SUMMARY" | "VIDEO_SUMMARY" | "QUIZ" | "FLASHCARD" | "TEST";
 export type AiModelPurpose = "TEXT" | "IMAGE";
 export type UsageGranularity = "DAY" | "WEEK" | "MONTH";
 

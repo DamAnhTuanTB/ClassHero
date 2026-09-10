@@ -9,6 +9,7 @@ import {
   IsEnum,
   IsInt,
   IsNumber,
+  IsObject,
   IsOptional,
   IsString,
   Max,
@@ -164,6 +165,14 @@ export class UpdateLessonDto {
   @IsString()
   @MaxLength(500)
   shortDescription?: string | null;
+
+  @ApiPropertyOptional({
+    description: "Nội dung Tiptap của Tổng quan buổi học",
+    nullable: true,
+  })
+  @IsOptional()
+  @IsObject()
+  overviewContentJson?: Record<string, unknown> | null;
 
   @ApiPropertyOptional({ enum: LessonType, example: LessonType.LIVE })
   @ValidateIf((_, value: unknown) => value !== undefined)

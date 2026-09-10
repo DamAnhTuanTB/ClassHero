@@ -17,6 +17,7 @@ import type {
 
 const EDITABLE_FEATURES = new Set<AiGenerationType>([
   AiGenerationType.SUMMARY,
+  AiGenerationType.VIDEO_SUMMARY,
   AiGenerationType.QUIZ,
   AiGenerationType.FLASHCARD,
   AiGenerationType.TEST,

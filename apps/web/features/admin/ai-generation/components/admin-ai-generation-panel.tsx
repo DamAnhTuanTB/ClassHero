@@ -17,6 +17,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
+import { AiJobTimer } from "@/features/admin/ai-generation/components/ai-job-timer";
 import { AdminDataErrorState } from "@/components/admin/admin-data-error-state";
 import { AdminJobErrorAlert } from "@/components/admin/admin-job-error-alert";
 import {
@@ -484,7 +485,7 @@ function GenerationCard({
               "Đang tải bộ Quiz"
             )
           ) : isActive ? (
-            <JobTimer createdAt={job!.createdAt} prefix="Đang xử lý (" suffix=")" />
+            <AiJobTimer createdAt={job!.createdAt} prefix="Đang xử lý (" suffix=")" />
           ) : job?.status === "FAILED" ? (
             "Thử lại"
           ) : type === "QUIZ" ||
@@ -661,34 +662,5 @@ function PanelSkeleton() {
         ))}
       </div>
     </section>
-  );
-}
-
-export function JobTimer({
-  createdAt,
-  prefix,
-  suffix = "",
-}: {
-  createdAt: string;
-  prefix: string;
-  suffix?: string;
-}) {
-  const [elapsed, setElapsed] = useState(0);
-
-  useEffect(() => {
-    const start = new Date(createdAt).getTime();
-    const update = () => {
-      setElapsed(Math.max(0, Math.floor((Date.now() - start) / 1000)));
-    };
-    update();
-    const interval = setInterval(update, 1000);
-    return () => clearInterval(interval);
-  }, [createdAt]);
-
-  return (
-    <>
-      {prefix}
-      {elapsed}s{suffix}
-    </>
   );
 }

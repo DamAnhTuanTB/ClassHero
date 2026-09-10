@@ -23,6 +23,7 @@ import {
   supportsReasoningEffort,
   supportsTemperature,
 } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
+import { replaceOpenAiRequestPrompts } from "@/features/admin/ai-generation/utils/openai-request-preview";
 import type {
   AdminQuizAssessmentKind,
   AdminQuizFigure,
@@ -248,6 +249,7 @@ export function AdminQuizFigureAiDialog({
   const displayedProviderInput = previewData
     ? buildDisplayedProviderInput(
         previewData.providerInput,
+        previewData.systemPrompt,
         previewData.userPrompt,
         displayedSystemPrompt,
         displayedUserPrompt,
@@ -776,34 +778,16 @@ function createPreviewInputKey(input: AdminQuizFigureCreateAiInput) {
 
 function buildDisplayedProviderInput(
   providerInput: Record<string, unknown>,
+  previewSystemPrompt: string,
   previewUserPrompt: string,
   systemPrompt: string,
   userPrompt: string,
 ) {
-  return {
-    ...providerInput,
-    instructions: systemPrompt,
-    input: replaceUserPrompt(providerInput.input, previewUserPrompt, userPrompt),
-  };
-}
-
-function replaceUserPrompt(value: unknown, preview: string, current: string): unknown {
-  if (typeof value === "string") return value === preview ? current : value;
-  if (!Array.isArray(value)) return value;
-  return value.map((message) => {
-    if (!message || typeof message !== "object" || Array.isArray(message)) return message;
-    const record = message as Record<string, unknown>;
-    if (!Array.isArray(record.content)) return message;
-    return {
-      ...record,
-      content: record.content.map((item) => {
-        if (!item || typeof item !== "object" || Array.isArray(item)) return item;
-        const content = item as Record<string, unknown>;
-        return content.type === "input_text" && content.text === preview
-          ? { ...content, text: current }
-          : item;
-      }),
-    };
+  return replaceOpenAiRequestPrompts(providerInput, {
+    previewSystemPrompt,
+    previewUserPrompt,
+    systemPrompt,
+    userPrompt,
   });
 }
 

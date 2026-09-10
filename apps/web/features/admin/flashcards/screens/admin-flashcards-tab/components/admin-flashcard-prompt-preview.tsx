@@ -14,6 +14,7 @@ import {
   supportsReasoningEffort,
   supportsTemperature,
 } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
+import { replaceOpenAiRequestPrompts } from "@/features/admin/ai-generation/utils/openai-request-preview";
 import { cn } from "@/lib/utils";
 
 type PromptTab = "system" | "user" | "input";
@@ -56,17 +57,43 @@ export function AdminFlashcardPromptPreview({
   )?.capabilities?.aiConfiguration;
   const usesReasoningEffort = supportsReasoningEffort(effectiveModel, capability);
   const usesTemperature = supportsTemperature(effectiveModel, capability);
+  const {
+    reasoning: previewReasoning,
+    temperature: previewTemperature,
+    ...baseRequest
+  } = preview.openAiRequest;
   const effectiveReasoningEffort = usesReasoningEffort
-    ? reasoningEffort || preview.configuration.reasoningEffort || "Mặc định"
-    : null;
+    ? reasoningEffort || previewReasoning?.effort || preview.configuration.reasoningEffort
+    : undefined;
   const effectiveTemperature = usesTemperature
-    ? resolveTemperature(temperature, preview.configuration.temperature)
-    : null;
-  const content = activeTab === "system"
-    ? systemInstructions || preview.systemPrompt
-    : activeTab === "user"
-      ? userPrompt || preview.userPrompt
-      : JSON.stringify(preview.openAiRequest, null, 2);
+    ? resolveTemperature(
+        temperature,
+        previewTemperature ?? preview.configuration.temperature,
+      )
+    : undefined;
+  const effectiveSystemInstructions = systemInstructions || preview.systemPrompt;
+  const effectiveUserPrompt = userPrompt || preview.userPrompt;
+  const responseRequest = {
+    ...replaceOpenAiRequestPrompts(baseRequest, {
+      previewSystemPrompt: preview.systemPrompt,
+      previewUserPrompt: preview.userPrompt,
+      systemPrompt: effectiveSystemInstructions,
+      userPrompt: effectiveUserPrompt,
+    }),
+    model: effectiveModel || null,
+    ...(effectiveReasoningEffort
+      ? { reasoning: { effort: effectiveReasoningEffort } }
+      : effectiveTemperature === undefined
+        ? {}
+        : { temperature: effectiveTemperature }),
+    max_output_tokens: Number(maxOutputTokens || preview.openAiRequest.max_output_tokens),
+  };
+  const content =
+    activeTab === "system"
+      ? effectiveSystemInstructions
+      : activeTab === "user"
+        ? effectiveUserPrompt
+        : JSON.stringify(responseRequest, null, 2);
   const tabs = [
     { value: "system", label: "Quy tắc hệ thống" },
     { value: "user", label: "Câu lệnh người dùng" },
@@ -87,8 +114,7 @@ export function AdminFlashcardPromptPreview({
       ? [
           {
             label: "Temperature",
-            value:
-              effectiveTemperature === null ? "Mặc định" : String(effectiveTemperature),
+            value: effectiveTemperature === undefined ? "Mặc định" : String(effectiveTemperature),
           },
         ]
       : []),
@@ -171,7 +197,7 @@ export function AdminFlashcardPromptPreview({
             {activeTab !== "input" ? <button type="button" onClick={() => setEditMode((current) => ({ ...current, [activeTab]: !current[activeTab] }))} className="theme-button-primary-subtle inline-flex min-h-8 items-center gap-1 rounded-lg px-2 text-xs font-extrabold">{editing ? <Eye className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}{editing ? "Xem trước" : "Chỉnh sửa"}</button> : null}
             <button type="button" onClick={() => void navigator.clipboard.writeText(content).then(() => toast.success("Đã sao chép câu lệnh"))} className="theme-button-primary-subtle inline-flex min-h-8 items-center gap-1 rounded-lg px-2 text-xs font-extrabold"><Copy className="h-3.5 w-3.5" />Sao chép</button>
           </div>
-          {activeTab === "input" ? <AdminAiJsonInputViewer data={preview.openAiRequest} /> : editing ? (
+          {activeTab === "input" ? <AdminAiJsonInputViewer data={responseRequest} /> : editing ? (
             <div className="p-3"><TextareaField id={`ai-flashcard-${activeTab}-prompt`} label={activeTab === "system" ? "Quy tắc hệ thống" : "Câu lệnh người dùng"} className="min-h-72 font-mono text-xs" value={activeTab === "system" ? systemInstructions : userPrompt} error={activeTab === "system" ? systemInstructionsError : userPromptError} onChange={(event) => activeTab === "system" ? onSystemInstructionsChange(event.currentTarget.value) : onUserPromptChange(event.currentTarget.value)} /></div>
           ) : <AdminAiPromptContentPreview kind={activeTab} content={content} />}
         </div>
@@ -187,7 +213,7 @@ export function AdminFlashcardPromptPreview({
 
 function resolveTemperature(selected: string, preview: number | null) {
   const value = selected.trim() ? Number(selected) : preview;
-  return value !== null && Number.isFinite(value) ? value : null;
+  return value !== null && Number.isFinite(value) ? value : undefined;
 }
 
 function estimateTextTokens(value: string) {

@@ -41,6 +41,20 @@ type LessonMutationPayload = {
 };
 
 test.describe("M4.5 admin lesson documents", () => {
+  test("opens the edit form from lesson detail instead of leaving its loading modal open", async ({
+    page,
+  }) => {
+    await seedAdminSession(page);
+    await setupM45ApiMock(page, { withMappedSource: true });
+
+    await page.goto(`/admin/lessons/${lessonOneId}`);
+    await page.getByRole("button", { name: "Chỉnh sửa buổi học" }).click();
+
+    const editDialog = page.getByRole("dialog", { name: "Sửa buổi học" });
+    await expect(editDialog.getByLabel("Tên buổi học")).toBeVisible();
+    await expect(editDialog.getByLabel("Đang tải biểu mẫu sửa buổi học")).toHaveCount(0);
+  });
+
   test("uploads and switches between multiple source PDFs", async ({
     page,
   }, testInfo) => {
@@ -574,6 +588,16 @@ async function setupM45ApiMock(
     const url = new URL(request.url());
     const pathname = url.pathname.replace("/api/v1", "");
     const method = request.method();
+
+    if (method === "GET" && pathname === `/admin/lessons/${lessonOneId}`) {
+      const lesson = state.learningPath.chapters
+        .flatMap((chapter) => chapter.lessons)
+        .find((item) => item.id === lessonOneId);
+
+      return fulfillJson(route, 200, {
+        data: lesson ?? buildLesson(lessonOneId, 1, "Buổi học 1: Số hữu tỉ"),
+      });
+    }
 
     if (method === "GET" && pathname === `/admin/learning-paths/${learningPathId}`) {
       return fulfillJson(route, 200, { data: state.learningPath });

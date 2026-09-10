@@ -20,6 +20,7 @@ import { AiGenerationProcessor } from "#api/workers/processors/ai-generation.pro
 import { AiGenerationExecutionService } from "#api/workers/services/ai-generation-execution.service";
 import { AiGenerationWorkerService } from "#api/workers/services/ai-generation-worker.service";
 import { LessonSummaryGenerationService } from "#api/workers/services/lesson-summary-generation.service";
+import { VideoSummaryGenerationService } from "#api/workers/services/video-summary-generation.service";
 import { LessonContentGenerationService } from "#api/workers/services/lesson-content-generation.service";
 import { QuizGenerationContextService } from "#api/modules/quiz/services/quiz-generation-context.service";
 import { QuizSourcePacketService } from "#api/modules/quiz/services/quiz-source-packet.service";
@@ -71,6 +72,7 @@ import { StemFigureRenderingWorkerService } from "#api/workers/services/stem-fig
     AiGenerationExecutionService,
     AiGenerationWorkerService,
     LessonSummaryGenerationService,
+    VideoSummaryGenerationService,
     LessonContentGenerationService,
     QuizGenerationContextService,
     QuizSourcePacketService,
