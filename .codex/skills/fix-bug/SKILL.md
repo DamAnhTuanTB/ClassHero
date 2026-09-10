@@ -1,167 +1,47 @@
 ---
 name: fix-bug
-description: Fix bugs in the Vietnamese learning-path project from commands like "/fix bug mô tả lỗi", "/fix bug lỗi 500 khi mở API", or "sửa bug mô tả". Use when Codex must read relevant project docs, map the bug to the likely milestone/module, reproduce or gather enough evidence, identify root cause, make the smallest safe fix, scale process and checks to bug size, avoid unrelated changes, verify with focused commands when practical, then explain the bug cause and concise handling approach with applied technical flow.
+description: Diagnose and fix a project-local bug from commands such as "/fix bug ...", "/fix ...", "sửa bug ...", or "fix lỗi ...". Gather evidence, identify root cause, apply the smallest safe fix, load only relevant contracts and conditional bug guidance, and verify proportionally.
 ---
 
 # Bug Fix Runner
 
-Use this skill for project-local bug fixing. Keep the workflow evidence-first: understand the bug, reproduce or inspect logs, find root cause, then patch narrowly.
+If the description is too vague to locate or reproduce safely, ask one concise question. Otherwise state any necessary assumption and continue.
 
-## Command Parsing
+## Minimal Startup
 
-Accept these forms:
+Before editing:
 
-- `/fix bug <bug description>`
-- `/fix <bug description>`
-- `sửa bug <bug description>`
-- `fix lỗi <bug description>`
+1. Apply the runtime-provided `AGENTS.md`; reopen only for exact changed lines.
+2. Search the roadmap only to orient an unmapped bug. Read a subtask block only when its scope or contract affects the fix.
+3. Open context, decisions, or execution-plan files only for a known relevant dependency or assumption.
+4. Use the Task Routing Map to read only affected contract sections. For source-structure, performance, or SEO concerns, open the matching layer/route section rather than the full document.
+5. For UI forms, modals, actions, uploads, badges, or state views, use `docs/ui-references/code-patterns.md` to open one matching pattern and compare the closest approved implementation.
+6. For KaTeX, MathJax, LaTeX normalization, or display-math layout bugs, read [`references/math-content.md`](references/math-content.md). Do not read it for other bugs.
+7. Inspect the symptom, current code, call sites, focused tests, and `git status --short`. Expand the reading set only if diagnosis reaches another surface.
 
-If the description is too vague to locate or reproduce safely, ask one concise question. Otherwise make a reasonable assumption and continue.
+For a small bug, give a 1–3 bullet plan covering evidence, likely files, and the focused check. Add contract/docs impact for larger bugs. Prompt files are not sources of truth.
 
-## Required Startup
+## Diagnose and Fix
 
-Before editing files:
+1. Gather the smallest realistic evidence: existing output, code path, focused command/test, or API request. Avoid starting browsers or servers unless requested or necessary to reproduce.
+2. Establish the root cause before editing. Check relevant config/env, stale processes or generated artifacts, validation, permissions, API/schema/persistence contracts, providers, and workers.
+3. Apply the smallest safe fix. Do not add features, change stack, broaden a refactor, or disturb unrelated worktree changes.
+4. Preserve the general invariants in `AGENTS.md` and the affected domain contract, including source aliases, shared HTTP-error helpers, RBAC, real UI interactions, and worker restart requirements.
+5. Update docs only when an actual contract, schema, AI behavior, env, workflow, performance, or SEO rule changes. Do not update changelog; `/commit` owns it.
 
-1. Locate repo root containing `AGENTS.md`.
-2. Read `AGENTS.md`.
-3. Read `docs/09-implementation-plan.md` enough to map the bug to the likely milestone/subtask; read the matching milestone file in `docs/implementation/` if subtask detail is needed.
-4. If present, read `.codex/plans/codex-execution-plan.md` for known dependencies, assumptions, or recent plan notes.
-5. Use the `Task routing map` in `AGENTS.md` to choose the project docs relevant to the suspected bug area.
-6. Read `docs/14-source-code-structure.md` if the fix changes source files, moves code, touches shared components, or edits backend module organization.
-7. If the bug touches UI forms, modals, detail grids, action controls, upload previews, badge/status UI, or loading/empty/error states, read `0. Cách Đọc Nhanh` in `docs/ui-references/code-patterns.md` and the matching file/section in `docs/ui-references/code-patterns/` before editing, then compare the fix against the closest approved implementation pattern.
-8. If the bug is about slowness, lag, timeout, cache, query, worker delay, AI latency, or observability, read `docs/12-performance-and-observability.md`.
-9. If the bug is about public pages not being indexable, wrong metadata, slug, sitemap, robots, canonical, Open Graph, structured data, or Google discovery, read `docs/13-seo-and-content-discovery.md`.
-10. Read those docs before code changes. If the suspected area changes during diagnosis, read the newly relevant docs too.
-11. Inspect `git status --short` and preserve unrelated user changes.
-12. Give a short plan: suspected module/subtask, docs read, reproduction/evidence command, likely files/layers, docs to update if behavior changes, and verification commands.
+Use a fuller diagnosis and verification path for auth/RBAC, payment, database/schema, API contracts, AI/RAG, workers, storage, notifications, security, or multi-module bugs. A small isolated bug may skip broad checks when the reason is reported.
 
-Do not use prompt files as source of truth. Use project docs and code.
+If a fix needs a secret, paid-provider run, production access, destructive data action, or major product decision, follow the corresponding `AGENTS.md` gate and stop for owner input when required.
 
-## Lean Mode For Small Bugs
+## Verify
 
-For small, low-risk bugs, finish quickly by using the lightest safe workflow.
+1. Rerun the check that represents the original symptom, then add typecheck, tests, lint, build, API, or runtime verification in proportion to risk.
+2. For a backend/API bug visible in the UI the owner is actively testing, verify the API origin actually used by the web app. Restart a stale owner-facing process when appropriate rather than relying on an alternate port.
+3. Stop temporary servers started only for diagnosis. State whether any owner-facing server remains running.
+4. If a deterministic check is available, do not claim success from inspection alone. If a required check cannot run, state why.
 
-Allowed reductions:
+## Completion
 
-- Read only `AGENTS.md`, enough of `docs/09-implementation-plan.md` to orient the bug, directly relevant routing docs, logs/error output, and touched code.
-- Per owner preference, do not spin up servers, browsers, Playwright UI, screenshots, or real interaction checks by default. Use existing error output, code inspection, focused static checks, targeted format, or typecheck as evidence unless the owner explicitly asks for browser/runtime verification.
-- Keep the plan to 1-3 short bullets.
-- Run one focused verification command, a quick curl, a validator, or no command if the change is docs/wording-only.
-- Skip broad `build`, full test suites, or full regression checks when the bug is isolated and low risk.
-- For backend/API bugs visible in a UI the owner is actively testing, verify the actual API origin used by the web app, usually `localhost:4000`. If that dev server is stale, restart the process on `4000` and rerun the failing payload there; do not rely only on a temporary alternate port.
+Before the final response, call `.codex/scripts/notify-task.sh` from repo root with `done`, `blocked`, or `failed`, a concrete `/fix bug <topic>` label, and a short outcome. Notification failure does not block completion.
 
-Non-negotiable:
-
-- Do not guess root cause when evidence is insufficient; say what is assumed.
-- Do not skip safety checks for secrets, scope, stack, MVP, or unrelated dirty files.
-- Do not update changelog during the bug-fix workflow; `/commit` will record the commit's main changes.
-- If a check is skipped, state `Not run: <short reason>` in the final response.
-- Use the fuller workflow for auth/RBAC, payment, database/schema, API contract, AI/RAG, worker, storage, notification, security, or multi-module bugs.
-
-## Diagnosis Workflow
-
-1. Reproduce the bug with the smallest realistic non-browser evidence when practical: existing error output, code inspection, focused command, curl/API check, or test. Do not use browser/page visits/dev-server interaction checks unless the owner explicitly asks.
-2. Capture the useful symptom: status code, stack trace, console output, failing test, request path, or UI state.
-3. If reproduction is not possible, explain why and use the best available evidence from code, logs, docs, and user description.
-4. Identify the root cause before editing. Avoid speculative fixes.
-5. Check whether the bug is caused by config/env, runtime process not restarted, API contract mismatch, schema mismatch, permission/RBAC, validation, or stale generated files.
-
-## Fix Rules
-
-- Make the smallest fix that addresses the root cause.
-- Keep the fix inside the documented structure in `docs/14-source-code-structure.md`; even a small fix must not add another component/helper/API call into an already wrong layer.
-- Do not change the approved stack.
-- Do not add features outside MVP.
-- Do not refactor broad areas just because they are nearby.
-- Do not overwrite or revert unrelated dirty files.
-- Update docs only when the actual contract, schema, AI/RAG behavior, env, or workflow changes.
-- If a database/API/AI behavior change is required, follow `AGENTS.md` rules for updating the corresponding docs.
-- If SEO/indexability behavior changes, update `docs/13-seo-and-content-discovery.md` or related public docs when needed.
-- For backend fixes in `apps/api/src`, preserve the alias convention: use `#api/...` for internal imports instead of `../` or `./`.
-- For backend fixes that touch HTTP errors, use `apps/api/src/common/errors` helpers/factories instead of adding direct Nest exception constructors with custom bodies in the fixed module.
-- For UI bugs, the fix must preserve production-like interaction. Do not replace broken behavior with static fake controls; visible buttons, checkbox/toggle state, tabs, menus, filters, forms, modals, and clickable-looking icons must keep semantic elements, state/handlers, and feedback.
-- When KaTeX and MathJax can render inside the same content wrapper, scope SVG
-  resets to the renderer-specific container (for example
-  `mjx-container[jax="SVG"] > svg`). Never apply a broad wrapper rule such as
-  `.mmd-content svg`, because it can override KaTeX's stretchy-delimiter SVG
-  layout and expose seams or connector strokes. Visually verify tall braces,
-  radicals and fractions at normal and enlarged zoom after changing math CSS.
-- For horizontally scrollable KaTeX display math, keep one canonical overflow
-  owner. Do not nest an `overflow-y: hidden` KaTeX display inside another clipped
-  math scroller: upper/lower limits and stretchy braces legitimately paint beyond
-  the inner line box and will lose strokes. Reserve ink-safe block padding on the
-  outer scroller, then verify the painted bounds of integrals with limits,
-  fractions, radicals, exponents/subscripts and tall delimiters against every
-  clipping ancestor.
-- Treat `\\right.` as LaTeX delimiter syntax, never as removable sentence
-  punctuation. When normalizing AI-authored display math, repair a misplaced
-  `$$` before `\\end{aligned}`/similar environments before parsing, and cover the
-  valid and malformed forms with regression tests instead of rendering raw red
-  fallback text.
-- For UI implementation bugs, do not invent local workaround gates when an approved code pattern exists. Forms, especially, must keep realtime validation from the shared/project pattern rather than patching symptoms with per-field `dirtyFields`/`touchedFields` logic.
-- If the bug reveals a small roadmap dependency/TODO issue, update `.codex/plans/codex-execution-plan.md`; ask the owner before major roadmap or scope changes.
-- If a fix requires a secret, paid service, production access, or large product decision, stop and ask.
-
-## Verification
-
-After the fix:
-
-1. Rerun the focused command/static check that fits the fix. If the original symptom was UI interaction, use code/typecheck/static verification by default and let the owner test the real UI.
-2. Run verification proportional to risk: focused checks for small bugs; broader `typecheck`, `build`, `lint`, or tests for shared, production, or multi-module changes.
-3. If a long-running server was started only for the bug fix, stop it unless the user asked to keep it running. If the server is the owner-facing dev API/web process they are currently testing, mention whether it was left running.
-4. Do not update changelog here; if the owner asks for `/commit`, that workflow writes changelog for the commit being created.
-5. If tests cannot run, write the reason in the final response.
-
-## Completion Notification
-
-Before the final response, call `.codex/scripts/notify-task.sh` from the repo root:
-
-- `done` when the bug fix is complete.
-- `blocked` when owner input is needed before continuing.
-- `failed` when reproduction, implementation, or checks fail and the task cannot be finished in this turn.
-
-Use a concrete task label such as `/fix bug <short topic>`. Keep the message short, outcome-focused, and free of secrets. Notification failure must not block the final response.
-
-## Final Response
-
-Keep the final answer useful, but do not over-compress the technical explanation. The owner is non-coding but wants to learn the technical flow. Include:
-
-- Nguyên nhân bug: what broke, why it broke, and where it happened.
-- Cách xử lý: explain what changed, why it fixes the root cause, and the applied technical flow through the touched code.
-- `Giải thích kỹ thuật dễ hiểu`:
-  - Mục tiêu kỹ thuật của fix.
-  - Luồng code trước khi lỗi xảy ra và luồng code sau khi sửa.
-  - Kỹ thuật đã dùng để xử lý: validation, config, controller/service, Prisma, hook/state, worker/provider, etc.; explain the role instead of only naming tools.
-  - Vì sao cách sửa này đúng root cause and does not expand scope.
-  - File quan trọng: where the symptom appeared, where the root cause lived, and where the fix was applied.
-  - Bạn nên hiểu gì sau bug này: 2-4 lessons learned.
-- Verification: commands run and result.
-- Files changed.
-- Notes: restart required, env/config needed, TODO/ASSUMPTION, or execution plan update.
-- Next action: the next check or likely `/task-ui`, `/task-connect`, or `/task-full` command if the bug blocks roadmap work. When recommending a roadmap command, include the task `Mode` and a one-sentence description of what that task does.
-
-Do not merge cause and fix into a vague summary. If the root cause is uncertain, say what was confirmed, what remains an assumption, and how the fix was verified.
-
-In `Cách xử lý` and `Giải thích kỹ thuật dễ hiểu`, describe the flow path, not just tool names. Examples:
-
-- Front-end: page/component -> hook/API client -> state/cache -> UI update.
-- Back-end: controller -> DTO/guard/validation -> service -> Prisma/external provider -> response.
-- Worker/AI: API -> BullMQ job -> worker/provider -> DB/status/cache.
-- Docs/config-only: say there is no runtime code flow.
-
-## Learning Notes
-
-After a bug fix, update `docs/learning-notes/` only when the bug teaches a reusable lesson.
-
-- Read `docs/learning-notes/README.md` and `docs/learning-notes/index.md` first.
-- Prefer updating the affected feature note in `docs/learning-notes/features/`.
-- Use `docs/learning-notes/foundation/` for reusable config/tooling/database/worker lessons.
-- Add the lesson under `Luồng lỗi thường gặp`, `Kiến thức cần nhớ`, or the most relevant section.
-- Do not store one-off symptoms, stack traces, secrets, private URLs, or noisy logs.
-- Do not copy the final response verbatim.
-- Do not update changelog when learning notes change; `/commit` will record the commit's main changes.
-- If not updated, mention briefly in the final response.
-
-## Changelog
-
-Do not write bug-fix changelog entries in this workflow. Changelog is written only during `/commit`, with one short, coherent entry for the whole commit.
+Report the confirmed cause, the narrow fix and technical flow, changed files, verification, and any restart, assumption, or unresolved item. Keep isolated fixes concise; for complex bugs, explain the before/after flow and reusable lesson in plain language. Update `docs/learning-notes/` only when the lesson is genuinely durable, after reading that folder's README and index.

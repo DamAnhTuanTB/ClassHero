@@ -1,19 +1,19 @@
 # Hệ thống học theo lộ trình
 
-MVP hệ thống học theo lộ trình, tổ chức dưới dạng Turborepo:
+MVP tổ chức dạng Turborepo:
 
 ```txt
 apps/web           Next.js front-end
-apps/api           NestJS API và worker source
-packages/shared    Type, schema, constant dùng chung
-docs/              Tài liệu sản phẩm/kỹ thuật
-.codex/            Skill, prompt, context và plan cho Codex
+apps/api           NestJS API và worker
+packages/shared    Type/schema/constant dùng chung
+docs               Product/technical docs
+.codex             Skill, context và plan cho Codex
 ```
 
-README là cửa vào vận hành. Bản đồ tài liệu nằm ở `docs/00-docs-map.md`; luật
-làm việc của Codex nằm ở `AGENTS.md` và `.codex/skills/*/SKILL.md`.
+README chỉ hướng dẫn vận hành nhanh. Định tuyến tài liệu nằm tại
+`docs/00-docs-map.md`; luật Codex nằm tại `AGENTS.md` và skill đang được kích hoạt.
 
-## 1. Cài đặt
+## Cài đặt
 
 Yêu cầu: Node.js, pnpm `11.10.0` và Docker Desktop/Engine.
 
@@ -24,28 +24,31 @@ cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env.local
 ```
 
-`apps/api/.env` là nguồn cấu hình duy nhất cho API, worker, Docker Compose và hạ
-tầng local. `apps/web/.env.local` chỉ dành cho runtime web: biến public
-`NEXT_PUBLIC_*` và secret server-side do route Next.js sở hữu như
-`YOUTUBE_API_KEY`. Không đặt OpenAI/Mathpix/backend secret trong file web. API và
-worker không đọc root `.env`; `.env.example` chỉ là template và không được dùng
-làm env runtime. Không commit file env thật.
+`apps/api/.env` là nguồn cấu hình API, worker, Docker Compose và hạ tầng local.
+`apps/web/.env.local` chỉ chứa biến public `NEXT_PUBLIC_*` hoặc secret server-side
+do Next.js sở hữu như `YOUTUBE_API_KEY`. Không đặt backend/provider secret trong
+web env, không dùng `.env.example` làm runtime env và không commit env thật.
 
-Mọi lệnh Compose phải truyền `--env-file apps/api/.env` để cả container env và
-các biến nội suy như host port cùng đọc đúng một nguồn.
+Mọi lệnh Compose phải truyền `--env-file apps/api/.env`.
 
-## 2. Chạy local
+## Chạy local
 
-Khởi động Postgres và Redis, apply migration, seed rồi chạy web/API:
+Cách khuyến nghị: application chạy bằng pnpm, hạ tầng chạy trong Docker.
 
 ```bash
-docker compose --env-file apps/api/.env up -d postgres redis
+docker compose --env-file apps/api/.env up -d postgres redis minio tex-renderer
 pnpm --filter @learning-path/api prisma migrate dev
 pnpm --filter @learning-path/api db:seed
 pnpm dev
 ```
 
-Các địa chỉ mặc định:
+Hoặc chạy toàn bộ bằng Docker:
+
+```bash
+docker compose --env-file apps/api/.env up --build
+```
+
+Không chạy worker pnpm và worker Docker cùng lúc vì cả hai dùng chung Redis queue.
 
 ```txt
 Web:     http://localhost:3000
@@ -54,26 +57,10 @@ Health:  http://localhost:4000/api/v1/health
 Swagger: http://localhost:4000/api/docs
 ```
 
-Chọn một trong hai cách chạy application process; không chạy worker local và
-worker Docker cùng lúc vì cả hai sẽ lấy job từ cùng Redis queue.
-
-Chạy application bằng pnpm, chỉ giữ hạ tầng trong Docker (khuyến nghị khi dev):
-
-```bash
-docker compose --env-file apps/api/.env up -d postgres redis minio tex-renderer
-pnpm dev
-```
-
-Hoặc chạy toàn bộ application bằng Docker:
-
-```bash
-docker compose --env-file apps/api/.env up --build
-```
-
-DBeaver local dùng `localhost:5432`, database `learning_path_dev`, user/password
+DBeaver local: `localhost:5432`, database `learning_path_dev`, user/password
 `postgres`.
 
-## 3. Kiểm tra thường dùng
+## Kiểm tra thường dùng
 
 ```bash
 pnpm typecheck
@@ -83,96 +70,52 @@ pnpm format:check
 pnpm format
 ```
 
-Auth UI E2E:
+Auth UI E2E và browser dependency:
 
 ```bash
 pnpm --filter @learning-path/web e2e:auth-ui
 pnpm --filter @learning-path/web exec playwright install chromium
 ```
 
-Chỉ sinh/lưu screenshot khi command hoặc yêu cầu có từ `screenshot`.
+Chỉ lưu screenshot khi command hoặc owner yêu cầu.
 
-## 4. Cách đọc docs
+## Docs và lệnh Codex
 
-Luồng mặc định cho một task:
-
-```txt
-AGENTS.md
--> docs/00-docs-map.md nếu cần định tuyến
--> docs/09-implementation-plan.md
--> docs/implementation/Mx.md theo mã task
--> docs domain liên quan
--> code hiện tại
-```
-
-Các index chính:
-
-| Phạm vi                | File                                                                                                                   |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Scope và flow          | `docs/01-product-scope.md`, `docs/02-user-flows.md`                                                                    |
-| Kiến trúc/env          | `docs/03-technical-architecture.md`, `docs/07-integration-and-env.md`                                                  |
-| Database/API           | `docs/04-database-model.md`, `docs/05-api-contract.md`                                                                 |
-| AI/RAG                 | `docs/06-ai-rag-spec.md`                                                                                               |
-| UI                     | `docs/08-ui-pages-and-components.md`, `docs/11-ui-design-system.md`                                                    |
-| Roadmap                | `docs/09-implementation-plan.md`, `docs/implementation/`                                                               |
-| Performance/SEO/source | `docs/12-performance-and-observability.md`, `docs/13-seo-and-content-discovery.md`, `docs/14-source-code-structure.md` |
-
-`docs/04-database-model.md` và `docs/05-api-contract.md` là index; khi chạm DB/API
-phải mở file domain tương ứng trong `docs/database/` hoặc `docs/api/`.
-
-## 5. Lệnh owner hay dùng
-
-| Mục tiêu                   | Lệnh                                                                                                  |
-| -------------------------- | ----------------------------------------------------------------------------------------------------- |
-| Chọn việc tiếp theo        | `/next-task`                                                                                          |
-| Làm trọn subtask           | `/task-full Mx.y`                                                                                     |
-| Lập plan trước             | `/task-full plan Mx.y`                                                                                |
-| Dựng UI bằng mock          | `/task-ui Mx.y`                                                                                       |
-| Sửa UI theo feedback       | `/change-ui ...`                                                                                      |
-| Nối UI với API thật        | `/task-connect Mx.y`                                                                                  |
-| Duyệt plan gần nhất        | `/do`                                                                                                 |
-| Sửa bug/refactor           | `/fix bug ...`, `/refactor ...`                                                                       |
-| Quản lý feature trong docs | `/add-feature ...`, `/update-feature ...`, `/delete-feature ...`, `/move-feature-to-next-version ...` |
-| Review docs/skill          | `/review-docs`                                                                                        |
-| Commit                     | `/commit`                                                                                             |
-
-Quy trình UI thường dùng:
+Với task có mã, luồng đọc mặc định là:
 
 ```txt
-/task-ui Mx.y
-/change-ui <góp ý>
-nói "ưng rồi" khi chốt UI
-/task-connect Mx.y
+AGENTS.md đã được runtime cung cấp
+→ block Mx.y trong docs/implementation/Mx.md
+→ section domain đúng bề mặt thay đổi
+→ code/call site/test và git status
 ```
 
-Các lệnh quản lý feature mặc định chỉ cập nhật docs/roadmap, chưa sửa production
-code. Changelog cũng chỉ được ghi trong workflow `/commit` khi commit thật sự
-được tạo.
+Không đọc toàn bộ các file trên. Dùng `docs/00-docs-map.md` để chọn context và
+xem bảng command đầy đủ.
 
-## 6. Điều khiển Codex qua Telegram
+```txt
+/next-task              chọn việc tiếp theo
+/task-full plan Mx.y    lập plan
+/do                     duyệt plan gần nhất
+/task-full Mx.y         làm trọn subtask
+/fix bug ...            sửa bug
+/review-docs            audit tài liệu/skill
+/commit                 commit và cập nhật changelog
+```
 
-Telegram notification/bot hiện đang tắt và chỉ bật lại khi owner yêu cầu rõ.
-Khi cần dùng, tạo `.codex/telegram/.env.local` từ
-`.codex/telegram/.env.example`, sau đó chạy:
+Feature-management commands mặc định chỉ sửa docs/roadmap. Codex không tự commit;
+changelog chỉ được cập nhật trong `/commit`.
+
+## Telegram local
+
+Telegram notification/bot đang tắt và chỉ bật lại khi owner yêu cầu. Khi cần,
+tạo `.codex/telegram/.env.local` từ `.codex/telegram/.env.example`, rồi chạy:
 
 ```bash
 .codex/scripts/run-telegram-bot.sh
 ```
 
-Các script `install-telegram-launch-agent.sh` và
-`uninstall-telegram-launch-agent.sh` dùng để cài/gỡ LaunchAgent macOS. Bot chỉ
-nhận lệnh từ `TELEGRAM_ALLOWED_CHAT_IDS`; các chat ID đã allow có quyền local đầy
-đủ với repo. Không commit `.env.local`, token, chat ID riêng hoặc transcript.
-
-## 7. Commit và bước tiếp theo
-
-Codex không tự commit. Khi muốn lưu thay đổi:
-
-```txt
-/commit
-/commit fast
-/commit full
-```
-
-Nếu chưa biết bắt đầu từ đâu, dùng `/next-task`; Codex sẽ đọc roadmap, context,
-changelog và trạng thái git để đề xuất subtask phù hợp.
+Bot chỉ nhận `TELEGRAM_ALLOWED_CHAT_IDS`; chat đã allow có toàn quyền local với
+repo. Không commit env, token, chat ID hoặc transcript. Các script
+`install-telegram-launch-agent.sh` và `uninstall-telegram-launch-agent.sh` dùng để
+cài/gỡ LaunchAgent macOS.

@@ -9,22 +9,22 @@ Use this skill to recommend what the owner should do next. Do not edit productio
 
 ## Workflow
 
-1. Read `AGENTS.md`.
-2. Read `README.md` for current workflow rules.
-3. Read `docs/00-docs-map.md` if present to orient the docs set.
-4. Read `docs/09-implementation-plan.md` and the relevant `docs/implementation/Mx.md` files.
-5. Read `docs/implementation/dependency-graph.md` and `docs/implementation/feature-coverage-matrix.md` if they exist.
-6. Check `.codex/context/current-context.md` and `.codex/plans/codex-execution-plan.md` if they exist.
-7. Check recent changelog entries in `.codex/changelog/`.
-8. Check `git status --short` to see whether there are uncommitted changes.
-9. Identify completed, blocked, and dependency-ready subtasks.
-10. For each recommended roadmap subtask, read its matching `docs/implementation/Mx.md` entry and extract:
+1. Apply the runtime-provided `AGENTS.md`; use the README/docs map only if a
+   workflow or routing detail is unclear.
+2. Read the roadmap order plus current context/execution plan needed to identify
+   candidates; use dependency/coverage entries for those candidates only.
+3. Read only the candidate subtask blocks in `docs/implementation/Mx.md`.
+4. Check recent changelog entries only when current context does not establish
+   whether a candidate was completed.
+5. Check `git status --short` to see whether there are uncommitted changes.
+6. Identify completed, blocked, and dependency-ready subtasks.
+7. For each recommended roadmap subtask, read its matching `docs/implementation/Mx.md` entry and extract:
 
 - `Mode`
 - task name/scope
 - a one-sentence description of what the task will implement or plan.
 
-11. Build a concise `Tài liệu nên đọc trước` list for the owner:
+8. Build a concise `Tài liệu nên đọc trước` list for the owner:
 
 - Focus on the few core docs that help the owner understand the next task, not every file Codex will read while coding.
 - Prefer 2-4 files by default; use 5 only when a task genuinely crosses domains.
@@ -33,16 +33,17 @@ Use this skill to recommend what the owner should do next. Do not edit productio
 - Include the exact milestone file and subtask heading, such as `docs/implementation/M1.md` -> `M1.2`.
 - Add the most useful domain overview/index doc and section, such as `docs/04-database-model.md` -> `Mapping file chi tiết` for DB tasks.
 - Add at most 1-2 child docs only when they are central to understanding the task, with their exact section if the file has multiple sections.
-- Do not list every related child file; Codex can still read the full required set from `AGENTS.md` before implementation.
+- Do not list every related child file; implementation will expand only the
+  contract sections activated by the actual change surface.
 
-12. Write `Phụ thuộc/lưu ý` as concrete status, not generic guidance:
+9. Write `Phụ thuộc/lưu ý` as concrete status, not generic guidance:
 
 - Say whether the worktree is clean or whether `/commit` should happen first.
 - Name the prerequisite task(s) already satisfied or still missing.
 - Name blockers, assumptions, or sequencing notes if any.
 - Do not write vague phrases like "đọc docs liên quan" unless followed by exact file paths.
 
-13. Recommend 1 primary next command and up to 2 alternatives.
+10. Recommend 1 primary next command and up to 2 alternatives.
 
 ## Completion Notification
 

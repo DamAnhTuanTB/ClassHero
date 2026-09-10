@@ -45,8 +45,11 @@ The task is complete only when every discovered, genuinely relevant cell is `APP
 
 ## Required Startup
 
-1. Read `AGENTS.md`.
-2. Read `docs/09-implementation-plan.md`, the relevant section of `docs/implementation/M9.md`, `docs/06-ai-rag-spec.md`, the AI prompt-cache section of `docs/12-performance-and-observability.md`, and `docs/14-source-code-structure.md`.
+1. Apply the runtime-provided `AGENTS.md`; do not reopen it mechanically.
+2. Read the relevant M9 subtask block, `docs/06-ai-rag-spec.md` quick-routing
+   section plus affected figure sections, the AI prompt-cache performance section,
+   and relevant back-end/shared source-structure sections. Search
+   `docs/09-implementation-plan.md` only when order/dependencies matter.
 3. Read API and database docs only when the requested change alters a persisted structure or public contract.
 4. Read applicable decision records for prompt ownership, subject routing, figure modes, and model routing.
 5. Read `.codex/plans/codex-execution-plan.md` when present and relevant.

@@ -1,97 +1,34 @@
-# Special-Case Prompts Cho Codex
+# Special-Case Prompt Fallbacks
 
-Dùng khi không gọi trực tiếp được slash skill. Nếu có skill tương ứng, ưu tiên skill.
+Chỉ dùng khi slash skill tương ứng không khả dụng.
 
-## 1. Task Chưa Rõ Subtask
+## Task chưa rõ mã
 
 ```txt
 Tôi muốn làm: <MÔ TẢ>.
 
-Yêu cầu:
-- Đọc AGENTS.md và docs/09-implementation-plan.md.
-- Tự map vào subtask gần nhất.
-- Đọc file milestone tương ứng trong docs/implementation/.
-- Đọc docs/14-source-code-structure.md nếu task có sửa code.
-- Đọc docs liên quan theo Task Routing Map.
-- Nếu có thể thuộc nhiều subtask, hỏi lại hoặc ghi ASSUMPTION.
-- Chỉ code khi phạm vi rõ.
+Dùng AGENTS.md và docs/00-docs-map.md để map vào subtask/Mode gần nhất. Đọc đúng
+block milestone và contract section liên quan. Nếu có nhiều cách hiểu làm đổi
+scope, hỏi một câu ngắn; chỉ code khi phạm vi đã đủ rõ.
 ```
 
-## 2. Feature Management
-
-Ưu tiên dùng:
+## Docs-only
 
 ```txt
-/add-feature <MÔ TẢ>
-/update-feature <MÔ TẢ>
-/delete-feature <MÔ TẢ>
-/move-feature-to-next-version <MÔ TẢ>
+Hãy cập nhật tài liệu, không sửa production code: <MÔ TẢ>.
+
+Xác định source of truth và các index/routing bị ảnh hưởng; giữ API/database/AI/UI/
+env/roadmap nhất quán. Không cập nhật changelog hoặc commit nếu tôi chưa yêu cầu.
 ```
 
-Quy tắc:
-
-- Mặc định chỉ cập nhật docs/source of truth/roadmap/task code.
-- Không code production nếu owner không nói rõ.
-- Nếu thêm feature lớn, tạo/gợi ý mã task mới trong `docs/implementation/Mx.md`.
-- Nếu đổi feature, sửa scope/Done/dependency của task hiện có nếu phù hợp.
-- Nếu xóa feature, đánh dấu task removed/out of scope hoặc bỏ khỏi thứ tự hiện tại.
-- Nếu hoãn feature, đánh dấu deferred/next version, không xóa.
-- Sau khi xong, gợi ý bước tiếp theo kèm mã task nếu xác định được.
-
-## 3. UI Work
+## Review-only
 
 ```txt
-/task-ui <MÃ SUBTASK>
-/change-ui <MÀN/CHỖ CẦN SỬA>
-/task-connect <MÃ SUBTASK>
+Hãy review <MODULE/FLOW/DIFF>, chưa sửa code.
+
+Đọc đúng contract và code/test liên quan. Trả findings theo mức độ, kèm evidence,
+affected path và missing verification; không suy đoán khi thiếu dữ liệu.
 ```
 
-Ghi nhớ:
-
-- `/task-ui`: chỉ UI với mock data, không connect API thật.
-- `/change-ui`: chỉ sửa UI theo feedback, không chốt docs UI cho đến khi owner nói "ưng/chốt".
-- `/task-connect`: nếu API chưa có thì code API đầy đủ theo task rồi nối UI.
-- UI phải mobile-first và ổn trên tablet/iPad, desktop.
-- UI public/indexable phải giữ cấu trúc SEO; flow nhạy độ trễ phải đọc performance docs.
-- UI code phải tuân thủ `docs/14-source-code-structure.md`: route/page compose screen, mỗi screen dùng `screens/<screen>/index.tsx` và component local trong `screens/<screen>/components`, shared component nằm ở `apps/web/components/{common,admin,student,parent}`, mỗi `.tsx` một component implementation chính.
-- UI form, modal, detail grid, action control, upload preview, badge/status và loading/empty/error state phải đối chiếu routing index trong `docs/ui-references/code-patterns.md` và file/section phù hợp trong `docs/ui-references/code-patterns/` trước khi tự viết biến thể mới.
-
-## 4. Bug, Refactor, Commit
-
-```txt
-/fix bug <MÔ TẢ LỖI>
-/refactor <MÃ TASK/TÍNH NĂNG/MODULE>
-/commit
-```
-
-Ghi nhớ:
-
-- `/fix bug`: tìm root cause, sửa nhỏ nhất, giải thích nguyên nhân và cách xử lý.
-- `/refactor`: không đổi behavior/API/schema/UI design; nếu cần đổi behavior thì dùng `/update-feature`; refactor phải bám `docs/14-source-code-structure.md`.
-- `/commit`: không sửa code production, chỉ kiểm tra diff, ghi changelog cho commit rồi commit.
-
-## 5. Docs-Only Fallback
-
-```txt
-Hãy cập nhật tài liệu, không sửa code: <MÔ TẢ>.
-
-Yêu cầu:
-- Đọc AGENTS.md.
-- Xác định docs bị ảnh hưởng.
-- Nếu đổi API/database/AI/UI/env, cập nhật cả index và file con tương ứng.
-- Nếu đổi rule tổ chức source code, cập nhật `docs/14-source-code-structure.md`, `AGENTS.md` và skill liên quan.
-- Nếu đổi hoặc chốt pattern code UI tái sử dụng, cập nhật `docs/ui-references/code-patterns.md`, file phù hợp trong `docs/ui-references/code-patterns/` và skill/prompt liên quan.
-- Nếu ảnh hưởng roadmap, cập nhật docs/09-implementation-plan.md hoặc docs/implementation/Mx.md.
-- Không cập nhật changelog trong fallback docs-only; changelog sẽ được ghi nếu owner yêu cầu `/commit`.
-```
-
-## 6. Security/Review Fallback
-
-```txt
-Hãy review: <MODULE/FLOW/DIFF>.
-
-Yêu cầu:
-- Đọc AGENTS.md và docs liên quan.
-- Không sửa code ngay nếu chưa được yêu cầu.
-- Trả findings trước, ưu tiên bug/rủi ro/hồi quy/missing tests.
-```
+Các trường hợp khác dùng skill: `/fix bug`, `/refactor`, `/change-ui`,
+`/task-connect`, `/review-docs` hoặc `/commit`.

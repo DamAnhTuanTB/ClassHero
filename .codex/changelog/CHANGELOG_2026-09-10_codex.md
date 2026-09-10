@@ -1,0 +1,3 @@
+- 2026-09-10: Streamlined Codex repository guidance, task skills, agent profiles, and execution pointers for focused context loading and safer handoffs.
+- 2026-09-10: Added the M15.9 admin Video Summary AI flow, including independent persistence, API and worker processing, configuration, admin review UI, shared content rendering, migrations, tests, and contracts.
+- 2026-09-10: Improved M7 student Quiz, Flashcard, and Test runners with keyboard navigation, preserved Flashcard solutions, clearer completion actions, and focused regression coverage.

@@ -9,23 +9,23 @@ Use this skill to audit Codex guidance files. Stay docs/skills/prompts focused u
 
 ## Workflow
 
-1. Read `AGENTS.md`, `README.md`, and the docs indexes:
-   - `docs/00-docs-map.md` if present.
-   - `docs/09-implementation-plan.md`
-   - `docs/04-database-model.md`
-   - `docs/05-api-contract.md`
-   - `docs/12-performance-and-observability.md` if present.
-   - `docs/13-seo-and-content-discovery.md` if present.
-   - `docs/14-source-code-structure.md` if present.
-   - `docs/ui-references/code-patterns.md` if present.
-   - matching files in `docs/ui-references/code-patterns/` when the review touches UI code-pattern workflow.
-   - `docs/ui-references/approved-patterns.md` if present.
-   - `docs/implementation/dependency-graph.md` if present.
-   - `docs/implementation/feature-coverage-matrix.md` if present.
-   - `docs/decisions/README.md` if present.
-   - `.codex/context/current-context.md` and `.codex/context/code-index.md` if present.
-2. Inspect `.codex/skills/*/SKILL.md` and `.codex/prompts/*.md`.
-3. Check for:
+1. Classify the review scope before reading:
+   - Narrow review: one docs area, command, workflow, stale path, or reported
+     contradiction. Read the relevant `AGENTS.md` section, `README.md`/docs map
+     entry, the target files, and only indexes/contracts they directly reference.
+   - Broad review: the owner explicitly asks to audit the full docs/skills set or
+     the issue crosses many areas. Then inspect the main indexes, dependency and
+     coverage docs, decisions index, context indexes, skills, and prompts.
+2. Treat a runtime-injected current `AGENTS.md` as already read. Do not reopen it
+   or any index in full unless exact lines are needed or the worktree version may
+   differ.
+3. Use headings/search to select sections in long docs. Read matching child files
+   only when the review touches that domain; for example, inspect UI pattern files
+   only for UI workflow review and performance/SEO/source-structure sections only
+   when those rules are in scope.
+4. Inspect `.codex/skills/*/SKILL.md` and `.codex/prompts/*.md` that mention or own
+   the reviewed workflow. Scan the full set only for a broad consistency audit.
+5. Check for:
    - stale command names such as old `/task` runner references;
    - wrong paths after docs were split;
    - overlapping or conflicting skill responsibilities;
@@ -36,13 +36,17 @@ Use this skill to audit Codex guidance files. Stay docs/skills/prompts focused u
    - stale current context, code index, feature coverage, dependency graph, or decision log references;
    - overly long repeated rules that should live in `AGENTS.md` or README instead.
    - context/index files that have become history logs instead of routing aids.
-4. If the user asks to fix, or the issue is an obvious docs-only correction, patch the relevant docs.
-5. Do not update changelog in this workflow. Changelog is written only during `/commit` for the commit being created.
-6. Run lightweight checks such as `rg` for stale references, `pnpm format:check`, and `git diff --check` when relevant.
+6. If the user asks to fix, or the issue is an obvious docs-only correction, patch the relevant docs.
+7. Do not update changelog in this workflow. Changelog is written only during `/commit` for the commit being created.
+8. Run lightweight checks such as `rg` for stale references, `pnpm format:check`, and `git diff --check` when relevant.
 
 ## Brevity Guard
 
 - Index files should route to the source of truth, not repeat its detailed contract.
+- A normal task should have a minimal context packet: exact subtask block, exact
+  domain/contract sections, touched code/call sites/tests, and worktree status.
+  Do not require full roadmap, milestone, UI, performance, source-structure, or
+  context files when a section/entry answers the task.
 - Keep `.codex/context/current-context.md` to the active direction, current
   subtask/status, latest relevant checks, blockers and links. Target roughly
   `<= 150` lines; move historical audits to ADRs, plans or artifacts.

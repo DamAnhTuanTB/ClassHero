@@ -31,14 +31,14 @@ Parse:
 
 Before generating any design image, read these sources:
 
-1. `AGENTS.md`
-2. `docs/11-ui-design-system.md`
-3. `docs/ui-references/approved-patterns.md`
-4. `docs/ui-references/code-patterns.md`
-5. `docs/08-ui-pages-and-components.md`
-6. `docs/09-implementation-plan.md`
-7. Relevant `docs/implementation/M*.md` when the target names a milestone/subtask
-8. Existing route/screen/component code for the closest implemented screen
+1. Runtime-provided `AGENTS.md`; do not reopen mechanically.
+2. Relevant token/component/responsive sections in `docs/11-ui-design-system.md`.
+3. Matching role/screen section in `docs/ui-references/approved-patterns.md`.
+4. Routing index in `docs/ui-references/code-patterns.md`.
+5. Affected screen/role section in `docs/08-ui-pages-and-components.md`.
+6. Exact subtask block in `docs/implementation/M*.md` when named; search the
+   roadmap only when order/dependencies matter.
+7. Existing route/screen/component code for the closest implemented screen.
 
 Then read only the relevant code-pattern files under `docs/ui-references/code-patterns/` based on the screen type:
 

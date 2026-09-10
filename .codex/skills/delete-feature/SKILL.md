@@ -23,11 +23,11 @@ If the feature or removal depth is unclear, ask one concise question.
 
 Before editing:
 
-1. Read `AGENTS.md`.
-2. Read `docs/01-product-scope.md` and `docs/02-user-flows.md`.
-3. Read `docs/09-implementation-plan.md` and relevant `docs/implementation/Mx.md` files.
-4. Read `docs/implementation/dependency-graph.md` and `docs/implementation/feature-coverage-matrix.md` if they exist.
-5. Read affected domain docs:
+1. Apply the runtime-provided `AGENTS.md`; do not reopen it mechanically.
+2. Read only product-scope and user-flow sections containing the feature.
+3. Search roadmap/milestone files for the feature and read the matching task blocks.
+4. Read only affected dependency-graph and coverage-matrix entries.
+5. Read only affected sections/files in domain docs:
    - UI: `docs/08-ui-pages-and-components.md`, `docs/11-ui-design-system.md`.
    - API: `docs/05-api-contract.md` and matching `docs/api/` file.
    - Database: `docs/04-database-model.md` and matching `docs/database/` file.

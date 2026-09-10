@@ -23,19 +23,20 @@ If the target code area is unclear, ask one concise question. If the request ask
 
 Before editing:
 
-1. Read `AGENTS.md`.
-2. If a task code is provided, read `docs/09-implementation-plan.md` and the matching `docs/implementation/Mx.md`.
-3. Read `docs/14-source-code-structure.md`.
-4. Use the `Task Routing Map` in `AGENTS.md` to read only directly relevant docs.
-5. If API/database/AI/UI surfaces are touched, read the matching index and domain docs:
+1. Apply the runtime-provided `AGENTS.md`; do not reopen it mechanically.
+2. If a task code is provided, read its complete block in
+   `docs/implementation/Mx.md`; search the roadmap only when order/dependencies matter.
+3. Read mandatory principles + the front-end/back-end/shared sections relevant to
+   the target in `docs/14-source-code-structure.md`.
+4. Use the Task Routing Map to read only directly affected contract sections:
    - API: `docs/05-api-contract.md` and matching `docs/api/` file.
    - Database: `docs/04-database-model.md` and matching `docs/database/` file.
    - UI: `docs/08-ui-pages-and-components.md`, `docs/11-ui-design-system.md`.
    - AI/RAG: `docs/06-ai-rag-spec.md`.
-6. If the refactor targets performance, latency, cache, query shape, worker throughput, or AI/RAG speed, read `docs/12-performance-and-observability.md`.
-7. If the refactor touches public/indexable page structure, metadata, slug, sitemap, robots, canonical, Open Graph or structured data, read `docs/13-seo-and-content-discovery.md`.
-8. Inspect current code, tests, call sites, and `git status --short`.
-9. Give a short plan: target area, intended refactor, source layers/boundaries to enforce, behavior-preservation checks, files likely touched.
+5. For performance/SEO triggers, read the general principles plus the exact layer
+   or public-route section, not the whole file.
+6. Inspect current code, tests, call sites, and `git status --short`.
+7. Give a short plan: target area, intended refactor, boundaries, checks, and files.
 
 ## Refactor Rules
 

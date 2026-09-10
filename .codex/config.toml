@@ -5,7 +5,7 @@ default_subagent_model = "gpt-5.6-terra"
 default_subagent_reasoning_effort = "medium"
 
 [agents.coordinator]
-description = "Điều phối implementation plan, phân batch, giao đúng agent và tổng hợp kết quả."
+description = "Chỉ điều phối nguyên một nhánh lớn do parent giao; không spawn khi main/root đã trực tiếp điều phối."
 config_file = "./agents/coordinator.toml"
 
 [agents.implementer]

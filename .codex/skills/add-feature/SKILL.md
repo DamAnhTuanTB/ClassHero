@@ -22,12 +22,12 @@ If the description is too vague to define scope, ask one concise question.
 
 Before editing:
 
-1. Read `AGENTS.md`.
-2. Read `docs/01-product-scope.md` to check MVP fit.
-3. Read `docs/02-user-flows.md` to understand affected roles/flows.
-4. Read `docs/09-implementation-plan.md` and relevant `docs/implementation/Mx.md` files.
-5. Read `docs/implementation/dependency-graph.md` and `docs/implementation/feature-coverage-matrix.md` if they exist.
-6. Read affected domain docs:
+1. Apply the runtime-provided `AGENTS.md`; do not reopen it mechanically.
+2. Read the relevant product-scope and user-flow sections; use headings/search
+   first when the feature is new.
+3. Search the roadmap and matching milestone blocks needed to place/reuse a task code.
+4. Read only affected dependency-graph and coverage-matrix entries.
+5. Read only the affected sections/files in domain docs:
    - UI: `docs/08-ui-pages-and-components.md`, `docs/11-ui-design-system.md`.
    - API: `docs/05-api-contract.md` and matching/new `docs/api/` file.
    - Database: `docs/04-database-model.md` and matching/new `docs/database/` file.
@@ -35,9 +35,8 @@ Before editing:
    - Env/integration: `docs/07-integration-and-env.md`.
    - Performance/observability: `docs/12-performance-and-observability.md` if the feature adds or changes list/search/cache, latency-sensitive flow, database query, worker/job, AI call, or observability behavior.
    - SEO/public discovery: `docs/13-seo-and-content-discovery.md` if the feature adds public/indexable pages or metadata/search-discovery behavior.
-7. Inspect existing code only enough to understand existing boundaries; do not plan production edits unless the owner explicitly asks to implement now.
-8. Inspect `git status --short`.
-9. Give a short plan: MVP decision, docs to add/update, task code to add/reuse, and checks.
+6. Inspect existing code only enough to understand boundaries; inspect `git status --short`.
+7. Give a short plan: MVP decision, docs to add/update, task code, and checks.
 
 ## Scope Guard
 

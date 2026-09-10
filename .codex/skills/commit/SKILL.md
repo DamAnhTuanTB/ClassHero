@@ -41,7 +41,8 @@ Commit scope:
 Before committing:
 
 1. Locate repo root containing `AGENTS.md`.
-2. Read `AGENTS.md`, especially changelog and commit rules.
+2. Apply the runtime-provided changelog/commit rules from `AGENTS.md`; reopen only
+   if the worktree copy changed or exact wording is needed.
 3. Run `git status --short`.
 4. Inspect `git diff --stat`, `git diff --name-only`, staged diff if any, and file-level diffs needed to understand the change.
 5. Update `.codex/changelog/CHANGELOG_YYYY-MM-DD_codex.md` for each commit being created. Add one short, coherent changelog entry for each commit's actual staged scope.

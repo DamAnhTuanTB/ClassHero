@@ -22,11 +22,11 @@ If the change is too vague to identify the feature or desired behavior, ask one 
 
 Before editing:
 
-1. Read `AGENTS.md`.
-2. Read `docs/01-product-scope.md` and `docs/02-user-flows.md` for product impact.
-3. Read `docs/09-implementation-plan.md` and the matching file in `docs/implementation/` if the feature maps to a milestone.
-4. Read `docs/implementation/dependency-graph.md` and `docs/implementation/feature-coverage-matrix.md` if they exist.
-5. Read source-of-truth docs for affected domains:
+1. Apply the runtime-provided `AGENTS.md`; do not reopen it mechanically.
+2. Read only the affected product-scope and user-flow sections.
+3. Search the roadmap and read the matching subtask block if the feature maps to a milestone.
+4. Read only affected dependency-graph and coverage-matrix entries.
+5. Read only the affected sections/files in domain docs:
    - UI: `docs/08-ui-pages-and-components.md`, `docs/11-ui-design-system.md`.
    - API: `docs/05-api-contract.md` and matching `docs/api/` file.
    - Database: `docs/04-database-model.md` and matching `docs/database/` file.

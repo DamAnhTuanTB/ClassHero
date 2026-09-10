@@ -25,9 +25,9 @@ If no screen/subtask is named, infer it from the most recent UI work. If the con
 
 Before editing:
 
-1. Read `AGENTS.md`.
-2. Read `docs/ui-references/approved-patterns.md`.
-3. Read `docs/ui-references/code-patterns.md`.
+1. Apply the runtime-provided `AGENTS.md`; do not reopen it mechanically.
+2. Read the matching role/screen section in `docs/ui-references/approved-patterns.md`.
+3. Read the routing index in `docs/ui-references/code-patterns.md`.
 4. Read only the relevant files in `docs/ui-references/code-patterns/` for UI flows touched by the approved work, such as form, modal, action/badge, detail layout, upload, state view, or admin CRUD.
 5. Read `docs/11-ui-design-system.md` only when the approval creates or confirms a broad design-system rule.
 6. Inspect the approved UI code and recent diff enough to identify the screen, files, visual choices, and possible reusable implementation patterns.
