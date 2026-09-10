@@ -344,7 +344,7 @@ test("lesson navigation stays visible and unlocks the next lesson after a passin
   await page.getByRole("button", { name: "Nộp bài thi" }).click();
   await expect(page.getByRole("heading", { name: "Kết quả Bài thi" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Dùng điểm bài này" })).toHaveCount(0);
-  await page.getByRole("button", { name: "Quay lại màn Bài thi" }).click();
+  await page.getByRole("button", { name: "Quay về bài học" }).click();
 
   await expect(nextLessonButton).toHaveCount(0);
   await expect(
@@ -1075,7 +1075,7 @@ test("lesson summary and quiz reveal feedback only after explicit actions", asyn
   await expect(page.getByRole("heading", { name: "Kết quả Quiz" })).toBeVisible();
   await expect(page.getByTestId("assessment-result-confetti")).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Quay lại màn Quiz" }).click();
+  await page.getByRole("button", { name: "Quay về bài học" }).click();
   await expect(page.getByRole("button", { name: "Xem lại", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Làm bộ Quiz mới" })).toBeVisible();
   await page.getByRole("button", { name: "Mở cài đặt Quiz" }).click();
@@ -1267,6 +1267,11 @@ test("flashcard reveals its detailed solution only after showing the back", asyn
       .locator(":scope > *")
       .evaluateAll((elements) => elements.map((element) => element.tagName)),
   ).toEqual(["P", "FIGURE", "DIV"]);
+  await page.getByRole("button", { name: "Lật thẻ xem mặt trước" }).click();
+  await expect(page.getByText("Lời giải", { exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Lật thẻ xem mặt sau" }).click();
+  await expect(page.getByText("Lời giải", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ẩn lời giải" })).toBeVisible();
   await expectNoFrameworkOverlay(page);
 });
 
@@ -1320,7 +1325,7 @@ test("flashcard uses the lesson entry panel, fullscreen runner, and fullscreen r
   await expect(page.getByRole("heading", { name: "Kết quả Flashcard" })).toBeVisible();
   await expect(page.getByTestId("assessment-result-confetti")).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Quay lại màn Flashcard" }).click();
+  await page.getByRole("button", { name: "Quay về bài học" }).click();
   await expect(page.getByRole("button", { name: "Xem lại", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Học bộ Flashcard mới" })).toBeVisible();
   await page.getByRole("button", { name: "Mở cài đặt Flashcard" }).click();
@@ -1952,6 +1957,42 @@ test("quiz arrow shortcuts preserve caret navigation while editing a text answer
   await expect(page.getByRole("button", { name: "Kiểm tra đáp án" })).toBeEnabled();
   await page.keyboard.press("Enter");
   await expect(page.getByText("Chính xác!")).toBeVisible();
+  await expectNoFrameworkOverlay(page);
+});
+
+test("flashcard arrow shortcuts navigate between cards", async ({ page }) => {
+  await setupStudentLearningApiMock(page, {
+    flashcardCardCount: 2,
+    testReady: false,
+    testPasses: false,
+  });
+  await page.goto(`/student/lessons/${lessonId}?tab=flashcard`);
+  await page.getByRole("button", { name: "Bắt đầu" }).click();
+
+  await expect(page.getByRole("heading", { name: "Thẻ 1/2" })).toBeVisible();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByRole("heading", { name: "Thẻ 2/2" })).toBeVisible();
+
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.getByRole("heading", { name: "Thẻ 1/2" })).toBeVisible();
+  await expectNoFrameworkOverlay(page);
+});
+
+test("test arrow shortcuts navigate between questions", async ({ page }) => {
+  await setupStudentLearningApiMock(page, {
+    testQuestionCount: 2,
+    testReady: true,
+    testPasses: false,
+  });
+  await page.goto(`/student/lessons/${lessonId}?tab=test`);
+  await page.getByRole("button", { name: "Bắt đầu bài thi" }).click();
+
+  await expect(page.getByRole("heading", { name: "Câu 1", exact: true })).toBeVisible();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByRole("heading", { name: "Câu 2", exact: true })).toBeVisible();
+
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.getByRole("heading", { name: "Câu 1", exact: true })).toBeVisible();
   await expectNoFrameworkOverlay(page);
 });
 

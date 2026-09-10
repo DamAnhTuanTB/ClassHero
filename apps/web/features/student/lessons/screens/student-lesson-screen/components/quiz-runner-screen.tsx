@@ -460,7 +460,7 @@ export function QuizRunnerScreen({
           ) : null}
 
           {!feedback ? (
-            <div className="mt-2">
+            <div className="mt-4">
               <div className="flex flex-wrap items-center gap-2">
                 {question.hintJson ? (
                   <button

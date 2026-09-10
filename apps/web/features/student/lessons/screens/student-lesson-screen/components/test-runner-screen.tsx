@@ -60,6 +60,15 @@ export function TestRunnerScreen({
   const isRunnerHistoryEntryActiveRef = useRef(false);
   const isSilentHistoryExitRef = useRef(false);
   const onBackRef = useRef(onBack);
+  const keyboardShortcutStateRef = useRef({
+    currentIndex,
+    isExitDialogOpen,
+    isPending: Boolean(pendingAction),
+    isSubmitConfirmOpen,
+    onNext,
+    onPrevious,
+    totalCount: attempt.questions.length,
+  });
 
   useEffect(() => {
     onBackRef.current = onBack;
@@ -101,17 +110,67 @@ export function TestRunnerScreen({
   }, [attempt.id, attempt.testSet.id]);
 
   const question = attempt.questions[currentIndex];
+  const totalCount = attempt.questions.length;
+  const isPending = Boolean(pendingAction);
+  keyboardShortcutStateRef.current = {
+    currentIndex,
+    isExitDialogOpen,
+    isPending,
+    isSubmitConfirmOpen,
+    onNext,
+    onPrevious,
+    totalCount,
+  };
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      const shortcutState = keyboardShortcutStateRef.current;
+
+      if (
+        event.defaultPrevented ||
+        event.isComposing ||
+        event.repeat ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey ||
+        shortcutState.isExitDialogOpen ||
+        shortcutState.isPending ||
+        shortcutState.isSubmitConfirmOpen ||
+        isTestAnswerEditingTarget(event.target)
+      ) {
+        return;
+      }
+
+      if (event.key === "ArrowLeft" && shortcutState.currentIndex > 0) {
+        event.preventDefault();
+        setShowIncompleteAlert(false);
+        shortcutState.onPrevious();
+        return;
+      }
+
+      if (
+        event.key === "ArrowRight" &&
+        shortcutState.currentIndex < shortcutState.totalCount - 1
+      ) {
+        event.preventDefault();
+        setShowIncompleteAlert(false);
+        shortcutState.onNext();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, []);
 
   if (!question) return null;
 
-  const totalCount = attempt.questions.length;
   const questionNumber = question.questionNumber ?? currentIndex + 1;
   const answeredQuestionIdSet = new Set(answeredQuestionIds);
   const incompleteQuestionNumbers = attempt.questions.flatMap((item, index) =>
     answeredQuestionIdSet.has(item.id) ? [] : [item.questionNumber ?? index + 1],
   );
   const progressPercent = ((currentIndex + 1) / Math.max(totalCount, 1)) * 100;
-  const isPending = Boolean(pendingAction);
 
   function dismissIncompleteAlert() {
     setShowIncompleteAlert(false);
@@ -305,6 +364,7 @@ export function TestRunnerScreen({
         <div className="mt-5 grid grid-cols-2 gap-3">
           <button
             type="button"
+            aria-keyshortcuts="ArrowLeft"
             disabled={currentIndex === 0 || isPending}
             onClick={() => {
               dismissIncompleteAlert();
@@ -317,6 +377,7 @@ export function TestRunnerScreen({
           </button>
           <button
             type="button"
+            aria-keyshortcuts="ArrowRight"
             disabled={currentIndex >= totalCount - 1 || isPending}
             onClick={() => {
               dismissIncompleteAlert();
@@ -361,5 +422,15 @@ export function TestRunnerScreen({
         onConfirm={() => void handleConfirmSubmit()}
       />
     </div>
+  );
+}
+
+function isTestAnswerEditingTarget(target: EventTarget | null) {
+  if (!(target instanceof Element)) return false;
+
+  return Boolean(
+    target.closest(
+      'input, textarea, select, math-field, [contenteditable="true"], [role="textbox"]',
+    ),
   );
 }

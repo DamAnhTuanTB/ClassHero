@@ -125,7 +125,7 @@ export function FlashcardRunnerScreen({
 
   useEffect(() => {
     setIsSolutionVisible(false);
-  }, [card.id, isBackVisible]);
+  }, [card.id]);
   const isConfirmedHistoryExitRef = useRef(false);
   const isMountedRef = useRef(true);
   const isRunnerHistoryEntryActiveRef = useRef(false);
@@ -288,6 +288,59 @@ export function FlashcardRunnerScreen({
   const isIncompleteAlertVisible =
     isIncompleteAlertRequested && incompleteCardNumbers.length > 0;
   const isInteractionLocked = Boolean(pendingAction);
+  const keyboardShortcutStateRef = useRef({
+    currentIndex,
+    isExitDialogOpen,
+    isInteractionLocked,
+    onNext: handleNext,
+    onPrevious: handlePrevious,
+    totalCount,
+  });
+  keyboardShortcutStateRef.current = {
+    currentIndex,
+    isExitDialogOpen,
+    isInteractionLocked,
+    onNext: handleNext,
+    onPrevious: handlePrevious,
+    totalCount,
+  };
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      const shortcutState = keyboardShortcutStateRef.current;
+
+      if (
+        event.defaultPrevented ||
+        event.isComposing ||
+        event.repeat ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey ||
+        shortcutState.isExitDialogOpen ||
+        shortcutState.isInteractionLocked
+      ) {
+        return;
+      }
+
+      if (event.key === "ArrowLeft" && shortcutState.currentIndex > 0) {
+        event.preventDefault();
+        shortcutState.onPrevious();
+        return;
+      }
+
+      if (
+        event.key === "ArrowRight" &&
+        shortcutState.currentIndex < shortcutState.totalCount - 1
+      ) {
+        event.preventDefault();
+        shortcutState.onNext();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, []);
 
   return (
     <div

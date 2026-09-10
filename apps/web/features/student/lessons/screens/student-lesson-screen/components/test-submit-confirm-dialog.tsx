@@ -99,7 +99,7 @@ export function TestSubmitConfirmDialog({
                 id="test-submit-dialog-title"
                 className="text-[15px] font-extrabold leading-tight text-[var(--theme-text-strong)] sm:text-base"
               >
-                {hasIncomplete ? "Cảnh báo bài chưa làm xong" : "Xác nhận nộp bài thi"}
+                {hasIncomplete ? "Cảnh báo bài thi chưa làm xong" : "Xác nhận nộp bài thi"}
               </h2>
             </header>
 
@@ -115,7 +115,7 @@ export function TestSubmitConfirmDialog({
                     .
                   </p>
                   <p className="text-xs font-semibold leading-5 text-[var(--theme-text-muted)]">
-                    Những câu chưa chọn sẽ không được tính điểm. Bạn vẫn muốn nộp bài chứ?
+                    Những câu chưa làm sẽ không được tính điểm. Bạn vẫn muốn nộp bài thi chứ?
                   </p>
                 </>
               ) : (

@@ -166,6 +166,19 @@ export function FlashcardResultScreen({
             <Sparkles className="h-5 w-5 shrink-0" aria-hidden="true" />
             Học bộ Flashcard mới
           </button>
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label="Quay về bài học"
+            className="student-preserve-mobile-shadow student-mobile-border col-span-2 inline-flex h-11 min-w-32 items-center justify-center justify-self-center gap-1.5 whitespace-nowrap rounded-xl border border-violet-200 bg-white px-4 text-sm font-black text-slate-700 shadow-[0_3px_0_rgb(221_214_254)] transition hover:bg-violet-50 hover:text-violet-700 active:translate-y-[2px] active:shadow-[0_1px_0_rgb(221_214_254)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-100 dark:border-violet-400/30 dark:bg-[var(--theme-surface)] dark:text-[var(--theme-text)] dark:shadow-[0_3px_0_rgb(76_29_149)] dark:hover:bg-[var(--theme-surface-soft)] dark:hover:text-violet-300 dark:active:shadow-[0_1px_0_rgb(76_29_149)] dark:focus-visible:ring-violet-500/30"
+          >
+            <ChevronLeft
+              className="h-5 w-5 shrink-0"
+              strokeWidth={2.8}
+              aria-hidden="true"
+            />
+            Trở về
+          </button>
         </div>
       </main>
     </div>
