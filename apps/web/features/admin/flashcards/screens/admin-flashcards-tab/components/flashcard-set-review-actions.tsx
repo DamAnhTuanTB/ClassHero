@@ -28,13 +28,14 @@ export function FlashcardSetReviewActions({
   const currentReviewStatus =
     reviewStatus === "APPROVED" ||
     reviewStatus === "NEEDS_REVIEW" ||
-    reviewStatus === "HIDDEN"
+    reviewStatus === "HIDDEN" ||
+    reviewStatus === "DRAFT"
       ? reviewStatus
-      : "NEEDS_REVIEW";
+      : "DRAFT";
 
   async function runAction(
     action: "SAVE" | "PUBLISH" | "WITHDRAW",
-    nextReviewStatus: "APPROVED" | "NEEDS_REVIEW" | "HIDDEN",
+    nextReviewStatus: "DRAFT" | "APPROVED" | "NEEDS_REVIEW" | "HIDDEN",
   ) {
     try {
       await reviewSet.mutateAsync({

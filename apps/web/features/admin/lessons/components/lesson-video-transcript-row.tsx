@@ -22,6 +22,7 @@ import {
   validateTranscriptField,
 } from "@/features/admin/lessons/schemas/lesson-video-transcript-schema";
 import { cn } from "@/lib/utils";
+import { resolveVideoPlaybackOffsetTime } from "@/lib/video-player-time";
 
 interface LessonVideoTranscriptRowProps {
   active: boolean;
@@ -29,8 +30,11 @@ interface LessonVideoTranscriptRowProps {
   getValues: UseFormGetValues<TranscriptFormValues>;
   index: number;
   isBusy: boolean;
+  isPlaybackTimeAvailable: boolean;
+  isOutsidePlayback: boolean;
   onPlayFromTime: (segment: TranscriptFormValues["segments"][number] | undefined) => void;
   onRemove: (index: number) => void;
+  playbackStartTime: number;
   register: UseFormRegister<TranscriptFormValues>;
   rowRefs: MutableRefObject<Record<number, HTMLDivElement | null>>;
   setTimelineRevision: Dispatch<SetStateAction<number>>;
@@ -45,8 +49,11 @@ function LessonVideoTranscriptRowComponent({
   getValues,
   index,
   isBusy,
+  isPlaybackTimeAvailable,
+  isOutsidePlayback,
   onPlayFromTime,
   onRemove,
+  playbackStartTime,
   register,
   rowRefs,
   setTimelineRevision,
@@ -56,7 +63,7 @@ function LessonVideoTranscriptRowComponent({
 }: LessonVideoTranscriptRowProps) {
   const { errors } = useFormState({
     control,
-    name: [`segments.${index}.timeString`, `segments.${index}.text`],
+    name: [`segments.${index}.sourceTimeString`, `segments.${index}.text`],
   });
 
   return (
@@ -65,11 +72,14 @@ function LessonVideoTranscriptRowComponent({
         rowRefs.current[index] = element;
       }}
       aria-current={active ? "true" : undefined}
+      aria-disabled={isOutsidePlayback || undefined}
       className={cn(
-        "grid gap-3 border-b border-l-4 border-b-[var(--theme-border)] border-l-transparent p-4 transition-[background-color,border-color,box-shadow] duration-200 last:border-b-0 sm:grid-cols-[7.5rem_minmax(0,1fr)_2.25rem]",
+        "grid gap-3 border-b border-l-4 border-b-[var(--theme-border)] border-l-transparent p-4 transition-[background-color,border-color,box-shadow] duration-200 last:border-b-0 sm:grid-cols-[7.5rem_7.5rem_minmax(0,1fr)_2.25rem]",
         active
           ? "border-l-[var(--theme-primary)] bg-[var(--theme-primary)]/10 shadow-sm ring-1 ring-inset ring-[var(--theme-primary)]/25"
-          : striped && "bg-[var(--theme-surface-sunken)]/65",
+          : isOutsidePlayback
+            ? "bg-[var(--theme-bg-hover)]/45 opacity-65"
+            : striped && "bg-[var(--theme-surface-sunken)]/65",
       )}
     >
       <div>
@@ -85,31 +95,62 @@ function LessonVideoTranscriptRowComponent({
         <input
           id={`transcript-time-${index}`}
           type="text"
+          value={isPlaybackTimeAvailable ? timeString || "—" : "—"}
+          disabled
+          readOnly
+          className={cn(
+            "h-10 w-full cursor-not-allowed rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input-bg-disabled)] px-3 text-sm font-bold text-[var(--theme-input-text-disabled)]",
+            active &&
+              "border-[var(--theme-primary)] text-[var(--theme-primary)] ring-2 ring-[var(--theme-primary)]/20",
+          )}
+        />
+      </div>
+
+      <div>
+        <label
+          htmlFor={`transcript-source-time-${index}`}
+          className="mb-1.5 block text-xs font-semibold text-[var(--theme-text-muted)]"
+        >
+          Thời gian gốc
+        </label>
+        <input
+          id={`transcript-source-time-${index}`}
+          type="text"
           inputMode="numeric"
-          {...register(`segments.${index}.timeString`, {
+          readOnly={isOutsidePlayback}
+          aria-disabled={isOutsidePlayback || undefined}
+          tabIndex={isOutsidePlayback ? -1 : undefined}
+          {...register(`segments.${index}.sourceTimeString`, {
             validate: (value) =>
-              validateTranscriptField(transcriptSegmentSchema.shape.timeString, value),
+              validateTranscriptField(
+                transcriptSegmentSchema.shape.sourceTimeString,
+                value,
+              ),
             onChange: (event: ChangeEvent<HTMLInputElement>) => {
-              const nextTimeString = event.target.value;
+              const nextSourceTimeString = event.target.value;
+              const sourceTime = transcriptTimestampPattern.test(nextSourceTimeString)
+                ? parseTranscriptTimestamp(nextSourceTimeString)
+                : undefined;
+              const playbackTime =
+                sourceTime === undefined
+                  ? undefined
+                  : resolveVideoPlaybackOffsetTime(sourceTime, playbackStartTime);
+              setValue(`segments.${index}.time`, playbackTime, {
+                shouldDirty: false,
+              });
               setValue(
-                `segments.${index}.time`,
-                transcriptTimestampPattern.test(nextTimeString)
-                  ? parseTranscriptTimestamp(nextTimeString)
-                  : undefined,
+                `segments.${index}.timeString`,
+                playbackTime === undefined ? "" : formatTranscriptTimestamp(playbackTime),
                 { shouldDirty: false },
               );
               setTimelineRevision((revision) => revision + 1);
             },
           })}
-          className={cn(
-            "h-10 w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-primary)]/10 px-3 text-sm font-bold text-[var(--theme-primary)] outline-none focus:border-[var(--theme-primary)] focus:ring-2 focus:ring-[var(--theme-primary)]/20",
-            active &&
-              "border-[var(--theme-primary)] ring-2 ring-[var(--theme-primary)]/20",
-          )}
+          className="h-10 w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 text-sm font-bold text-[var(--theme-text-strong)] outline-none focus:border-[var(--theme-primary)] focus:ring-2 focus:ring-[var(--theme-primary)]/20"
         />
-        {errors.segments?.[index]?.timeString && (
+        {!isOutsidePlayback && errors.segments?.[index]?.sourceTimeString && (
           <p className="mt-1 text-xs text-[var(--theme-danger)]">
-            {errors.segments[index]?.timeString?.message}
+            {errors.segments[index]?.sourceTimeString?.message}
           </p>
         )}
       </div>
@@ -124,13 +165,21 @@ function LessonVideoTranscriptRowComponent({
         <textarea
           id={`transcript-text-${index}`}
           rows={2}
+          readOnly={isOutsidePlayback}
+          aria-disabled={isOutsidePlayback || undefined}
+          tabIndex={isOutsidePlayback ? -1 : undefined}
           {...register(`segments.${index}.text`, {
             validate: (value) =>
               validateTranscriptField(transcriptSegmentSchema.shape.text, value),
           })}
           className="min-h-20 w-full resize-y rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-sm leading-6 text-[var(--theme-text-strong)] outline-none focus:border-[var(--theme-primary)] focus:ring-2 focus:ring-[var(--theme-primary)]/20"
         />
-        {errors.segments?.[index]?.text && (
+        {isOutsidePlayback && (
+          <span className="mt-1.5 inline-flex rounded-full border border-[var(--theme-border)] bg-[var(--theme-surface)] px-2 py-0.5 text-[0.7rem] font-bold text-[var(--theme-text-muted)]">
+            Ngoài đoạn phát
+          </span>
+        )}
+        {!isOutsidePlayback && errors.segments?.[index]?.text && (
           <p className="mt-1 text-xs text-[var(--theme-danger)]">
             {errors.segments[index]?.text?.message}
           </p>
@@ -141,7 +190,8 @@ function LessonVideoTranscriptRowComponent({
         <button
           type="button"
           onClick={() => onRemove(index)}
-          className="theme-button-danger flex h-9 w-9 items-center justify-center rounded-lg"
+          disabled={isBusy || isOutsidePlayback}
+          className="theme-button-danger flex h-9 w-9 items-center justify-center rounded-lg disabled:cursor-not-allowed disabled:opacity-40"
           aria-label={`Xóa đoạn bản chép lời ${index + 1}`}
           title="Xóa đoạn bản chép lời"
         >
@@ -150,7 +200,12 @@ function LessonVideoTranscriptRowComponent({
         <button
           type="button"
           onClick={() => onPlayFromTime(getValues(`segments.${index}`))}
-          disabled={isBusy || !transcriptTimestampPattern.test(timeString)}
+          disabled={
+            isBusy ||
+            isOutsidePlayback ||
+            !transcriptTimestampPattern.test(timeString) ||
+            !isPlaybackTimeAvailable
+          }
           className="theme-button-neutral flex h-9 w-9 items-center justify-center rounded-lg text-[var(--theme-primary)] disabled:cursor-not-allowed disabled:opacity-50"
           aria-label={`Phát video từ mốc ${timeString || index + 1}`}
           title="Phát video từ mốc này"
@@ -169,4 +224,16 @@ function parseTranscriptTimestamp(value: string) {
     .split(":")
     .map(Number)
     .reduce((total, part) => total * 60 + part, 0);
+}
+
+function formatTranscriptTimestamp(totalSeconds: number) {
+  const roundedSeconds = Math.max(0, Math.round(totalSeconds));
+  const hours = Math.floor(roundedSeconds / 3600);
+  const minutes = Math.floor((roundedSeconds % 3600) / 60);
+  const seconds = roundedSeconds % 60;
+  const secondsText = seconds.toString().padStart(2, "0");
+
+  return hours > 0
+    ? `${hours}:${minutes.toString().padStart(2, "0")}:${secondsText}`
+    : `${minutes}:${secondsText}`;
 }

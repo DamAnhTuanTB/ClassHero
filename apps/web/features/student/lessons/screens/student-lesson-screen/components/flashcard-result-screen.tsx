@@ -128,7 +128,7 @@ export function FlashcardResultScreen({
             aria-busy={pendingAction === "restart-unknown"}
             disabled={progress.unknownCount === 0 || pendingAction === "restart-unknown"}
             onClick={onRestartUnknown}
-            className="student-preserve-mobile-shadow inline-flex h-14 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-2xl border border-violet-400 bg-white px-1.5 text-sm font-black text-violet-700 shadow-[0_4px_0_rgb(221_214_254)] transition active:translate-y-[3px] active:shadow-[0_1px_0_rgb(221_214_254)] disabled:cursor-not-allowed disabled:opacity-45 dark:border-violet-400/50 dark:bg-[var(--theme-surface)] dark:text-violet-300 dark:shadow-[0_4px_0_rgb(76_29_149)] sm:px-3 sm:text-[17px]"
+            className="student-preserve-mobile-shadow student-mobile-border inline-flex h-14 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-2xl border border-violet-200 bg-white px-1.5 text-sm font-black text-violet-700 shadow-[0_4px_0_rgb(221_214_254)] transition active:translate-y-[3px] active:shadow-[0_1px_0_rgb(221_214_254)] disabled:cursor-not-allowed disabled:opacity-45 dark:border-violet-400/30 dark:bg-[var(--theme-surface)] dark:text-violet-300 dark:shadow-[0_4px_0_rgb(76_29_149)] sm:px-3 sm:text-[17px]"
           >
             <RotateCcw className="h-5 w-5 shrink-0" aria-hidden="true" />
             Ôn lại thẻ chưa thuộc
@@ -170,7 +170,7 @@ export function FlashcardResultScreen({
             type="button"
             onClick={onBack}
             aria-label="Quay về bài học"
-            className="student-preserve-mobile-shadow student-mobile-border col-span-2 inline-flex h-11 min-w-32 items-center justify-center justify-self-center gap-1.5 whitespace-nowrap rounded-xl border border-violet-200 bg-white px-4 text-sm font-black text-slate-700 shadow-[0_3px_0_rgb(221_214_254)] transition hover:bg-violet-50 hover:text-violet-700 active:translate-y-[2px] active:shadow-[0_1px_0_rgb(221_214_254)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-100 dark:border-violet-400/30 dark:bg-[var(--theme-surface)] dark:text-[var(--theme-text)] dark:shadow-[0_3px_0_rgb(76_29_149)] dark:hover:bg-[var(--theme-surface-soft)] dark:hover:text-violet-300 dark:active:shadow-[0_1px_0_rgb(76_29_149)] dark:focus-visible:ring-violet-500/30"
+            className="student-preserve-mobile-shadow student-mobile-border col-span-2 inline-flex h-14 w-1/2 items-center justify-center justify-self-center gap-1.5 whitespace-nowrap rounded-xl border border-violet-200 bg-white px-4 text-sm font-black text-violet-700 shadow-[0_3px_0_rgb(221_214_254)] transition hover:bg-violet-50 hover:text-violet-700 active:translate-y-[2px] active:shadow-[0_1px_0_rgb(221_214_254)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-100 dark:border-violet-400/30 dark:bg-[var(--theme-surface)] dark:text-violet-300 dark:shadow-[0_3px_0_rgb(76_29_149)] dark:hover:bg-[var(--theme-surface-soft)] dark:hover:text-violet-300 dark:active:shadow-[0_1px_0_rgb(76_29_149)] dark:focus-visible:ring-violet-500/30"
           >
             <ChevronLeft
               className="h-5 w-5 shrink-0"

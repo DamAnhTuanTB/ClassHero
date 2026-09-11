@@ -23,6 +23,8 @@ import {
   generatedFlashcardOutputSchema,
 } from "#api/modules/flashcards/types/flashcard-generation.types";
 import {
+  collectFlashcardMathSyntaxWarnings,
+  normalizeFlashcardLearnerText,
   toFlashcardSolutionTiptap,
   toFlashcardTiptap,
   validateGeneratedFlashcards,
@@ -209,15 +211,22 @@ export class FlashcardGenerationService {
       });
       const firstSortOrder = (lastCard?.sortOrder ?? -1) + 1;
       for (const [index, card] of output.cards.entries()) {
+        const normalizedCard = {
+          ...card,
+          front: normalizeFlashcardLearnerText(card.front),
+          back: normalizeFlashcardLearnerText(card.back),
+          solution: normalizeFlashcardLearnerText(card.solution),
+        };
+        const reviewWarnings = collectFlashcardMathSyntaxWarnings(normalizedCard);
         const cardId = randomUUID();
         await tx.flashcard.create({
           data: {
             id: cardId,
             flashcardSetId: set.id,
             lessonId: context.lessonId!,
-            frontJson: json(toFlashcardTiptap(card.front)),
-            backJson: json(toFlashcardTiptap(card.back)),
-            solutionJson: json(toFlashcardSolutionTiptap(card.solution)),
+            frontJson: json(toFlashcardTiptap(normalizedCard.front)),
+            backJson: json(toFlashcardTiptap(normalizedCard.back)),
+            solutionJson: json(toFlashcardSolutionTiptap(normalizedCard.solution)),
             difficulty: card.difficulty,
             reviewStatus: ReviewStatus.NEEDS_REVIEW,
             sortOrder: firstSortOrder + index,
@@ -232,13 +241,14 @@ export class FlashcardGenerationService {
               aiGenerationId: context.aiGenerationId,
               generationCardIndex: index,
               requiresSolutionFigure: card.requiresSolutionFigure,
+              ...(reviewWarnings.length > 0 ? { reviewWarnings } : {}),
             }),
           },
         });
         const baseFigureContext = {
           flashcardId: cardId,
-          front: card.front,
-          solution: card.solution,
+          front: normalizedCard.front,
+          solution: normalizedCard.solution,
           sourcePacketPageNumbers: card.sourcePacketPageNumbers,
           targetGrade: input.targetGrade,
           subject: {

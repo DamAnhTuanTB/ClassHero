@@ -3,7 +3,9 @@ import {
   readStemFigureDisplayScale,
 } from "@learning-path/shared";
 import { ReviewStatus } from "@prisma/client";
+import { serializeLessonSummaryContentJson } from "#api/modules/learning-paths/serializers/lesson-summary.serializers";
 import type { StudentLessonAccessContext } from "#api/modules/learning-paths/types/lesson.types";
+import { normalizeVideoSummaryDocument } from "#api/modules/learning-paths/utils/video-summary-output";
 import type {
   StudentFileAccessUrls,
   StudentLessonContentRecord,
@@ -70,6 +72,7 @@ export function serializeStudentLessonContent(
       title: document.title,
     })),
     summary: serializeStudentLessonSummary(record.summary, stemFigureAssetUrls),
+    videoSummary: serializeStudentVideoSummary(record.videoSummary),
     quizSets: record.quizSets.map(({ _count, ...set }) => ({
       ...set,
       questionCount: _count.questions,
@@ -86,6 +89,26 @@ export function serializeStudentLessonContent(
   };
 }
 
+export function serializeStudentVideoSummary(
+  record: StudentLessonContentRecord["videoSummary"],
+) {
+  if (
+    !record ||
+    record.deletedAt ||
+    record.staleAt ||
+    record.reviewStatus !== ReviewStatus.APPROVED
+  ) {
+    return null;
+  }
+
+  return {
+    id: record.id,
+    lessonId: record.lessonId,
+    contentJson: normalizeVideoSummaryDocument(record.contentJson),
+    updatedAt: record.updatedAt,
+  };
+}
+
 export function serializeStudentLessonSummary(
   record: StudentLessonSummaryRecord | null,
   stemFigureAssetUrls: ReadonlyMap<string, string | null> = new Map(),
@@ -97,20 +120,24 @@ export function serializeStudentLessonSummary(
   return {
     id: record.id,
     lessonId: record.lessonId,
-    contentJson: hydrateStemFigureReferences(
-      record.contentJson,
-      new Map(
-        record.stemFigures.map((figure) => [
-          figure.id,
-          {
-            status: "SUCCEEDED" as const,
-            figureIndex: figure.figureIndex,
-            altText: figure.currentRevision?.altText ?? "Hình minh họa STEM",
-            caption: figure.currentRevision?.caption ?? null,
-            assetUrl: stemFigureAssetUrls.get(figure.id) ?? null,
-            displayScale: readStemFigureDisplayScale(figure.currentRevision?.latexSource),
-          },
-        ]),
+    contentJson: serializeLessonSummaryContentJson(
+      hydrateStemFigureReferences(
+        record.contentJson,
+        new Map(
+          record.stemFigures.map((figure) => [
+            figure.id,
+            {
+              status: "SUCCEEDED" as const,
+              figureIndex: figure.figureIndex,
+              altText: figure.currentRevision?.altText ?? "Hình minh họa STEM",
+              caption: figure.currentRevision?.caption ?? null,
+              assetUrl: stemFigureAssetUrls.get(figure.id) ?? null,
+              displayScale: readStemFigureDisplayScale(
+                figure.currentRevision?.latexSource,
+              ),
+            },
+          ]),
+        ),
       ),
     ),
     source: record.source,

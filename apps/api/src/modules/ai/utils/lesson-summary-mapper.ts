@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import {
-  normalizeLessonSummaryAngleNotation,
   normalizeLessonSummaryNoteContent,
+  normalizeLearnerMathTextSyntax,
+  normalizeThreePointAngleNotation,
 } from "@learning-path/shared";
 
 import {
@@ -96,7 +97,9 @@ export function mapLessonSummaryProviderOutput(input: {
           `theorySections.${sourceSectionIndex}.items.${itemIndex}.note`;
         blocks.push({
           type: "note",
-          content: normalizeLessonSummaryNoteContent(item.note.content),
+          content: normalizeMathText(
+            normalizeLessonSummaryNoteContent(item.note.content),
+          ),
           sourcePageNumbers: item.note.sourcePageNumbers,
           figures: [],
         });
@@ -152,12 +155,11 @@ export function mapLessonSummaryProviderOutput(input: {
     const heading = requireText(sourceSection.displayHeading, "displayHeading");
     sections.push({
       order: sections.length + 1,
-      displayHeading: stripLeadingHeadingNumber(heading),
+      displayHeading: normalizeMathText(stripLeadingHeadingNumber(heading)),
       sourceEvidence: sourceSection.sourceEvidence,
       blocks,
     });
   }
-
   const applicationBlocks: LessonSummaryMvpBlock[] = [];
   const applicationExercises = [
     ...input.output.applicationExercises.standardExercises.map(
@@ -211,17 +213,31 @@ export function mapLessonSummaryProviderOutput(input: {
     });
   }
 
+  const objectiveCountIssue = buildObjectiveCountReviewIssue({
+    objectiveCount: input.output.objectives.length,
+    theorySectionCount: input.output.theorySections.length,
+  });
+
   const content = lessonSummaryOutputSchema.parse({
     lessonId: input.lessonId,
     targetGrade: input.targetGrade ?? null,
-    title: requireText(input.output.title, "title"),
-    objectives:
-      input.output.objectives && input.output.objectives.length > 0
-        ? input.output.objectives.map((value) => requireText(value, "objective"))
-        : null,
+    title: normalizeMathText(requireText(input.output.title, "title")),
+    objectives: input.output.objectives.map((objective) =>
+      normalizeMathText(requireText(objective, "objective")),
+    ),
     sections,
-    warnings: null,
-    warningDetails: null,
+    warnings: objectiveCountIssue ? [objectiveCountIssue.message] : null,
+    warningDetails: objectiveCountIssue
+      ? [
+          {
+            code: objectiveCountIssue.code,
+            path: objectiveCountIssue.path,
+            message: objectiveCountIssue.message,
+            severity: "WARNING",
+          },
+        ]
+      : null,
+    reviewIssues: objectiveCountIssue ? [objectiveCountIssue] : [],
   });
   return { content, figures, phaseOneBlocks, phaseOneProviderPaths };
 }
@@ -258,8 +274,8 @@ export function mapLessonSummaryProviderExampleBlock(
 function mapTheoryBlock(block: LessonSummaryProviderTheoryBlock): LessonSummaryMvpBlock {
   return {
     type: block.type,
-    title: requireText(block.title, "theory.title"),
-    content: requireText(block.content, `${block.type}.content`),
+    title: normalizeMathText(requireText(block.title, "theory.title")),
+    content: normalizeMathText(requireText(block.content, `${block.type}.content`)),
     sourcePageNumbers: block.sourcePageNumbers,
     figures: [],
   };
@@ -361,7 +377,7 @@ function normalizeSolution(value: string) {
 }
 
 function normalizeMathText(value: string) {
-  return normalizeLessonSummaryAngleNotation(value).trim();
+  return normalizeLearnerMathTextSyntax(normalizeThreePointAngleNotation(value)).trim();
 }
 
 function requireText(value: string, field: string) {
@@ -372,6 +388,28 @@ function requireText(value: string, field: string) {
 
 function stripLeadingHeadingNumber(value: string) {
   return value.replace(/^\s*(?:§\s*)?\d+(?:[.,]\d+)*(?:\s*[:.)-])?\s+/u, "").trim();
+}
+
+function buildObjectiveCountReviewIssue(input: {
+  objectiveCount: number;
+  theorySectionCount: number;
+}) {
+  if (input.objectiveCount === input.theorySectionCount) return null;
+  const code = "OBJECTIVE_SECTION_COUNT_MISMATCH";
+  const path = "objectives";
+  const message = `Có ${input.objectiveCount} kiến thức trọng tâm nhưng ${input.theorySectionCount} đề mục lý thuyết.`;
+  return {
+    id: `${code}-${fingerprint(input).slice(0, 12)}`,
+    code,
+    path,
+    message,
+    suggestion:
+      "Kiểm tra và chỉnh khối kiến thức trọng tâm để mỗi đề mục lý thuyết có đúng một ý tương ứng.",
+    technicalDetails: `objectives=${input.objectiveCount}; theorySections=${input.theorySectionCount}`,
+    fingerprint: fingerprint({ code, path, ...input }),
+    resolution: resolveLessonSummaryReviewIssueResolution(code),
+    accepted: false,
+  };
 }
 
 function fingerprint(value: unknown) {

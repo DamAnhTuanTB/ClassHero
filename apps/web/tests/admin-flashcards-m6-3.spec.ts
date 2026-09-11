@@ -86,8 +86,11 @@ test("admin creates a flashcard set and card from lesson detail", async ({ page 
   await page.getByRole("tab", { name: "Flashcard" }).click();
 
   await expect(page.getByRole("heading", { name: "Quản lý Flashcard" })).toBeVisible();
-  await expect(page.getByRole("tab", { name: /Công thức nền tảng/ })).toBeVisible();
+  const publishedSetTab = page.getByRole("tab", { name: /Công thức nền tảng/ });
+  await expect(publishedSetTab).toBeVisible();
+  await expect(publishedSetTab).toContainText("Đã phát hành - 1 flashcard");
   await expect(page.getByText("Định lý Pythagore")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Hủy duyệt" })).toBeVisible();
 
   await page.getByRole("button", { name: "Thêm bộ flashcard" }).click();
   const setDialog = page.getByRole("dialog", { name: "Tạo bộ flashcard" });
@@ -100,6 +103,7 @@ test("admin creates a flashcard set and card from lesson detail", async ({ page 
   await expect(flashcardTabs).toHaveCount(2);
   await expect(flashcardTabs.nth(0)).toContainText("Công thức nền tảng");
   await expect(flashcardTabs.nth(1)).toContainText("Khái niệm trọng tâm");
+  await expect(flashcardTabs.nth(1)).toContainText("Chưa phát hành");
   await expect(flashcardTabs.nth(1)).toHaveAttribute("aria-selected", "true");
 
   await page.getByRole("button", { name: "Thêm flashcard" }).first().click();
@@ -122,6 +126,7 @@ test("admin creates a flashcard set and card from lesson detail", async ({ page 
   await expect(
     activeSetPanel.getByText("Quãng đường đi được trong một đơn vị thời gian"),
   ).toBeVisible();
+  await expect(activeSetPanel.getByRole("button", { name: "Duyệt" })).toBeVisible();
   await expect(
     activeSetPanel.getByText("Lấy quãng đường chia cho thời gian chuyển động"),
   ).toBeVisible();
@@ -1104,7 +1109,7 @@ async function setupFlashcardApiMock(
         lessonId,
         title: body.title,
         source: "ADMIN",
-        reviewStatus: "APPROVED",
+        reviewStatus: "DRAFT",
         questionCount: 0,
         sortOrder: quizSets.length,
         _count: { questions: 0 },
@@ -1161,7 +1166,7 @@ async function setupFlashcardApiMock(
         title: body.title,
         difficulty: body.difficulty,
         source: "ADMIN",
-        reviewStatus: "APPROVED",
+        reviewStatus: "DRAFT",
         isReserve: false,
         cardCount: 0,
         sortOrder: sets.length,
@@ -1193,7 +1198,7 @@ async function setupFlashcardApiMock(
         flashcardSetId: setId,
         lessonId,
         ...body,
-        reviewStatus: "APPROVED",
+        reviewStatus: "NEEDS_REVIEW",
         sortOrder: cards.length,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),

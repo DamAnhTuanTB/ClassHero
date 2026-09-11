@@ -700,7 +700,11 @@ export function QuizLearningPanel({
         checkedCount: aggregateResult.totalCount,
         latestSubmittedAttempt: aggregateResult,
       });
-      await onProgressChanged();
+      void onProgressChanged().catch((error: unknown) => {
+        toast.error("Đã hoàn thành Quiz nhưng chưa làm mới được tiến độ", {
+          description: getErrorMessage(error),
+        });
+      });
       if (historyQuery.data) void historyQuery.refetch();
       return true;
     } catch (error) {
@@ -811,6 +815,8 @@ export function QuizLearningPanel({
   }
 
   if (result) {
+    const nextQuizSet = getNextNonEmptyQuizSet(lesson.quizSets, activeQuizSet);
+
     return renderWithCurtain(
       <QuizResultScreen
         result={result}
@@ -828,13 +834,7 @@ export function QuizLearningPanel({
         }
         onRestartIncorrect={() => void handleStart("INCORRECT", result.id)}
         onStartNewSet={() =>
-          void handleStart(
-            "ALL",
-            undefined,
-            getNextLearningSet(lesson.quizSets, activeQuizSet.id),
-            true,
-            "start-new-set",
-          )
+          void handleStart("ALL", undefined, nextQuizSet, true, "start-new-set")
         }
       />,
     );
@@ -881,10 +881,7 @@ export function QuizLearningPanel({
       attemptStatus?.state === "COMPLETED" ? attemptStatus.latestSubmittedAttempt : null;
     const isCompleted = completedAttempt !== null;
     const hasQuestions = activeQuizSet.questionCount > 0;
-    const nextQuizSet =
-      lesson.quizSets.length > 0
-        ? getNextLearningSet(lesson.quizSets, activeQuizSet.id)
-        : activeQuizSet;
+    const nextQuizSet = getNextNonEmptyQuizSet(lesson.quizSets, activeQuizSet);
     const entryActionLabel = getQuizEntryActionLabel(attemptStatus);
     const EntryActionIcon = isCompleted ? Eye : Play;
 
@@ -940,7 +937,9 @@ export function QuizLearningPanel({
             />
           </div>
           <p className="mt-3 text-sm font-semibold leading-6 text-slate-600 dark:text-[var(--theme-text-muted)] sm:mt-4 lg:text-base lg:leading-7">
-            Cùng luyện tập kiến thức vừa học xong nhé.
+            {isCompleted
+              ? "Bộ Quiz đã được hoàn thành. Cùng ôn tập lại nhé."
+              : "Cùng luyện tập kiến thức vừa học xong nhé."}
           </p>
           <div
             className={isCompleted ? "mt-4 grid gap-3 lg:grid-cols-2" : "mt-4 grid gap-3"}
@@ -976,7 +975,7 @@ export function QuizLearningPanel({
                 disabled={
                   nextQuizSet.questionCount === 0 || pendingAction === "start-new-set"
                 }
-                className="inline-flex min-h-14 w-full min-w-0 items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl border-2 border-sky-300 bg-white px-3 text-base font-black text-sky-700 transition hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-sky-400/50 dark:bg-[var(--theme-surface)] dark:text-sky-300 dark:hover:bg-sky-500/10 sm:px-5 sm:text-lg"
+                className="student-preserve-mobile-shadow inline-flex min-h-14 w-full min-w-0 items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl border-2 border-sky-300 bg-white px-3 text-base font-black text-sky-700 shadow-[0_3px_0_rgb(186_230_253),0_10px_16px_-13px_rgb(14_165_233_/_30%)] transition hover:bg-sky-50 active:translate-y-[2px] active:shadow-[0_1px_0_rgb(186_230_253),0_5px_10px_-12px_rgb(14_165_233_/_24%)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-sky-400/50 dark:bg-[var(--theme-surface)] dark:text-sky-300 dark:shadow-[0_3px_0_rgb(7_89_133_/_55%),0_10px_16px_-14px_rgb(14_165_233_/_20%)] dark:hover:bg-sky-500/10 sm:px-5 sm:text-lg"
               >
                 <RotateCcw className="h-6 w-6 shrink-0" aria-hidden="true" />
                 Làm bộ Quiz mới
@@ -1290,6 +1289,19 @@ function formatQuizScore(accuracyPercent: number) {
   return new Intl.NumberFormat("en-US", {
     maximumFractionDigits: 1,
   }).format(Number((accuracyPercent / 10).toFixed(1)));
+}
+
+function getNextNonEmptyQuizSet(
+  quizSets: readonly StudentQuizSet[],
+  activeQuizSet: StudentQuizSet,
+) {
+  return quizSets.some((quizSet) => quizSet.questionCount > 0)
+    ? getNextLearningSet(
+        quizSets,
+        activeQuizSet.id,
+        (quizSet) => quizSet.questionCount > 0,
+      )
+    : activeQuizSet;
 }
 
 function waitForCurtain(durationMs: number) {

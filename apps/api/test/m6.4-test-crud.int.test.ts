@@ -119,6 +119,8 @@ describe("M6.4 test CRUD integration", () => {
 
     expect(primary.durationSeconds).toBe(900);
     expect(primary.totalScore.toNumber()).toBe(10);
+    expect(primary.reviewStatus).toBe(ReviewStatus.DRAFT);
+    expect(secondary.reviewStatus).toBe(ReviewStatus.DRAFT);
     const sets = await service.listSetsByLesson("TEST", lessonId);
     expect(sets.map((set) => set.id)).toEqual([primary.id, secondary.id]);
     expect(sets.map((set) => set.sortOrder)).toEqual([0, 1]);
@@ -183,6 +185,9 @@ describe("M6.4 test CRUD integration", () => {
     });
 
     expect(multipleChoice.testSetId).toBe(primarySetId);
+    expect(multipleChoice.reviewStatus).toBe(ReviewStatus.NEEDS_REVIEW);
+    expect(multipleChoice.explanation?.reviewStatus).toBe(ReviewStatus.NEEDS_REVIEW);
+    expect(textInput.reviewStatus).toBe(ReviewStatus.NEEDS_REVIEW);
     expect(multipleChoice.explanation?.contentJson).toEqual(
       documentWithText("2 + 2 = 4."),
     );
@@ -241,6 +246,40 @@ describe("M6.4 test CRUD integration", () => {
       where: { id: firstQuestionId },
     });
     expect(published.publishedAt).toBeInstanceOf(Date);
+
+    await service.reviewQuestion({
+      kind: "TEST",
+      questionId: firstQuestionId,
+      userId: actorUserId,
+      dto: { reviewStatus: ReviewStatus.NEEDS_REVIEW },
+      context,
+    });
+    await expect(
+      prisma.testQuestion.findUniqueOrThrow({ where: { id: firstQuestionId } }),
+    ).resolves.toMatchObject({
+      publishedAt: null,
+      reviewStatus: ReviewStatus.NEEDS_REVIEW,
+    });
+    await expect(
+      prisma.testSet.findUniqueOrThrow({ where: { id: primarySetId } }),
+    ).resolves.toMatchObject({ reviewStatus: ReviewStatus.APPROVED });
+    await service.reviewQuestion({
+      kind: "TEST",
+      questionId: firstQuestionId,
+      userId: actorUserId,
+      dto: { reviewStatus: ReviewStatus.APPROVED },
+      context,
+    });
+    await service.reviewSet({
+      kind: "TEST",
+      setId: primarySetId,
+      userId: actorUserId,
+      dto: {
+        reviewStatus: ReviewStatus.APPROVED,
+        action: QuizSetReviewActionDto.SAVE,
+      },
+      context,
+    });
 
     await service.updateQuestion({
       kind: "TEST",

@@ -172,7 +172,32 @@ export function FlashcardSetPanel({
         });
       });
       return true;
-    }, [navigableCards, selectedCardIndex],
+    },
+    [navigableCards, selectedCardIndex],
+  );
+
+  const handleCardReview = useCallback(
+    async (target: AdminFlashcard, reviewStatus: "APPROVED" | "NEEDS_REVIEW") => {
+      try {
+        await reviewCard.mutateAsync({
+          flashcardId: target.id,
+          reviewStatus,
+        });
+        toast.success(
+          reviewStatus === "APPROVED" ? "Đã duyệt flashcard" : "Đã hủy duyệt flashcard",
+        );
+      } catch (error) {
+        toast.error(
+          getUserFacingErrorMessage(
+            error,
+            reviewStatus === "APPROVED"
+              ? "Chưa thể duyệt flashcard."
+              : "Chưa thể hủy duyệt flashcard.",
+          ),
+        );
+      }
+    },
+    [reviewCard],
   );
 
   useEffect(() => {
@@ -185,12 +210,35 @@ export function FlashcardSetPanel({
         event.ctrlKey ||
         event.metaKey ||
         event.shiftKey ||
-        (event.key !== "ArrowLeft" && event.key !== "ArrowRight") ||
-        document.querySelector('[role="dialog"][aria-modal="true"]') ||
-        isFlashcardNavigationShortcutTarget(event.target)
+        (event.key !== "Enter" &&
+          event.key !== "ArrowLeft" &&
+          event.key !== "ArrowRight") ||
+        document.querySelector('[role="dialog"][aria-modal="true"]')
       ) {
         return;
       }
+
+      if (event.key === "Enter") {
+        const canReviewSelectedCard =
+          selectedCard?.reviewStatus === "NEEDS_REVIEW" &&
+          Boolean(selectedCard.sourceMetadataJson?.aiGenerationId) &&
+          !(
+            reviewCard.isPending && reviewCard.variables?.flashcardId === selectedCard.id
+          );
+        if (
+          !selectedCard ||
+          !canReviewSelectedCard ||
+          isFlashcardReviewShortcutTarget(event.target)
+        ) {
+          return;
+        }
+
+        event.preventDefault();
+        void handleCardReview(selectedCard, "APPROVED");
+        return;
+      }
+
+      if (isFlashcardNavigationShortcutTarget(event.target)) return;
 
       const didNavigate = selectRelativeCard(event.key === "ArrowLeft" ? -1 : 1);
       if (didNavigate) event.preventDefault();
@@ -198,7 +246,13 @@ export function FlashcardSetPanel({
 
     window.addEventListener("keydown", handleFlashcardShortcut);
     return () => window.removeEventListener("keydown", handleFlashcardShortcut);
-  }, [selectRelativeCard]);
+  }, [
+    handleCardReview,
+    reviewCard.isPending,
+    reviewCard.variables,
+    selectedCard,
+    selectRelativeCard,
+  ]);
 
   async function handleReviewAll() {
     try {
@@ -416,19 +470,9 @@ export function FlashcardSetPanel({
                     ),
                   );
               }}
-              onReview={(target) => {
-                void reviewCard
-                  .mutateAsync({
-                    flashcardId: target.id,
-                    reviewStatus: "APPROVED",
-                  })
-                  .then(() => toast.success("Đã duyệt flashcard"))
-                  .catch((error: unknown) =>
-                    toast.error(
-                      getUserFacingErrorMessage(error, "Chưa thể duyệt flashcard."),
-                    ),
-                  );
-              }}
+              onReview={(target, reviewStatus) =>
+                void handleCardReview(target, reviewStatus)
+              }
             />
           ) : null}
         </div>
@@ -502,6 +546,17 @@ function isFlashcardNavigationShortcutTarget(target: EventTarget | null) {
   return Boolean(
     target.closest(
       'input, textarea, select, math-field, [contenteditable="true"], [role="textbox"], [role="combobox"], [role="listbox"], [role="menu"], [role="slider"], [role="spinbutton"], [role="tablist"], [role="tree"]',
+    ),
+  );
+}
+
+function isFlashcardReviewShortcutTarget(target: EventTarget | null) {
+  if (isFlashcardNavigationShortcutTarget(target)) return true;
+  if (!(target instanceof Element)) return false;
+
+  return Boolean(
+    target.closest(
+      'a, button, summary, [role="button"], [role="link"], [role="menuitem"], [role="option"], [role="checkbox"], [role="radio"], [role="switch"]',
     ),
   );
 }

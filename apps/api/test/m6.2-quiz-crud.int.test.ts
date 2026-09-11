@@ -114,6 +114,7 @@ describe("M6.2 Quiz CRUD Integration Test", () => {
     expect(set.id).toBeDefined();
     expect(set.title).toBe("Toán Đại Số 10");
     expect(set).not.toHaveProperty("difficulty");
+    expect(set.reviewStatus).toBe(ReviewStatus.DRAFT);
     testQuizSetId = set.id;
   });
 
@@ -207,6 +208,8 @@ describe("M6.2 Quiz CRUD Integration Test", () => {
     expect(question.optionsJson).toHaveLength(5);
     expect(question.correctAnswerJson).toEqual(["E"]);
     expect(question.explanation?.contentJson).toBeDefined();
+    expect(question.reviewStatus).toBe(ReviewStatus.NEEDS_REVIEW);
+    expect(question.explanation?.reviewStatus).toBe(ReviewStatus.NEEDS_REVIEW);
 
     // Check count incremented
     const set = await prisma.quizSet.findUnique({ where: { id: testQuizSetId } });
@@ -405,7 +408,7 @@ describe("M6.2 Quiz CRUD Integration Test", () => {
     );
     expect(result).toEqual({
       approvedQuestionCount: 2,
-      pendingReviewQuestionCount: 1,
+      pendingReviewQuestionCount: 3,
     });
 
     const reviewedQuestions = await prisma.quizQuestion.findMany({
@@ -448,7 +451,7 @@ describe("M6.2 Quiz CRUD Integration Test", () => {
       quizService.reviewAllPendingAiQuestions(testQuizSetId, testUserId, mockContext),
     ).resolves.toEqual({
       approvedQuestionCount: 0,
-      pendingReviewQuestionCount: 1,
+      pendingReviewQuestionCount: 3,
     });
   });
 
@@ -538,6 +541,22 @@ describe("M6.2 Quiz CRUD Integration Test", () => {
         (question) => question.publishedAt?.getTime() === firstPublishedAt?.getTime(),
       ),
     ).toBe(true);
+
+    await quizService.reviewQuestion(
+      approvedQuestion.id,
+      testUserId,
+      { reviewStatus: ReviewStatus.NEEDS_REVIEW },
+      mockContext,
+    );
+    await expect(
+      prisma.quizQuestion.findUniqueOrThrow({ where: { id: approvedQuestion.id } }),
+    ).resolves.toMatchObject({
+      publishedAt: null,
+      reviewStatus: ReviewStatus.NEEDS_REVIEW,
+    });
+    await expect(
+      prisma.quizSet.findUniqueOrThrow({ where: { id: set.id } }),
+    ).resolves.toMatchObject({ reviewStatus: ReviewStatus.APPROVED });
   });
 
   it("rejects publishing a Quiz set without an approved question", async () => {

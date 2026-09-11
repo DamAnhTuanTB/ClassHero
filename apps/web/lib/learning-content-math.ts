@@ -1,5 +1,6 @@
 import {
   normalizeLatexCommandBackslashes,
+  normalizeLatexEnvironmentPairs,
   normalizeMathTextLatexSegments,
   normalizeMissingInlineMathClosers,
 } from "@learning-path/shared";
@@ -9,6 +10,8 @@ export const LEARNING_CONTENT_KATEX_MACROS = {
   "\\N": "\\mathbb{N}",
   "\\R": "\\mathbb{R}",
   "\\Z": "\\mathbb{Z}",
+  "\\wideparen": "\\overset{\\frown}{#1}",
+  "\\overparen": "\\overset{\\frown}{#1}",
 } as const;
 
 const DISPLAY_MATH_ENVIRONMENT_NAMES = [
@@ -47,9 +50,11 @@ const REPEATED_LATEX_COMMAND_BACKSLASH_PATTERN =
  * the script-size reduction used by inline `\\frac`.
  */
 export function normalizeLearningContentLatex(value: string) {
-  return normalizeLatexCommandBackslashes(
-    normalizeLearningContentLatexCommandEscapes(
-      normalizeDecodedLearningContentLatex(value),
+  return normalizeLatexEnvironmentPairs(
+    normalizeLatexCommandBackslashes(
+      normalizeLearningContentLatexCommandEscapes(
+        normalizeDecodedLearningContentLatex(value),
+      ),
     ),
   ).replace(/\\frac\b/gu, "\\dfrac");
 }

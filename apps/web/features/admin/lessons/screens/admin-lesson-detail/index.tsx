@@ -25,8 +25,10 @@ import { statusLabels, statusStyles } from "@/features/admin/courses/admin-cours
 import type { AdminLesson } from "@/features/admin/courses/admin-courses-data";
 import type { AdminQuizInitialData } from "@/features/admin/quiz/api/admin-quiz-api";
 import { usePersistentBooleanState } from "@/lib/use-persistent-boolean-state";
+import type { VideoPlaybackWindow } from "@/lib/video-player-time";
 import {
   CustomYoutubePlayer,
+  DEFAULT_CUSTOM_VIDEO_SETTINGS,
   type CustomYoutubePlayerHandle,
   type CustomVideoSettings,
 } from "@/components/shared/custom-youtube-player";
@@ -130,11 +132,15 @@ export function AdminLessonDetailManager({
   const [activeTestSetId, setActiveTestSetId] = useState<string | undefined>();
   const [requestedGeneration, setRequestedGeneration] =
     useState<AdminAiGenerationDialogRequest | null>(null);
+  const [videoSummaryGenerationRequestId, setVideoSummaryGenerationRequestId] =
+    useState(0);
   const lessonContentPanelId = `admin-lesson-tab-panel-${lessonId}`;
   const [isLessonEditorOpen, setIsLessonEditorOpen] = useState(false);
   const [previewSettings, setPreviewSettings] = useState<CustomVideoSettings | null>(
     null,
   );
+  const [videoPlaybackWindow, setVideoPlaybackWindow] =
+    useState<VideoPlaybackWindow | null>(null);
   const videoPlayerRef = useRef<CustomYoutubePlayerHandle>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const latestPlaybackTimeRef = useRef(0);
@@ -147,7 +153,10 @@ export function AdminLessonDetailManager({
     if (typeof window !== "undefined") {
       const searchParams = new URLSearchParams(window.location.search);
       const tab = searchParams.get("tab") as LessonContentTabKey;
-      if (tab && ["documents", "summary", "quiz", "flashcard", "test"].includes(tab)) {
+      if (
+        tab &&
+        ["documents", "video", "summary", "quiz", "flashcard", "test"].includes(tab)
+      ) {
         setActiveTab(tab);
       }
     }
@@ -177,6 +186,10 @@ export function AdminLessonDetailManager({
     const timeoutId = globalThis.setTimeout(preloadContentTabs, 250);
     return () => globalThis.clearTimeout(timeoutId);
   }, [lesson]);
+
+  useEffect(() => {
+    setPreviewSettings(null);
+  }, [lesson?.videoUrl]);
 
   const handleTabChange = useCallback(
     (nextTab: LessonContentTabKey) => {
@@ -334,6 +347,15 @@ export function AdminLessonDetailManager({
 
   const lessonVideoSettings = lesson.customVideoSettings as
     CustomVideoSettings | null | undefined;
+  const hasSavedVideoTranscript = Boolean(
+    lesson.videoUrl &&
+    lessonVideoSettings?.transcript?.some(
+      (segment) => Number.isFinite(segment.time) && segment.text.trim().length > 0,
+    ),
+  );
+  const videoSummaryDisabledReason = !lesson.videoUrl
+    ? "Cần có video để tạo Tổng quan video."
+    : "Cần lưu bản chép lời video trước khi tạo.";
 
   return (
     <main data-admin-theme="true" className="theme-page">
@@ -434,7 +456,9 @@ export function AdminLessonDetailManager({
                                 videoUrl={lesson.videoUrl}
                                 settings={previewSettings || lessonVideoSettings}
                                 title={lesson.title}
+                                showOriginalTimeline
                                 onPlaybackTimeChange={handlePlaybackTimeChange}
+                                onPlaybackWindowChange={setVideoPlaybackWindow}
                               />
                             ) : (
                               <a
@@ -457,7 +481,7 @@ export function AdminLessonDetailManager({
                           {lesson.videoUrl &&
                             (lesson.videoUrl.includes("youtube.com") ||
                               lesson.videoUrl.includes("youtu.be")) && (
-                              <div className="px-4 sm:px-0">
+                              <div key={lesson.videoUrl} className="px-4 sm:px-0">
                                 <LessonVideoSettingsForm
                                   lessonId={lessonId}
                                   initialSettings={lessonVideoSettings}
@@ -467,11 +491,15 @@ export function AdminLessonDetailManager({
                                   videoUrl={lesson.videoUrl}
                                   initialSettings={lessonVideoSettings}
                                   onPreviewSettingsChange={setPreviewSettings}
+                                  playbackWindow={videoPlaybackWindow}
                                 />
                                 <LessonVideoTranscriptPanel
                                   lessonId={lessonId}
                                   initialSettings={lessonVideoSettings}
                                   onPlayFromTime={handlePlayTranscriptSegment}
+                                  playbackEndTimeInSeconds={
+                                    videoPlaybackWindow?.endTimeInSeconds
+                                  }
                                   subscribeToPlaybackTime={subscribeToPlaybackTime}
                                 />
                               </div>
@@ -498,19 +526,6 @@ export function AdminLessonDetailManager({
                     fallbackText={lesson.shortDescription}
                     lessonId={lessonId}
                     onSaved={handleLessonSaved}
-                  />
-
-                  <VideoSummaryDialog
-                    lessonId={lessonId}
-                    onVideoSeek={handlePlayTranscriptSegment}
-                    disabled={
-                      !lesson.videoUrl || !lessonVideoSettings?.transcript?.length
-                    }
-                    disabledReason={
-                      !lesson.videoUrl
-                        ? "Cần có video để tóm tắt."
-                        : "Cần lưu bản chép lời video trước khi tóm tắt."
-                    }
                   />
                 </div>
 
@@ -615,6 +630,11 @@ export function AdminLessonDetailManager({
                 quizTargetSetId={activeQuizSetId}
                 testTargetSetId={activeTestSetId}
                 requestedGeneration={requestedGeneration}
+                videoSummaryDisabledReason={videoSummaryDisabledReason}
+                videoSummaryReady={hasSavedVideoTranscript}
+                onGenerateVideoSummary={() =>
+                  setVideoSummaryGenerationRequestId((current) => current + 1)
+                }
                 onOpenResult={handleOpenAiResult}
                 onRequestedGenerationHandled={handleRequestedGenerationHandled}
               />
@@ -630,6 +650,22 @@ export function AdminLessonDetailManager({
                 role="tabpanel"
                 className="min-h-[400px] overflow-hidden bg-transparent sm:rounded-xl sm:border sm:border-[var(--theme-border)] sm:bg-[var(--theme-bg-subtle)]"
               >
+                <VideoSummaryDialog
+                  lessonId={lessonId}
+                  onVideoSeek={handlePlayTranscriptSegment}
+                  videoStartTimeOffsetSeconds={
+                    lessonVideoSettings?.isDisabled
+                      ? 0
+                      : (lessonVideoSettings?.startTimeInSeconds ??
+                        DEFAULT_CUSTOM_VIDEO_SETTINGS.startTimeInSeconds)
+                  }
+                  videoEndTimeSeconds={videoPlaybackWindow?.endTimeInSeconds}
+                  disabled={!hasSavedVideoTranscript}
+                  disabledReason={videoSummaryDisabledReason}
+                  generationRequestId={videoSummaryGenerationRequestId}
+                  showContent={activeTab === "video"}
+                />
+
                 {activeTab === "documents" &&
                 !isLessonEditorOpen &&
                 lesson.learningPathId ? (

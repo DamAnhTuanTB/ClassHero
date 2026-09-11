@@ -23,6 +23,19 @@ import {
   GraduationCap,
 } from "lucide-react";
 import { ClassHeroLogo } from "@/components/common/brand/classhero-logo";
+import { getVideoKeyboardSeekOffset } from "@/lib/video-keyboard-controls";
+import {
+  getVideoResumePromptLines,
+  resolveVideoResumePosition,
+} from "@/lib/video-playback-resume";
+import {
+  formatVideoTime,
+  renumberVideoPlaybackChapters,
+  resolveVideoPlaybackChapters,
+  resolveVideoPlaybackTime,
+  resolveVideoPlaybackWindow,
+  type VideoPlaybackWindow,
+} from "@/lib/video-player-time";
 
 const STUDENT_START_ANIMATION_FALLBACK_MS = 1300;
 const YOUTUBE_PLAYER_INIT_TIMEOUT_MS = 12_000;
@@ -82,13 +95,22 @@ interface CustomYoutubePlayerProps {
   settings?: CustomVideoSettings | null;
   title?: string;
   startButtonVariant?: "default" | "student";
+  showOriginalTimeline?: boolean;
+  enableArrowKeySeeking?: boolean;
+  renumberPlaybackChapters?: boolean;
+  resumePositionSeconds?: number | null;
   onError?: () => void;
+  onPlaybackProgressChange?: (timeInSeconds: number) => void;
+  onPlaybackStateChange?: (state: VideoPlaybackState) => void;
   onPlaybackTimeChange?: (timeInSeconds: number) => void;
+  onPlaybackWindowChange?: (playbackWindow: VideoPlaybackWindow) => void;
 }
 
 export interface CustomYoutubePlayerHandle {
   playFromPlaybackTime: (timeInSeconds: number) => boolean;
 }
+
+export type VideoPlaybackState = "playing" | "paused" | "ended";
 
 declare global {
   interface Window {
@@ -106,13 +128,20 @@ export const CustomYoutubePlayer = forwardRef<
     settings,
     title,
     startButtonVariant = "default",
+    showOriginalTimeline = false,
+    enableArrowKeySeeking = false,
+    renumberPlaybackChapters = false,
+    resumePositionSeconds,
     onError,
+    onPlaybackProgressChange,
+    onPlaybackStateChange,
     onPlaybackTimeChange,
+    onPlaybackWindowChange,
   },
   ref,
 ) {
   const rawSettings = { ...DEFAULT_CUSTOM_VIDEO_SETTINGS, ...settings };
-  const chapters = settings?.chapters || [];
+  const sourceChapters = settings?.chapters || [];
 
   // Xử lý giá trị mặc định của viền đen
   const bottomPercent =
@@ -131,7 +160,7 @@ export const CustomYoutubePlayer = forwardRef<
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
+  const [sourceDuration, setSourceDuration] = useState(0);
   const [volume, setVolume] = useState(100);
   const [isMuted, setIsMuted] = useState(false);
   const [isReady, setIsReady] = useState(false);
@@ -155,14 +184,45 @@ export const CustomYoutubePlayer = forwardRef<
   const isFirstPlayStartedRef = useRef<boolean>(false);
   const isWaitingForStudentStartAnimationRef = useRef(false);
   const isMobileTimelineDraggingRef = useRef(false);
+  const onPlaybackProgressChangeRef = useRef(onPlaybackProgressChange);
+  const onPlaybackStateChangeRef = useRef(onPlaybackStateChange);
+
+  useEffect(() => {
+    onPlaybackProgressChangeRef.current = onPlaybackProgressChange;
+    onPlaybackStateChangeRef.current = onPlaybackStateChange;
+  }, [onPlaybackProgressChange, onPlaybackStateChange]);
 
   const isPhoneViewport = windowSize.w > 0 && windowSize.w < 640;
+  const playbackWindow = resolveVideoPlaybackWindow({
+    sourceDurationInSeconds: sourceDuration,
+    startTimeInSeconds: currentSettings.startTimeInSeconds,
+    endTimeCutInSeconds: currentSettings.endTimeCutInSeconds,
+  });
+  const duration = playbackWindow.durationInSeconds;
+  const playbackChapters = resolveVideoPlaybackChapters(sourceChapters, playbackWindow);
+  const chapters = renumberPlaybackChapters
+    ? renumberVideoPlaybackChapters(playbackChapters)
+    : playbackChapters;
+
+  useEffect(() => {
+    if (sourceDuration <= 0) return;
+    onPlaybackWindowChange?.(playbackWindow);
+  }, [
+    onPlaybackWindowChange,
+    playbackWindow.durationInSeconds,
+    playbackWindow.endTimeInSeconds,
+    playbackWindow.startTimeInSeconds,
+    sourceDuration,
+  ]);
 
   const updateCurrentTime = useCallback(
     (timeInSeconds: number) => {
       const safeTime = Number.isFinite(timeInSeconds) ? Math.max(0, timeInSeconds) : 0;
       setCurrentTime(safeTime);
       onPlaybackTimeChange?.(safeTime);
+      if (isFirstPlayStartedRef.current) {
+        onPlaybackProgressChangeRef.current?.(safeTime);
+      }
     },
     [onPlaybackTimeChange],
   );
@@ -345,13 +405,7 @@ export const CustomYoutubePlayer = forwardRef<
 
           const rawDuration = event.target.getDuration();
           if (rawDuration > 0) {
-            const validDuration = Math.max(
-              0,
-              rawDuration -
-                currentSettings.startTimeInSeconds -
-                currentSettings.endTimeCutInSeconds,
-            );
-            setDuration(validDuration);
+            setSourceDuration(rawDuration);
             durationRef.current = rawDuration;
           }
           setVolume(event.target.getVolume() || 100);
@@ -360,6 +414,7 @@ export const CustomYoutubePlayer = forwardRef<
         },
         onStateChange: (event: any) => {
           if (event.data === window.YT.PlayerState.PLAYING) {
+            onPlaybackStateChangeRef.current?.("playing");
             isWaitingForStudentStartAnimationRef.current = false;
             if (studentStartFallbackTimeoutRef.current) {
               clearTimeout(studentStartFallbackTimeoutRef.current);
@@ -408,7 +463,15 @@ export const CustomYoutubePlayer = forwardRef<
             setIsPlaying(false);
           }
 
+          if (
+            event.data === window.YT.PlayerState.PAUSED &&
+            isFirstPlayStartedRef.current
+          ) {
+            onPlaybackStateChangeRef.current?.("paused");
+          }
+
           if (event.data === window.YT.PlayerState.ENDED) {
+            onPlaybackStateChangeRef.current?.("ended");
             playerRef.current.seekTo(
               durationRef.current - currentSettings.endTimeCutInSeconds,
               true,
@@ -431,34 +494,57 @@ export const CustomYoutubePlayer = forwardRef<
   };
 
   useEffect(() => {
+    if (sourceDuration <= 0 || !playerRef.current) return;
+
+    const sourceTime =
+      typeof playerRef.current.getCurrentTime === "function"
+        ? playerRef.current.getCurrentTime()
+        : playbackWindow.startTimeInSeconds;
+    const playbackTime = resolveVideoPlaybackTime(sourceTime, playbackWindow);
+    const clampedSourceTime = playbackWindow.startTimeInSeconds + playbackTime;
+
+    if (clampedSourceTime !== sourceTime) {
+      playerRef.current.seekTo(clampedSourceTime, true);
+    }
+    updateCurrentTime(playbackTime);
+  }, [
+    playbackWindow.endTimeInSeconds,
+    playbackWindow.startTimeInSeconds,
+    sourceDuration,
+    updateCurrentTime,
+  ]);
+
+  useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isPlaying && playerRef.current) {
       interval = setInterval(() => {
         if (!playerRef.current || typeof playerRef.current.getCurrentTime !== "function")
           return;
 
-        const time = playerRef.current.getCurrentTime();
-        if (time < currentSettings.startTimeInSeconds) {
-          playerRef.current.seekTo(currentSettings.startTimeInSeconds, true);
+        const sourceTime = playerRef.current.getCurrentTime();
+        const playbackTime = resolveVideoPlaybackTime(sourceTime, playbackWindow);
+        const clampedSourceTime = playbackWindow.startTimeInSeconds + playbackTime;
+
+        if (clampedSourceTime !== sourceTime) {
+          playerRef.current.seekTo(clampedSourceTime, true);
         }
-        if (
-          time > durationRef.current - currentSettings.endTimeCutInSeconds &&
-          durationRef.current > 0
-        ) {
-          playerRef.current.seekTo(
-            durationRef.current - currentSettings.endTimeCutInSeconds,
-            true,
-          );
+        if (sourceTime >= playbackWindow.endTimeInSeconds && sourceDuration > 0) {
           playerRef.current.pauseVideo();
           setIsPlaying(false);
         }
-        updateCurrentTime(time - currentSettings.startTimeInSeconds);
+        updateCurrentTime(playbackTime);
       }, 100);
     }
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isPlaying, updateCurrentTime]);
+  }, [
+    isPlaying,
+    playbackWindow.endTimeInSeconds,
+    playbackWindow.startTimeInSeconds,
+    sourceDuration,
+    updateCurrentTime,
+  ]);
 
   const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
@@ -564,6 +650,12 @@ export const CustomYoutubePlayer = forwardRef<
   const handleStart = () => {
     if (isStarting || !isReady || !playerRef.current) return;
 
+    const resumeTime = resolveVideoResumePosition(resumePositionSeconds, duration);
+    if (resumeTime !== null) {
+      playerRef.current.seekTo(currentSettings.startTimeInSeconds + resumeTime, true);
+      updateCurrentTime(resumeTime);
+    }
+
     startRequestedAtRef.current = Date.now();
     setIsStarting(true);
     setShowOverlay(true);
@@ -661,7 +753,7 @@ export const CustomYoutubePlayer = forwardRef<
     }
   };
 
-  const handleSkipBackward = () => {
+  const handleSkipBackward = useCallback(() => {
     if (!playerRef.current) return;
     const actualCurrentTime = currentTime + currentSettings.startTimeInSeconds;
     let newTime = actualCurrentTime - currentSettings.seekStepInSeconds;
@@ -670,9 +762,14 @@ export const CustomYoutubePlayer = forwardRef<
     }
     playerRef.current.seekTo(newTime, true);
     updateCurrentTime(newTime - currentSettings.startTimeInSeconds);
-  };
+  }, [
+    currentSettings.seekStepInSeconds,
+    currentSettings.startTimeInSeconds,
+    currentTime,
+    updateCurrentTime,
+  ]);
 
-  const handleSkipForward = () => {
+  const handleSkipForward = useCallback(() => {
     if (!playerRef.current) return;
     const actualCurrentTime = currentTime + currentSettings.startTimeInSeconds;
     let newTime = actualCurrentTime + currentSettings.seekStepInSeconds;
@@ -681,14 +778,45 @@ export const CustomYoutubePlayer = forwardRef<
     }
     playerRef.current.seekTo(newTime, true);
     updateCurrentTime(newTime - currentSettings.startTimeInSeconds);
-  };
+  }, [
+    currentSettings.endTimeCutInSeconds,
+    currentSettings.seekStepInSeconds,
+    currentSettings.startTimeInSeconds,
+    currentTime,
+    updateCurrentTime,
+  ]);
 
-  const formatTime = (seconds: number) => {
-    const safeSeconds = Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
-    const m = Math.floor(safeSeconds / 60);
-    const s = Math.floor(safeSeconds % 60);
-    return `${m}:${s < 10 ? "0" : ""}${s}`;
-  };
+  useEffect(() => {
+    if (!enableArrowKeySeeking || !isPlaying) return;
+
+    function handleArrowKeySeek(event: KeyboardEvent) {
+      const seekOffset = getVideoKeyboardSeekOffset({
+        altKey: event.altKey,
+        ctrlKey: event.ctrlKey,
+        defaultPrevented: event.defaultPrevented,
+        isComposing: event.isComposing,
+        isEditingTarget: isVideoKeyboardEditingTarget(event.target),
+        key: event.key,
+        metaKey: event.metaKey,
+        seekStepInSeconds: currentSettings.seekStepInSeconds,
+        shiftKey: event.shiftKey,
+      });
+      if (seekOffset === null) return;
+
+      event.preventDefault();
+      if (seekOffset < 0) handleSkipBackward();
+      else handleSkipForward();
+    }
+
+    window.addEventListener("keydown", handleArrowKeySeek, true);
+    return () => window.removeEventListener("keydown", handleArrowKeySeek, true);
+  }, [
+    currentSettings.seekStepInSeconds,
+    enableArrowKeySeeking,
+    handleSkipBackward,
+    handleSkipForward,
+    isPlaying,
+  ]);
 
   const handleFullscreen = () => {
     if (!containerRef.current) return;
@@ -771,6 +899,10 @@ export const CustomYoutubePlayer = forwardRef<
   const progressPercentage = duration
     ? Math.max(0, Math.min(100, (currentTime / duration) * 100))
     : 0;
+  const sourceBounds = playbackWindow;
+  const resumeTime = resolveVideoResumePosition(resumePositionSeconds, duration);
+  const resumePromptLines =
+    resumeTime !== null ? getVideoResumePromptLines(resumeTime) : null;
 
   const shouldShowIntro = currentTime < currentSettings.introOverlayDurationInSeconds;
   if (currentSettings.isDisabled) {
@@ -814,6 +946,7 @@ export const CustomYoutubePlayer = forwardRef<
   return (
     <div
       ref={containerRef}
+      aria-keyshortcuts={enableArrowKeySeeking ? "ArrowLeft ArrowRight" : undefined}
       className={`bg-black group flex flex-col items-center justify-center overflow-hidden ${isFullscreen ? (isPseudoPortrait ? "fixed z-[99999] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-90" : "fixed inset-0 z-[99999] w-full h-full") : "relative z-0 w-full aspect-video sm:rounded-lg border-y sm:border border-[var(--theme-border)]"}`}
       style={
         isPseudoPortrait
@@ -928,7 +1061,7 @@ export const CustomYoutubePlayer = forwardRef<
               ) : startButtonVariant === "student" ? (
                 <div
                   key="student-ready"
-                  className="relative mb-3 h-20 w-20 sm:mb-5 sm:h-28 sm:w-28"
+                  className="relative mb-4 h-20 w-20 sm:mb-6 sm:h-28 sm:w-28"
                 >
                   <span className="absolute -inset-5 rounded-full bg-sky-500/20 blur-2xl transition duration-300 group-hover/start:bg-violet-500/25" />
                   <span className="absolute -inset-2 rounded-full border-2 border-dashed border-cyan-300/70 transition-transform duration-700 group-hover/start:rotate-45 motion-safe:animate-[spin_12s_linear_infinite]" />
@@ -946,8 +1079,19 @@ export const CustomYoutubePlayer = forwardRef<
                 </div>
               )}
               {!isStarting && (
-                <span className="text-white/80 font-medium text-sm sm:text-lg">
-                  {isReady ? "Nhấn để bắt đầu học" : "Đang kết nối tới Giáo viên"}
+                <span className="max-w-[min(82vw,34rem)] px-4 text-center text-sm font-medium leading-5 text-white/80 sm:text-lg sm:leading-7">
+                  {isReady ? (
+                    resumePromptLines ? (
+                      <>
+                        <span className="block">{resumePromptLines[0]}</span>
+                        <span className="mt-1 block">{resumePromptLines[1]}</span>
+                      </>
+                    ) : (
+                      "Nhấn để bắt đầu học"
+                    )
+                  ) : (
+                    "Đang kết nối tới Giáo viên"
+                  )}
                 </span>
               )}
             </div>
@@ -974,7 +1118,7 @@ export const CustomYoutubePlayer = forwardRef<
         {/* Dải băng đen che Tiêu đề của Youtube khi Pause */}
         {isFirstPlayStarted && showOverlay && (
           <div className="absolute top-0 left-0 w-full h-[50px] sm:h-[60px] bg-black z-10 flex items-center px-2 sm:px-4 pointer-events-none transition-opacity duration-300">
-            <span className="text-white/70 font-semibold text-xs sm:text-sm line-clamp-1">
+            <span className="line-clamp-1 text-xs font-semibold text-white sm:text-sm">
               {title || "Video bài giảng"}
             </span>
           </div>
@@ -992,8 +1136,18 @@ export const CustomYoutubePlayer = forwardRef<
           >
             {/* Progress Bar */}
             <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3 w-full">
-              <span className="text-white text-[11px] sm:text-[13px] font-bold w-9 sm:w-11 text-right">
-                {formatTime(currentTime)}
+              <span className="flex shrink-0 flex-col items-end justify-center whitespace-nowrap text-right leading-none">
+                <span className="text-[11px] font-bold text-white sm:text-[13px]">
+                  {formatVideoTime(currentTime)}
+                </span>
+                {showOriginalTimeline ? (
+                  <span
+                    className="mt-1 text-[8px] font-medium text-white/60 sm:text-[10px]"
+                    title="Thời gian bắt đầu trong video gốc"
+                  >
+                    Gốc {formatVideoTime(sourceBounds.startTimeInSeconds)}
+                  </span>
+                ) : null}
               </span>
               <div
                 className="flex-1 relative h-4 sm:h-5 group/slider cursor-pointer flex items-center"
@@ -1073,26 +1227,37 @@ export const CustomYoutubePlayer = forwardRef<
                     style={{ left: `${hoverPercent}%` }}
                   >
                     <div
-                      className="bg-gray-900/90 text-white text-[11px] sm:text-xs font-medium px-2.5 py-1.5 rounded whitespace-nowrap shadow-lg backdrop-blur-sm border border-white/10"
+                      className="whitespace-nowrap rounded border border-white/10 bg-gray-900/90 px-2.5 py-1.5 text-[11px] font-medium text-white shadow-lg backdrop-blur-sm sm:text-xs"
                       style={{
                         transform: `translateX(calc(50% - ${hoverPercent}% + ${hoverPercent / 10 - 5}px))`,
                       }}
                     >
-                      {formatTime((hoverPercent / 100) * duration)}
-                      {(() => {
-                        const hoverTime = (hoverPercent / 100) * duration;
-                        const activeChapter = chapters
-                          .slice()
-                          .reverse()
-                          .find((c) => c.time <= hoverTime);
-                        return activeChapter ? (
-                          <span className="ml-1.5 font-bold text-blue-300">
-                            • {activeChapter.title}
-                          </span>
-                        ) : (
-                          ""
-                        );
-                      })()}
+                      <div>
+                        {formatVideoTime((hoverPercent / 100) * duration)}
+                        {(() => {
+                          const hoverTime = (hoverPercent / 100) * duration;
+                          const activeChapter = chapters
+                            .slice()
+                            .reverse()
+                            .find((c) => c.time <= hoverTime);
+                          return activeChapter ? (
+                            <span className="ml-1.5 font-bold text-blue-300">
+                              • {activeChapter.title}
+                            </span>
+                          ) : (
+                            ""
+                          );
+                        })()}
+                      </div>
+                      {showOriginalTimeline ? (
+                        <div className="mt-1 text-[9px] font-medium text-white/65 sm:text-[10px]">
+                          Gốc{" "}
+                          {formatVideoTime(
+                            sourceBounds.startTimeInSeconds +
+                              (hoverPercent / 100) * duration,
+                          )}
+                        </div>
+                      ) : null}
                     </div>
                     <div className="w-0 h-0 border-l-[5px] border-r-[5px] border-t-[5px] border-l-transparent border-r-transparent border-t-gray-900/90"></div>
                   </div>
@@ -1104,8 +1269,18 @@ export const CustomYoutubePlayer = forwardRef<
                   style={{ left: `${progressPercentage}%` }}
                 />
               </div>
-              <span className="text-white text-[11px] sm:text-[13px] font-bold w-9 sm:w-11">
-                {formatTime(duration)}
+              <span className="flex shrink-0 flex-col items-start justify-center whitespace-nowrap leading-none">
+                <span className="text-[11px] font-bold text-white sm:text-[13px]">
+                  {formatVideoTime(duration)}
+                </span>
+                {showOriginalTimeline ? (
+                  <span
+                    className="mt-1 text-[8px] font-medium text-white/60 sm:text-[10px]"
+                    title="Thời gian kết thúc trong video gốc"
+                  >
+                    Gốc {formatVideoTime(sourceBounds.endTimeInSeconds)}
+                  </span>
+                ) : null}
               </span>
             </div>
 
@@ -1276,3 +1451,13 @@ export const CustomYoutubePlayer = forwardRef<
     </div>
   );
 });
+
+function isVideoKeyboardEditingTarget(target: EventTarget | null) {
+  if (!(target instanceof Element)) return false;
+
+  return Boolean(
+    target.closest(
+      'input, textarea, select, math-field, [contenteditable="true"], [role="textbox"]',
+    ),
+  );
+}

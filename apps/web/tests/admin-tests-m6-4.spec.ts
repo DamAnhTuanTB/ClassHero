@@ -52,6 +52,9 @@ test("admin creates a timed test set and a question from lesson detail", async (
   await setDialog.getByRole("button", { name: "Thêm bộ đề" }).click();
 
   await expect(page.getByRole("tab", { name: /Bộ đề 1/ })).toBeVisible();
+  await expect(
+    page.getByRole("tab", { name: /Bộ đề 1/ }).getByText("Chưa phát hành"),
+  ).toBeVisible();
   await expect(page.getByText("20 phút", { exact: true })).toBeVisible();
   await expect(page.getByRole("group", { name: "Hành động bộ Test" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Lưu", exact: true })).toBeVisible();
@@ -96,6 +99,32 @@ test("admin creates a timed test set and a question from lesson detail", async (
   await expect(page.getByText("Số 2 là số chẵn.", { exact: true })).toBeVisible();
   await expect(page.getByText("Số 3 là số chẵn.", { exact: true })).toBeVisible();
   await expect(page.getByRole("tablist", { name: "Chọn câu hỏi Test" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Duyệt", exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Thêm câu hỏi" }).first().click();
+  await questionDialog
+    .getByRole("textbox", { name: "Nội dung câu hỏi" })
+    .fill("Câu hỏi Test thứ hai.");
+  for (const option of ["A", "B", "C", "D"]) {
+    await questionDialog
+      .getByRole("textbox", { name: `Phương án ${option}` })
+      .fill(`Lựa chọn ${option}`);
+  }
+  await questionDialog
+    .getByRole("button", { name: "Chọn phương án A là đáp án đúng" })
+    .click();
+  await questionDialog.getByRole("button", { name: "Thêm câu hỏi" }).click();
+  await expect(questionDialog).toBeHidden();
+
+  const testContentTab = page.getByRole("tab", { name: "Test", exact: true });
+  await testContentTab.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(testContentTab).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByText("Câu hỏi Test thứ hai.", { exact: true })).toBeVisible();
+
+  await page.keyboard.press("ArrowLeft");
+  await expect(testContentTab).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByText("Số 2 là số chẵn.", { exact: true })).toBeVisible();
   await expectNoFrameworkOverlay(page);
 });
 
@@ -453,7 +482,7 @@ async function setupTestsApiMock(page: Page) {
         ...body,
         difficultyRatioJson: null,
         source: "ADMIN",
-        reviewStatus: "APPROVED",
+        reviewStatus: "DRAFT",
         questionCount: 0,
         totalScore: "10",
         sortOrder: sets.length,
@@ -582,7 +611,7 @@ async function setupTestsApiMock(page: Page) {
         explanation: null,
         points: null,
         effectivePoints: 10,
-        reviewStatus: "APPROVED",
+        reviewStatus: "NEEDS_REVIEW",
       };
       questions.push(question);
       questionsBySet.set(setId, questions);

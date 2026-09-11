@@ -1,15 +1,14 @@
 import {
-  normalizeLessonSummaryAngleNotation,
-  normalizeMathTextLatexCommands,
+  hasMalformedMathText,
+  normalizeLearnerMathTextSyntax,
+  normalizeThreePointAngleNotation,
   tokenizeMathText,
 } from "@learning-path/shared";
 import { QuestionType } from "@prisma/client";
 import type { GeneratedQuestion } from "#api/modules/ai/types/lesson-content-generation.types";
 
 export function toTiptap(text: string) {
-  const normalizedText = normalizeMathTextLatexCommands(
-    normalizeLessonSummaryAngleNotation(text),
-  );
+  const normalizedText = normalizeGeneratedMathText(text);
   const content: Array<Record<string, unknown>> = [];
   let inlineContent: Array<Record<string, unknown>> = [];
 
@@ -131,14 +130,23 @@ function mapGeneratedExample(question: GeneratedQuestion) {
   const sourceChunkIds = "sourceChunkIds" in question ? question.sourceChunkIds : [];
   const mappedBlock = {
     type: "example" as const,
-    problem: normalizeLessonSummaryAngleNotation(question.example.problem),
+    problem: normalizeGeneratedMathText(question.example.problem),
     solution: question.example.solution
-      ? normalizeLessonSummaryAngleNotation(question.example.solution)
+      ? normalizeGeneratedMathText(question.example.solution)
       : null,
-    answer: normalizeLessonSummaryAngleNotation(question.example.answer),
+    answer: normalizeGeneratedMathText(question.example.answer),
     geometryStatement:
       "geometryStatement" in question.example
-        ? (question.example.geometryStatement ?? undefined)
+        ? question.example.geometryStatement
+          ? {
+              hypotheses: question.example.geometryStatement.hypotheses.map(
+                normalizeGeneratedMathText,
+              ),
+              conclusions: question.example.geometryStatement.conclusions.map(
+                normalizeGeneratedMathText,
+              ),
+            }
+          : undefined
         : undefined,
     origin: "AI_AUTHORED" as const,
   };
@@ -149,13 +157,62 @@ function mapGeneratedExample(question: GeneratedQuestion) {
     contentJson: toTiptap(
       [block.solution, `Đáp án: ${block.answer}`].filter(Boolean).join("\n"),
     ),
-    recoveryIssues: [] as Array<{
+    recoveryIssues: collectTestMathSyntaxIssues(question) as Array<{
       classification: "REVIEWABLE";
       code: string;
       message: string;
       technicalDetails?: string;
+      blocking: false;
     }>,
   };
+}
+
+function normalizeGeneratedMathText(value: string) {
+  return normalizeLearnerMathTextSyntax(normalizeThreePointAngleNotation(value));
+}
+
+function collectTestMathSyntaxIssues(question: GeneratedQuestion) {
+  const candidates: Array<{ path: string; value: string }> = [
+    { path: "example.problem", value: question.example.problem },
+    { path: "example.answer", value: question.example.answer },
+    ...(question.example.solution
+      ? [{ path: "example.solution", value: question.example.solution }]
+      : []),
+    ...(question.questionType === QuestionType.MULTIPLE_CHOICE
+      ? question.options.map((option, index) => ({
+          path: `options.${index}.text`,
+          value: option.text,
+        }))
+      : []),
+    ...(question.questionType === QuestionType.MULTI_STATEMENT_TRUE_FALSE
+      ? question.statements.map((statement, index) => ({
+          path: `statements.${index}.text`,
+          value: statement.text,
+        }))
+      : []),
+  ];
+  if ("geometryStatement" in question.example && question.example.geometryStatement) {
+    question.example.geometryStatement.hypotheses.forEach((value, index) => {
+      candidates.push({ path: `example.geometryStatement.hypotheses.${index}`, value });
+    });
+    question.example.geometryStatement.conclusions.forEach((value, index) => {
+      candidates.push({ path: `example.geometryStatement.conclusions.${index}`, value });
+    });
+  }
+  const malformed = candidates.filter(({ value }) =>
+    hasMalformedMathText(normalizeGeneratedMathText(value)),
+  );
+  if (malformed.length === 0) return [];
+  return [
+    {
+      classification: "REVIEWABLE" as const,
+      code: "MALFORMED_LATEX",
+      message:
+        "Một số công thức LaTeX vẫn chưa cân bằng sau bước chuẩn hóa; cần admin kiểm tra.",
+      technicalDetails: `paths=${malformed.map(({ path }) => path).join(",")}`,
+      blocking: false as const,
+    },
+  ];
 }
 
 export function assertGeneratedContent(input: {

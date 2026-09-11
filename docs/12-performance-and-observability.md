@@ -354,10 +354,13 @@ Rules:
 - Analytics/difficulty dùng aggregate theo time bucket. Không query hoặc trả raw event stream trên lesson page.
 - Semantic search/AI context lazy-load khi học sinh mở panel; không đưa embedding/search/AI bundle vào đường tải player ban đầu nếu chưa dùng.
 - Đo riêng player start latency, heartbeat error rate, interval merge duration, smart-resume latency và contextual AI latency.
-- `M15.9` whole-video summary chỉ lazy-load preview/modal khi admin mở. Preview
+- `M9.7` whole-video summary chỉ lazy-load preview/modal khi admin mở. Preview
   count token và ước tính chi phí từ normalized transcript packet nhưng không
   gọi provider; execute dùng một background job, idempotency/draft hash và không
   poll khi modal đóng trừ query trạng thái tối thiểu của lesson detail.
+- Reset dữ liệu phụ thuộc Video URL chạy trong cùng lesson-update transaction,
+  chỉ đọc/xóa tối đa một Video Summary theo unique `lesson_id`, không gọi provider;
+  worker đang chạy phải bị source-hash gate chặn nếu URL đã đổi.
 
 ---
 
@@ -410,6 +413,20 @@ AI là phần dễ tạo độ trễ và chi phí cao, nên Codex phải:
   system/developer prompt ổn định; mọi PDF, manifest, custom user request và dữ
   liệu theo lesson đứng sau breakpoint. `prompt_cache_options` dùng TTL `30m`;
   không gửi `prompt_cache_retention` deprecated cho nhóm model này.
+- Quy ước góc ba điểm `\widehat{ABC}` và contract cú pháp toán cơ học đổi stable
+  prompt/schema của Summary, Video Summary, Quiz, Flashcard, Test cùng nhánh
+  solution refinement/regeneration. Summary hiện dùng
+  `lesson-summary-math-v45-math-syntax-contract`, Video Summary dùng
+  `video-summary-v10-bidirectional-chapter-contract`,
+  `flashcard_math_v8_angle_notation` và `lesson-content-math-v14-angle-notation`.
+  Schema tương ứng phải bump để không tái sử dụng contract cũ; Video Summary dùng
+  schema `8`, Quiz dùng `quiz-pdf-figure-schema-v39-math-syntax-contract`,
+  Flashcard dùng `flashcard_v7_math_syntax_contract`, Test dùng
+  `lesson-content-subject-schema-v7-math-syntax-contract`. Refinement/regeneration
+  dùng prompt `v6`/`v3` (candidate bị loại `v4`) và schema `v4`/`v2`. Đây là
+  `NEW_STABLE_PREFIX_WARMUP`: prefix/key cũ không được tái sử dụng cho version
+  mới; sau warm-up, dữ liệu lesson/PDF động vẫn nằm sau breakpoint nên các
+  request cùng contract tiếp tục dùng chung cache key.
 - Index chống trùng câu hỏi hiện có của Quiz là dữ liệu theo lesson nên phải đứng
   sau explicit breakpoint. Chỉ serialize loại câu, đề bài plain text và phần
   phương án/mệnh đề thực sự thuộc nội dung câu hỏi; bỏ đáp án, hint, lời giải,

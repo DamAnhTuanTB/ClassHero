@@ -1,15 +1,6 @@
-import {
-  normalizeMathTextLatexCommands,
-  normalizeMissingInlineMathClosers,
-  stripForbiddenTextControlCharacters,
-} from "@learning-path/shared";
+import { normalizeLearnerMathTextSyntax } from "@learning-path/shared";
 
 import type { GeneratedQuizQuestion } from "#api/modules/quiz/types/quiz-generation.types";
-
-const DISPLAY_MATH_BLOCK_PATTERN = /\$\$([\s\S]*?)\$\$/gu;
-const LATEX_ENVIRONMENT_TOKEN_PATTERN = /\\(begin|end)\{([A-Za-z][A-Za-z0-9*]*)\}/gu;
-const MISPLACED_DISPLAY_MATH_CLOSER_PATTERN =
-  /\$\$(?=(?:\s*\\end\{[A-Za-z][A-Za-z0-9*]*\})+\s*\$\$)/gu;
 
 /**
  * Repairs deterministic LaTeX-environment defects in newly generated Quiz data.
@@ -96,52 +87,6 @@ export function normalizeQuizInlineMathDelimiters(value: string) {
   return normalized;
 }
 
-export function normalizeQuizDisplayMathEnvironments(value: string) {
-  return value
-    .replace(MISPLACED_DISPLAY_MATH_CLOSER_PATTERN, "")
-    .replace(
-      DISPLAY_MATH_BLOCK_PATTERN,
-      (_block, content: string) => `$$${balanceLatexEnvironments(content)}$$`,
-    );
-}
-
-function balanceLatexEnvironments(content: string) {
-  const openEnvironments: string[] = [];
-  let normalized = "";
-  let cursor = 0;
-
-  for (const match of content.matchAll(LATEX_ENVIRONMENT_TOKEN_PATTERN)) {
-    const tokenIndex = match.index;
-    const operation = match[1];
-    const environmentName = match[2];
-    if (tokenIndex === undefined || !operation || !environmentName) continue;
-
-    normalized += content.slice(cursor, tokenIndex);
-    if (operation === "begin") {
-      normalized += match[0];
-      openEnvironments.push(environmentName);
-    } else {
-      const matchingOpenIndex = openEnvironments.lastIndexOf(environmentName);
-      if (matchingOpenIndex >= 0) {
-        while (openEnvironments.length - 1 > matchingOpenIndex) {
-          normalized += `\\end{${openEnvironments.pop()!}}`;
-        }
-        normalized += match[0];
-        openEnvironments.pop();
-      }
-      // An orphan closing token is removed because it cannot represent valid
-      // nested LaTeX and retaining it would force KaTeX into its error fallback.
-    }
-    cursor = tokenIndex + match[0].length;
-  }
-
-  normalized += content.slice(cursor);
-  while (openEnvironments.length > 0) {
-    normalized += `\\end{${openEnvironments.pop()!}}`;
-  }
-  return normalized;
-}
-
 function countRepeatedCharacter(value: string, start: number, character: string) {
   let end = start + 1;
   while (value[end] === character) end += 1;
@@ -165,12 +110,7 @@ function isInlineMathClosingBoundary(character: string | undefined) {
 
 function normalizeGeneratedQuizValue<T>(value: T): T {
   if (typeof value === "string") {
-    const normalized = normalizeQuizDisplayMathEnvironments(
-      normalizeMathTextLatexCommands(
-        normalizeMissingInlineMathClosers(normalizeQuizInlineMathDelimiters(value)),
-      ),
-    );
-    return stripForbiddenTextControlCharacters(normalized) as T;
+    return normalizeLearnerMathTextSyntax(normalizeQuizInlineMathDelimiters(value)) as T;
   }
   if (Array.isArray(value)) {
     return value.map((item) => normalizeGeneratedQuizValue(item)) as T;

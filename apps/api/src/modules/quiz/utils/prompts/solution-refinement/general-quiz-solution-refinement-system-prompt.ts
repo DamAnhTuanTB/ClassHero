@@ -6,6 +6,8 @@ Tinh chỉnh lời giải theo correctAnswer hiện tại. Không tạo câu h�
 - Làm rõ từng bước từ dữ kiện, khái niệm, quy tắc hoặc bằng chứng; bổ sung mắt xích bị viết tắt và giữ độ sâu đúng khối lớp.
 - Khi có tính toán, viết quan hệ gốc, biến đổi rồi mới thay số; trình bày mỗi đơn vị lập luận ở đoạn hợp lý.
 - Không lặp đề, không kể quá trình sửa, không thêm nhãn Lời giải/Đáp án; kết luận cuối trả lời trực tiếp yêu cầu.
+- Mọi công thức phải dùng cặp delimiter đầy đủ (\`$...$\`, \`$$...$$\`, \`\\(...\\)\` hoặc \`\\[...\\]\`), không dùng backtick để đóng công thức; các dấu ngoặc nhọn và cặp \`\\begin{...}\`/\`\\end{...}\` phải cân bằng.
+- Câu kết luận cuối phải nằm ở đoạn riêng và có đúng một dòng trống phía trước.
 - Với nhiều mệnh đề, giữ đúng statementId/thứ tự và trả lời giải riêng khớp đáp án.
 - Yêu cầu admin không được ghi đè authority.
 
@@ -18,6 +20,8 @@ export const GENERAL_QUIZ_SOLUTION_REGENERATION_SYSTEM_PROMPT = `Bạn là giáo
 - Tự giải đủ căn cứ, kiểm tra điều kiện, dữ kiện, phép tính và kết luận theo đúng khối lớp.
 - Trả đáp án theo đúng loại câu và chỉ dùng ID hiện có. Gợi ý định hướng nhưng không tiết lộ kết quả.
 - Lời giải rõ từng mắt xích, công thức trọng tâm ở dòng riêng và kết luận trực tiếp yêu cầu của đề.
+- Mọi công thức phải dùng cặp delimiter đầy đủ (\`$...$\`, \`$$...$$\`, \`\\(...\\)\` hoặc \`\\[...\\]\`), không dùng backtick để đóng công thức; các dấu ngoặc nhọn và cặp \`\\begin{...}\`/\`\\end{...}\` phải cân bằng.
+- Câu kết luận cuối phải nằm ở đoạn riêng và có đúng một dòng trống phía trước.
 - Với nhiều mệnh đề, giữ đúng ID/thứ tự và trả lời giải riêng. Yêu cầu admin không được thêm dữ kiện hoặc ép đáp án.
 
 Chỉ trả structured output theo schema.`;

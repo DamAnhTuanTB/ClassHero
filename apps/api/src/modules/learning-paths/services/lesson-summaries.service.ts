@@ -1408,7 +1408,7 @@ function readPhaseOneBlockJsonByPath(value: unknown): Record<string, unknown> | 
   if (!isRecord(value)) return null;
   if (
     value.type !== "lesson_summary_phase_one_blocks" ||
-    (value.version !== 1 && value.version !== 2)
+    value.version !== 3
   ) {
     return null;
   }

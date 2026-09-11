@@ -461,6 +461,7 @@ export class AssessmentAdminService {
           durationSeconds: dto.durationSeconds,
           totalScore: new Prisma.Decimal(10),
           source: ContentSource.ADMIN,
+          reviewStatus: ReviewStatus.DRAFT,
           sortOrder: (lastSet?.sortOrder ?? -1) + 1,
           createdById: userId,
           updatedById: userId,
@@ -642,7 +643,7 @@ export class AssessmentAdminService {
           correctAnswerJson: toInputJson(dto.correctAnswerJson),
           hintJson: toNullableInputJson(dto.hintJson),
           gradingConfigJson: Prisma.DbNull,
-          reviewStatus: ReviewStatus.APPROVED,
+          reviewStatus: ReviewStatus.NEEDS_REVIEW,
           sortOrder: (lastQuestion?.sortOrder ?? -1) + 1,
         },
       });
@@ -653,6 +654,7 @@ export class AssessmentAdminService {
         lessonId: set.lessonId,
         questionId: question.id,
         targetType: "TEST_QUESTION",
+        reviewStatus: ReviewStatus.NEEDS_REVIEW,
       });
 
       if (explanationId) {

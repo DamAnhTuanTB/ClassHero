@@ -114,7 +114,7 @@ describe("QuizGenerationJobService target set", () => {
         title: "Bộ đề 1",
         durationSeconds: 900,
         source: "ADMIN",
-        reviewStatus: "APPROVED",
+        reviewStatus: "DRAFT",
         sortOrder: 0,
         createdById: "admin-1",
         updatedById: "admin-1",

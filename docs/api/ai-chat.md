@@ -118,7 +118,7 @@ ASSUMPTION: Chat AI có thể xử lý sync trong request ở MVP nếu latency 
 - Retrieval tiếp tục filter theo lesson; transcript window không thay thế document RAG.
 - Cache key phải gồm timeline/transcript/chapter version để cấu hình cắt hoặc nội dung đã sửa không trả explanation cũ.
 - Chapter summary/flashcard video là background job, có source timestamp và review status.
-- Whole-video summary admin ở `M15.9` là pipeline riêng: bắt buộc video + saved
+- Whole-video summary admin ở `M9.7` là pipeline riêng: bắt buộc video + saved
   transcript, nhận toàn bộ normalized transcript packet và optional chapter
   timeline từ backend, dùng request draft/hash rồi chạy background job. Flow này
   không dùng window transcript của contextual Q&A và không ghi vào Lesson Summary.

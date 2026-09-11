@@ -65,7 +65,7 @@ dùng một màn nằm trong `screens/<screen>/components`. Import nội bộ d�
 | `tex-renderer/`                                      | Isolated TeX Live/LuaLaTeX → SVG service                                |
 | `test/`                                              | API unit/integration/live opt-in tests                                  |
 
-M15.9 entrypoints hiện nằm trong `modules/learning-paths/` và
+M9.7 Video Summary entrypoints hiện nằm trong `modules/learning-paths/` và
 `workers/services/video-summary-generation.service.ts`; tìm `video-summary` để
 mở controller, DTO, service, prompt/schema/source helpers và focused tests.
 Backend import nội bộ dùng `#api/...`; root domain chỉ giữ `*.module.ts`, phần còn

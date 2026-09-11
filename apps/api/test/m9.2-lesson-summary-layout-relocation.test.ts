@@ -34,7 +34,7 @@ describe("M9.2 lesson Summary layout relocation", () => {
     const prepared = prepareLessonSummaryPhaseOneLayoutEdits(
       {
         type: "lesson_summary_phase_one_blocks",
-        version: 2,
+        version: 3,
         providerOutput: output,
         blocks: mapped.phaseOneBlocks,
         providerPaths: mapped.phaseOneProviderPaths,
@@ -87,7 +87,7 @@ describe("M9.2 lesson Summary layout relocation", () => {
 
     const snapshot = {
       type: "lesson_summary_phase_one_blocks" as const,
-      version: 2 as const,
+      version: 3 as const,
       providerOutput: output,
       blocks: mapped.phaseOneBlocks,
       providerPaths: mapped.phaseOneProviderPaths,
@@ -211,7 +211,7 @@ describe("M9.2 lesson Summary layout relocation", () => {
 function createProviderOutput() {
   return getLessonSummaryProviderTransportOutputSchema("MATH", "CONTEXTUAL", 12).parse({
     title: "Phương trình đường thẳng",
-    objectives: null,
+    objectives: ["Nhận biết và sử dụng vectơ chỉ phương của đường thẳng."],
     theorySections: [
       {
         displayHeading: "Vectơ chỉ phương",

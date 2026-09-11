@@ -195,6 +195,7 @@ export async function syncAssessmentExplanation(
     lessonId: string;
     questionId: string;
     targetType: AiExplanationTargetType;
+    reviewStatus?: ReviewStatus;
   },
 ) {
   if (input.explanationJson === undefined) return input.currentExplanationId;
@@ -217,7 +218,7 @@ export async function syncAssessmentExplanation(
       data: {
         contentJson: toInputJson(input.explanationJson),
         source: ContentSource.ADMIN,
-        reviewStatus: ReviewStatus.APPROVED,
+        reviewStatus: input.reviewStatus ?? ReviewStatus.APPROVED,
         staleAt: null,
       },
       select: { id: true },
@@ -232,7 +233,7 @@ export async function syncAssessmentExplanation(
       lessonId: input.lessonId,
       contentJson: toInputJson(input.explanationJson),
       source: ContentSource.ADMIN,
-      reviewStatus: ReviewStatus.APPROVED,
+      reviewStatus: input.reviewStatus ?? ReviewStatus.APPROVED,
     },
     select: { id: true },
   });

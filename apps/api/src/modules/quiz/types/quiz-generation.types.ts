@@ -1,4 +1,7 @@
-import { AI_REASONING_EFFORT_LEVELS } from "@learning-path/shared";
+import {
+  AI_REASONING_EFFORT_LEVELS,
+  LEARNER_MATH_TEXT_SYNTAX_DESCRIPTION,
+} from "@learning-path/shared";
 import { Difficulty, QuestionType } from "@prisma/client";
 import { z } from "zod";
 
@@ -8,7 +11,7 @@ export const QUIZ_PROMPT_VERSIONS = {
   CHEMISTRY: "quiz-chemistry-v84-semantic-review-only",
   GENERAL: "quiz-general-v84-semantic-review-only",
 } as const;
-export const QUIZ_SCHEMA_VERSION = "quiz-pdf-figure-schema-v38-compact-descriptions";
+export const QUIZ_SCHEMA_VERSION = "quiz-pdf-figure-schema-v39-math-syntax-contract";
 export const QUIZ_MAX_OUTPUT_TOKENS = 12_000;
 export const QUIZ_MIN_OUTPUT_TOKENS = 1_000;
 export const QUIZ_MAX_CONFIGURED_OUTPUT_TOKENS = 32_000;
@@ -544,8 +547,7 @@ export function getGeneratedQuizOutputSchema(
     configuration.questionCount === undefined
       ? questions.min(1).max(50)
       : questions.length(configuration.questionCount);
-  const description =
-    "Danh sách câu Quiz theo đúng số lượng, loại câu và độ khó đã yêu cầu; mọi nội dung học sinh nhìn thấy phải tuân thủ system prompt.";
+  const description = LEARNER_MATH_TEXT_SYNTAX_DESCRIPTION;
   if (!configuration.includeSourceCoverageAudit) {
     return z.object({ questions: resolvedQuestions }).strict().describe(description);
   }

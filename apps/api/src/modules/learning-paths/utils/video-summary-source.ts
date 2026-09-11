@@ -1,6 +1,8 @@
 import { hashAiValue } from "#api/modules/ai/utils/ai-hash";
 
 type RecordValue = Record<string, unknown>;
+const LEADING_CHAPTER_NUMBER_PATTERN = /^\s*\d+\s*(?:[.)](?!\d)|[-–—:])\s*/u;
+
 export type VideoSummarySource = {
   videoUrl: string;
   transcript: Array<{ time: number; endTime?: number; text: string }>;
@@ -22,33 +24,38 @@ export function buildVideoSummarySource(input: {
   const videoUrl = input.videoUrl?.trim();
   const settings = record(input.customVideoSettings);
   if (!videoUrl || !settings) return null;
-  const start = numberOr(settings.startTimeInSeconds, 0);
   const transcript = Array.isArray(settings.transcript)
-    ? settings.transcript.flatMap((item) => {
-        const value = record(item);
-        const time = numberOr(value?.time, -1);
-        const text = typeof value?.text === "string" ? value.text.trim() : "";
-        return time >= start && text
-          ? [
-              {
-                time: round(time - start),
-                ...(typeof value?.endTime === "number"
-                  ? { endTime: round(Math.max(0, value.endTime - start)) }
-                  : {}),
-                text,
-              },
-            ]
-          : [];
-      })
+    ? settings.transcript
+        .flatMap((item) => {
+          const value = record(item);
+          const time = numberOr(value?.time, -1);
+          const text = typeof value?.text === "string" ? value.text.trim() : "";
+          return time >= 0 && text
+            ? [
+                {
+                  time: round(time),
+                  ...(typeof value?.endTime === "number"
+                    ? { endTime: round(Math.max(time, value.endTime)) }
+                    : {}),
+                  text,
+                },
+              ]
+            : [];
+        })
+        .sort((left, right) => left.time - right.time)
     : [];
   if (!transcript.length) return null;
   const chapters = Array.isArray(settings.chapters)
-    ? settings.chapters.flatMap((item) => {
-        const value = record(item);
-        const time = numberOr(value?.time, -1);
-        const title = typeof value?.title === "string" ? value.title.trim() : "";
-        return time >= start && title ? [{ time: round(time - start), title }] : [];
-      })
+    ? settings.chapters
+        .flatMap((item) => {
+          const value = record(item);
+          const time = numberOr(value?.time, -1);
+          const title = typeof value?.title === "string" ? value.title.trim() : "";
+          return time >= 0 && title
+            ? [{ time: round(time), title: normalizeVideoSummaryChapterTitle(title) }]
+            : [];
+        })
+        .sort((left, right) => left.time - right.time)
     : [];
   const language =
     typeof settings.transcriptLanguage === "string"
@@ -58,14 +65,21 @@ export function buildVideoSummarySource(input: {
     videoUrl: hashAiValue(videoUrl),
     transcript: hashAiValue(transcript),
     chapters: hashAiValue(chapters),
-    playerSettings: hashAiValue({
-      startTimeInSeconds: settings.startTimeInSeconds ?? null,
-      endTimeCutInSeconds: settings.endTimeCutInSeconds ?? null,
-    }),
+    // Video Summary is always generated for the original video. Lesson-player
+    // cut settings must neither trim/rebase the source nor make the summary stale.
+    playerSettings: hashAiValue({ timeline: "ORIGINAL_VIDEO" }),
     source: "",
   };
   hashes.source = hashAiValue(hashes);
   return { videoUrl, transcript, chapters, language, hashes };
+}
+
+export function normalizeVideoSummaryChapterTitle(value: string) {
+  const trimmedTitle = value.trim();
+  const titleWithoutNumber = trimmedTitle
+    .replace(LEADING_CHAPTER_NUMBER_PATTERN, "")
+    .trim();
+  return titleWithoutNumber || trimmedTitle;
 }
 
 export function serializeVideoSummarySourceText(source: VideoSummarySource) {

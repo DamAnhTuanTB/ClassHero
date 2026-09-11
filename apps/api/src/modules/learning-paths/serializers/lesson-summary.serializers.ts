@@ -5,13 +5,10 @@ import {
 } from "#api/modules/learning-paths/utils/lesson-summary-review";
 
 export function serializeLessonSummary(record: LessonSummaryRecord) {
-  const contentJson = isRecord(record.contentJson)
-    ? reconcileLessonSummaryReviewIssues(record.contentJson)
-    : record.contentJson;
   return {
     id: record.id,
     lessonId: record.lessonId,
-    contentJson: improveLessonSummaryReviewIssueCopy(contentJson),
+    contentJson: serializeLessonSummaryContentJson(record.contentJson),
     source: record.source,
     reviewStatus: record.reviewStatus,
     aiGenerationId: record.aiGenerationId,
@@ -20,6 +17,13 @@ export function serializeLessonSummary(record: LessonSummaryRecord) {
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
   };
+}
+
+export function serializeLessonSummaryContentJson(contentJson: unknown) {
+  const reconciledContentJson = isRecord(contentJson)
+    ? reconcileLessonSummaryReviewIssues(contentJson)
+    : contentJson;
+  return improveLessonSummaryReviewIssueCopy(reconciledContentJson);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

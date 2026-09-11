@@ -1,4 +1,7 @@
-import type { AiReasoningEffort } from "@learning-path/shared";
+import {
+  LEARNER_MATH_TEXT_SYNTAX_DESCRIPTION,
+  type AiReasoningEffort,
+} from "@learning-path/shared";
 import { Difficulty } from "@prisma/client";
 import { z } from "zod";
 
@@ -18,9 +21,9 @@ export interface FlashcardSubjectSnapshot {
   slug: string;
 }
 
-export const FLASHCARD_SCHEMA_VERSION = "flashcard_v6_solution_figure_only";
+export const FLASHCARD_SCHEMA_VERSION = "flashcard_v7_math_syntax_contract";
 export const FLASHCARD_PROMPT_VERSIONS: Record<FlashcardSubjectKey, string> = {
-  MATH: "flashcard_math_v7_solution_figure_only",
+  MATH: "flashcard_math_v8_angle_notation",
   PHYSICS: "flashcard_physics_v7_solution_figure_only",
   CHEMISTRY: "flashcard_chemistry_v7_solution_figure_only",
   GENERAL: "flashcard_general_v7_solution_figure_only",
@@ -70,7 +73,10 @@ export const generatedFlashcardOutputSchema = z
       .min(1)
       .max(60),
   })
-  .strict();
+  .strict()
+  .describe(
+    `Bộ Flashcard và mọi nội dung học sinh nhìn thấy. ${LEARNER_MATH_TEXT_SYNTAX_DESCRIPTION}`,
+  );
 
 export const flashcardGenerationJobInputSchema = z
   .object({

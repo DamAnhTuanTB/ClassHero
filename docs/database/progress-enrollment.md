@@ -94,9 +94,17 @@ Nếu cần tracking trial view, thêm bảng `trial_access_logs` sau.
 
 ### 6.4. M15 smart video progress extension
 
-Scope mở rộng M15 cần lưu tiến độ xem tách khỏi `lesson_progress`.
+Scope mở rộng M15 lưu tiến độ xem tách khỏi `lesson_progress`.
 
-ASSUMPTION tên model trước khi chốt Prisma:
+Model smart-resume đã chốt:
+
+- `video_playback_progress`: unique theo `(student_user_id, lesson_id)`, lưu
+  `last_position_seconds`, `timeline_version` và timestamps.
+- `timeline_version` là hash của video URL, trạng thái custom player và hai mốc
+  cắt. Đổi watermark/hiển thị không làm mất resume; đổi nguồn hoặc
+  cửa sổ phát sẽ không dùng nhầm vị trí cũ.
+
+ASSUMPTION các model còn lại trước khi chốt Prisma:
 
 ```txt
 video_playback_sessions
@@ -121,6 +129,8 @@ Index/constraint dự kiến:
 - GiST/range hoặc chiến lược merge phù hợp cho interval khi chốt schema.
 - index aggregate `(lesson_id, chapter_key, bucket_start_seconds)`.
 
-TODO `M15.1`: chốt model/field/migration cụ thể sau khi benchmark write volume và chiến lược merge interval.
+TODO `M15.1`: chốt model session/interval cụ thể sau khi benchmark write
+volume và chiến lược merge interval; không chuyển vị trí resume trở lại
+`lesson_progress`.
 
 ---

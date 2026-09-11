@@ -158,6 +158,10 @@ Rules:
 - `live_url` là optional cho buổi `LIVE`; buổi `BASIC` luôn lưu `live_url = null`.
 - Admin có thể chuyển lesson tới bất kỳ vị trí nào giữa một chapter, chapter khác trong cùng learning path và top-level. Service phải validate chapter, order/title, dịch các sibling bị ảnh hưởng và cập nhật lesson trong cùng transaction.
 - `custom_video_settings` (field JSON hiện có trong Prisma) có thể lưu transcript đã được admin duyệt ở `transcript: Array<{ time: number; endTime?: number; text: string }>` và ngôn ngữ ở `transcriptLanguage`; transcript là optional nên M3.8 không cần migration riêng. `time`/`endTime` lưu theo timestamp video nguồn với tối đa 3 chữ số thập phân để có thể ánh xạ lại khi cấu hình cắt thay đổi. API bản nháp và form admin hiển thị `playbackTime = sourceTime - startTimeInSeconds`; khi lưu/phát, frontend đổi ngược về source time. `endTime` optional để dữ liệu transcript cũ vẫn tương thích.
+- Khi `video_url` đổi sau chuẩn hóa hoặc bị clear, service giữ các cài đặt player
+  độc lập nhưng reset `chapters = []`, `transcript = []`, bỏ
+  `transcriptLanguage` và hard-delete `lesson_video_summaries` của lesson trong
+  cùng transaction. Không cần migration schema cho behavior này.
 - Quiz, flashcard, test, document, summary, progress và AI chat vẫn gắn với `lesson_id`.
 - Counter `learning_paths.total_chapter_count` và `learning_paths.total_lesson_count` phải được service cập nhật khi tạo/xóa mềm phần tử liên quan.
 - Chapter/lesson được clone cho bản cá nhân giữ `source_chapter_id`/`source_lesson_id` để ánh xạ lịch sử học trước khi cá nhân hóa; lesson nguồn không thuộc chapter tiếp tục có `chapter_id = null` trong bản clone.
@@ -208,7 +212,7 @@ Rules:
 
 ---
 
-### 5.6. `lesson_video_summaries` (`M15.9`, planned)
+### 5.6. `lesson_video_summaries` (`M9.7`, implemented)
 
 ```txt
 id uuid pk
@@ -236,13 +240,19 @@ Rules:
   `lessons.short_description` để không ghi đè Summary kiến thức từ PDF hoặc
   Tổng quan buổi học do admin nhập.
 - `content_json` dùng contract rich text riêng của Video Summary: overview ngắn,
-  sections theo thứ tự video và learning outcomes/problems solved. Công thức dùng
-  node LaTeX canonical của renderer chung; M15.9 không tạo STEM figure.
-- Bốn source hash được chụp từ dữ liệu backend đã chuẩn hóa. Thay đổi video URL,
-  transcript, chapter hoặc cấu hình cắt đặt `stale_at`; output stale vẫn được giữ
-  cho admin đối chiếu nhưng không được coi là bản mới nhất.
+  objectives và sections Knowledge/Example theo thứ tự video; không có khối
+  `summary` riêng. Công thức dùng node LaTeX canonical của renderer chung; M9.7
+  không tạo STEM figure. Dữ liệu version cũ được lọc `summary` ở read boundary,
+  không cần migration xóa JSON đã lưu.
+- Bốn source hash được chụp từ dữ liệu backend đã chuẩn hóa. Thay đổi riêng
+  transcript hoặc chapter đặt `stale_at`; output stale vẫn được giữ cho admin đối
+  chiếu nhưng không được coi là bản mới nhất. Thay đổi/clear Video URL hard-delete
+  record này vì toàn bộ output không còn thuộc cùng video.
 - Worker chỉ promote bản mới sau khi structured output qua schema/semantic gate;
   job lỗi không ghi đè bản hiện hành.
+- Action xóa Video Summary hard-delete bản ghi `lesson_video_summaries`; audit log
+  giữ snapshot trước khi xóa. Không cascade sang transcript, chapter, video hoặc
+  Lesson Summary.
 
 `lesson_video_summary_request_drafts` lưu preview immutable gồm lesson/admin,
 request hash, bốn source hash, exact system/user prompt, normalized chapter +

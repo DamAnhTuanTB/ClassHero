@@ -181,15 +181,16 @@ export function useStudentLessonQueries(
     enabled,
   });
   const testHistoryQuery = useQuery({
-    ...getStudentTestHistoryQueryOptions(lessonId, session?.accessToken, session?.user.id),
+    ...getStudentTestHistoryQueryOptions(
+      lessonId,
+      session?.accessToken,
+      session?.user.id,
+    ),
     enabled,
   });
   const prepareQuizTab = useCallback(async () => {
     const quizSets = lessonQuery.data?.quizSets ?? [];
-    const storedQuizSetId = readStoredQuizActiveSetId(
-      lessonId,
-      session?.user.id,
-    );
+    const storedQuizSetId = readStoredQuizActiveSetId(lessonId, session?.user.id);
     const quizSetId =
       quizSets.find((quizSet) => quizSet.id === storedQuizSetId)?.id ??
       quizSets[0]?.id ??
@@ -292,6 +293,7 @@ export function useStudentLessonQueries(
     testStatusQuery,
     testHistoryQuery,
     token: session?.accessToken ?? "",
+    userId: session?.user.id,
     prepareQuizTab,
     refreshLearningProgress,
   };

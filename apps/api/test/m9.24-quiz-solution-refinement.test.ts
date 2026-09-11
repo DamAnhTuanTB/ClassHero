@@ -5,6 +5,8 @@ import {
   multiStatementQuizSolutionRegenerationOutputSchema,
   multiStatementQuizSolutionRefinementOutputSchema,
   multipleChoiceQuizSolutionRegenerationOutputSchema,
+  QUIZ_SOLUTION_REFINEMENT_SCHEMA_VERSION,
+  QUIZ_SOLUTION_REGENERATION_SCHEMA_VERSION,
   quizSolutionRefinementJobInputSchema,
   singleQuizSolutionRefinementOutputSchema,
   textInputQuizSolutionRegenerationOutputSchema,
@@ -30,6 +32,10 @@ describe("M9.24 Quiz solution AI actions", () => {
       expect(regeneration).toContain("không được xem đáp án, hint hoặc lời giải cũ");
       expect(regeneration).toContain("ảnh hình đề đính kèm");
       expect(regeneration).toContain("không sao chép mù nhãn sai");
+      expect(refinement).toContain("cặp delimiter đầy đủ");
+      expect(refinement).toContain("đoạn riêng");
+      expect(regeneration).toContain("cặp delimiter đầy đủ");
+      expect(regeneration).toContain("đoạn riêng");
       expect(regeneration).toContain("Chỉ trả structured output theo schema");
     },
   );
@@ -40,6 +46,8 @@ describe("M9.24 Quiz solution AI actions", () => {
     expect(prompt).toContain("Mỗi kết luận có nhãn nằm ở đoạn riêng");
     expect(prompt).toContain("Bỏ nhãn không được viện dẫn");
     expect(prompt).toContain("không nhảy cóc");
+    expect(prompt).toContain("`\\widehat{ABC}`");
+    expect(prompt).toContain("không viết `m\\angle ABC`");
   });
 
   it("sends current answer and solution only to REFINE", () => {
@@ -48,7 +56,7 @@ describe("M9.24 Quiz solution AI actions", () => {
     expect(request.userPrompt).toContain("CURRENT_SOLUTION");
     expect(request.userPrompt).not.toContain("CURRENT_HINT");
     expect(request.inputImages).toBeUndefined();
-    expect(request.promptVersion).toContain("refinement-math-v5");
+    expect(request.promptVersion).toContain("refinement-math-v6-math-syntax-contract");
   });
 
   it("sends problem, options and question image but hides old answer content from REGENERATE", () => {
@@ -64,7 +72,7 @@ describe("M9.24 Quiz solution AI actions", () => {
     expect(request.inputImages).toEqual([
       { imageUrl: "data:image/png;base64,AAAA", detail: "high" },
     ]);
-    expect(request.promptVersion).toContain("regeneration-math-v2");
+    expect(request.promptVersion).toContain("regeneration-math-v3-math-syntax-contract");
   });
 
   it.each(["MATH", "PHYSICS", "CHEMISTRY", "GENERAL"] as const)(
@@ -88,16 +96,29 @@ describe("M9.24 Quiz solution AI actions", () => {
   );
 
   it("uses strict mode-specific refinement output schemas", () => {
-    expect(singleQuizSolutionRefinementOutputSchema.parse({ solution: "Giải." })).toEqual({
-      solution: "Giải.",
-    });
+    expect(QUIZ_SOLUTION_REFINEMENT_SCHEMA_VERSION).toBe(
+      "quiz-solution-refinement-v4-math-syntax-contract",
+    );
+    expect(QUIZ_SOLUTION_REGENERATION_SCHEMA_VERSION).toBe(
+      "quiz-solution-regeneration-v2-math-syntax-contract",
+    );
     expect(
-      multiStatementQuizSolutionRefinementOutputSchema.parse({
-        statementSolutions: [
-          { statementId: "a", solution: "Giải a." },
-          { statementId: "b", solution: "Giải b." },
-        ],
-      }).statementSolutions.map((item) => item.statementId),
+      JSON.stringify(singleQuizSolutionRefinementOutputSchema.toJSONSchema()),
+    ).toContain("cặp delimiter đầy đủ");
+    expect(singleQuizSolutionRefinementOutputSchema.parse({ solution: "Giải." })).toEqual(
+      {
+        solution: "Giải.",
+      },
+    );
+    expect(
+      multiStatementQuizSolutionRefinementOutputSchema
+        .parse({
+          statementSolutions: [
+            { statementId: "a", solution: "Giải a." },
+            { statementId: "b", solution: "Giải b." },
+          ],
+        })
+        .statementSolutions.map((item) => item.statementId),
     ).toEqual(["a", "b"]);
     expect(
       singleQuizSolutionRefinementOutputSchema.safeParse({

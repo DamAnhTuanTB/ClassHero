@@ -4,6 +4,7 @@ import "katex/contrib/mhchem";
 import { MathpixMarkdownModel } from "mathpix-markdown-it";
 
 import {
+  LEARNING_CONTENT_KATEX_MACROS,
   normalizeLearningContentLatex,
   normalizeLearningContentLatexCommandEscapes,
   normalizeLearningContentMathMarkdown,
@@ -121,6 +122,20 @@ test("normalizes and renders supported Math, Chemistry, and Physics commands", (
     });
     expect(html).not.toContain('mathcolor="#cc0000"');
   }
+});
+
+test("renders wide arc notation from AI-authored learning content", () => {
+  const latex = String.raw`\operatorname{sd}\wideparen{BCD}+\operatorname{sd}\overparen{BAD}=360^\circ`;
+  const html = katex.renderToString(normalizeLearningContentLatex(latex), {
+    macros: LEARNING_CONTENT_KATEX_MACROS,
+    strict: false,
+    throwOnError: false,
+  });
+
+  expect(html).not.toContain('mathcolor="#cc0000"');
+  expect(html).toContain("⌢");
+  expect(html).toContain("BCD");
+  expect(html).toContain("BAD");
 });
 
 test("không biến từ trùng tên lệnh LaTeX trong văn xuôi thành công thức", () => {
@@ -316,6 +331,22 @@ test("giữ xuống dòng aligned khi dòng kế tiếp bắt đầu bằng lệ
   expect(normalizeLearningContentLatexCommandEscapes(content)).toBe(content);
 });
 
+test("tự đóng môi trường LaTeX còn thiếu trước khi render nội dung học sinh cũ", () => {
+  const malformed = String.raw`\begin{aligned}\widehat{C}&=180^\circ-\widehat{A}\\&=120^\circ,`;
+  const repaired = String.raw`\begin{aligned}\widehat{C}&=180^\circ-\widehat{A}\\&=120^\circ,\end{aligned}`;
+
+  expect(normalizeLearningContentLatex(malformed)).toBe(repaired);
+  expect(normalizeLearningContentLatex(repaired)).toBe(repaired);
+  expect(normalizeLearningContentLatex(String.raw`x^2+y^2`)).toBe(String.raw`x^2+y^2`);
+
+  const html = katex.renderToString(normalizeLearningContentLatex(malformed), {
+    displayMode: true,
+    strict: false,
+    throwOnError: false,
+  });
+  expect(html).not.toContain('mathcolor="#cc0000"');
+});
+
 test("chỉ bỏ slash escape dư và không nuốt row separator đứng trước lệnh", () => {
   expect(normalizeLearningContentLatexCommandEscapes(String.raw`\\widehat{C}`)).toBe(
     String.raw`\widehat{C}`,
@@ -362,6 +393,17 @@ test("pipeline Mathpix giữ đủ ba dòng của các lời giải Quiz bị l�
     });
     expect(html.match(/<mtr>/gu)).toHaveLength(3);
   }
+});
+
+test("repairs a missing terminal inline-math closer without guessing an unfinished formula", () => {
+  const malformed = String.raw`Tứ giác $ABCD$ nội tiếp đường tròn $(O).`;
+  const repaired = String.raw`Tứ giác $ABCD$ nội tiếp đường tròn $(O)$.`;
+
+  expect(normalizeMathpixMarkdown(malformed)).toBe(repaired);
+  expect(normalizeMathpixMarkdown(repaired)).toBe(repaired);
+  expect(normalizeMathpixMarkdown(String.raw`Trường hợp mơ hồ $x+1`)).toBe(
+    String.raw`Trường hợp mơ hồ $x+1`,
+  );
 });
 
 test("pipeline Mathpix giữ row separator ở mọi lệnh từng được hỗ trợ sửa escape", () => {

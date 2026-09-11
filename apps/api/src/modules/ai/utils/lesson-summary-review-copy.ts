@@ -21,7 +21,7 @@ const DIFFICULT_TERM_REPLACEMENTS: Array<[RegExp, string]> = [
   [/\bsolution\b/giu, "lời giải"],
   [/\banswer\b/giu, "đáp án"],
   [/\bsteps\b/giu, "các bước thực hiện"],
-  [/\bobjectives\b/giu, "mục tiêu học tập"],
+  [/\bobjectives\b/giu, "kiến thức trọng tâm"],
   [/\bvisual\b/giu, "hình minh họa"],
   [/\btype\b/giu, "loại dữ liệu"],
   [/\binvalid\b/giu, "chưa hợp lệ"],

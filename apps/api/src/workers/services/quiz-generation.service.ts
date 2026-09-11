@@ -44,6 +44,7 @@ import {
 import {
   getGeneratedQuizSolutionText,
   mapGeneratedQuizQuestion,
+  normalizeQuizLearnerText,
   toQuizSolutionTiptap,
   toQuizTiptap,
 } from "#api/modules/quiz/utils/quiz-generation-mapper";
@@ -72,7 +73,10 @@ import {
   buildQuizSolutionRefinementInput,
   buildQuizSolutionRegenerationInput,
 } from "#api/modules/quiz/utils/quiz-solution-refinement-prompt";
-import { normalizeGeneratedQuizQuestionContent } from "#api/modules/quiz/utils/quiz-generation-content-normalizer";
+import {
+  normalizeGeneratedQuizQuestionContent,
+  normalizeQuizConclusionParagraph,
+} from "#api/modules/quiz/utils/quiz-generation-content-normalizer";
 import { buildQuizStructuredInput } from "#api/modules/quiz/utils/quiz-generation-prompt";
 import {
   type GenerationRecoveryIssue,
@@ -744,10 +748,13 @@ function assertOrderedIds(expected: string[], actual: string[]) {
 function toSolutionText(
   output: QuizSolutionRefinementOutput | QuizSolutionRegenerationOutput,
 ) {
-  if ("solution" in output) return output.solution.trim();
-  return output.statementSolutions
-    .map(({ statementId, solution }) => `**${statementId})** ${solution.trim()}`)
-    .join("\n\n");
+  const solution =
+    "solution" in output
+      ? output.solution.trim()
+      : output.statementSolutions
+          .map(({ statementId, solution }) => `**${statementId})** ${solution.trim()}`)
+          .join("\n\n");
+  return normalizeQuizConclusionParagraph(normalizeQuizLearnerText(solution));
 }
 
 function readCurrentStoredSolution(sourceMetadata: unknown, explanationJson: unknown) {

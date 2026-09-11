@@ -30,8 +30,13 @@ Behavior:
 - Trả metadata chapter cha để UI hiển thị breadcrumb/tổng quan.
 - Trả `navigation.previous`/`navigation.next` theo thứ tự chapter + lesson của
   lộ trình hiệu lực.
-- Trả video, material, document `READY`, tóm tắt đã duyệt và metadata của
-  quiz/flashcard/test set đã duyệt, không phải reserve.
+- Trả video, material, document `READY`, tóm tắt kiến thức đã duyệt,
+  `videoSummary` đã duyệt và metadata của quiz/flashcard/test set đã duyệt,
+  không phải reserve. `videoSummary` chỉ xuất hiện khi bản ghi `APPROVED`, chưa
+  xóa và không stale; response không trả review/source hash hay provenance admin.
+- Trả `videoProgress` của đúng student gồm vị trí gần nhất, phiên bản
+  timeline và thời điểm lưu. Khi video URL hoặc cửa sổ cắt thay đổi,
+  vị trí cũ không được trả về cho timeline mới.
 - Figure Summary/Quiz đã duyệt trả optional `displayScale` do backend hydrate từ
   source revision để giao diện co/phóng toàn bộ visual card nhất quán; response
   student không trả mã TikZ và asset cũ thiếu metadata giữ layout mặc định.
@@ -66,6 +71,12 @@ Response chính:
     "materials": [],
     "documents": [],
     "summary": null,
+    "videoSummary": null,
+    "videoProgress": {
+      "lastPositionSeconds": 1203,
+      "timelineVersion": "sha256",
+      "updatedAt": "2026-09-11T03:00:00.000Z"
+    },
     "quizSets": [],
     "flashcardSets": [],
     "testSets": [],
@@ -167,7 +178,7 @@ Role: `STUDENT`.
 
 ---
 
-## 15. Smart video learning API (`M15`, planned)
+## 15. Smart video learning API (`M15`)
 
 Các endpoint dưới đây là contract định hướng; request/response cuối cùng được chốt trong từng subtask trước khi code.
 
@@ -177,11 +188,33 @@ Role: `STUDENT`.
 
 Behavior:
 
-- Trả `lastPositionSeconds`, unique watched seconds/percent, timeline version và optional chapter mastery/recommendations.
+- Trả `lastPositionSeconds`, `timelineVersion` và `updatedAt` cho lát cắt
+  smart-resume đã triển khai. Unique watched seconds/percent và optional
+  chapter mastery/recommendations được bổ sung trong các lát cắt M15 sau.
 - Mọi timestamp phía student dùng timeline sau cắt.
 - Không dùng watched percent để tự đánh dấu completed.
 
+### `PATCH /student/lessons/:lessonId/video-progress`
+
+Role: `STUDENT`.
+
+Body:
+
+```json
+{ "positionSeconds": 1203.4 }
+```
+
+Behavior:
+
+- Kiểm tra quyền đọc lesson và lưu vị trí tuyệt đối gần nhất theo
+  timeline sau cắt; request lặp an toàn vì không cộng dồn thời gian.
+- Client batch khoảng 10 giây và flush khi pause, ẩn/rời trang hoặc
+  component unmount; không gửi theo từng frame.
+- Response cùng shape với `GET video-progress`.
+
 ### `POST /student/lessons/:lessonId/video-sessions`
+
+Planned cho watched intervals và analytics đầy đủ.
 
 Role: `STUDENT`.
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Save } from "lucide-react";
+import { Clock3, Save } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Controller, useForm, type Resolver } from "react-hook-form";
 import { toast } from "sonner";
@@ -9,6 +9,7 @@ import { z } from "zod";
 import { tiptapTextDocumentSchema } from "@learning-path/shared";
 import { EditorDialogShell } from "@/components/admin/courses/editor-dialog-shell";
 import { FieldLabel } from "@/components/common/forms/field-label";
+import { TextField } from "@/components/common/forms/text-field";
 import { AdminLessonSummaryGeometryStatementFields } from "@/features/admin/ai-generation/components/admin-lesson-summary-geometry-statement-fields";
 import {
   AdminLessonSummaryBlockFigureFields,
@@ -27,6 +28,9 @@ import {
   createLessonSummaryBlockEditorValues,
   getLessonSummaryBlockEditableFields,
   getLessonSummaryBlockLabel,
+  formatLessonSummaryStartTime,
+  LESSON_SUMMARY_START_TIME_PATTERN,
+  parseLessonSummaryStartTime,
   type LessonSummaryBlockEditorValues,
   type LessonSummaryEditableBlockType,
   type LessonSummaryEditableField,
@@ -82,6 +86,10 @@ const lessonSummaryBlockFormSchema = z
       "exercise",
       "summary",
     ]),
+    isVideoTimelineHidden: z.boolean(),
+    startTimeEnabled: z.boolean(),
+    startTime: z.string().optional().default(""),
+    originalStartTime: z.string().optional().default(""),
     title: editorDocumentSchema,
     content: editorDocumentSchema,
     problem: editorDocumentSchema,
@@ -92,6 +100,17 @@ const lessonSummaryBlockFormSchema = z
     conclusions: editorDocumentSchema,
   })
   .superRefine((values, context) => {
+    if (values.startTimeEnabled) {
+      for (const field of ["startTime", "originalStartTime"] as const) {
+        if (!LESSON_SUMMARY_START_TIME_PATTERN.test(values[field])) {
+          context.addIssue({
+            code: "custom",
+            message: "Dùng định dạng MM:SS hoặc H:MM:SS",
+            path: [field],
+          });
+        }
+      }
+    }
     for (const field of getLessonSummaryBlockEditableFields(values.blockType)) {
       const value = values[field];
       if (!hasTiptapDocumentContent(value)) {
@@ -138,8 +157,12 @@ export function AdminLessonSummaryBlockEditorDialog({
   blockPath,
   figures,
   isOpen,
+  isVideoTimelineEditor = false,
+  isVideoTimelineHidden = false,
   lessonId,
   subjectKey,
+  videoEndTimeSeconds,
+  videoStartTimeOffsetSeconds = 0,
   onClose,
   onSave,
 }: {
@@ -147,8 +170,12 @@ export function AdminLessonSummaryBlockEditorDialog({
   blockPath: string;
   figures: AdminStemFigure[];
   isOpen: boolean;
+  isVideoTimelineEditor?: boolean;
+  isVideoTimelineHidden?: boolean;
   lessonId: string;
   subjectKey: "MATH" | "PHYSICS" | "CHEMISTRY" | "GENERAL" | null;
+  videoEndTimeSeconds?: number;
+  videoStartTimeOffsetSeconds?: number;
   onClose: () => void;
   onSave: (block: Record<string, unknown>) => void;
 }) {
@@ -158,7 +185,10 @@ export function AdminLessonSummaryBlockEditorDialog({
     ) as Resolver<LessonSummaryBlockEditorValues>,
     mode: "onChange",
     reValidateMode: "onChange",
-    defaultValues: createLessonSummaryBlockEditorValues(block),
+    defaultValues: createLessonSummaryBlockEditorValues(block, {
+      isVideoTimelineHidden,
+      startTimeOffsetSeconds: videoStartTimeOffsetSeconds,
+    }),
   });
   const editableFields = getLessonSummaryBlockEditableFields(block.type);
   const blockLabel = getLessonSummaryBlockLabel(block.type);
@@ -172,12 +202,39 @@ export function AdminLessonSummaryBlockEditorDialog({
     ensureFigureMutation.isPending ||
     replaceFigureMutation.isPending ||
     deleteFigureMutation.isPending;
+  const hasVideoStartCut =
+    Number.isFinite(videoStartTimeOffsetSeconds) && videoStartTimeOffsetSeconds > 0;
+  const originalStartTime = form.watch("originalStartTime");
+  const originalStartSeconds = parseLessonSummaryStartTime(originalStartTime);
+  const isOriginalTimeOutsidePlayback =
+    originalStartSeconds !== null &&
+    ((isVideoTimelineHidden && originalStartSeconds < videoStartTimeOffsetSeconds) ||
+      (Number.isFinite(videoEndTimeSeconds) &&
+        originalStartSeconds >= (videoEndTimeSeconds ?? Number.MAX_SAFE_INTEGER)));
+  const playbackStartTime =
+    originalStartSeconds === null || isOriginalTimeOutsidePlayback
+      ? ""
+      : formatLessonSummaryStartTime(
+          Math.max(0, originalStartSeconds - videoStartTimeOffsetSeconds),
+        );
 
   useEffect(() => {
     if (!isOpen) return;
-    form.reset(createLessonSummaryBlockEditorValues(block));
+    form.reset(
+      createLessonSummaryBlockEditorValues(block, {
+        isVideoTimelineHidden,
+        startTimeOffsetSeconds: videoStartTimeOffsetSeconds,
+      }),
+    );
     setFigureDrafts({});
-  }, [block, blockPath, form, isOpen]);
+  }, [
+    block,
+    blockPath,
+    form,
+    isOpen,
+    isVideoTimelineHidden,
+    videoStartTimeOffsetSeconds,
+  ]);
 
   const submit = form.handleSubmit(async (values) => {
     try {
@@ -203,6 +260,9 @@ export function AdminLessonSummaryBlockEditorDialog({
       }
       onSave(
         applyLessonSummaryBlockEditorValues(block, values, {
+          isVideoTimelineHidden,
+          preferOriginalStartTime: isVideoTimelineEditor,
+          startTimeOffsetSeconds: videoStartTimeOffsetSeconds,
           updateGeometryStatement: supportsGeometryStatement,
         }),
       );
@@ -249,6 +309,72 @@ export function AdminLessonSummaryBlockEditorDialog({
         </header>
 
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5 sm:p-6">
+          {form.watch("startTimeEnabled") ? (
+            <div
+              className={
+                hasVideoStartCut || isVideoTimelineEditor || isVideoTimelineHidden
+                  ? "grid max-w-2xl gap-4 sm:grid-cols-2"
+                  : "max-w-sm"
+              }
+            >
+              {isVideoTimelineEditor ? (
+                <TextField
+                  id="lesson-summary-block-start-time"
+                  inputMode="numeric"
+                  label="Thời gian bắt đầu"
+                  value={playbackStartTime || "—"}
+                  helperText={
+                    isOriginalTimeOutsidePlayback
+                      ? "Khối đang nằm ngoài khoảng phát."
+                      : "Tự động tính từ thời gian gốc, chỉ để đối chiếu."
+                  }
+                  icon={<Clock3 className="h-5 w-5" aria-hidden="true" />}
+                  disabled
+                />
+              ) : (
+                <TextField
+                  id="lesson-summary-block-start-time"
+                  inputMode="numeric"
+                  label="Thời gian bắt đầu"
+                  placeholder="VD: 12:30 hoặc 1:02:30"
+                  helperText="Dùng định dạng MM:SS hoặc H:MM:SS."
+                  icon={<Clock3 className="h-5 w-5" aria-hidden="true" />}
+                  disabled={isVideoTimelineHidden}
+                  error={form.formState.errors.startTime}
+                  {...form.register("startTime")}
+                />
+              )}
+              {hasVideoStartCut || isVideoTimelineEditor || isVideoTimelineHidden ? (
+                <Controller
+                  control={form.control}
+                  name="originalStartTime"
+                  render={({ field, fieldState }) => (
+                    <TextField
+                      id="lesson-summary-block-original-start-time"
+                      inputMode="numeric"
+                      label="Thời gian gốc"
+                      helperText={
+                        isVideoTimelineEditor
+                          ? "Mốc trên video gốc; thời gian sau cắt sẽ tự cập nhật."
+                          : "Tự động tính từ mốc sau cắt, chỉ để đối chiếu."
+                      }
+                      icon={<Clock3 className="h-5 w-5" aria-hidden="true" />}
+                      disabled={!isVideoTimelineEditor && !isVideoTimelineHidden}
+                      error={
+                        isVideoTimelineEditor || isVideoTimelineHidden
+                          ? fieldState.error
+                          : undefined
+                      }
+                      value={field.value}
+                      onBlur={field.onBlur}
+                      onChange={field.onChange}
+                    />
+                  )}
+                />
+              ) : null}
+            </div>
+          ) : null}
+
           {editableFields.map((fieldName) => {
             const config = FIELD_CONFIG[fieldName];
             const maxLength = getFieldMaxLength(block.type, fieldName);

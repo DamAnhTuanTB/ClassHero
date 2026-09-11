@@ -221,9 +221,20 @@ export function useAdminAssessmentQuestionMutations(
       onSuccess: invalidate,
     }),
     reviewQuestion: useMutation({
-      mutationFn: (questionId: string) => {
+      mutationFn: ({
+        questionId,
+        reviewStatus,
+      }: {
+        questionId: string;
+        reviewStatus: "APPROVED" | "NEEDS_REVIEW";
+      }) => {
         if (!session?.accessToken) throw new Error("No token");
-        return reviewAdminAssessmentQuestion(kind, questionId, session.accessToken);
+        return reviewAdminAssessmentQuestion(
+          kind,
+          questionId,
+          reviewStatus,
+          session.accessToken,
+        );
       },
       onSuccess: invalidate,
     }),

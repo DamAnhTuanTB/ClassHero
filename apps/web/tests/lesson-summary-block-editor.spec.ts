@@ -10,7 +10,7 @@ test.describe("lesson summary block Tiptap editor", () => {
     const values = createLessonSummaryBlockEditorValues({
       type: "theorem",
       title: "Tổng hai góc đối",
-      content: String.raw`Ta có $\angle DAB+\angle BCD=180^\circ$.`,
+      content: String.raw`Ta có $m\angle DAB+m\widehat{BCD}=180^\circ$.`,
     });
 
     expect(values.content).toEqual({
@@ -47,6 +47,95 @@ test.describe("lesson summary block Tiptap editor", () => {
         createLessonSummaryBlockEditorValues(block),
       ),
     ).toEqual(block);
+  });
+
+  test("shows and updates the original-video start time for timed blocks", () => {
+    const block = {
+      type: "knowledge" as const,
+      title: "Hệ hai phương trình bậc nhất",
+      content: "Nội dung kiến thức.",
+      startSeconds: 75.25,
+    };
+    const values = createLessonSummaryBlockEditorValues(block);
+
+    expect(values.startTimeEnabled).toBe(true);
+    expect(values.startTime).toBe("1:15");
+    expect(applyLessonSummaryBlockEditorValues(block, values)).toEqual(block);
+    expect(
+      applyLessonSummaryBlockEditorValues(
+        block,
+        {
+          ...values,
+          originalStartTime: "1:02:03",
+        },
+        { preferOriginalStartTime: true },
+      ),
+    ).toMatchObject({ startSeconds: 3_723 });
+  });
+
+  test("edits the original time while preserving the derived post-cut time", () => {
+    const block = {
+      type: "knowledge" as const,
+      title: "Hệ hai phương trình bậc nhất",
+      content: "Nội dung kiến thức.",
+      startSeconds: 2_026.5,
+    };
+    const values = createLessonSummaryBlockEditorValues(block, {
+      startTimeOffsetSeconds: 5,
+    });
+
+    expect(values.startTime).toBe("33:41");
+    expect(
+      applyLessonSummaryBlockEditorValues(block, values, {
+        startTimeOffsetSeconds: 5,
+      }),
+    ).toEqual(block);
+    expect(
+      applyLessonSummaryBlockEditorValues(
+        block,
+        { ...values, originalStartTime: "34:05" },
+        { preferOriginalStartTime: true, startTimeOffsetSeconds: 5 },
+      ),
+    ).toMatchObject({ startSeconds: 2_045 });
+  });
+
+  test("edits original time directly for a hidden video block", () => {
+    const block = {
+      type: "knowledge" as const,
+      title: "Khối ẩn",
+      content: "Nội dung ngoài khoảng phát.",
+      startSeconds: 1_700,
+    };
+    const values = createLessonSummaryBlockEditorValues(block, {
+      isVideoTimelineHidden: true,
+      startTimeOffsetSeconds: 1_800,
+    });
+
+    expect(values.startTime).toBe("0:00");
+    expect(values.originalStartTime).toBe("28:20");
+    expect(
+      applyLessonSummaryBlockEditorValues(
+        block,
+        { ...values, originalStartTime: "30:08" },
+        {
+          isVideoTimelineHidden: true,
+          startTimeOffsetSeconds: 1_800,
+        },
+      ),
+    ).toMatchObject({ startSeconds: 1_808 });
+  });
+
+  test("does not add a start time to ordinary lesson-summary blocks", () => {
+    const block = {
+      type: "knowledge" as const,
+      title: "Hệ hai phương trình bậc nhất",
+      content: "Nội dung kiến thức.",
+    };
+    const values = createLessonSummaryBlockEditorValues(block);
+
+    expect(values.startTimeEnabled).toBe(false);
+    expect(values.startTime).toBe("");
+    expect(applyLessonSummaryBlockEditorValues(block, values)).toEqual(block);
   });
 
   test("preserves an unchanged hypothesis/conclusion statement", () => {

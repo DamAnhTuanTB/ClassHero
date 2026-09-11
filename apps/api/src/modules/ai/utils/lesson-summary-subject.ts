@@ -61,7 +61,7 @@ export function buildLessonContentSubjectProfile(subject: LessonSummarySubjectSn
         "- Ưu tiên ký hiệu đúng nguồn rồi đến ký hiệu chuẩn của công thức Toán; ký hiệu phụ mới phải được gọi tên theo đại lượng/đối tượng trước khi dùng và không đổi nghĩa giữa chừng.",
         "- Khi tạo bài toán về hình chữ nhật có hai số đo cạnh khác nhau, dùng `chiều dài` cho số đo lớn hơn và `chiều rộng` cho số đo nhỏ hơn; không gọi một cạnh là `chiều cao`. Counterexample hợp lệ: vẫn dùng `chiều cao` cho đường cao, khoảng cách vuông góc, độ cao theo trục trong một mô hình hoặc kích thước của hình khối; nếu hai cạnh bằng nhau thì gọi là hình vuông thay vì cố gán một cạnh dài hơn.",
         "- Với chứng minh hình học lớp 7–9, example.geometryStatement phải có GT và KL; trường hợp khác để null.",
-        "- Chuẩn hóa kí hiệu góc theo ba điểm với đỉnh ở giữa, ví dụ ∠ABC có đỉnh B.",
+        "- Góc ba điểm phải viết theo quy ước SGK `$\\widehat{ABC}$` với B là đỉnh; không viết `$m\\angle ABC$`, `$\\angle ABC$` hoặc đổi ký hiệu cung thành góc.",
       ].join("\n");
     case "PHYSICS":
       return [

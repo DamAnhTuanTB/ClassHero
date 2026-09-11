@@ -8,7 +8,9 @@ Mục tiêu: đủ rõ để Codex tạo NestJS AI module, AiProvider abstractio
 
 - Embedding/RAG `M5.x`: đọc `Provider strategy`, `Document processing pipeline`, `Retrieval spec`, `Background jobs`.
 - AI generation `M9.1` đến `M9.3`: đọc `AI generation types`, `Mapping AI output to database`, `Background jobs`.
-- Explanation/chat `M9.4` đến `M9.7`: đọc `Explanation cache invalidation`, `Chat AI trong buổi học`, `Student request-new logic`, `Safety`.
+- Student request-new/explanation/chat `M9.4` đến `M9.6`: đọc `Explanation cache invalidation`, `Chat AI trong buổi học`, `Student request-new logic`, `Safety`.
+- Admin Video Summary `M9.7`: đọc `Whole-video summary admin`, cùng contract API,
+  database và UI Video Summary tương ứng.
 - Nếu task đổi bảng/log/cache, đối chiếu `docs/04-database-model.md` và file phù hợp trong `docs/database/`.
 - Nếu task đổi endpoint hoặc response, đối chiếu `docs/05-api-contract.md` và file phù hợp trong `docs/api/`.
 - Không gọi provider thật trong test mặc định; dùng mock provider.
@@ -113,11 +115,13 @@ khi worker được phép gọi logic lưu domain.
 
 Để tránh gửi cùng một policy hai lần, stable system prompt sở hữu các rule về
 nội dung, nguồn, lập luận và định dạng; description trong JSON Schema chỉ mô tả
-shape, constraint máy kiểm được và ý nghĩa cục bộ của field. Summary áp dụng
+shape, constraint máy kiểm được, ý nghĩa cục bộ của field và invariant cú pháp
+toán cơ học dùng chung. Summary áp dụng
 cùng nguyên tắc này cho root description: schema `ref_v2` giảm từ 20.636 xuống
 16.968 byte ở Math và từ 16.054 xuống 12.386 byte ở các subject còn lại, không
 đổi JSON shape, Zod validation hay mapper. Custom system prompt vì vậy không bị
-policy mặc định chèn ngược trở lại qua root schema description.
+policy chuyên môn mặc định chèn ngược trở lại; invariant delimiter/ngoặc/môi
+trường cân bằng vẫn tồn tại ở root schema description.
 
 Ngay tại cổng structured output dùng chung, backend phải loại ký tự NUL `U+0000`
 khỏi mọi string/key lồng nhau trước lần Zod parse cuối. JavaScript có thể giữ ký
@@ -681,14 +685,15 @@ thức`). Không dùng ba bullet dài liền nhau vì preview khó nhận ra ran
   bằng chữ hoa, có ít nhất hai từ và không chứa cú pháp toán. Dấu `$` được chèn
   trước dấu câu. Decimal, công thức nhiều vế, code span, display math, currency
   escape và trường hợp mơ hồ phải giữ nguyên.
-  Structured Outputs sở hữu JSON transport; default prompt không yêu cầu model
-  phân biệt raw escape, rà ký tự điều khiển hoặc sửa delimiter. Các lỗi cơ học
-  chắc chắn được giao cho normalizer sau khi provider trả structured output.
+  Prompt mặc định và root schema description đều yêu cầu delimiter, ngoặc nhọn
+  và môi trường cân bằng để model trả đúng ngay từ đầu; backend normalizer vẫn là
+  safety net, không phải lý do bỏ contract khỏi prompt/schema.
   Nếu provider vẫn thay dấu `\\` bằng `U+001C` đã decode hoặc chuỗi escape như
   `u001cwidehat`, normalizer phải khôi phục dấu `\\` trước mọi tên lệnh thuộc
   allowlist, không chỉ riêng `widehat`; alias lỗi đã biết như `u001croot` được
   khôi phục về `\\sqrt`. Cơ chế chạy trong toàn bộ đề, phương án/mệnh đề, gợi ý
-  và lời giải; ký tự điều khiển không in được còn lại phải bị loại trước khi lưu
+  và lời giải của Summary, Video Summary, Quiz, Test và Flashcard; ký tự điều
+  khiển không in được còn lại phải bị loại trước khi lưu
   và trước khi render dữ liệu cũ. Admin Quiz JSON preview/save chạy lại cùng
   repair trên mọi field chữ để snapshot AI cũ được project và lưu nhất quán.
   Repair phải idempotent, không đổi prose, currency escape hoặc identifier không
@@ -830,10 +835,11 @@ Quiz và Test tiếp tục dùng contract câu hỏi riêng của M9.3:
   Summary Toán ở phần phương pháp/example `AI_AUTHORED`/`SOURCE_ADAPTED`, cùng
   lời giải Test Toán; Flashcard, answer ngắn, prompt vẽ hình và các subject khác
   không bị ép dùng quy ước đánh số này. Đây là invariant prompt-only; không thêm
-  semantic validator hay đổi JSON shape. Corrective dùng prompt version mới
-  `lesson-summary-math-v41-lesson-core-exercise-diversity`,
-  `quiz-math-v78`, `lesson-content-math-v12` và
-  `quiz-solution-refinement-math-v4`; các subject refinement khác dùng `v2`.
+  semantic validator hay đổi JSON shape. Corrective hiện dùng prompt version
+  `lesson-summary-math-v45-math-syntax-contract`,
+  `quiz-math-v89-semantic-review-only`, `lesson-content-math-v14-angle-notation` và
+  `quiz-solution-refinement-math-v6-math-syntax-contract`; các subject
+  refinement khác dùng cùng generation contract `v6`.
 
 ### 5.1. Summary generation
 
@@ -898,6 +904,17 @@ Contract provider:
 - Mỗi section dùng `items[]`: `UNIT { theory, example }` hoặc `NOTE { note }`.
   Mapper flatten `UNIT` thành theory rồi example liền nhau; note giữ đúng vị trí
   trước/giữa/sau unit và không thể chen vào giữa cặp bắt buộc.
+- `objectives` là field cấp cao do provider sinh, được UI đặt thành khối riêng ở
+  đầu bản Sinh kiến thức giống cấu trúc của Video Summary. Mỗi
+  `theorySections[]` có đúng một objective cùng vị trí, nêu ngắn gọn kiến thức
+  hoặc năng lực trọng tâm của section tương ứng. Đây là yêu cầu prompt; nếu
+  provider vẫn trả thiếu hoặc thừa objective, mapper giữ toàn bộ candidate và
+  gắn `OBJECTIVE_SECTION_COUNT_MISMATCH` để admin review thay vì hủy paid output.
+  Objective không phải bản sao bắt buộc của
+  `displayHeading`. `applicationExercises` và section backend tạo mang tên
+  `Bài tập vận dụng` không được đưa vào khối này. Các nhãn Ví dụ, Luyện tập,
+  Vận dụng, Bài tập hoặc tiểu mục không được nâng thành `theorySections` chỉ để
+  tạo thêm objective.
 - Theory/note có `sourcePageNumbers`. Example/exercise có `origin` và
   `sourcePageNumbers`; lời giải là string bắt buộc, phải diễn giải đầy đủ theo
   thứ tự và phong cách SGK, không rút thành gợi ý ngắn.
@@ -983,11 +1000,11 @@ Contract provider:
   field hoặc semantic validator. Vì schema chỉ kiểm tra cấu trúc và số lượng,
   quy tắc này định hướng model nhưng không tạo bảo đảm semantic tuyệt đối; mapper
   vẫn giữ output có cấu trúc hợp lệ nếu model tự đánh giá sai độ trùng.
-  Corrective này dùng prompt version
-  `lesson-summary-math-v41-lesson-core-exercise-diversity`,
-  `lesson-summary-{physics|chemistry|general}-v37-lesson-core-exercise-diversity`;
-  schema giữ nguyên
-  `lesson-summary-pdf-packet-six-block-schema-v29-exact-exercise-counts`.
+  Corrective hiện dùng prompt version
+  `lesson-summary-math-v45-math-syntax-contract`,
+  `lesson-summary-{physics|chemistry|general}-v40-math-syntax-contract`;
+  schema dùng
+  `lesson-summary-pdf-packet-six-block-schema-v33-math-syntax-warning`.
   Cache classification là `NEW_STABLE_PREFIX_WARMUP`: prompt mới tạo stable
   prefix/key mới và cần warm-up một lần cho từng subject/model/cặp số lượng;
   sau warm-up, các lesson/PDF cùng contract tiếp tục reuse prefix đó.
@@ -995,6 +1012,19 @@ Contract provider:
   `22.000` byte cho Toán lớp 7–9, `18.500` byte cho Toán lớp 10–12 và `17.500`
   byte cho subject không phải Toán. Thay đổi hợp lệ vượt trần phải được review và
   điều chỉnh budget có chủ đích, không xóa test hoặc quay lại lặp description.
+- Trong nội dung chữ của Summary Toán, góc ba điểm dùng quy ước SGK
+  `\widehat{ABC}` với B là đỉnh; provider không trả `m\angle ABC` hoặc
+  `\angle ABC`. Mapper và renderer chuẩn hóa hai dạng này, đồng thời
+  bỏ tiền tố `m` của dữ liệu cũ `m\widehat{ABC}`, để bảo vệ output lệch
+  chuẩn mà không đổi ký hiệu cung thành góc.
+  Dấu phân cách toán inline bị thiếu chỉ được tự khôi phục khi có ranh
+  giới câu chắc chắn; chuỗi công thức dở dang, mơ hồ phải được giữ nguyên.
+  Cùng quy ước text Toán được áp dụng cho Video Summary, Quiz, Flashcard
+  và Test; mỗi feature vẫn sở hữu prompt/mapper riêng. Prompt hiện hành bị
+  ảnh hưởng là `video-summary-v9-angle-notation`,
+  `flashcard_math_v8_angle_notation` và `lesson-content-math-v14-angle-notation`;
+  Quiz đã có quy tắc prompt tương ứng; fallback mapper/renderer dùng cùng helper
+  feature-neutral và schema root giữ contract cú pháp cơ học.
 - Mỗi example Toán tự phân loại bằng `isGeometry`. Với Hình học lớp 7–9, schema
   bắt buộc `isGeometry=true` và `geometryStatement` có cả GT lẫn KL. Với Hình học
   lớp 10–12, `isGeometry=true` nhưng `geometryStatement=null`; nội dung không
@@ -1084,9 +1114,24 @@ Contract provider:
   canonicalize.
 - Figure profile hiện tại là light-only.
 
-Sau mapper, review validator vẫn kiểm dấu `$` và ngoặc `{}` của mọi trường text
-chứa LaTeX; chuỗi mất cân bằng tạo `MALFORMED_LATEX` dạng `FIX_ONLY` tại đúng
-field. Không thêm semantic visual gate hoặc automatic visual retry.
+Sau mapper, review validator kiểm delimiter, ngoặc `{}` và cặp môi trường LaTeX
+của mọi trường text, gồm title, objectives, theory/note/example/exercise và
+`geometryStatement` GT–KL. Chuỗi còn mất cân bằng tạo `MALFORMED_LATEX` dạng
+`FIX_ONLY` tại đúng field. Đây chỉ là cảnh báo review, không chặn persist.
+
+Contract chuẩn hóa learner text dùng chung:
+
+- Summary chuẩn hóa root title/objectives, section heading, theory title/content,
+  note content, problem/solution/answer và GT–KL; Video Summary chuẩn hóa title,
+  objectives, heading cùng mọi field knowledge/example; Quiz và Test chuẩn hóa
+  đề, phương án/mệnh đề, hint, lời giải và GT–KL; Flashcard chuẩn hóa
+  front/back/solution.
+- Số đo góc ba điểm của môn Toán được canonicalize về `\widehat{ABC}`. Repair
+  delimiter, command backslash, environment và control character phải idempotent,
+  chỉ sửa khi có bằng chứng cơ học đủ chắc chắn và không tự đổi nghĩa chuyên môn.
+- Sau repair, lỗi cú pháp còn lại được persist dưới cảnh báo
+  `MALFORMED_LATEX`/review metadata với `blocking=false`; không được biến lỗi
+  trình bày này thành lỗi toàn job. Backend không tự bịa nội dung.
 
 Summary và figure dùng hai structured-output call khác nhau. Giai đoạn 1 đọc PDF
 packet và trả nội dung cùng provenance/locator của figure; backend chỉ cấp ID,
@@ -1532,8 +1577,8 @@ Default system prompt Quiz của mỗi môn phải giữ đúng tám section l�
 tự `I. Hồ sơ môn học`, `II. Kiểm chứng`, `III. Vai trò và nguồn kiến thức`,
 `IV. Tính mới so với ngân hàng Quiz`, `V. Bốn loại câu hỏi`, `VI. Phân loại độ
 khó`, `VII. Đề bài và lời giải`, `VIII. Hình minh họa`. Policy nội dung nằm ở
-system prompt; description trong provider schema chỉ giữ nghĩa field và
-constraint không thể hiện bằng shape. Các rule LaTeX, hint và lời giải phải viết
+system prompt; description trong provider schema chỉ giữ nghĩa field, constraint
+không thể hiện bằng shape và contract cú pháp toán cơ học dùng chung. Các rule LaTeX, hint và lời giải phải viết
 cô đọng theo invariant. Model chỉ tự kiểm chứng phần không thể xác minh
 deterministic: tính đúng chuyên môn, điều kiện áp dụng, mạch suy luận, độ khớp
 nguồn, tính mới và quan hệ ngữ nghĩa giữa dữ kiện với đáp án/hình. Structured
@@ -1541,9 +1586,9 @@ schema chịu trách nhiệm shape/required/enum và exact count của Quiz; m�
 lượng bài Summary chỉ được nêu một lần trong contract sinh, không lặp ở audit
 cuối. Normalizer/backend chịu trách nhiệm JSON transport, ký tự điều khiển,
 delimiter/môi trường LaTeX và ranh
-giới đoạn kết luận có thể sửa chắc chắn. Default prompt không yêu cầu model chạy
-thêm vòng rà riêng cho các lỗi cơ học này. Custom system prompt vẫn là full
-override và không bị chèn policy mặc định.
+giới đoạn kết luận có thể sửa chắc chắn. Prompt mặc định vẫn yêu cầu output đúng;
+backend chỉ là safety net. Custom system prompt là full override về policy nội
+dung, nhưng root schema vẫn giữ invariant cú pháp cơ học tối thiểu.
 Mỗi lần preview/tạo Quiz, backend lấy toàn bộ câu hỏi còn tồn tại trong lesson ở
 mọi trạng thái review, thuộc mọi Quiz set chưa xóa, rồi nối một index JSONL gọn
 vào cuối user prompt. Mỗi dòng là tuple dùng mã loại `M`/`T`/`S`/`I` tương ứng
@@ -1578,11 +1623,11 @@ Với `MULTI_STATEMENT_TRUE_FALSE`, câu kết cuối trong từng lời giải 
 `statements[].value` theo đúng ID (`true` → đúng, `false` → sai); model phải đối
 chiếu lại lập luận, value và câu kết trước khi trả JSON.
 System prompt là owner duy nhất của policy sinh nội dung; provider schema chỉ
-giữ shape, constraint máy kiểm được và mô tả ngắn về ý nghĩa field. Không lặp
-toàn bộ policy lời giải, gợi ý, định dạng LaTeX hay từng loại câu trong schema;
-Zod vẫn là cổng validation cuối và JSON shape không đổi. Cách phân vai này cũng
-giữ custom system prompt là full override thay vì vô tình chèn policy mặc định
-qua description của schema. Phần
+giữ shape, constraint máy kiểm được, mô tả ngắn về ý nghĩa field và invariant cú
+pháp toán cơ học. Không lặp toàn bộ policy lời giải, gợi ý hay từng loại câu
+trong schema; Zod vẫn là cổng validation cuối và JSON shape không đổi. Custom
+system prompt là full override về policy nội dung, còn invariant cơ học vẫn nằm
+trong root schema. Phần
 transport của Quiz khóa `schemaReferenceStrategy=ref_v2`; không dùng `auto` để
 tránh bộ chọn kích thước đổi strategy ngầm giữa các schema version. Sinh kiến
 thức tiếp tục dùng `ref_v2` đã được A/B và rollout riêng. Quiz gửi stable
@@ -1602,7 +1647,7 @@ mất cache prefix ổn định.
 Mỗi lần rút gọn hoặc đổi nghĩa system prompt/schema phải tăng version tương ứng;
 rollout hiện dùng `quiz-math-v89-semantic-review-only`,
 `quiz-{physics|chemistry|general}-v84-semantic-review-only` và
-`quiz-pdf-figure-schema-v38-compact-descriptions`. Đây là contract cache mới nên
+`quiz-pdf-figure-schema-v39-math-syntax-contract`. Đây là contract cache mới nên
 lượt đầu warm-up prefix; các lượt sau có cùng model và contract tiếp tục reuse
 cache dù index câu hỏi hiện có thay đổi.
 Sau khi persist, `ai_generations.output_json` của Quiz là mutable working
@@ -1867,8 +1912,8 @@ Validation:
   không thay đổi.
 - Mọi môi trường LaTeX trong display math phải có cặp `\begin{X}`/`\end{X}`
   đúng tên, đóng theo thứ tự lồng ngược và nằm trọn trước dấu `$$` kết thúc.
-  Đây là invariant cơ học do backend sở hữu, không phải một vòng tự rà trong
-  system prompt hoặc description provider schema. Sau structured output,
+  Đây là invariant cơ học được nêu trong prompt/schema và được backend bảo vệ.
+  Sau structured output,
   backend Quiz chạy normalizer deterministic trên toàn bộ
   chuỗi của từng câu: sửa inline math mở bằng `$` nhưng bị model đóng nhầm bằng
   backtick hoặc bị thiếu dấu đóng trước ranh giới câu đủ chắc chắn theo evidence
@@ -1876,7 +1921,8 @@ Validation:
   bổ sung thẻ đóng còn thiếu theo stack, đóng môi trường lồng sai thứ tự và
   bỏ thẻ đóng không có thẻ mở. Markdown code span hợp lệ được giữ nguyên.
   Normalizer chạy lại ngay trước transaction lưu, có tính idempotent và
-  không ném lỗi, không tạo `generationIssues` hay chặn persistence. Output Quiz
+  không ném lỗi. Cú pháp còn sai tạo `generationIssues` reviewable với
+  `blocking=false`, tuyệt đối không chặn persistence. Output Quiz
   mới được sửa trước persist. Với dữ liệu cũ, raw Markdown dùng chung repair khi
   render; admin JSON preview/save có thể project lại snapshot chuỗi AI. Không tự
   tái cấu trúc Tiptap đã lưu nếu không còn snapshot chuỗi thô, vì không đủ căn cứ
@@ -2664,6 +2710,9 @@ Không gửi toàn bộ lịch sử chat.
 
 Khi session dài, worker hoặc service có thể tạo/cập nhật summary.
 
+Phần này là cơ chế nội bộ tùy chọn của Chat AI `M9.6`, không phải subtask
+`M9.7`; `M9.7` thuộc Video Summary admin.
+
 ASSUMPTION:
 
 - Sau mỗi 20 messages, tạo/cập nhật summary.
@@ -2937,7 +2986,7 @@ Không gọi AI blocking trong request-new.
 - Không gửi toàn bộ tài liệu hoặc toàn bộ lịch sử chat vào AI.
 - Với contextual smart video `M15.4`, không gửi toàn bộ transcript mỗi lần; chỉ
   dùng chapter, cửa sổ cue lân cận và retrieved chunks cần thiết. Whole-video
-  summary `M15.9` là ngoại lệ có chủ đích: gửi normalized transcript packet của
+  summary `M9.7` là ngoại lệ có chủ đích: gửi normalized transcript packet của
   đúng lesson một lần theo immutable preview draft, không kèm PDF/watch events.
 
 ASSUMPTION:
@@ -2976,43 +3025,63 @@ Rules:
 - Recommendation/difficulty không được giao hoàn toàn cho model từ raw event stream. Backend tạo feature tổng hợp, áp rule giải thích được; AI chỉ hỗ trợ diễn đạt hoặc xếp hạng trong phạm vi an toàn.
 - Mọi action student phải áp rate limit/budget guard và không làm blocking player.
 
-Whole-video summary admin `M15.9`:
+Whole-video summary admin `M9.7`:
 
 - Sở hữu prompt/schema/mapper/validator riêng theo `MATH | PHYSICS | CHEMISTRY |
 GENERAL`; không import private Lesson Summary core. Chỉ tái sử dụng hạ tầng
   trung lập như provider, model routing, queue, budget, usage và rich-text render.
-- Input authority là video metadata/cut settings, chapter timeline tùy chọn và
-  transcript đã lưu của đúng lesson. Client không được truyền raw source.
+- Input authority là video metadata, chapter timeline tùy chọn và toàn bộ
+  transcript đã lưu của đúng video gốc. Cấu hình cắt của lesson player
+  không được trim/rebase source Video Summary. Client không được truyền raw source.
 - Output structured dùng `title`, `objectives[]`, `sections[]` và blocks tương
   thích document `lesson_summary_blocks`. `objectives` hiển thị dưới nhãn
-  `Các kiến thức sẽ học`, đúng một ý chính cho mỗi section. Mỗi section có
+  `Các kiến thức trong bài giảng`, đúng một ý chính cho mỗi section. Mỗi section có
   `startSeconds`; `knowledge` có `title`, `content`, `startSeconds`; `example` có đủ
   `problem`, `solution`, `answer`, `startSeconds`; các block giữ đúng thứ tự xuất
-  hiện trong video. `summary` là block cuối, nêu kiến thức và kĩ năng người học
-  có thể vận dụng sau khi xem; không có `title` riêng vì UI đã hiển thị nhãn
-  `Tổng kết` và chỉ gồm bullet các dạng bài/nhiệm vụ có thể giải quyết. Example
-  phụ thuộc hình/ảnh/bảng/biểu đồ không thể tự đủ dữ kiện bằng text phải bị loại.
+  hiện trong video. Video Summary không có khối `summary`/`Tổng kết` riêng.
+  Example phụ thuộc hình/ảnh/bảng/biểu đồ không thể tự đủ dữ kiện bằng text vẫn
+  được giữ trong candidate và tạo warning để admin kiểm tra; semantic warning này
+  không được chặn, xóa output hoặc làm thất bại paid generation.
   Văn phong, quy tắc LaTeX và quy tắc trình bày lời
   giải dùng cùng invariant đã áp dụng cho Sinh kiến thức.
 - Không bắt buộc có `example` nếu transcript không chứa ví dụ/bài tập; model
-  không được tự tạo ví dụ để lấp cấu trúc. Khi có chapter, ưu tiên bám các ranh
-  giới lớn; chỉ dùng timestamp có trong nguồn và không tự bịa kiến thức.
+  không được tự tạo ví dụ để lấp cấu trúc. Khi nguồn có chapter, output phải có
+  đúng một section và một objective cho mỗi chapter, cùng số lượng/thứ tự;
+  `displayHeading` và `startSeconds` lấy title canonical/time của chapter; title
+  canonical bỏ tiền tố thứ tự dư thừa vì `order` được quản lý riêng, còn các
+  block chỉ thuộc khoảng từ chapter đó đến trước chapter kế tiếp. Backend dùng
+  schema theo đúng số chapter và chuẩn hóa lại metadata section từ source trước
+  khi validate/persist. Chỉ khi nguồn không có chapter, AI mới tự chia section;
+  sau khi persist thành công, backend ghi ngược heading/timestamp của các section
+  thành `customVideoSettings.chapters` trong cùng transaction và lưu hash chapter
+  mới vào Video Summary để không tự phát sinh trạng thái stale.
 - Prose phải mạch lạc, paragraph/list tách đúng vai trò. Công thức dùng LaTeX
   canonical tương thích KaTeX/mhchem; không sinh TikZ/STEM figure ở task này.
 - Prompt preview và execute dùng cùng serializer/draft/hash. Nếu transcript vượt
   input limit đã cấu hình, preflight chặn thân thiện; không cắt im lặng hoặc gọi
   provider nhiều lần ngoài ước tính chi phí đã hiển thị.
-- Cache/stale key gồm video URL, transcript, chapter, player cut settings,
-  prompt/schema version và generation configuration.
-- Default prompt `video-summary-v6`, schema version 5 phân vai giống flow Sinh kiến thức:
+- Cache/stale key gồm video URL, transcript gốc, chapter, prompt/schema version
+  và generation configuration; thay đổi player cut settings không làm stale.
+  Riêng Video URL đổi hoặc bị clear sẽ xóa bản Video Summary hiện hành và reset
+  chapter/transcript ở lesson; draft/job cũ bị source-hash gate từ chối persist.
+- Default prompt `video-summary-v10-bidirectional-chapter-contract`, schema version 8 và document version 6 phân
+  vai giống flow Sinh kiến thức:
   stable system prompt sở hữu quy tắc bám nguồn, cấu trúc
-  `objectives -> knowledge/example -> summary`, timestamp cue cho section/block,
-  example tự đủ dữ kiện, bullet kết quả học tập, văn phong và quy ước riêng
+  `objectives -> knowledge/example`, timestamp cue cho block; section dùng exact
+  chapter time khi có chapter và cue sớm nhất khi AI tự chia section, example tự
+  đủ dữ kiện, văn phong và quy ước riêng
   cho `MATH | PHYSICS | CHEMISTRY | GENERAL`; user prompt chỉ chứa metadata
   buổi học cùng các lựa chọn theo lần chạy: cách trình bày,
   độ dài, số lượng từ và yêu cầu bổ sung. Khi Số lượng từ
   để trống, prompt ghi rõ không đặt giới hạn riêng thay vì tự gán
-  350 từ. Custom system/user prompt tiếp tục là full override.
+  350 từ. System prompt mặc định phải tự mô tả đầy đủ quy tắc của Video Summary,
+  không dùng tên feature khác làm chỉ dẫn cho model. Custom system/user prompt
+  tiếp tục là full override nhưng vẫn phải tuân theo structured schema không có
+  `summary`. Dữ liệu block-format version cũ được lọc bỏ `summary` ở read boundary,
+  không cần xóa dữ liệu hàng loạt. Đây là `NEW_STABLE_PREFIX_WARMUP`: system prompt
+  và structured schema đổi nên prefix/cache key cũ không được tái sử dụng; dữ liệu
+  động vẫn đứng sau breakpoint và cache ổn định lại sau warm-up cho từng
+  subject/model.
 
 ---
 

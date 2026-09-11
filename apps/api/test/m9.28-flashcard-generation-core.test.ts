@@ -15,6 +15,8 @@ import {
   buildOpenAiStructuredResponseRequest,
 } from "#api/modules/ai/utils/openai-response-request";
 import {
+  collectFlashcardMathSyntaxWarnings,
+  normalizeFlashcardLearnerText,
   toFlashcardSolutionTiptap,
   validateGeneratedFlashcards,
 } from "#api/modules/flashcards/utils/flashcard-generation-mapper";
@@ -113,6 +115,8 @@ describe("M9.28 Flashcard-owned generation core", () => {
     expect(systemPrompt).toContain("Mỗi đơn vị lập luận nằm trong một đoạn");
     expect(systemPrompt).toContain("viết công thức gốc trước");
     expect(systemPrompt).toContain("`aligned`");
+    expect(systemPrompt).toContain("`$\\widehat{ABC}$`");
+    expect(systemPrompt).toContain("không viết `$m\\angle ABC$`");
     expect(userPrompt).toContain("### NHIỆM VỤ TẠO FLASHCARD");
     expect(userPrompt).toContain("Môn học của khóa: Toán (MATH)");
     expect(userPrompt).toContain("học sinh lớp 10");
@@ -176,7 +180,7 @@ describe("M9.28 Flashcard-owned generation core", () => {
     }
 
     expect(FLASHCARD_PROMPT_VERSIONS).toEqual({
-      MATH: "flashcard_math_v7_solution_figure_only",
+      MATH: "flashcard_math_v8_angle_notation",
       PHYSICS: "flashcard_physics_v7_solution_figure_only",
       CHEMISTRY: "flashcard_chemistry_v7_solution_figure_only",
       GENERAL: "flashcard_general_v7_solution_figure_only",
@@ -191,13 +195,33 @@ describe("M9.28 Flashcard-owned generation core", () => {
     );
     const schemaText = JSON.stringify(format.format.schema);
 
-    expect(FLASHCARD_SCHEMA_VERSION).toBe("flashcard_v6_solution_figure_only");
+    expect(FLASHCARD_SCHEMA_VERSION).toBe("flashcard_v7_math_syntax_contract");
     expect(schemaText).toContain("tình huống thực tế phù hợp");
+    expect(schemaText).toContain("cặp delimiter đầy đủ");
     expect(schemaText).toContain(
       "tuân thủ quy tắc nội dung, lập luận, định dạng trong system prompt",
     );
     expect(schemaText).not.toContain("Một câu hỏi lý thuyết ngắn");
     expect(schemaText).not.toContain("Tách các đơn vị lập luận bằng một dòng trống");
+  });
+
+  it("normalizes Flashcard math and persists malformed syntax as a warning contract", () => {
+    expect(normalizeFlashcardLearnerText(String.raw`Tính $m\angle ABC=60^\circ$.`)).toBe(
+      String.raw`Tính $\widehat{ABC}=60^\circ$.`,
+    );
+    expect(
+      collectFlashcardMathSyntaxWarnings({
+        front: String.raw`Tính $x_{1$.`,
+        back: "Một giá trị.",
+        solution: "Áp dụng công thức.",
+      }),
+    ).toEqual([
+      expect.objectContaining({
+        code: "MALFORMED_LATEX",
+        severity: "WARNING",
+        paths: ["front"],
+      }),
+    ]);
   });
 
   it("keeps a custom user prompt while appending existing fronts as reference data", () => {
@@ -400,6 +424,16 @@ describe("M9.28 Flashcard-owned generation core", () => {
         ]),
       }),
     ]);
+  });
+
+  it("normalizes measured three-point angles in Flashcard text", () => {
+    const document = toFlashcardSolutionTiptap(
+      String.raw`Ta có $m\angle DAB=m\widehat{BCD}$.`,
+    );
+
+    expect(JSON.stringify(document)).toContain("\\\\widehat{DAB}");
+    expect(JSON.stringify(document)).toContain("\\\\widehat{BCD}");
+    expect(JSON.stringify(document)).not.toContain("m\\\\widehat");
   });
 
   it("keeps Flashcard out of the shared Test generation implementation", () => {

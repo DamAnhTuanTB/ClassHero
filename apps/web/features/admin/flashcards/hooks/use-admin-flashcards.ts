@@ -155,7 +155,7 @@ export function useAdminFlashcardSetMutations(lessonId: string) {
       setId,
     }: {
       action: "SAVE" | "PUBLISH" | "WITHDRAW";
-      reviewStatus: "APPROVED" | "NEEDS_REVIEW" | "HIDDEN";
+      reviewStatus: "DRAFT" | "APPROVED" | "NEEDS_REVIEW" | "HIDDEN";
       setId: string;
     }) =>
       reviewAdminFlashcardSet(

@@ -3,7 +3,6 @@
 import {
   BookOpenText,
   BrainCircuit,
-  CheckCircle2,
   CircleAlert,
   ClipboardCheck,
   FileQuestion,
@@ -11,6 +10,7 @@ import {
   Loader2,
   RefreshCw,
   Sparkles,
+  Video,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
@@ -67,7 +67,15 @@ const AdminFlashcardGenerationDialog = dynamic(
   { ssr: false },
 );
 
+type AdminAiCardType = AdminAiGenerationType | "VIDEO_SUMMARY";
+
 const cards = [
+  {
+    type: "VIDEO_SUMMARY",
+    label: "Video",
+    description: "Tạo Tổng quan video từ bản chép lời đã lưu.",
+    icon: Video,
+  },
   {
     type: "SUMMARY",
     label: "Kiến thức",
@@ -100,17 +108,23 @@ export function AdminAiGenerationPanel({
   flashcardTargetSetId,
   quizTargetSetId,
   testTargetSetId,
+  onGenerateVideoSummary,
   onOpenResult,
   onRequestedGenerationHandled,
   requestedGeneration,
+  videoSummaryDisabledReason,
+  videoSummaryReady,
 }: {
   lessonId: string;
   flashcardTargetSetId?: string;
   quizTargetSetId?: string;
   testTargetSetId?: string;
+  onGenerateVideoSummary: () => void;
   onOpenResult: (type: AdminAiGenerationType, resourceId: string | null) => void;
   onRequestedGenerationHandled: () => void;
   requestedGeneration: AdminAiGenerationDialogRequest | null;
+  videoSummaryDisabledReason: string;
+  videoSummaryReady: boolean;
 }) {
   const panelQuery = useAdminAiGenerationPanel(lessonId);
   const flashcardSetsQuery = useAdminFlashcardSets(lessonId);
@@ -197,16 +211,17 @@ export function AdminAiGenerationPanel({
             </h2>
           </div>
           <p className="mt-1 text-sm font-medium text-[var(--theme-text-muted)]">
-            Tạo bản nháp từ tài liệu buổi học, sau đó kiểm tra và hoàn thiện nội dung.
+            Tạo bản nháp từ video hoặc tài liệu buổi học, sau đó kiểm tra và hoàn thiện
+            nội dung.
           </p>
         </div>
         <ReadinessBadge
-          ready={panel.readiness.generationReady}
+          ready={panel.readiness.generationReady || videoSummaryReady}
           summaryReady={panel.readiness.summaryReady}
         />
       </div>
 
-      {panel.readiness.reason ? (
+      {panel.readiness.reason && !videoSummaryReady ? (
         <div className="mt-4 flex items-start gap-2 rounded-lg border border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)] p-3 text-sm font-semibold text-[var(--theme-warning-text)]">
           <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           <span>
@@ -218,33 +233,51 @@ export function AdminAiGenerationPanel({
         </div>
       ) : null}
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {cards.map((card) => {
-          const job = panel.jobs[card.type];
+          const job =
+            card.type === "VIDEO_SUMMARY" ? panel.videoSummaryJob : panel.jobs[card.type];
           const isActive = job?.status === "QUEUED" || job?.status === "RUNNING";
           const isReady =
-            card.type === "SUMMARY"
-              ? panel.readiness.summaryReady
-              : card.type === "QUIZ"
-                ? panel.readiness.quizReady
-                : panel.readiness.generationReady;
+            card.type === "VIDEO_SUMMARY"
+              ? videoSummaryReady
+              : card.type === "SUMMARY"
+                ? panel.readiness.summaryReady
+                : card.type === "QUIZ"
+                  ? panel.readiness.quizReady
+                  : panel.readiness.generationReady;
           return (
             <GenerationCard
               key={card.type}
               {...card}
+              disabledReason={
+                card.type === "VIDEO_SUMMARY"
+                  ? videoSummaryDisabledReason
+                  : card.type === "QUIZ"
+                    ? panel.readiness.quizReason
+                    : panel.readiness.reason
+              }
               isActive={isActive}
-              isPreparing={card.type === refreshingSetType}
+              isPreparing={
+                card.type !== "VIDEO_SUMMARY" && card.type === refreshingSetType
+              }
               isReady={isReady}
               job={job}
-              onGenerate={() => void handleOpenGenerationDialog(card.type)}
-              onOpen={() => onOpenResult(card.type, job?.resourceId ?? null)}
+              onGenerate={() => {
+                if (card.type === "VIDEO_SUMMARY") {
+                  onGenerateVideoSummary();
+                  return;
+                }
+                void handleOpenGenerationDialog(card.type);
+              }}
             />
           );
         })}
       </div>
 
       {cards.map((card) => {
-        const job = panel.jobs[card.type];
+        const job =
+          card.type === "VIDEO_SUMMARY" ? panel.videoSummaryJob : panel.jobs[card.type];
         return job?.jobId && (job.status === "QUEUED" || job.status === "RUNNING") ? (
           <AdminAiJobWatcher
             key={job.jobId}
@@ -376,6 +409,7 @@ export function AdminAiGenerationPanel({
 
 function GenerationCard({
   description,
+  disabledReason,
   icon: Icon,
   isActive,
   isPreparing,
@@ -383,21 +417,21 @@ function GenerationCard({
   job,
   label,
   onGenerate,
-  onOpen,
   type,
 }: {
   description: string;
+  disabledReason?: string | null;
   icon: typeof BookOpenText;
   isActive: boolean;
   isPreparing: boolean;
   isReady: boolean;
   job: AdminAiPanelJob | null;
   label: string;
-  type: AdminAiGenerationType;
+  type: AdminAiCardType;
   onGenerate: () => void;
-  onOpen: () => void;
 }) {
-  const hasCurrentSummary = type !== "SUMMARY" || job?.reviewStatus !== null;
+  const hasCurrentSummary =
+    (type !== "SUMMARY" && type !== "VIDEO_SUMMARY") || job?.reviewStatus !== null;
   const hasSucceededContent = job?.status === "SUCCEEDED" && hasCurrentSummary;
   const status = getJobStatus(job, isReady, type);
   return (
@@ -430,43 +464,18 @@ function GenerationCard({
       {hasSucceededContent ? (
         <button
           type="button"
-          onClick={
-            type === "SUMMARY" ||
-            type === "QUIZ" ||
-            type === "FLASHCARD" ||
-            type === "TEST"
-              ? onGenerate
-              : onOpen
-          }
-          className={cn(
-            "mt-4 inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-extrabold",
-            type === "SUMMARY" ||
-              type === "QUIZ" ||
-              type === "FLASHCARD" ||
-              type === "TEST"
-              ? "theme-button-primary"
-              : "theme-button-primary-subtle",
-          )}
+          onClick={onGenerate}
+          className="theme-button-primary mt-4 inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-extrabold"
         >
-          {type === "SUMMARY" ? (
-            <Sparkles className="h-4 w-4" aria-hidden="true" />
-          ) : type === "QUIZ" || type === "FLASHCARD" || type === "TEST" ? (
-            <Sparkles className="h-4 w-4" aria-hidden="true" />
-          ) : (
-            <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
-          )}
-          {type === "SUMMARY" ||
-          type === "QUIZ" ||
-          type === "FLASHCARD" ||
-          type === "TEST"
-            ? "Tạo mới"
-            : "Mở để duyệt"}
+          <Sparkles className="h-4 w-4" aria-hidden="true" />
+          Tạo mới
         </button>
       ) : (
         <button
           type="button"
           onClick={onGenerate}
           disabled={!isReady || isActive || isPreparing}
+          title={!isReady ? (disabledReason ?? undefined) : undefined}
           className="theme-button-primary mt-4 inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-extrabold disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isActive || isPreparing ? (
@@ -488,13 +497,8 @@ function GenerationCard({
             <AiJobTimer createdAt={job!.createdAt} prefix="Đang xử lý (" suffix=")" />
           ) : job?.status === "FAILED" ? (
             "Thử lại"
-          ) : type === "QUIZ" ||
-            type === "SUMMARY" ||
-            type === "FLASHCARD" ||
-            type === "TEST" ? (
-            "Tạo mới"
           ) : (
-            "Cấu hình"
+            "Tạo mới"
           )}
         </button>
       )}
@@ -511,7 +515,7 @@ function AdminAiJobWatcher({
   jobId: string;
   lessonId: string;
   onCompleted: (type: AdminAiGenerationType, resourceId: string | null) => void;
-  type: AdminAiGenerationType;
+  type: AdminAiCardType;
 }) {
   const queryClient = useQueryClient();
   const jobQuery = useAdminAiJob(jobId, true);
@@ -539,14 +543,21 @@ function AdminAiJobWatcher({
       queryClient.invalidateQueries({ queryKey: ["admin", "quiz"] }),
       queryClient.invalidateQueries({ queryKey: ["admin", "flashcards"] }),
       queryClient.invalidateQueries({ queryKey: adminAssessmentQueryKeys.all }),
+      queryClient.invalidateQueries({
+        queryKey: ["admin-video-summary", lessonId],
+      }),
     ]);
     if (job.status === "SUCCEEDED") {
       toast.success(
-        type === "SUMMARY"
-          ? "AI đã tạo xong bản kiến thức. Hãy kiểm tra và lưu nội dung."
-          : "AI đã tạo xong nội dung. Hãy kiểm tra trước khi duyệt.",
+        type === "VIDEO_SUMMARY"
+          ? "AI đã tạo xong Tổng quan video. Hãy kiểm tra và phát hành."
+          : type === "SUMMARY"
+            ? "AI đã tạo xong bản kiến thức. Hãy kiểm tra và lưu nội dung."
+            : "AI đã tạo xong nội dung. Hãy kiểm tra trước khi duyệt.",
       );
-      onCompleted(type, job.resourceId);
+      if (type !== "VIDEO_SUMMARY") {
+        onCompleted(type, job.resourceId);
+      }
     } else {
       toast.error(
         sanitizeUserFacingMessage(
@@ -589,7 +600,7 @@ function ReadinessBadge({
 function getJobStatus(
   job: AdminAiPanelJob | null,
   ready: boolean,
-  type: AdminAiGenerationType,
+  type: AdminAiCardType,
 ) {
   if (!ready) {
     return {
@@ -613,7 +624,7 @@ function getJobStatus(
     };
   }
   if (job.status === "SUCCEEDED") {
-    if (type === "SUMMARY") {
+    if (type === "SUMMARY" || type === "VIDEO_SUMMARY") {
       if (job.reviewStatus === null) {
         return {
           label: "Chưa tạo",
@@ -656,8 +667,8 @@ function PanelSkeleton() {
     >
       <SkeletonBlock className="h-6 w-52 rounded-full" />
       <SkeletonBlock className="mt-2 h-4 w-96 max-w-full rounded-full opacity-70" />
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {Array.from({ length: 4 }, (_, index) => (
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        {Array.from({ length: 5 }, (_, index) => (
           <SkeletonBlock key={index} className="h-56 rounded-xl" />
         ))}
       </div>

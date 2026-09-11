@@ -1,5 +1,6 @@
 import {
   AI_REASONING_EFFORT_LEVELS,
+  LEARNER_MATH_TEXT_SYNTAX_DESCRIPTION,
   LESSON_SUMMARY_MAX_SYSTEM_INSTRUCTIONS_CHARACTERS,
   lessonSummaryGeometryStatementSchema,
   stemFigureVisualSchema,
@@ -9,13 +10,13 @@ import { z } from "zod";
 import { lessonSummarySubjectKeySchema } from "#api/modules/ai/types/lesson-summary-subject.types";
 
 export const LESSON_SUMMARY_PROMPT_VERSIONS = {
-  MATH: "lesson-summary-math-v41-lesson-core-exercise-diversity",
-  PHYSICS: "lesson-summary-physics-v37-lesson-core-exercise-diversity",
-  CHEMISTRY: "lesson-summary-chemistry-v37-lesson-core-exercise-diversity",
-  GENERAL: "lesson-summary-general-v37-lesson-core-exercise-diversity",
+  MATH: "lesson-summary-math-v45-math-syntax-contract",
+  PHYSICS: "lesson-summary-physics-v40-math-syntax-contract",
+  CHEMISTRY: "lesson-summary-chemistry-v40-math-syntax-contract",
+  GENERAL: "lesson-summary-general-v40-math-syntax-contract",
 } as const;
 export const LESSON_SUMMARY_SCHEMA_VERSION =
-  "lesson-summary-pdf-packet-six-block-schema-v29-exact-exercise-counts";
+  "lesson-summary-pdf-packet-six-block-schema-v33-math-syntax-warning";
 export const LESSON_SUMMARY_MAX_CONTEXT_TOKENS = 12_000;
 export const LESSON_SUMMARY_MAX_OUTPUT_TOKENS = 8_000;
 export const LESSON_SUMMARY_MIN_OUTPUT_TOKENS = 8_000;
@@ -72,6 +73,7 @@ export const LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION =
   "Ví dụ tổng quát SAI: `$$A=B=C.$$` Ví dụ tổng quát ĐÚNG: `$$\\begin{aligned}A&=B\\\\&=C.\\end{aligned}$$`.",
   "Không áp dụng quy tắc này cho các phương trình độc lập, hệ phương trình, phép gán nhiều đại lượng hoặc dấu `=` nằm trong cấu trúc lồng nhau. Ngoài đúng các trường hợp đó, nếu bước tự kiểm tra còn thấy chuỗi tính/biến đổi vi phạm thì phải viết lại field trước khi trả output.",
   "Bảo toàn dấu câu và ký hiệu có chức năng của nguồn; tự bổ sung dấu câu còn thiếu khi ngữ pháp và quan hệ trình bày xác định rõ. Câu dẫn mở danh sách, hệ, bảng hoặc công thức display ở dòng sau phải kết thúc bằng dấu `:`; dùng dấu `,`, `;` và `.` đúng quan hệ câu, không để chuỗi `..` mà phải chọn `.` hoặc `...` theo nghĩa.",
+  "Mọi công thức phải dùng cặp delimiter đầy đủ (`$...$`, `$$...$$`, `\\(...\\)` hoặc `\\[...\\]`), không dùng backtick để đóng công thức; các dấu `{}` và từng cặp `\\begin{...}`/`\\end{...}` phải cân bằng.",
   "Chỉ dùng $\\Leftrightarrow$ cho quan hệ tương đương hai chiều và $\\Rightarrow$ cho suy ra một chiều; không tự thêm hai ký hiệu này khi lập luận không chứng minh quan hệ tương ứng. Khi nhiều công thức display liên tiếp thuộc cùng một hệ, nhóm trường hợp hoặc chuỗi biến đổi, nhóm chúng trong một khối `$$\\begin{aligned}...\\end{aligned}$$` hoặc môi trường `split` phù hợp và ngắt dòng tại toán tử quan hệ/phép biến đổi hợp lý; không để các từ nối như `và`, `nên`, `do đó` thành dòng rời giữa hai công thức. Trong `aligned`/`split`, đặt dấu `&` tại quan hệ chính cần căn như `=`; không đặt `&` ngay trước toán tử suy luận hoặc tương đương đứng đầu dòng như `\\Rightarrow`, `\\Leftrightarrow`, `\\Longrightarrow`, `\\Longleftrightarrow`, `\\implies`, `\\impliedby`, `\\iff` và các biến thể chiều ngược, vì toán tử sẽ bị đẩy vào cột dấu bằng. Khi dòng suy ra còn có dấu bằng, viết toán tử và vế trái trước dấu căn, ví dụ `\\Rightarrow\\quad a &= 2x`. Công thức độc lập ngắn hoặc không cùng một mạch vẫn giữ riêng, không ép gộp.",
 ].join(" ");
 export const LESSON_SUMMARY_LOGICAL_DERIVATION_INSTRUCTION = [
@@ -82,8 +84,12 @@ export const LESSON_SUMMARY_LOGICAL_DERIVATION_INSTRUCTION = [
 ].join(" ");
 export const LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION =
   "Trong problem, solution và answer của mọi example/bài tập, mỗi ý con mang nhãn a), b), c) hoặc nhãn chữ cái tương đương phải bắt đầu ở dòng riêng; không được đặt hai nhãn ý con trên cùng một dòng.";
-export const LESSON_SUMMARY_PROVIDER_ROOT_FORMATTING_DESCRIPTION =
-  "Structured output của bản tóm tắt bài học; mọi field văn bản phải tuân thủ quy tắc nội dung, nguồn, lập luận và định dạng trong system prompt.";
+export const LESSON_SUMMARY_PROVIDER_ROOT_FORMATTING_DESCRIPTION = `Structured output của bản tóm tắt bài học; mọi field văn bản phải tuân thủ quy tắc nội dung, nguồn, lập luận và định dạng trong system prompt. ${LEARNER_MATH_TEXT_SYNTAX_DESCRIPTION}`;
+const LESSON_SUMMARY_THEORY_SECTIONS_DESCRIPTION =
+  "Các đề mục kiến thức lớn của bài theo đúng thứ tự nguồn; không chứa đề mục Ví dụ, Luyện tập, Vận dụng hoặc Bài tập.";
+const LESSON_SUMMARY_OBJECTIVES_DESCRIPTION =
+  "Khối riêng ở đầu bản Sinh kiến thức; đúng một ý ngắn gọn cho mỗi theorySections cùng vị trí, nêu kiến thức hoặc năng lực trọng tâm của section tương ứng. Không tạo objective cho Ví dụ, Luyện tập, Vận dụng, Bài tập, tiểu mục hoặc applicationExercises.";
+
 const baseBlockSchema = z.object({
   figures: z.array(stemFigureVisualSchema).max(3).default([]),
   sourcePageNumbers: z.array(z.number().int().positive()).max(20).optional(),
@@ -638,7 +644,11 @@ function createLessonSummaryProviderTransportOutputBaseSchema(
   return z
     .object({
       title: transportText(240),
-      objectives: z.array(transportText(500)).min(1).max(10).nullable(),
+      objectives: z
+        .array(transportText(500))
+        .min(1)
+        .max(19)
+        .describe(LESSON_SUMMARY_OBJECTIVES_DESCRIPTION),
       theorySections: z
         .array(
           z
@@ -650,7 +660,8 @@ function createLessonSummaryProviderTransportOutputBaseSchema(
             .strict(),
         )
         .min(1)
-        .max(19),
+        .max(19)
+        .describe(LESSON_SUMMARY_THEORY_SECTIONS_DESCRIPTION),
       applicationExercises: z
         .object({
           standardExercises: counts
@@ -675,7 +686,11 @@ function createLessonSummaryProviderNonMathTransportOutputSchema(
   return z
     .object({
       title: transportText(240),
-      objectives: z.array(transportText(500)).min(1).max(10).nullable(),
+      objectives: z
+        .array(transportText(500))
+        .min(1)
+        .max(19)
+        .describe(LESSON_SUMMARY_OBJECTIVES_DESCRIPTION),
       theorySections: z
         .array(
           z
@@ -687,7 +702,8 @@ function createLessonSummaryProviderNonMathTransportOutputSchema(
             .strict(),
         )
         .min(1)
-        .max(19),
+        .max(19)
+        .describe(LESSON_SUMMARY_THEORY_SECTIONS_DESCRIPTION),
       applicationExercises: z
         .object({
           standardExercises: counts
@@ -765,7 +781,7 @@ export const lessonSummaryOutputSchema = z
     lessonId: nonEmptyText(240),
     targetGrade: z.number().int().min(1).max(12).nullable().optional(),
     title: nonEmptyText(240),
-    objectives: z.array(nonEmptyText(500)).min(1).max(10).nullable(),
+    objectives: z.array(nonEmptyText(500)).min(1).max(19).nullable(),
     sections: z
       .array(
         z

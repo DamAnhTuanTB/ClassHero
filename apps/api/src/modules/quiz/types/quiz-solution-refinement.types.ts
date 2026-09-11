@@ -1,3 +1,4 @@
+import { LEARNER_MATH_TEXT_SYNTAX_DESCRIPTION } from "@learning-path/shared";
 import { QuestionType } from "@prisma/client";
 import { z } from "zod";
 
@@ -8,11 +9,26 @@ export const TEST_SOLUTION_REFINEMENT_TARGET_TYPE = "TEST_SOLUTION_REFINEMENT" a
 export const QUIZ_SOLUTION_REFINEMENT_MODES = ["REFINE", "REGENERATE"] as const;
 export type QuizSolutionRefinementMode = (typeof QUIZ_SOLUTION_REFINEMENT_MODES)[number];
 export const QUIZ_SOLUTION_REFINEMENT_SCHEMA_VERSION =
-  "quiz-solution-refinement-v3-split-mode";
-export const QUIZ_SOLUTION_REGENERATION_SCHEMA_VERSION = "quiz-solution-regeneration-v1";
+  "quiz-solution-refinement-v4-math-syntax-contract";
+export const QUIZ_SOLUTION_REGENERATION_SCHEMA_VERSION =
+  "quiz-solution-regeneration-v2-math-syntax-contract";
 
-const refinedTextSchema = z.string().trim().min(1).max(30_000);
-const hintSchema = z.string().trim().min(1).max(1_000);
+const refinedTextSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(30_000)
+  .describe(
+    `Lời giải phải kết thúc bằng một câu kết luận nằm ở đoạn riêng, có đúng một dòng trống phía trước. ${LEARNER_MATH_TEXT_SYNTAX_DESCRIPTION}`,
+  );
+const hintSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(1_000)
+  .describe(
+    `Gợi ý định hướng nhưng không tiết lộ kết quả. ${LEARNER_MATH_TEXT_SYNTAX_DESCRIPTION}`,
+  );
 const numericAnswerSchema = z
   .string()
   .trim()
@@ -168,10 +184,10 @@ export function resolveQuizSolutionRefinementPromptVersion(
   const operation = mode === "REFINE" ? "refinement" : "regeneration";
   const version =
     mode === "REFINE"
-      ? "v5"
+      ? "v6-math-syntax-contract"
       : includeCurrentSolutionAsRejected
-        ? "v3-rejected-candidate"
-        : "v2";
+        ? "v4-rejected-candidate-math-syntax-contract"
+        : "v3-math-syntax-contract";
   return `quiz-solution-${operation}-${subjectKey.toLowerCase()}-${version}`;
 }
 

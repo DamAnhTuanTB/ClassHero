@@ -171,7 +171,7 @@ export function QuizResultScreen({
                   "student-preserve-mobile-shadow inline-flex h-14 w-full items-center justify-center gap-2 whitespace-nowrap rounded-2xl px-2 text-sm font-black transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200 disabled:cursor-not-allowed disabled:opacity-45 dark:focus-visible:ring-sky-500/30 sm:px-3 sm:text-[17px]",
                   action.primary
                     ? "bg-sky-600 text-white shadow-[0_4px_0_rgb(3_105_161)] active:translate-y-[3px] active:shadow-[0_1px_0_rgb(3_105_161)] enabled:hover:bg-sky-700"
-                    : "student-mobile-border border border-sky-500 bg-white text-sky-700 shadow-[0_4px_0_rgb(186_230_253)] active:translate-y-[3px] active:shadow-[0_1px_0_rgb(186_230_253)] enabled:hover:bg-sky-50 dark:border-sky-400 dark:bg-[var(--theme-surface)] dark:text-sky-300 dark:shadow-[0_4px_0_rgb(7_89_133)] dark:active:shadow-[0_1px_0_rgb(7_89_133)] dark:enabled:hover:bg-sky-500/10",
+                    : "student-mobile-border border border-sky-200 bg-white text-sky-700 shadow-[0_4px_0_rgb(186_230_253)] active:translate-y-[3px] active:shadow-[0_1px_0_rgb(186_230_253)] enabled:hover:bg-sky-50 dark:border-sky-400/30 dark:bg-[var(--theme-surface)] dark:text-sky-300 dark:shadow-[0_4px_0_rgb(7_89_133)] dark:active:shadow-[0_1px_0_rgb(7_89_133)] dark:enabled:hover:bg-sky-500/10",
                 )}
               >
                 {action.pending && action.showsLocalPending ? (
@@ -197,7 +197,7 @@ export function QuizResultScreen({
             type="button"
             onClick={onBack}
             aria-label="Quay về bài học"
-            className="student-preserve-mobile-shadow student-mobile-border col-span-2 inline-flex h-11 min-w-32 items-center justify-center justify-self-center gap-1.5 whitespace-nowrap rounded-xl border border-sky-200 bg-white px-4 text-sm font-black text-slate-700 shadow-[0_3px_0_rgb(186_230_253)] transition hover:bg-sky-50 hover:text-sky-700 active:translate-y-[2px] active:shadow-[0_1px_0_rgb(186_230_253)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200 dark:border-sky-400/30 dark:bg-[var(--theme-surface)] dark:text-[var(--theme-text)] dark:shadow-[0_3px_0_rgb(7_89_133)] dark:hover:bg-[var(--theme-surface-soft)] dark:hover:text-sky-300 dark:active:shadow-[0_1px_0_rgb(7_89_133)] dark:focus-visible:ring-sky-500/30"
+            className="student-preserve-mobile-shadow student-mobile-border col-span-2 inline-flex h-14 w-1/2 items-center justify-center justify-self-center gap-1.5 whitespace-nowrap rounded-xl border border-sky-200 bg-white px-4 text-sm font-black text-sky-700 shadow-[0_3px_0_rgb(186_230_253)] transition hover:bg-sky-50 hover:text-sky-700 active:translate-y-[2px] active:shadow-[0_1px_0_rgb(186_230_253)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200 dark:border-sky-400/30 dark:bg-[var(--theme-surface)] dark:text-sky-300 dark:shadow-[0_3px_0_rgb(7_89_133)] dark:hover:bg-[var(--theme-surface-soft)] dark:hover:text-sky-300 dark:active:shadow-[0_1px_0_rgb(7_89_133)] dark:focus-visible:ring-sky-500/30"
           >
             <ChevronLeft
               className="h-5 w-5 shrink-0"

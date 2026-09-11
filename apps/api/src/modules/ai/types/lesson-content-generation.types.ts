@@ -1,27 +1,30 @@
+import { LEARNER_MATH_TEXT_SYNTAX_DESCRIPTION } from "@learning-path/shared";
 import { Difficulty, QuestionType } from "@prisma/client";
 import { z } from "zod";
 
 import { lessonSummarySubjectKeySchema } from "#api/modules/ai/types/lesson-summary-subject.types";
 
 export const LESSON_CONTENT_PROMPT_VERSIONS = {
-  MATH: "lesson-content-math-v13-exact-type-quota",
+  MATH: "lesson-content-math-v14-angle-notation",
   PHYSICS: "lesson-content-subject-prompt-v10-exact-type-quota",
   CHEMISTRY: "lesson-content-subject-prompt-v10-exact-type-quota",
   GENERAL: "lesson-content-subject-prompt-v10-exact-type-quota",
 } as const;
-export const LESSON_CONTENT_SCHEMA_VERSION = "lesson-content-subject-schema-v6";
+export const LESSON_CONTENT_SCHEMA_VERSION =
+  "lesson-content-subject-schema-v7-math-syntax-contract";
 export const LESSON_CONTENT_MAX_CONTEXT_TOKENS = 8_000;
 export const LESSON_CONTENT_MAX_OUTPUT_TOKENS = 12_000;
 export const LESSON_CONTENT_MIN_OUTPUT_TOKENS = 1_000;
 
 const text = (max: number) => z.string().trim().min(1).max(max);
+const learnerText = (max: number) => text(max);
 const difficultySchema = z.enum([Difficulty.EASY, Difficulty.MEDIUM, Difficulty.HARD]);
 const sourceChunkIdsSchema = z.array(z.uuid()).min(1).max(8);
 
 const assessmentExampleBaseShape = {
-  problem: text(2_000),
-  solution: text(5_000).nullable(),
-  answer: text(2_000),
+  problem: learnerText(2_000),
+  solution: learnerText(5_000).nullable(),
+  answer: learnerText(2_000),
 };
 
 const mathAssessmentExampleSchema = z
@@ -29,8 +32,8 @@ const mathAssessmentExampleSchema = z
     ...assessmentExampleBaseShape,
     geometryStatement: z
       .object({
-        hypotheses: z.array(text(1_000)).max(20),
-        conclusions: z.array(text(1_000)).max(20),
+        hypotheses: z.array(learnerText(1_000)).max(20),
+        conclusions: z.array(learnerText(1_000)).max(20),
       })
       .strict()
       .nullable(),
@@ -53,7 +56,7 @@ const nonMathTestQuestionFields = {
   ),
 };
 
-const optionSchema = z.object({ id: text(40), text: text(1_000) }).strict();
+const optionSchema = z.object({ id: text(40), text: learnerText(1_000) }).strict();
 
 function buildQuestionUnion<T extends z.ZodRawShape>(commonFields: T) {
   return z.discriminatedUnion("questionType", [
@@ -78,7 +81,9 @@ function buildQuestionUnion<T extends z.ZodRawShape>(commonFields: T) {
         ...commonFields,
         statements: z
           .array(
-            z.object({ id: text(40), text: text(1_000), value: z.boolean() }).strict(),
+            z
+              .object({ id: text(40), text: learnerText(1_000), value: z.boolean() })
+              .strict(),
           )
           .min(2)
           .max(8),
@@ -105,14 +110,20 @@ export const generatedTestOutputSchema = z
     title: text(180),
     questions: z.array(generatedTestQuestionSchema).min(1).max(50),
   })
-  .strict();
+  .strict()
+  .describe(
+    `Bài Test và mọi nội dung học sinh nhìn thấy. ${LEARNER_MATH_TEXT_SYNTAX_DESCRIPTION}`,
+  );
 
 const generatedNonMathTestOutputSchema = z
   .object({
     title: text(180),
     questions: z.array(generatedNonMathTestQuestionSchema).min(1).max(50),
   })
-  .strict();
+  .strict()
+  .describe(
+    `Bài Test và mọi nội dung học sinh nhìn thấy. ${LEARNER_MATH_TEXT_SYNTAX_DESCRIPTION}`,
+  );
 
 export function getGeneratedTestOutputSchema(
   subjectKey: z.infer<typeof lessonSummarySubjectKeySchema>,

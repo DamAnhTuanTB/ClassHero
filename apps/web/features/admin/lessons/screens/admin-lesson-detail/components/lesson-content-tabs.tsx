@@ -1,14 +1,23 @@
 "use client";
 
-import { BookOpenText, ClipboardList, FileText, HelpCircle, Layers } from "lucide-react";
+import {
+  BookOpenText,
+  ClipboardList,
+  FileText,
+  HelpCircle,
+  Layers,
+  Video,
+} from "lucide-react";
 import type { KeyboardEvent } from "react";
 import { cn } from "@/lib/utils";
 import { useRevealActiveHorizontalItem } from "@/lib/use-reveal-active-horizontal-item";
 
-export type LessonContentTabKey = "documents" | "summary" | "quiz" | "flashcard" | "test";
+export type LessonContentTabKey =
+  "documents" | "video" | "summary" | "quiz" | "flashcard" | "test";
 
 const lessonContentTabs = [
   { key: "documents", label: "Tài liệu", icon: FileText },
+  { key: "video", label: "Video", icon: Video },
   { key: "summary", label: "Kiến thức", icon: BookOpenText },
   { key: "quiz", label: "Quiz", icon: HelpCircle },
   { key: "flashcard", label: "Flashcard", icon: Layers },
@@ -49,7 +58,7 @@ export function LessonContentTabs({
       event.target instanceof Element &&
       Boolean(
         event.target.closest(
-          "[data-quiz-question-shortcut], [data-flashcard-card-shortcut]",
+          "[data-quiz-question-shortcut], [data-flashcard-card-shortcut], [data-test-question-shortcut]",
         ),
       );
     if (isActiveContentItemShortcut) {
@@ -82,7 +91,7 @@ export function LessonContentTabs({
         role="tablist"
         aria-label="Nội dung buổi học"
         onKeyDown={handleKeyDown}
-        className="relative grid min-w-[32rem] grid-cols-5"
+        className="relative grid min-w-[38rem] grid-cols-6"
       >
         {lessonContentTabs.map((tab) => {
           const Icon = tab.icon;
@@ -102,6 +111,9 @@ export function LessonContentTabs({
               data-flashcard-card-shortcut={
                 isActive && tab.key === "flashcard" ? "true" : undefined
               }
+              data-test-question-shortcut={
+                isActive && tab.key === "test" ? "true" : undefined
+              }
               tabIndex={isActive ? 0 : -1}
               onClick={() => onChange(tab.key)}
               className={cn(
@@ -118,7 +130,7 @@ export function LessonContentTabs({
         })}
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute bottom-0 left-0 h-0.5 w-1/5 rounded-full bg-[var(--theme-primary)] transition-transform duration-200 ease-out motion-reduce:transition-none"
+          className="pointer-events-none absolute bottom-0 left-0 h-0.5 w-1/6 rounded-full bg-[var(--theme-primary)] transition-transform duration-200 ease-out motion-reduce:transition-none"
           style={{
             transform: `translateX(${activeTabIndex * 100}%)`,
           }}

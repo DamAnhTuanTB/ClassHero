@@ -27,6 +27,10 @@ export type LessonSummaryEditableField =
 
 export type LessonSummaryBlockEditorValues = {
   blockType: LessonSummaryEditableBlockType;
+  isVideoTimelineHidden: boolean;
+  startTimeEnabled: boolean;
+  startTime: string;
+  originalStartTime: string;
   title: TiptapTextDocument;
   content: TiptapTextDocument;
   problem: TiptapTextDocument;
@@ -80,12 +84,30 @@ export function getLessonSummaryBlockEditableFields(
 
 export function createLessonSummaryBlockEditorValues(
   block: Record<string, unknown> & { type: LessonSummaryEditableBlockType },
+  options: {
+    isVideoTimelineHidden?: boolean;
+    startTimeOffsetSeconds?: number;
+  } = {},
 ): LessonSummaryBlockEditorValues {
   const geometryStatement = lessonSummaryGeometryStatementSchema.safeParse(
     block.geometryStatement,
   );
+  const startSeconds = isValidStartSeconds(block.startSeconds)
+    ? block.startSeconds
+    : null;
+  const startTimeOffsetSeconds = normalizeStartTimeOffset(options.startTimeOffsetSeconds);
+  const playbackStartSeconds =
+    startSeconds !== null ? Math.max(0, startSeconds - startTimeOffsetSeconds) : null;
   return {
     blockType: block.type,
+    isVideoTimelineHidden: options.isVideoTimelineHidden === true,
+    startTimeEnabled: playbackStartSeconds !== null,
+    startTime:
+      playbackStartSeconds !== null
+        ? formatLessonSummaryStartTime(playbackStartSeconds)
+        : "",
+    originalStartTime:
+      startSeconds !== null ? formatLessonSummaryStartTime(startSeconds) : "",
     title: toEditorDocument(block.title),
     content: toEditorDocument(block.content),
     problem: toEditorDocument(block.problem),
@@ -104,9 +126,41 @@ export function createLessonSummaryBlockEditorValues(
 export function applyLessonSummaryBlockEditorValues(
   block: Record<string, unknown> & { type: LessonSummaryEditableBlockType },
   values: LessonSummaryBlockEditorValues,
-  options: { updateGeometryStatement?: boolean } = {},
+  options: {
+    isVideoTimelineHidden?: boolean;
+    preferOriginalStartTime?: boolean;
+    startTimeOffsetSeconds?: number;
+    updateGeometryStatement?: boolean;
+  } = {},
 ) {
   const nextBlock = structuredClone(block);
+  if (values.startTimeEnabled && isValidStartSeconds(block.startSeconds)) {
+    const originalStartTime = formatLessonSummaryStartTime(block.startSeconds);
+    const nextOriginalStartSeconds = parseLessonSummaryStartTime(
+      values.originalStartTime,
+    );
+    const startTimeOffsetSeconds = normalizeStartTimeOffset(
+      options.startTimeOffsetSeconds,
+    );
+    const originalPlaybackStartTime = formatLessonSummaryStartTime(
+      Math.max(0, block.startSeconds - startTimeOffsetSeconds),
+    );
+    const nextPlaybackStartSeconds = parseLessonSummaryStartTime(values.startTime);
+    if (
+      (options.preferOriginalStartTime || options.isVideoTimelineHidden) &&
+      nextOriginalStartSeconds !== null &&
+      values.originalStartTime !== originalStartTime
+    ) {
+      nextBlock.startSeconds = nextOriginalStartSeconds;
+    } else if (
+      !options.preferOriginalStartTime &&
+      !options.isVideoTimelineHidden &&
+      nextPlaybackStartSeconds !== null &&
+      values.startTime !== originalPlaybackStartTime
+    ) {
+      nextBlock.startSeconds = nextPlaybackStartSeconds + startTimeOffsetSeconds;
+    }
+  }
   for (const field of BLOCK_FIELDS[block.type]) {
     const originalValue = typeof block[field] === "string" ? block[field] : "";
     const originalDocument = createMathMarkdownTiptapDocument(
@@ -128,30 +182,20 @@ export function applyLessonSummaryBlockEditorValues(
         block.geometryStatement,
       );
       const originalHypothesesDocument = toEditorDocument(
-        originalStatement.success
-          ? originalStatement.data.hypotheses.join("\n\n")
-          : "",
+        originalStatement.success ? originalStatement.data.hypotheses.join("\n\n") : "",
       );
       const originalConclusionsDocument = toEditorDocument(
-        originalStatement.success
-          ? originalStatement.data.conclusions.join("\n\n")
-          : "",
+        originalStatement.success ? originalStatement.data.conclusions.join("\n\n") : "",
       );
       nextBlock.geometryStatement = {
         hypotheses:
           originalStatement.success &&
-          areTiptapDocumentsEquivalent(
-            originalHypothesesDocument,
-            values.hypotheses,
-          )
+          areTiptapDocumentsEquivalent(originalHypothesesDocument, values.hypotheses)
             ? originalStatement.data.hypotheses
             : [serializeTiptapDocumentToMathMarkdown(values.hypotheses)],
         conclusions:
           originalStatement.success &&
-          areTiptapDocumentsEquivalent(
-            originalConclusionsDocument,
-            values.conclusions,
-          )
+          areTiptapDocumentsEquivalent(originalConclusionsDocument, values.conclusions)
             ? originalStatement.data.conclusions
             : [serializeTiptapDocumentToMathMarkdown(values.conclusions)],
       };
@@ -159,6 +203,36 @@ export function applyLessonSummaryBlockEditorValues(
     }
   }
   return nextBlock;
+}
+
+export const LESSON_SUMMARY_START_TIME_PATTERN = /^(?:\d+:[0-5]\d|\d+:[0-5]\d:[0-5]\d)$/u;
+
+export function formatLessonSummaryStartTime(startSeconds: number) {
+  const wholeSeconds = Math.floor(Math.max(0, startSeconds));
+  const hours = Math.floor(wholeSeconds / 3_600);
+  const minutes = Math.floor((wholeSeconds % 3_600) / 60);
+  const seconds = wholeSeconds % 60;
+  const secondsText = seconds.toString().padStart(2, "0");
+
+  return hours > 0
+    ? `${hours}:${minutes.toString().padStart(2, "0")}:${secondsText}`
+    : `${minutes}:${secondsText}`;
+}
+
+export function parseLessonSummaryStartTime(value: string) {
+  if (!LESSON_SUMMARY_START_TIME_PATTERN.test(value)) return null;
+  return value
+    .split(":")
+    .map(Number)
+    .reduce((total, part) => total * 60 + part, 0);
+}
+
+function isValidStartSeconds(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+function normalizeStartTimeOffset(value: number | undefined) {
+  return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0;
 }
 
 function toEditorDocument(value: unknown) {

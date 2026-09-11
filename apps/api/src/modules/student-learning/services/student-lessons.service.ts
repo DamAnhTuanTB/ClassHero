@@ -1,5 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { AttemptStatus, ReviewStatus } from "@prisma/client";
+import { throwBadRequest } from "#api/common/errors/api-exception";
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import { FilesService } from "#api/modules/files/services/files.service";
 import { StudentLessonAccessService } from "#api/modules/learning-paths/services/student-lesson-access.service";
@@ -18,6 +19,10 @@ import {
   serializeStudentTestStatus,
 } from "#api/modules/student-learning/serializers/student-lesson.serializers";
 import type { StudentLessonContentRecord } from "#api/modules/student-learning/types/student-lesson.types";
+import {
+  buildVideoTimelineVersion,
+  serializeVideoPlaybackProgress,
+} from "#api/modules/student-learning/utils/video-playback-progress";
 
 @Injectable()
 export class StudentLessonsService {
@@ -44,11 +49,24 @@ export class StudentLessonsService {
       throwLessonNotFound();
     }
 
-    const [fileAccessUrls, stemFigureAssetUrls, navigation] = await Promise.all([
-      this.resolveFileAccessUrls(record),
-      this.resolveStemFigureAssetUrls(record.summary),
-      this.getLessonNavigation(record.learningPathId, lessonId),
-    ]);
+    const [fileAccessUrls, stemFigureAssetUrls, navigation, videoProgressRecord] =
+      await Promise.all([
+        this.resolveFileAccessUrls(record),
+        this.resolveStemFigureAssetUrls(record.summary),
+        this.getLessonNavigation(record.learningPathId, lessonId),
+        this.prisma.videoPlaybackProgress.findUnique({
+          where: { studentUserId_lessonId: { studentUserId, lessonId } },
+          select: {
+            lastPositionSeconds: true,
+            timelineVersion: true,
+            updatedAt: true,
+          },
+        }),
+      ]);
+    const timelineVersion = buildVideoTimelineVersion(
+      record.videoUrl,
+      record.customVideoSettings,
+    );
     return {
       ...serializeStudentLessonContent(
         record,
@@ -57,7 +75,65 @@ export class StudentLessonsService {
         stemFigureAssetUrls,
       ),
       navigation,
+      videoProgress: serializeVideoPlaybackProgress(timelineVersion, videoProgressRecord),
     };
+  }
+
+  async getVideoProgress(lessonId: string, studentUserId: string) {
+    await this.studentLessonAccessService.assertCanRead(lessonId, studentUserId);
+    const lesson = await this.getVideoTimelineLesson(lessonId);
+    const timelineVersion = buildVideoTimelineVersion(
+      lesson.videoUrl,
+      lesson.customVideoSettings,
+    );
+    const progress = await this.prisma.videoPlaybackProgress.findUnique({
+      where: { studentUserId_lessonId: { studentUserId, lessonId } },
+      select: {
+        lastPositionSeconds: true,
+        timelineVersion: true,
+        updatedAt: true,
+      },
+    });
+
+    return serializeVideoPlaybackProgress(timelineVersion, progress);
+  }
+
+  async saveVideoProgress(
+    lessonId: string,
+    studentUserId: string,
+    positionSeconds: number,
+  ) {
+    await this.studentLessonAccessService.assertCanRead(lessonId, studentUserId);
+    const lesson = await this.getVideoTimelineLesson(lessonId);
+    const timelineVersion = buildVideoTimelineVersion(
+      lesson.videoUrl,
+      lesson.customVideoSettings,
+    );
+
+    if (!timelineVersion) {
+      throwBadRequest("LESSON_VIDEO_REQUIRED", "Buổi học chưa có video để lưu tiến độ");
+    }
+
+    const progress = await this.prisma.videoPlaybackProgress.upsert({
+      where: { studentUserId_lessonId: { studentUserId, lessonId } },
+      create: {
+        studentUserId,
+        lessonId,
+        lastPositionSeconds: roundPlaybackPosition(positionSeconds),
+        timelineVersion,
+      },
+      update: {
+        lastPositionSeconds: roundPlaybackPosition(positionSeconds),
+        timelineVersion,
+      },
+      select: {
+        lastPositionSeconds: true,
+        timelineVersion: true,
+        updatedAt: true,
+      },
+    });
+
+    return serializeVideoPlaybackProgress(timelineVersion, progress);
   }
 
   async getLessonSummary(lessonId: string, studentUserId: string) {
@@ -234,6 +310,19 @@ export class StudentLessonsService {
     };
   }
 
+  private async getVideoTimelineLesson(lessonId: string) {
+    const lesson = await this.prisma.lesson.findUnique({
+      where: { id: lessonId },
+      select: { customVideoSettings: true, videoUrl: true },
+    });
+
+    if (!lesson) {
+      throwLessonNotFound();
+    }
+
+    return lesson;
+  }
+
   private async resolveFileAccessUrls(record: StudentLessonContentRecord) {
     const filesById = new Map<
       string,
@@ -276,4 +365,8 @@ export class StudentLessonsService {
     );
     return new Map(entries);
   }
+}
+
+function roundPlaybackPosition(positionSeconds: number) {
+  return Math.round(positionSeconds * 10) / 10;
 }

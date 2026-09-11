@@ -1,7 +1,8 @@
 import type { GeneratedFlashcardOutput } from "#api/modules/flashcards/types/flashcard-generation.types";
 import {
-  normalizeMathTextLatexCommands,
-  normalizeMissingInlineMathClosers,
+  hasMalformedMathText,
+  normalizeLearnerMathTextSyntax,
+  normalizeThreePointAngleNotation,
   tokenizeMathText,
 } from "@learning-path/shared";
 import type { Difficulty } from "@prisma/client";
@@ -15,9 +16,7 @@ export function toFlashcardSolutionTiptap(text: string) {
 }
 
 function toFlashcardTiptapDocument(text: string, parseStrongMarkdown: boolean) {
-  const normalizedText = normalizeMathTextLatexCommands(
-    normalizeMissingInlineMathClosers(text),
-  );
+  const normalizedText = normalizeFlashcardLearnerText(text);
   const content: Array<Record<string, unknown>> = [];
   let inlineContent: Array<Record<string, unknown>> = [];
   const flushParagraph = () => {
@@ -50,6 +49,33 @@ function toFlashcardTiptapDocument(text: string, parseStrongMarkdown: boolean) {
   }
   flushParagraph();
   return { type: "doc", content };
+}
+
+export function normalizeFlashcardLearnerText(value: string) {
+  return normalizeLearnerMathTextSyntax(normalizeThreePointAngleNotation(value));
+}
+
+export function collectFlashcardMathSyntaxWarnings(input: {
+  front: string;
+  back: string;
+  solution: string;
+}) {
+  const malformedPaths = Object.entries(input)
+    .filter((entry): entry is [keyof typeof input, string] =>
+      hasMalformedMathText(normalizeFlashcardLearnerText(entry[1])),
+    )
+    .map(([path]) => path);
+  return malformedPaths.length === 0
+    ? []
+    : [
+        {
+          code: "MALFORMED_LATEX",
+          message:
+            "Một số công thức LaTeX vẫn chưa cân bằng sau bước chuẩn hóa; cần admin kiểm tra.",
+          severity: "WARNING" as const,
+          paths: malformedPaths,
+        },
+      ];
 }
 
 export function validateGeneratedFlashcards(input: {

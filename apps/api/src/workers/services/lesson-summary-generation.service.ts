@@ -203,7 +203,7 @@ export class LessonSummaryGenerationService {
       output: { ...providerOutput, data: mapped.content },
       recordedOutput: {
         type: "lesson_summary_phase_one_blocks",
-        version: 2,
+        version: 3,
         providerOutput: providerOutput.data,
         blocks: mapped.phaseOneBlocks,
         providerPaths: mapped.phaseOneProviderPaths,

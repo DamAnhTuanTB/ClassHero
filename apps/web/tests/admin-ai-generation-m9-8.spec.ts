@@ -31,6 +31,36 @@ function textDocument(text: string) {
   };
 }
 
+function videoSummaryContent() {
+  return {
+    type: "lesson_summary_blocks",
+    version: 6,
+    data: {
+      lessonId,
+      title: "Tổng quan Số hữu tỉ",
+      objectives: ["Nhận biết số hữu tỉ"],
+      sections: [
+        {
+          order: 1,
+          displayHeading: "Khái niệm số hữu tỉ",
+          startSeconds: 1_800,
+          blocks: [
+            {
+              type: "example",
+              problem: "Viết số hữu tỉ dưới dạng phân số.",
+              solution: "Áp dụng định nghĩa số hữu tỉ.",
+              answer: "$\\frac{1}{2}$ là một số hữu tỉ.",
+              startSeconds: 1_800,
+              figures: [],
+              origin: "SOURCE_EXACT",
+            },
+          ],
+        },
+      ],
+    },
+  };
+}
+
 test.describe("M9.8 admin AI generation panel", () => {
   test.beforeEach(async ({ page }) => {
     await seedAdminSession(page);
@@ -39,15 +69,67 @@ test.describe("M9.8 admin AI generation panel", () => {
   test("uses custom controls and validates summary/quiz fields in realtime", async ({
     page,
   }) => {
-    const mock = await setupAiGenerationMock(page);
+    const mock = await setupAiGenerationMock(page, {
+      initialVideoSummaryContent: videoSummaryContent(),
+      lessonVideoReady: true,
+    });
     await page.goto(`/admin/lessons/${lessonId}`);
 
     await expect(
       page.getByRole("heading", { name: "Tạo nội dung bằng AI" }),
     ).toBeVisible();
-    for (const name of ["Kiến thức", "Quiz", "Flashcard", "Test"]) {
+    for (const name of ["Video", "Kiến thức", "Quiz", "Flashcard", "Test"]) {
       await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
     }
+    await expect(
+      page.locator('[aria-labelledby="admin-ai-generation-heading"] article h3'),
+    ).toHaveText(["Video", "Kiến thức", "Quiz", "Flashcard", "Test"]);
+    await generationCard(page, "Video")
+      .getByRole("button", { name: "Tạo mới", exact: true })
+      .click();
+    const videoDialog = page.getByRole("dialog", {
+      name: "Tóm tắt Video bằng AI",
+    });
+    await expect(videoDialog).toBeVisible();
+    await expect(
+      videoDialog.getByRole("button", { name: "Cập nhật dữ liệu gửi AI" }),
+    ).toBeEnabled();
+    await videoDialog.getByRole("button", { name: "Đóng" }).click();
+    await expect(page.getByRole("tab", { name: "Video", exact: true })).toBeVisible();
+    await page.getByRole("tab", { name: "Video", exact: true }).click();
+    await expect(
+      page.getByRole("heading", { name: "Tổng quan video", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", {
+        name: "Bắt đầu 0:00 · Gốc 30:00",
+        exact: true,
+      }),
+    ).toBeVisible();
+    for (const mode of ["Chỉ xem UI", "Chỉ xem JSON", "Song song"]) {
+      await expect(page.getByTitle(mode, { exact: true })).toBeVisible();
+    }
+    await page.getByTitle("Song song", { exact: true }).click();
+    await expect(
+      page.getByText("Bản này chưa có raw Phase 1.", { exact: false }),
+    ).toHaveCount(0);
+    await expect(page.getByText("figures", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("origin", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("startSeconds", { exact: true }).first()).toBeVisible();
+    await page.getByTitle("Chỉ xem JSON", { exact: true }).click();
+    await page.getByRole("button", { name: "Xổ toàn bộ", exact: true }).click();
+    await expect(page.getByText("figures", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("origin", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("startSeconds", { exact: true }).first()).toBeVisible();
+    await page.getByTitle("Chỉ xem UI", { exact: true }).click();
+    await page.getByRole("button", { name: "Chỉnh sửa nội dung khối" }).click();
+    await expect(
+      page.getByText("Bản này chưa có raw Phase 1.", { exact: false }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Đóng phần chỉnh sửa khối" }),
+    ).toBeVisible();
+    await page.getByRole("tab", { name: "Tài liệu", exact: true }).click();
 
     await generationCard(page, "Kiến thức")
       .getByRole("button", { name: "Tạo mới", exact: true })
@@ -435,9 +517,7 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect(
       usageDialog.getByText("Tạo hình minh họa Quiz · Thành công"),
     ).toBeVisible();
-    await expect(
-      usageDialog.getByText("Quiz · Câu 4 · Hình lời giải"),
-    ).toBeVisible();
+    await expect(usageDialog.getByText("Quiz · Câu 4 · Hình lời giải")).toBeVisible();
     await usageDialog
       .getByRole("button", { name: /Xem chi tiết GPT-5.6 Luna, 66 VNĐ/ })
       .click();
@@ -575,15 +655,13 @@ test.describe("M9.8 admin AI generation panel", () => {
 
     const navigationRows = page.locator('[data-testid^="quiz-question-navigation-"]');
     await expect(navigationRows).toHaveCount(5);
-    await expect(page.getByTestId("quiz-pending-ai-heading")).toContainText(
-      "AI chờ duyệt",
-    );
+    await expect(page.getByTestId("quiz-pending-ai-heading")).toContainText("Chờ duyệt");
     await expect(page.getByTestId("quiz-approved-heading")).toContainText("Đã duyệt");
     await expect(navigationRows).toContainText([
       "Trắc nghiệm",
       "Trắc nghiệm",
-      "Đúng/Sai 1 mệnh đề",
-      "Đúng/Sai nhiều mệnh đề",
+      "Đúng / Sai 1 mệnh đề",
+      "Đúng / Sai nhiều mệnh đề",
       "Nhập đáp án",
     ]);
     await expect(
@@ -595,7 +673,7 @@ test.describe("M9.8 admin AI generation panel", () => {
     const quizStatistics = page.getByLabel("Thống kê bộ Quiz");
     await expect(quizStatistics).toContainText("Tổng câu5");
     await expect(quizStatistics).toContainText("Đã duyệt4");
-    await expect(quizStatistics).toContainText("AI chờ duyệt1");
+    await expect(quizStatistics).toContainText("Chờ duyệt1");
     await expect(quizStatistics).not.toContainText("Chưa lưu");
     const unsavedWarning = page.getByTestId("quiz-unsaved-approved-warning");
     await expect(unsavedWarning).toContainText(
@@ -689,7 +767,8 @@ test.describe("M9.8 admin AI generation panel", () => {
       page.getByTestId("quiz-question-navigation-MULTIPLE_CHOICE").getByRole("tab"),
     ).toHaveCount(2);
     await expect(
-      page.locator(`#quiz-question-${questionId}`).getByText("Đã duyệt", {
+      page.locator(`#quiz-question-${questionId}`).getByRole("button", {
+        name: "Hủy duyệt",
         exact: true,
       }),
     ).toBeVisible();
@@ -1074,7 +1153,19 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect
       .poll(() => mock.quizReviewPayloads)
       .toEqual([{ questionId, reviewStatus: "APPROVED" }]);
-    await expect(page.getByText("Đã duyệt", { exact: true })).toBeVisible();
+    const cancelReviewButton = page.getByRole("button", {
+      name: "Hủy duyệt",
+      exact: true,
+    });
+    await expect(cancelReviewButton).toBeVisible();
+    await cancelReviewButton.click();
+    await expect
+      .poll(() => mock.quizReviewPayloads)
+      .toEqual([
+        { questionId, reviewStatus: "APPROVED" },
+        { questionId, reviewStatus: "NEEDS_REVIEW" },
+      ]);
+    await expect(page.getByRole("button", { name: "Duyệt", exact: true })).toBeVisible();
   });
 
   test("bulk reviews every pending AI question in the current Quiz set before save", async ({
@@ -1133,7 +1224,7 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect(page.getByTestId("quiz-question-navigation-pending-ai")).toHaveCount(0);
     const quizStatistics = page.getByLabel("Thống kê bộ Quiz");
     await expect(quizStatistics).toContainText("Đã duyệt3");
-    await expect(quizStatistics).toContainText("AI chờ duyệt0");
+    await expect(quizStatistics).toContainText("Chờ duyệt0");
     await expect(page.getByTestId("quiz-unsaved-approved-warning")).toContainText(
       "Bạn đã duyệt thêm 3 câu. Nhớ nhấn Lưu để cập nhật vào lượt phát hành gần nhất cho học sinh.",
     );
@@ -1389,8 +1480,8 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect(page.getByText("Thẻ ghi nhớ", { exact: true })).toHaveCount(2);
     for (const quizType of [
       "Trắc nghiệm",
-      "Đúng/Sai 1 mệnh đề",
-      "Đúng/Sai nhiều mệnh đề",
+      "Đúng / Sai 1 mệnh đề",
+      "Đúng / Sai nhiều mệnh đề",
       "Nhập đáp án",
     ]) {
       await expect(page.getByText(quizType, { exact: true })).toHaveCount(0);
@@ -1469,6 +1560,61 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect
       .poll(() => mock.flashcardSetReviewPayloads.at(-1)?.action)
       .toBe("WITHDRAW");
+  });
+
+  test("reviews the selected pending AI Flashcard with Enter and allows cancel review", async ({
+    page,
+  }) => {
+    const flashcardSetId = "66666666-6666-4666-8666-666666666681";
+    const flashcardId = "66666666-6666-4666-8666-666666666682";
+    const mock = await setupAiGenerationMock(page, {
+      flashcardSets: [
+        {
+          id: flashcardSetId,
+          lessonId,
+          title: "Bộ flashcard Enter",
+          difficulty: "MIXED",
+          source: "ADMIN",
+          reviewStatus: "DRAFT",
+          cardCount: 1,
+          pendingReviewCardCount: 1,
+          unpublishedApprovedCardCount: 0,
+          aiGenerations: [],
+          sortOrder: 0,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ],
+      flashcards: [
+        flashcardFixture(flashcardId, flashcardSetId, {
+          reviewStatus: "NEEDS_REVIEW",
+          sourceMetadataJson: { aiGenerationId: "generation-flashcard-enter" },
+        }),
+      ],
+    });
+
+    await page.goto(`/admin/lessons/${lessonId}`);
+    await page.getByRole("tab", { name: "Flashcard", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Duyệt", exact: true })).toBeVisible();
+
+    await page.keyboard.press("Enter");
+    await expect
+      .poll(() => mock.flashcardReviewPayloads)
+      .toEqual([{ flashcardId, reviewStatus: "APPROVED" }]);
+
+    const cancelReviewButton = page.getByRole("button", {
+      name: "Hủy duyệt",
+      exact: true,
+    });
+    await expect(cancelReviewButton).toBeVisible();
+    await cancelReviewButton.click();
+    await expect
+      .poll(() => mock.flashcardReviewPayloads)
+      .toEqual([
+        { flashcardId, reviewStatus: "APPROVED" },
+        { flashcardId, reviewStatus: "NEEDS_REVIEW" },
+      ]);
+    await expect(page.getByRole("button", { name: "Duyệt", exact: true })).toBeVisible();
   });
 
   test("configures a summary and shows the exact system, user and full input prompts", async ({
@@ -1579,6 +1725,8 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect
       .poll(() => mock.payloads.SUMMARY)
       .toEqual({
+        autoEnhanceTextbookSourceImages: true,
+        useTextbookSourceImages: true,
         documentIds: [documentId],
         style: "academic",
         styleInstructions:
@@ -1611,13 +1759,9 @@ test.describe("M9.8 admin AI generation panel", () => {
     const dialog = page.getByRole("dialog", { name: "Tạo Kiến thức bằng AI" });
     const sourceImageCheckbox = dialog.getByLabel("Dùng ảnh gốc của tài liệu");
     const autoEnhanceCheckbox = dialog.getByLabel("Tự động làm nét ảnh");
-    await expect(sourceImageCheckbox).not.toBeChecked();
-    await expect(autoEnhanceCheckbox).toHaveCount(0);
+    await expect(sourceImageCheckbox).toBeChecked();
+    await expect(autoEnhanceCheckbox).toBeChecked();
 
-    await sourceImageCheckbox.check();
-    await expect(autoEnhanceCheckbox).toBeVisible();
-    await expect(autoEnhanceCheckbox).not.toBeChecked();
-    await autoEnhanceCheckbox.check();
     await sourceImageCheckbox.uncheck();
     await expect(autoEnhanceCheckbox).toHaveCount(0);
     await sourceImageCheckbox.check();
@@ -1917,7 +2061,8 @@ test.describe("M9.8 admin AI generation panel", () => {
     await generationCard(page, "Kiến thức")
       .getByRole("button", { name: "Tạo mới", exact: true })
       .click();
-    await expect(dialog.getByLabel("Dùng ảnh gốc của tài liệu")).not.toBeChecked();
+    await expect(dialog.getByLabel("Dùng ảnh gốc của tài liệu")).toBeChecked();
+    await expect(dialog.getByLabel("Tự động làm nét ảnh")).toBeChecked();
     await expect(dialog.getByLabel("Yêu cầu bổ sung")).toHaveValue("");
   });
 
@@ -3937,9 +4082,11 @@ async function setupAiGenerationMock(
     initialReviewStatus?: "DRAFT" | "NEEDS_REVIEW" | "APPROVED" | "HIDDEN";
     runningPolls?: number;
     initialSummaryContent?: unknown;
+    initialVideoSummaryContent?: unknown;
     initialSummaryGenerationInput?: Record<string, unknown>;
     phaseOneBlockJsonByPath?: Record<string, unknown>;
     lessonTitle?: string;
+    lessonVideoReady?: boolean;
     quizQuestions?: Array<Record<string, unknown>>;
     quizSets?: Array<Record<string, unknown>>;
     quizSetsAfterFirstRequest?: Array<Record<string, unknown>>;
@@ -3965,6 +4112,10 @@ async function setupAiGenerationMock(
   }> = [];
   const quizBulkReviewSetIds: string[] = [];
   const flashcardBulkReviewSetIds: string[] = [];
+  const flashcardReviewPayloads: Array<{
+    flashcardId: string;
+    reviewStatus: string;
+  }> = [];
   const flashcardSetReviewPayloads: Array<{
     action?: string;
     reviewStatus: string;
@@ -4035,6 +4186,17 @@ async function setupAiGenerationMock(
       createdAt: string;
       updatedAt: string;
     } | null;
+    videoSummary: {
+      id: string;
+      lessonId: string;
+      contentJson: unknown;
+      source: "AI";
+      reviewStatus: "NEEDS_REVIEW";
+      aiGenerationId: string;
+      staleAt: null;
+      createdAt: string;
+      updatedAt: string;
+    } | null;
   } = {
     figures: structuredClone(options.stemFigures ?? []),
     flashcards: structuredClone(options.flashcards ?? []),
@@ -4048,6 +4210,19 @@ async function setupAiGenerationMock(
           reviewStatus: options.initialReviewStatus ?? "NEEDS_REVIEW",
           aiGenerationId: "generation-review",
           phaseOneBlockJsonByPath: options.phaseOneBlockJsonByPath,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }
+      : null,
+    videoSummary: options.initialVideoSummaryContent
+      ? {
+          id: "video-summary-review",
+          lessonId,
+          contentJson: options.initialVideoSummaryContent,
+          source: "AI",
+          reviewStatus: "NEEDS_REVIEW",
+          aiGenerationId: "generation-video-summary-review",
+          staleAt: null,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         }
@@ -4066,6 +4241,21 @@ async function setupAiGenerationMock(
         data: {
           ...lesson(),
           ...(options.lessonTitle ? { title: options.lessonTitle } : {}),
+          ...(options.lessonVideoReady
+            ? {
+                videoUrl: "https://drive.google.com/file/d/video-ready/view",
+                customVideoSettings: {
+                  startTimeInSeconds: 1_800,
+                  transcript: [
+                    {
+                      time: 1_800,
+                      endTime: 1_830,
+                      text: "Giới thiệu khái niệm số hữu tỉ.",
+                    },
+                  ],
+                },
+              }
+            : {}),
         },
       });
     }
@@ -4140,6 +4330,9 @@ async function setupAiGenerationMock(
     }
     if (method === "GET" && pathname === `/admin/lessons/${lessonId}/summary`) {
       return fulfillJson(route, 200, { data: state.summary });
+    }
+    if (method === "GET" && pathname === `/admin/lessons/${lessonId}/video-summary`) {
+      return fulfillJson(route, 200, { data: state.videoSummary });
     }
     if (method === "GET" && pathname === `/admin/lessons/${lessonId}/stem-figures`) {
       stemFigureListRequests += 1;
@@ -5141,6 +5334,7 @@ async function setupAiGenerationMock(
     const quizQuestionReviewMatch = pathname.match(
       /^\/admin\/quiz-questions\/([^/]+)\/review$/,
     );
+    const flashcardReviewMatch = pathname.match(/^\/admin\/flashcards\/([^/]+)\/review$/);
     const solutionRefinementPreviewMatch = pathname.match(
       /^\/admin\/quiz-questions\/([^/]+)\/solution-refinement\/preview$/,
     );
@@ -5390,6 +5584,16 @@ async function setupAiGenerationMock(
       );
       return fulfillJson(route, 201, { data: updatedQuestion });
     }
+    if (method === "POST" && flashcardReviewMatch) {
+      const flashcardId = flashcardReviewMatch[1] ?? "";
+      const reviewStatus = String(request.postDataJSON().reviewStatus);
+      flashcardReviewPayloads.push({ flashcardId, reviewStatus });
+      state.flashcards = state.flashcards.map((card) =>
+        card.id === flashcardId ? { ...card, publishedAt: null, reviewStatus } : card,
+      );
+      const updatedCard = state.flashcards.find((card) => card.id === flashcardId);
+      return fulfillJson(route, 201, { data: updatedCard });
+    }
 
     return fulfillJson(route, 404, {
       error: { code: "MOCK_NOT_FOUND", message: `${method} ${pathname}` },
@@ -5405,6 +5609,7 @@ async function setupAiGenerationMock(
     quizBulkReviewSetIds,
     quizSetReviewPayloads,
     flashcardBulkReviewSetIds,
+    flashcardReviewPayloads,
     flashcardSetReviewPayloads,
     flashcardFigurePreviewPayloads,
     flashcardFigureCreatePayloads,

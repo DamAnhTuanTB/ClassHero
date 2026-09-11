@@ -145,6 +145,17 @@ export const studentLessonContentSelect = {
   summary: {
     select: studentLessonSummarySelect,
   },
+  videoSummary: {
+    select: {
+      id: true,
+      lessonId: true,
+      contentJson: true,
+      reviewStatus: true,
+      staleAt: true,
+      updatedAt: true,
+      deletedAt: true,
+    },
+  },
   quizSets: {
     where: {
       deletedAt: null,

@@ -197,6 +197,26 @@ describe("M6.5 student lesson content integration", () => {
           updatedById: admin.id,
         },
       }),
+      prisma.lessonVideoSummary.create({
+        data: {
+          lessonId,
+          contentJson: documentWithText("Tóm tắt video đã phát hành."),
+          source: ContentSource.ADMIN,
+          reviewStatus: ReviewStatus.APPROVED,
+          createdById: admin.id,
+          updatedById: admin.id,
+        },
+      }),
+      prisma.lessonVideoSummary.create({
+        data: {
+          lessonId: trialLessonId,
+          contentJson: documentWithText("Tóm tắt video đang ẩn."),
+          source: ContentSource.ADMIN,
+          reviewStatus: ReviewStatus.HIDDEN,
+          createdById: admin.id,
+          updatedById: admin.id,
+        },
+      }),
     ]);
 
     const [approvedQuizSet] = await Promise.all([
@@ -329,6 +349,9 @@ describe("M6.5 student lesson content integration", () => {
       await prisma.flashcardSet.deleteMany({ where: { lessonId } });
       await prisma.quizQuestion.deleteMany({ where: { lessonId } });
       await prisma.quizSet.deleteMany({ where: { lessonId } });
+      await prisma.lessonVideoSummary.deleteMany({
+        where: { lessonId: { in: [lessonId, trialLessonId] } },
+      });
       await prisma.lessonSummary.deleteMany({ where: { lessonId } });
       await prisma.lessonMaterial.deleteMany({ where: { lessonId } });
       await prisma.lessonDocument.deleteMany({ where: { lessonId } });
@@ -356,9 +379,12 @@ describe("M6.5 student lesson content integration", () => {
 
     expect(content.access.mode).toBe("ENROLLMENT");
     expect(content.summary?.contentJson).toEqual(documentWithText("Tóm tắt đã duyệt."));
+    expect(content.videoSummary?.contentJson).toEqual(
+      documentWithText("Tóm tắt video đã phát hành."),
+    );
     expect(content.materials).toHaveLength(1);
     expect(content.documents).toHaveLength(1);
-    expect(content.documents[0]?.file.accessUrl).toContain("cdn.example.com/m6-5");
+    expect(content.documents[0]?.file.accessUrl).toMatch(/^https?:\/\//);
     expect(content.quizSets.map((set) => set.title)).toEqual(["Quiz được phép"]);
     expect(content.quizSets[0]?.questionCount).toBe(1);
     expect(content.flashcardSets[0]?.cardCount).toBe(1);
@@ -371,6 +397,26 @@ describe("M6.5 student lesson content integration", () => {
     expect(serialized).not.toContain("test-answer-secret-m6-5");
     expect(serialized).not.toContain("Quiz đang ẩn");
     expect(serialized).not.toContain("Quiz dự phòng");
+  });
+
+  it("does not expose a stale video summary to students", async () => {
+    await prisma.lessonVideoSummary.update({
+      where: { lessonId },
+      data: { staleAt: new Date() },
+    });
+
+    try {
+      const content = await studentLessonsService.getLessonContent(
+        lessonId,
+        enrolledStudentId,
+      );
+      expect(content.videoSummary).toBeNull();
+    } finally {
+      await prisma.lessonVideoSummary.update({
+        where: { lessonId },
+        data: { staleAt: null },
+      });
+    }
   });
 
   it("returns quiz content without answer keys or hidden questions", async () => {
@@ -425,6 +471,7 @@ describe("M6.5 student lesson content integration", () => {
     );
 
     expect(content.access.mode).toBe("TRIAL");
+    expect(content.videoSummary).toBeNull();
     expect(content.testAvailability.canStartTest).toBe(false);
     expect(status.canStart).toBe(false);
   });

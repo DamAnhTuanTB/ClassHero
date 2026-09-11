@@ -801,7 +801,9 @@ export function FlashcardLearningPanel({
           />
         </div>
         <p className="mt-3 text-sm font-semibold leading-6 text-slate-600 dark:text-[var(--theme-text-muted)] sm:mt-4 lg:text-base lg:leading-7">
-          Cùng ghi nhớ các kiến thức đã học nhé.
+          {progress.isCompleted && !hasPendingSession
+            ? "Bộ Flashcard đã được hoàn thành. Cùng ôn tập lại nhé."
+            : "Cùng ghi nhớ các kiến thức đã học nhé."}
         </p>
         <div
           className={
@@ -832,7 +834,7 @@ export function FlashcardLearningPanel({
               }
               aria-busy={pendingAction === "start-new-set"}
               disabled={pendingAction === "start-new-set"}
-              className="inline-flex min-h-14 w-full min-w-0 items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl border-2 border-violet-300 bg-white px-3 text-base font-black text-violet-700 transition hover:bg-violet-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-100 disabled:opacity-70 dark:border-violet-400/50 dark:bg-[var(--theme-surface)] dark:text-violet-300 dark:hover:bg-violet-500/10 sm:px-5 sm:text-lg"
+              className="student-preserve-mobile-shadow inline-flex min-h-14 w-full min-w-0 items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl border-2 border-violet-300 bg-white px-3 text-base font-black text-violet-700 shadow-[0_3px_0_rgb(221_214_254),0_10px_16px_-13px_rgb(139_92_246_/_30%)] transition hover:bg-violet-50 active:translate-y-[2px] active:shadow-[0_1px_0_rgb(221_214_254),0_5px_10px_-12px_rgb(139_92_246_/_24%)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-100 disabled:opacity-70 dark:border-violet-400/50 dark:bg-[var(--theme-surface)] dark:text-violet-300 dark:shadow-[0_3px_0_rgb(76_29_149_/_55%),0_10px_16px_-14px_rgb(139_92_246_/_20%)] dark:hover:bg-violet-500/10 sm:px-5 sm:text-lg"
             >
               <RotateCcw className="h-6 w-6 shrink-0" aria-hidden="true" />
               Học bộ Flashcard mới

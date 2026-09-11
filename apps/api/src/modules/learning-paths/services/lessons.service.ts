@@ -272,6 +272,24 @@ export class LessonsService {
         }
 
         assertVideoUrlAllowed(dto.videoUrl);
+        const normalizedVideoUrl =
+          dto.videoUrl !== undefined
+            ? normalizeOptionalText(dto.videoUrl)
+            : before.videoUrl;
+        const videoUrlChanged =
+          dto.videoUrl !== undefined &&
+          normalizedVideoUrl !== normalizeOptionalText(before.videoUrl);
+        const requestedVideoSettings =
+          dto.customVideoSettings !== undefined
+            ? dto.customVideoSettings
+            : before.customVideoSettings;
+        const customVideoSettingsUpdate = videoUrlChanged
+          ? resetVideoSourceDependentSettings(requestedVideoSettings)
+          : dto.customVideoSettings !== undefined
+            ? dto.customVideoSettings
+              ? (dto.customVideoSettings as unknown as Prisma.InputJsonValue)
+              : Prisma.DbNull
+            : undefined;
         const lessonType = dto.lessonType ?? before.lessonType;
         const liveUrl = normalizeLessonLiveUrl(
           lessonType,
@@ -324,25 +342,41 @@ export class LessonsService {
             ...(dto.examOpenAt !== undefined
               ? { examOpenAt: dto.examOpenAt ?? null }
               : {}),
-            ...(dto.videoUrl !== undefined
-              ? { videoUrl: normalizeOptionalText(dto.videoUrl) }
-              : {}),
+            ...(dto.videoUrl !== undefined ? { videoUrl: normalizedVideoUrl } : {}),
             ...(dto.completionMinScore !== undefined
               ? { completionMinScore: dto.completionMinScore }
               : {}),
             ...(dto.trialEnabled !== undefined ? { trialEnabled: dto.trialEnabled } : {}),
-            ...(dto.customVideoSettings !== undefined
-              ? {
-                  customVideoSettings: dto.customVideoSettings
-                    ? (dto.customVideoSettings as unknown as Prisma.InputJsonValue)
-                    : Prisma.DbNull,
-                }
+            ...(customVideoSettingsUpdate !== undefined
+              ? { customVideoSettings: customVideoSettingsUpdate }
               : {}),
             ...(dto.status !== undefined ? { status } : {}),
             updatedById: actorUserId,
           },
           select: lessonSelect,
         });
+
+        if (videoUrlChanged) {
+          const videoSummary = await tx.lessonVideoSummary.findUnique({
+            where: { lessonId },
+          });
+          if (videoSummary) {
+            await tx.lessonVideoSummary.delete({
+              where: { id: videoSummary.id },
+            });
+            await tx.auditLog.create({
+              data: {
+                actorUserId,
+                action: "LESSON_VIDEO_SUMMARY_RESET_AFTER_VIDEO_URL_CHANGE",
+                entityType: "LessonVideoSummary",
+                entityId: videoSummary.id,
+                before: toInputJson(videoSummary),
+                ipAddress: context.ipAddress,
+                userAgent: context.userAgent,
+              },
+            });
+          }
+        }
 
         await tx.auditLog.create({
           data: {
@@ -720,6 +754,28 @@ export class LessonsService {
       throwDuplicatedLessonTitle();
     }
   }
+}
+
+function resetVideoSourceDependentSettings(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return Prisma.DbNull;
+  }
+
+  const settings = Object.fromEntries(
+    Object.entries(value).filter(
+      ([key, setting]) =>
+        setting !== undefined &&
+        key !== "chapters" &&
+        key !== "transcript" &&
+        key !== "transcriptLanguage",
+    ),
+  );
+
+  return {
+    ...settings,
+    chapters: [],
+    transcript: [],
+  } as Prisma.InputJsonValue;
 }
 
 function parseLessonOverviewContent(

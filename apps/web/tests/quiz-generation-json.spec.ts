@@ -178,14 +178,14 @@ test.describe("Quiz mutable generation JSON preview", () => {
     const preview = buildQuizQuestionPreviewFromGenerationJson(currentQuestion, {
       questionType: "MULTIPLE_CHOICE",
       difficulty: "MEDIUM",
-      hint: String.raw`Dùng $\angle DAB$.`,
+      hint: String.raw`Dùng $m\angle DAB$.`,
       options: [
         { id: "A", text: String.raw`$\angle DAB=70^\circ$` },
-        { id: "B", text: String.raw`$\angle DAB=110^\circ$` },
+        { id: "B", text: String.raw`$m\widehat{DAB}=110^\circ$` },
       ],
       correctOptionId: "A",
       explanation: {
-        problem: String.raw`Cho $\angle DAB=70^\circ$.`,
+        problem: String.raw`Cho $m\angle DAB=70^\circ$.`,
         solution: String.raw`Vậy $\angle DAB=70^\circ$.`,
       },
     });
@@ -195,6 +195,7 @@ test.describe("Quiz mutable generation JSON preview", () => {
     expect(JSON.stringify(preview.hintJson)).toContain("widehat{DAB}");
     expect(JSON.stringify(preview.explanation?.contentJson)).toContain("widehat{DAB}");
     expect(JSON.stringify(preview)).not.toContain('"latex":"\\\\angle DAB');
+    expect(JSON.stringify(preview)).not.toContain("m\\\\widehat");
   });
 
   test("loads only the structured solution into Edit for previously stored Quiz data", () => {

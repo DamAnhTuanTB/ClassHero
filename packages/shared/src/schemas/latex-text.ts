@@ -139,6 +139,17 @@ const DECODED_LATEX_CONTROL_PREFIX_PATTERN = new RegExp(
   "gu",
 );
 
+const LATEX_ENVIRONMENT_TOKEN_PATTERN = /\\(begin|end)\{([A-Za-z][A-Za-z0-9*]*)\}/gu;
+const DISPLAY_MATH_BLOCK_PATTERN = /\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\]/gu;
+const MISPLACED_DOLLAR_DISPLAY_CLOSER_PATTERN =
+  /\$\$(?=(?:\s*\\end\{[A-Za-z][A-Za-z0-9*]*\})+\s*\$\$)/gu;
+const MISPLACED_BRACKET_DISPLAY_CLOSER_PATTERN =
+  /\\\](?=(?:\s*\\end\{[A-Za-z][A-Za-z0-9*]*\})+\s*\\\])/gu;
+const MAX_LEARNER_MATH_REPAIR_PASSES = 3;
+
+export const LEARNER_MATH_TEXT_SYNTAX_DESCRIPTION =
+  "Mọi công thức phải dùng cặp delimiter đầy đủ (`$...$`, `$$...$$`, `\\(...\\)` hoặc `\\[...\\]`), không dùng backtick để đóng công thức; các dấu `{}` và từng cặp `\\begin{...}`/`\\end{...}` phải cân bằng.";
+
 /**
  * Repairs a decoded LaTeX fragment when a known command lost its leading
  * backslash. The grammar and command allowlists keep ordinary identifiers and
@@ -202,6 +213,145 @@ export function stripForbiddenTextControlCharacters(value: string) {
     .join("");
 }
 
+/**
+ * Reports only deterministic syntax defects that remain unsafe for math
+ * rendering. This is intentionally a warning predicate rather than a schema
+ * rejection so generated content can still reach the admin review flow.
+ */
+export function hasMalformedMathText(value: string) {
+  let dollarDelimiterLength = 0;
+  let parenthesizedMath = false;
+  let bracketedMath = false;
+  let braceDepth = 0;
+  let codeDelimiterLength = 0;
+  const environments: string[] = [];
+
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index]!;
+
+    if (character === "`") {
+      const delimiterLength = countRepeatedCharacter(value, index, "`");
+      if (codeDelimiterLength === 0) codeDelimiterLength = delimiterLength;
+      else if (codeDelimiterLength === delimiterLength) codeDelimiterLength = 0;
+      index += delimiterLength - 1;
+      continue;
+    }
+    if (codeDelimiterLength > 0) continue;
+
+    const codePoint = character.codePointAt(0) ?? 0;
+    if (
+      codePoint <= 8 ||
+      codePoint === 11 ||
+      codePoint === 12 ||
+      (codePoint >= 14 && codePoint <= 31) ||
+      codePoint === 127
+    ) {
+      return true;
+    }
+
+    if (character === "\\") {
+      const token = value.slice(index, index + 2);
+      if (token === "\\(") {
+        if (parenthesizedMath || bracketedMath || dollarDelimiterLength > 0) {
+          return true;
+        }
+        parenthesizedMath = true;
+        index += 1;
+        continue;
+      }
+      if (token === "\\)") {
+        if (!parenthesizedMath) return true;
+        if (braceDepth !== 0) return true;
+        parenthesizedMath = false;
+        index += 1;
+        continue;
+      }
+      if (token === "\\[") {
+        if (bracketedMath || parenthesizedMath || dollarDelimiterLength > 0) {
+          return true;
+        }
+        bracketedMath = true;
+        index += 1;
+        continue;
+      }
+      if (token === "\\]") {
+        if (!bracketedMath) return true;
+        if (braceDepth !== 0) return true;
+        bracketedMath = false;
+        index += 1;
+        continue;
+      }
+      index += 1;
+      continue;
+    }
+
+    if (character === "$") {
+      const delimiterLength = Math.min(countRepeatedCharacter(value, index, "$"), 2);
+      if (parenthesizedMath || bracketedMath) return true;
+      if (dollarDelimiterLength === 0) dollarDelimiterLength = delimiterLength;
+      else if (dollarDelimiterLength === delimiterLength) {
+        if (braceDepth !== 0) return true;
+        dollarDelimiterLength = 0;
+      } else return true;
+      index += delimiterLength - 1;
+      continue;
+    }
+
+    const inMath = dollarDelimiterLength > 0 || parenthesizedMath || bracketedMath;
+    if (!inMath) continue;
+    if (character === "{") braceDepth += 1;
+    if (character === "}") {
+      if (braceDepth === 0) return true;
+      braceDepth -= 1;
+    }
+  }
+
+  if (
+    dollarDelimiterLength > 0 ||
+    parenthesizedMath ||
+    bracketedMath ||
+    braceDepth !== 0
+  ) {
+    return true;
+  }
+
+  const environmentSource = maskMarkdownCodeSpans(value);
+  for (const match of environmentSource.matchAll(LATEX_ENVIRONMENT_TOKEN_PATTERN)) {
+    if (isEscapedByAnotherBackslash(environmentSource, match.index ?? 0)) continue;
+    const operation = match[1];
+    const environment = match[2];
+    if (!operation || !environment) continue;
+    if (operation === "begin") environments.push(environment);
+    else if (environments.pop() !== environment) return true;
+  }
+  return environments.length > 0;
+}
+
+function maskMarkdownCodeSpans(value: string) {
+  let masked = "";
+  let codeDelimiterLength = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    if (value[index] === "`") {
+      const delimiterLength = countRepeatedCharacter(value, index, "`");
+      if (codeDelimiterLength === 0) codeDelimiterLength = delimiterLength;
+      else if (codeDelimiterLength === delimiterLength) codeDelimiterLength = 0;
+      masked += " ".repeat(delimiterLength);
+      index += delimiterLength - 1;
+      continue;
+    }
+    masked += codeDelimiterLength > 0 ? " " : value[index];
+  }
+  return masked;
+}
+
+function isEscapedByAnotherBackslash(value: string, index: number) {
+  let slashCount = 0;
+  for (let cursor = index - 1; cursor >= 0 && value[cursor] === "\\"; cursor -= 1) {
+    slashCount += 1;
+  }
+  return slashCount % 2 === 1;
+}
+
 function normalizeUnprotectedLatex(latex: string) {
   return latex
     .replace(
@@ -235,9 +385,62 @@ export function normalizeMathTextLatexCommands(value: string) {
 }
 
 /**
+ * Repairs mechanically recoverable begin/end defects inside display-math
+ * delimiters. Prose, inline math and Markdown code spans remain untouched.
+ */
+export function normalizeMathTextLatexEnvironments(value: string) {
+  return transformOutsideMarkdownCodeSpans(value, (segment) =>
+    segment
+      .replace(MISPLACED_DOLLAR_DISPLAY_CLOSER_PATTERN, "")
+      .replace(MISPLACED_BRACKET_DISPLAY_CLOSER_PATTERN, "")
+      .replace(
+        DISPLAY_MATH_BLOCK_PATTERN,
+        (
+          _block,
+          dollarContent: string | undefined,
+          bracketContent: string | undefined,
+        ) => {
+          const content = dollarContent ?? bracketContent ?? "";
+          const repaired = balanceLatexEnvironments(content);
+          return dollarContent === undefined ? `\\[${repaired}\\]` : `$$${repaired}$$`;
+        },
+      ),
+  );
+}
+
+/**
+ * Balances LaTeX environments inside an already extracted math fragment.
+ * Renderers use this for legacy Tiptap and Mathpix nodes that no longer carry
+ * their outer Markdown delimiters.
+ */
+export function normalizeLatexEnvironmentPairs(latex: string) {
+  return balanceLatexEnvironments(latex);
+}
+
+/**
+ * Runs the shared deterministic learner-text repair pipeline to a bounded fixed
+ * point. Remaining malformed syntax is intentionally left for review rather
+ * than being repaired by guessing at mathematical meaning.
+ */
+export function normalizeLearnerMathTextSyntax(value: string) {
+  let normalized = value;
+  for (let pass = 0; pass < MAX_LEARNER_MATH_REPAIR_PASSES; pass += 1) {
+    const repaired = stripForbiddenTextControlCharacters(
+      normalizeMathTextLatexEnvironments(
+        normalizeMathTextLatexCommands(normalizeMissingInlineMathClosers(normalized)),
+      ),
+    );
+    if (repaired === normalized || !hasMalformedMathText(repaired)) return repaired;
+    normalized = repaired;
+  }
+  return normalized;
+}
+
+/**
  * Repairs a missing inline-math closer only when the current span crosses a
- * clear sentence boundary into ordinary prose. The evidence gate deliberately
- * excludes content that still looks mathematical after the boundary, so valid
+ * clear sentence boundary into ordinary prose. It also removes an unmatched
+ * dollar immediately followed by a clearly prose-only sentence. The evidence
+ * gates deliberately exclude content that still looks mathematical, so valid
  * decimals, multi-part formulas, display math, code spans, and escaped dollars
  * remain byte-for-byte unchanged.
  */
@@ -301,6 +504,11 @@ export function normalizeMissingInlineMathClosers(value: string) {
     }
 
     if (nextDelimiter < 0) {
+      if (isHighConfidenceOrphanInlineMathDollar(content)) {
+        normalized += content;
+        cursor = contentEnd;
+        continue;
+      }
       normalized += value.slice(cursor);
       break;
     }
@@ -469,6 +677,18 @@ function findHighConfidenceInlineMathCloser(content: string) {
       return prefixEnd;
     }
   }
+
+  const terminalPunctuation = /[.!?]\s*$/u.exec(content);
+  if (terminalPunctuation?.index !== undefined) {
+    const prefixEnd = trimEndIndex(content, terminalPunctuation.index);
+    const mathPrefix = content.slice(0, prefixEnd);
+    if (
+      looksLikeCompleteMathPrefix(mathPrefix) &&
+      /(?:\\[A-Za-z]+|[=^_+*/<>-]|[\])}])\s*$/u.test(mathPrefix)
+    ) {
+      return prefixEnd;
+    }
+  }
   return null;
 }
 
@@ -488,6 +708,15 @@ function looksLikeOrdinaryProseSuffix(value: string) {
   return (value.match(/\p{L}[\p{L}\p{M}'’-]*/gu) ?? []).length >= 2;
 }
 
+function isHighConfidenceOrphanInlineMathDollar(content: string) {
+  if (!/^\s+\p{Lu}/u.test(content)) return false;
+  const firstSentence = content.split(/(?<=[.!?])(?:\s|$)/u, 1)[0]?.trim() ?? "";
+  return (
+    looksLikeOrdinaryProseSuffix(firstSentence) &&
+    !/(?:\\[A-Za-z]+|[=^_+*<>[\]{}])/u.test(firstSentence)
+  );
+}
+
 function hasBalancedUnescapedBraces(value: string) {
   let depth = 0;
   for (let index = 0; index < value.length; index += 1) {
@@ -500,6 +729,74 @@ function hasBalancedUnescapedBraces(value: string) {
     if (depth < 0) return false;
   }
   return depth === 0;
+}
+
+function balanceLatexEnvironments(content: string) {
+  const openEnvironments: string[] = [];
+  let normalized = "";
+  let cursor = 0;
+
+  for (const match of content.matchAll(LATEX_ENVIRONMENT_TOKEN_PATTERN)) {
+    const tokenIndex = match.index;
+    const operation = match[1];
+    const environmentName = match[2];
+    if (tokenIndex === undefined || !operation || !environmentName) continue;
+
+    normalized += content.slice(cursor, tokenIndex);
+    if (operation === "begin") {
+      normalized += match[0];
+      openEnvironments.push(environmentName);
+    } else {
+      const matchingOpenIndex = openEnvironments.lastIndexOf(environmentName);
+      if (matchingOpenIndex >= 0) {
+        while (openEnvironments.length - 1 > matchingOpenIndex) {
+          normalized += `\\end{${openEnvironments.pop()!}}`;
+        }
+        normalized += match[0];
+        openEnvironments.pop();
+      }
+    }
+    cursor = tokenIndex + match[0].length;
+  }
+
+  normalized += content.slice(cursor);
+  while (openEnvironments.length > 0) {
+    normalized += `\\end{${openEnvironments.pop()!}}`;
+  }
+  return normalized;
+}
+
+function transformOutsideMarkdownCodeSpans(
+  value: string,
+  transform: (segment: string) => string,
+) {
+  let normalized = "";
+  let segmentStart = 0;
+  let cursor = 0;
+
+  while (cursor < value.length) {
+    if (value[cursor] !== "`") {
+      cursor += 1;
+      continue;
+    }
+    const delimiterLength = countRepeatedCharacter(value, cursor, "`");
+    const closer = findMatchingDelimiterRun(
+      value,
+      cursor + delimiterLength,
+      "`",
+      delimiterLength,
+    );
+    if (closer < 0) break;
+
+    normalized += transform(value.slice(segmentStart, cursor));
+    const codeSpanEnd = closer + delimiterLength;
+    normalized += value.slice(cursor, codeSpanEnd);
+    cursor = codeSpanEnd;
+    segmentStart = codeSpanEnd;
+  }
+
+  normalized += transform(value.slice(segmentStart));
+  return normalized;
 }
 
 function isMathClosingBoundary(character: string | undefined) {

@@ -27,6 +27,7 @@ import {
   TextCursorInput,
   ToggleLeft,
   Trash2,
+  Undo2,
   type LucideIcon,
 } from "lucide-react";
 import dynamic from "next/dynamic";
@@ -304,13 +305,26 @@ export function AdminAssessmentTab({
     }
   };
 
-  const handleReviewQuestion = async (question: AdminAssessmentQuestion) => {
+  const handleReviewQuestion = async (
+    question: AdminAssessmentQuestion,
+    reviewStatus: "APPROVED" | "NEEDS_REVIEW",
+  ) => {
     try {
-      await questionMutations.reviewQuestion.mutateAsync(question.id);
-      toast.success("Đã duyệt câu hỏi AI");
+      await questionMutations.reviewQuestion.mutateAsync({
+        questionId: question.id,
+        reviewStatus,
+      });
+      toast.success(
+        reviewStatus === "APPROVED" ? "Đã duyệt câu hỏi" : "Đã hủy duyệt câu hỏi",
+      );
     } catch (error) {
       toast.error(
-        getUserFacingErrorMessage(error, "Chưa duyệt được câu hỏi. Vui lòng thử lại."),
+        getUserFacingErrorMessage(
+          error,
+          reviewStatus === "APPROVED"
+            ? "Chưa duyệt được câu hỏi. Vui lòng thử lại."
+            : "Chưa hủy duyệt được câu hỏi. Vui lòng thử lại.",
+        ),
       );
     }
   };
@@ -393,11 +407,7 @@ export function AdminAssessmentTab({
             {quizSets.map((set, setIndex) => {
               const isActive = set.id === activeSet?.id;
               const totalQuestionCount = set._count?.questions ?? set.questionCount ?? 0;
-              const pendingReviewCount = set.pendingReviewQuestionCount ?? 0;
-              const approvedQuestionCount = Math.max(
-                totalQuestionCount - pendingReviewCount,
-                0,
-              );
+              const isPublished = set.reviewStatus === "APPROVED";
               return (
                 <button
                   key={set.id}
@@ -416,31 +426,20 @@ export function AdminAssessmentTab({
                       : "border-transparent text-[var(--theme-text-muted)] hover:bg-[var(--theme-surface-soft)] hover:text-[var(--theme-text-strong)]",
                   )}
                 >
-                  <span className="flex min-w-0 flex-col items-start gap-1">
+                  <span className="flex min-w-0 flex-col items-center gap-1 text-center">
                     <span className="whitespace-nowrap leading-none">{set.title}</span>
-                    {isTest ? (
-                      <span className="text-[11px] font-bold text-[var(--theme-text-muted)]">
-                        {totalQuestionCount} câu hỏi
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1.5 text-[10px] font-extrabold leading-none">
-                        <span
-                          className={cn(
-                            "rounded-full px-2 py-1",
-                            isActive
-                              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300"
-                              : "bg-[var(--theme-surface-soft)] text-[var(--theme-text-muted)]",
-                          )}
-                        >
-                          {approvedQuestionCount} đã duyệt
-                        </span>
-                        {pendingReviewCount > 0 ? (
-                          <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-700 dark:bg-amber-950/70 dark:text-amber-300">
-                            {pendingReviewCount} chờ duyệt
-                          </span>
-                        ) : null}
-                      </span>
-                    )}
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-1 text-[10px] font-extrabold leading-none",
+                        isPublished
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300"
+                          : "bg-[var(--theme-surface-soft)] text-[var(--theme-text-muted)]",
+                      )}
+                    >
+                      {isPublished
+                        ? `Đã phát hành - ${totalQuestionCount} câu hỏi`
+                        : "Chưa phát hành"}
+                    </span>
                   </span>
                   {isActive ? (
                     <span className="absolute inset-x-0 -bottom-px h-0.5 bg-[var(--theme-primary)]" />
@@ -488,8 +487,11 @@ export function AdminAssessmentTab({
                 setEditorQuestion(question as AdminAssessmentQuestion);
                 setIsEditorOpen(true);
               }}
-              onReviewQuestion={(question) =>
-                void handleReviewQuestion(question as AdminAssessmentQuestion)
+              onReviewQuestion={(question, reviewStatus) =>
+                void handleReviewQuestion(
+                  question as AdminAssessmentQuestion,
+                  reviewStatus,
+                )
               }
               onReviewAllQuestions={() => void handleReviewAllQuizQuestions()}
               onSaveGenerationJson={async (questionId, generationQuestionJson) => {
@@ -502,7 +504,7 @@ export function AdminAssessmentTab({
               isReviewingAllQuestions={questionMutations.reviewAllQuestions.isPending}
               reviewingQuestionId={
                 questionMutations.reviewQuestion.isPending
-                  ? questionMutations.reviewQuestion.variables
+                  ? questionMutations.reviewQuestion.variables?.questionId
                   : undefined
               }
             />
@@ -609,7 +611,10 @@ function QuizSetPanel({
   onDeleteSet: () => void;
   onEditSet: () => void;
   onEditQuestion: (question: AdminQuizQuestion | AdminTestQuestion) => void;
-  onReviewQuestion: (question: AdminQuizQuestion | AdminTestQuestion) => void;
+  onReviewQuestion: (
+    question: AdminQuizQuestion | AdminTestQuestion,
+    reviewStatus: "APPROVED" | "NEEDS_REVIEW",
+  ) => void;
   onReviewAllQuestions: () => void;
   onSaveGenerationJson: (
     questionId: string,
@@ -647,12 +652,7 @@ function QuizSetPanel({
   const quizQuestionNavigation = useMemo(() => {
     const quizQuestions = (questions ?? []) as unknown as AdminQuizQuestion[];
     const pendingQuestions = orderQuizQuestionsByType(
-      quizQuestions.filter(
-        (question) =>
-          question.reviewStatus === "NEEDS_REVIEW" &&
-          (Boolean(question.sourceMetadataJson?.aiGenerationId) ||
-            activeSet.source === "AI"),
-      ),
+      quizQuestions.filter((question) => question.reviewStatus === "NEEDS_REVIEW"),
     );
     const approvedQuestions = orderQuizQuestionsByType(
       quizQuestions.filter((question) => question.reviewStatus === "APPROVED"),
@@ -693,7 +693,7 @@ function QuizSetPanel({
       pendingQuestions,
       rows,
     };
-  }, [activeSet.source, questions]);
+  }, [questions]);
   const selectedQuestionIndex =
     questions?.findIndex((question) => question.id === selectedQuestionId) ?? -1;
   const selectedQuestion =
@@ -896,7 +896,7 @@ function QuizSetPanel({
         }
 
         event.preventDefault();
-        onReviewQuestion(selectedQuizQuestion);
+        onReviewQuestion(selectedQuizQuestion, "APPROVED");
         return;
       }
 
@@ -993,8 +993,8 @@ function QuizSetPanel({
               </strong>
             </span>
             <span className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 text-xs font-bold text-amber-700 dark:border-amber-800/70 dark:bg-amber-950/35 dark:text-amber-300">
-              <Sparkles className="size-4" aria-hidden="true" />
-              AI chờ duyệt
+              <CircleHelp className="size-4" aria-hidden="true" />
+              Chờ duyệt
               <strong className="text-sm font-black">
                 {quizQuestionNavigation.pendingQuestions.length}
               </strong>
@@ -1114,8 +1114,8 @@ function QuizSetPanel({
               className="flex w-fit items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-extrabold text-amber-800 dark:border-amber-800/70 dark:bg-amber-950/35 dark:text-amber-200"
               data-testid="quiz-pending-ai-heading"
             >
-              <Sparkles className="size-4" aria-hidden="true" />
-              <span>AI chờ duyệt</span>
+              <CircleHelp className="size-4" aria-hidden="true" />
+              <span>Chờ duyệt</span>
               <span className="rounded-full bg-amber-200/70 px-1.5 py-0.5 text-[10px] font-black leading-none tabular-nums text-amber-900 dark:bg-amber-800 dark:text-amber-100">
                 {quizQuestionNavigation.pendingQuestions.length}
               </span>
@@ -1303,7 +1303,7 @@ function QuizSetPanel({
               <button
                 type="button"
                 disabled={reviewingQuestionId === selectedQuizQuestion.id}
-                onClick={() => onReviewQuestion(selectedQuizQuestion)}
+                onClick={() => onReviewQuestion(selectedQuizQuestion, "APPROVED")}
                 className="theme-button-success inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 self-start whitespace-nowrap rounded-lg px-3 text-xs font-extrabold transition disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {reviewingQuestionId === selectedQuizQuestion.id ? (
@@ -1430,7 +1430,9 @@ function QuizSetPanel({
                     onEdit={() => onEditQuestion(selectedQuestion)}
                     onNext={() => selectRelativeQuizQuestion(1)}
                     onPrevious={() => selectRelativeQuizQuestion(-1)}
-                    onReview={() => onReviewQuestion(selectedQuestion)}
+                    onReview={(reviewStatus) =>
+                      onReviewQuestion(selectedQuestion, reviewStatus)
+                    }
                     isQuestionNavigationDisabled={
                       quizQuestionNavigation.navigableQuestions.length <= 1
                     }
@@ -1555,7 +1557,9 @@ function QuizSetPanel({
               onEdit={() => onEditQuestion(selectedQuestion)}
               onNext={() => selectRelativeQuizQuestion(1)}
               onPrevious={() => selectRelativeQuizQuestion(-1)}
-              onReview={() => onReviewQuestion(selectedQuestion)}
+              onReview={(reviewStatus) =>
+                onReviewQuestion(selectedQuestion, reviewStatus)
+              }
               isQuestionNavigationDisabled={
                 quizQuestionNavigation.navigableQuestions.length <= 1
               }
@@ -1625,7 +1629,7 @@ function QuestionCard({
   onEdit: () => void;
   onNext?: () => void;
   onPrevious?: () => void;
-  onReview: () => void;
+  onReview: (reviewStatus: "APPROVED" | "NEEDS_REVIEW") => void;
   isQuestionNavigationDisabled?: boolean;
   isReviewing: boolean;
   setId: string;
@@ -1695,37 +1699,39 @@ function QuestionCard({
     >
       <div className="space-y-2">
         <div className="flex min-h-10 items-center justify-between gap-3">
-          {isAiGenerated ? (
-            <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {isAiGenerated ? (
               <span className="inline-flex min-h-7 items-center gap-1.5 rounded-md border border-sky-200 bg-sky-50 px-2 text-xs font-extrabold text-sky-700 dark:border-sky-800 dark:bg-sky-950/60 dark:text-sky-300">
                 <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
                 AI
               </span>
-              {isApproved ? (
-                <span className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-[var(--theme-success-border)] bg-[var(--theme-success-bg)] px-2.5 text-xs font-extrabold text-[var(--theme-success-text)]">
-                  <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
-                  Đã duyệt
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  disabled={isReviewing}
-                  onClick={onReview}
-                  className="theme-button-primary-subtle inline-flex min-h-8 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 text-xs font-extrabold disabled:opacity-60"
-                  aria-keyshortcuts="Enter"
-                >
-                  {isReviewing ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-                  ) : (
-                    <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
-                  )}
-                  {isReviewing ? "Đang duyệt" : "Duyệt"}
-                </button>
+            ) : null}
+            <button
+              type="button"
+              disabled={isReviewing}
+              onClick={() => onReview(isApproved ? "NEEDS_REVIEW" : "APPROVED")}
+              className={cn(
+                "inline-flex min-h-8 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 text-xs font-extrabold disabled:opacity-60",
+                isApproved ? "theme-button-neutral" : "theme-button-primary-subtle",
               )}
-            </div>
-          ) : (
-            <span aria-hidden="true" />
-          )}
+              aria-keyshortcuts={!isApproved && isAiGenerated ? "Enter" : undefined}
+            >
+              {isReviewing ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+              ) : isApproved ? (
+                <Undo2 className="h-3.5 w-3.5" aria-hidden="true" />
+              ) : (
+                <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+              )}
+              {isReviewing
+                ? isApproved
+                  ? "Đang hủy duyệt"
+                  : "Đang duyệt"
+                : isApproved
+                  ? "Hủy duyệt"
+                  : "Duyệt"}
+            </button>
+          </div>
           <div className="ml-auto flex shrink-0 gap-2">
             <AdminQuizQuestionFigureAiMenu
               assessmentKind={assessmentKind}
@@ -1976,7 +1982,13 @@ function QuestionCard({
 
 function isQuestionNavigationShortcutTarget(target: EventTarget | null) {
   if (!(target instanceof Element)) return false;
-  if (target.closest("[data-quiz-question-shortcut]")) return false;
+  if (
+    target.closest(
+      "[data-quiz-question-shortcut], [data-test-question-shortcut]",
+    )
+  ) {
+    return false;
+  }
 
   return Boolean(
     target.closest(

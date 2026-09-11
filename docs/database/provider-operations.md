@@ -68,7 +68,7 @@ Domain này phục vụ màn `/admin/ai-settings` và không lưu secret provide
   sang cả `TEXT` và `IMAGE` để hành vi không đổi ngay sau deploy. Job cũ chỉ có
   một `routeSnapshot` tiếp tục được đọc như route text và dùng làm fallback ảnh
   tương thích; job mới bắt buộc snapshot riêng hai route.
-- Migration `M15.9` seed `VIDEO_SUMMARY/TEXT` bằng bản sao cấu hình
+- Migration `M9.7` seed `VIDEO_SUMMARY/TEXT` bằng bản sao cấu hình
   `SUMMARY/TEXT` hiện hành để flow có default an toàn ngay sau deploy. Sau đó hai
   route có version/cấu hình độc lập; không tạo `VIDEO_SUMMARY/IMAGE`.
 

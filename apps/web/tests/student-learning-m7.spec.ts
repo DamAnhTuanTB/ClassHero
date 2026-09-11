@@ -7,6 +7,38 @@ test.beforeEach(async ({ page }) => {
   await seedStudentSession(page);
 });
 
+test("student chuyển giữa toàn bộ và từng phần của Video Summary", async ({
+  page,
+}, testInfo) => {
+  await setupStudentLearningApiMock(page, {
+    includeVideoSummary: true,
+    testReady: false,
+    testPasses: false,
+  });
+
+  await page.goto(`/student/lessons/${lessonId}`);
+  await expect(page.getByRole("button", { name: "Tất cả" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.getByText("Khái niệm số hữu tỉ")).toBeVisible();
+  await expect(page.getByText("Ví dụ so sánh số hữu tỉ")).toBeVisible();
+
+  await page.getByRole("button", { name: "Từng phần" }).click();
+  await expect(page.getByRole("button", { name: "Từng phần" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.getByText("Khái niệm số hữu tỉ")).toHaveCount(0);
+  await expect(page.getByText("Ví dụ so sánh số hữu tỉ")).toHaveCount(0);
+  await expect(
+    page.getByText("Nội dung tương ứng sẽ hiển thị khi video được phát."),
+  ).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("student-video-summary-segment-waiting.png"),
+  });
+});
+
 test("student lesson dark theme covers lesson, Quiz, Flashcard, dialogs, and Test", async ({
   page,
 }, testInfo) => {
@@ -17,7 +49,9 @@ test("student lesson dark theme covers lesson, Quiz, Flashcard, dialogs, and Tes
 
   await page.goto(`/student/lessons/${lessonId}`);
   await expect(page.locator("html")).toHaveClass(/dark/);
-  await expect(page.getByRole("heading", { name: "Kiến thức trọng tâm" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Kiến thức sách giáo khoa" }),
+  ).toBeVisible();
   expect(
     await page
       .getByRole("main")
@@ -183,7 +217,9 @@ test("quiz tab keeps the current panel stable until its preloaded status is read
   });
   await page.goto(`/student/lessons/${lessonId}`);
 
-  await expect(page.getByRole("heading", { name: "Kiến thức trọng tâm" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Kiến thức sách giáo khoa" }),
+  ).toBeVisible();
   await expect.poll(() => statusRequestCount).toBe(1);
   await page.evaluate(() => {
     const probe = { observedQuizLoading: false };
@@ -211,7 +247,9 @@ test("quiz tab keeps the current panel stable until its preloaded status is read
   const quizTab = page.getByRole("button", { name: "Quiz", exact: true });
   await quizTab.click();
   await expect(quizTab).toHaveAttribute("aria-busy", "true");
-  await expect(page.getByRole("heading", { name: "Kiến thức trọng tâm" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Kiến thức sách giáo khoa" }),
+  ).toBeVisible();
   releaseQuizStatus();
   await expect(page.getByRole("button", { name: "Bắt đầu", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Bài học", exact: true }).click();
@@ -255,7 +293,9 @@ test("stale Quiz runner history never flashes or reopens over the plain Quiz tab
     );
     lessonTab?.click();
   });
-  await expect(page.getByRole("heading", { name: "Kiến thức trọng tâm" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Kiến thức sách giáo khoa" }),
+  ).toBeVisible();
   await expect(page).not.toHaveURL(/learningSurface=/);
 
   await page.evaluate(() => {
@@ -364,6 +404,9 @@ test("completed test offers review and a new test attempt", async ({ page }) => 
 
   await expect(page.getByRole("button", { name: "Bắt đầu bài thi" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Xem lại bài thi" })).toBeVisible();
+  await expect(
+    page.getByText("Bài thi đã được hoàn thành. Cùng ôn tập lại nhé."),
+  ).toBeVisible();
   const newTestButton = page.getByRole("button", {
     name: "Làm bài thi mới",
     exact: true,
@@ -1012,7 +1055,9 @@ test("lesson summary and quiz reveal feedback only after explicit actions", asyn
   await setupStudentLearningApiMock(page, { testReady: false, testPasses: false });
   await page.goto(`/student/lessons/${lessonId}`);
 
-  await expect(page.getByRole("heading", { name: "Kiến thức trọng tâm" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Kiến thức sách giáo khoa" }),
+  ).toBeVisible();
   await expect(page.getByRole("region", { name: "Video bài giảng" })).toBeVisible();
   await expect(page.locator('iframe[src*="youtube.com/embed/video-m7"]')).toBeVisible();
   await expect(page.getByText("Kiến thức trọng tâm M7")).toBeVisible();
@@ -1078,6 +1123,9 @@ test("lesson summary and quiz reveal feedback only after explicit actions", asyn
   await page.getByRole("button", { name: "Quay về bài học" }).click();
   await expect(page.getByRole("button", { name: "Xem lại", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Làm bộ Quiz mới" })).toBeVisible();
+  await expect(
+    page.getByText("Bộ Quiz đã được hoàn thành. Cùng ôn tập lại nhé."),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Mở cài đặt Quiz" }).click();
   await page.getByRole("menuitem", { name: "Các bộ Quiz đã làm" }).click();
   const quizHistoryDialog = page.getByRole("dialog", {
@@ -1328,6 +1376,9 @@ test("flashcard uses the lesson entry panel, fullscreen runner, and fullscreen r
   await page.getByRole("button", { name: "Quay về bài học" }).click();
   await expect(page.getByRole("button", { name: "Xem lại", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Học bộ Flashcard mới" })).toBeVisible();
+  await expect(
+    page.getByText("Bộ Flashcard đã được hoàn thành. Cùng ôn tập lại nhé."),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Mở cài đặt Flashcard" }).click();
   await page.getByRole("menuitem", { name: "Các bộ Flashcard đã học" }).click();
   const flashcardHistoryDialog = page.getByRole("dialog", {
@@ -1681,12 +1732,16 @@ test("inactive Flashcard state never locks lesson scrolling after navigation or 
     .toBe("flashcard-set-m7");
 
   await page.goto(`/student/lessons/${lessonId}`);
-  await expect(page.getByRole("heading", { name: "Kiến thức trọng tâm" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Kiến thức sách giáo khoa" }),
+  ).toBeVisible();
   await expectLessonDocumentToScroll(page);
   await expect(page).not.toHaveURL(/learningSurface=/);
 
   await page.reload();
-  await expect(page.getByRole("heading", { name: "Kiến thức trọng tâm" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Kiến thức sách giáo khoa" }),
+  ).toBeVisible();
   await expectLessonDocumentToScroll(page);
   await expect(page).not.toHaveURL(/learningSurface=/);
   await expectNoFrameworkOverlay(page);
@@ -2996,7 +3051,9 @@ test("test prerequisite actions reflect partial Flashcard completion", async ({
   await expect(page.getByRole("button", { name: "Làm Flashcard" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Bắt đầu bài thi" })).toBeDisabled();
   await page.getByRole("button", { name: "Làm Quiz" }).click();
-  await expect(page.getByRole("status", { name: "Đang chuẩn bị Quiz" }).first()).toBeVisible();
+  await expect(
+    page.getByRole("status", { name: "Đang chuẩn bị Quiz" }).first(),
+  ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Câu hỏi 1", exact: true }),
   ).toBeVisible();
@@ -3218,6 +3275,37 @@ test("Quiz keeps the new active set after back and reload", async ({ page }) => 
   await expectNoFrameworkOverlay(page);
 });
 
+test("Quiz can start a new set while completed progress refresh is still pending", async ({
+  page,
+}) => {
+  let releaseProgressRefresh: () => void = () => undefined;
+  const quizProgressRefreshGate = new Promise<void>((resolve) => {
+    releaseProgressRefresh = resolve;
+  });
+  await setupStudentLearningApiMock(page, {
+    includeAlternateQuizSet: true,
+    quizProgressRefreshGate,
+    testReady: false,
+    testPasses: false,
+  });
+
+  try {
+    await page.goto(`/student/lessons/${lessonId}?tab=quiz`);
+    await page.getByRole("button", { name: "Bắt đầu", exact: true }).click();
+    await page.getByRole("button", { name: /B.*4/ }).click();
+    await page.getByRole("button", { name: "Kiểm tra đáp án" }).click();
+    await page.getByRole("button", { name: "Hoàn thành Quiz" }).click();
+
+    await expect(page.getByRole("heading", { name: "Kết quả Quiz" })).toBeVisible();
+    await page.getByRole("button", { name: "Làm bộ Quiz mới" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Câu hỏi 1", exact: true }),
+    ).toBeVisible();
+  } finally {
+    releaseProgressRefresh();
+  }
+});
+
 test("Flashcard keeps the new active set after back and reload", async ({ page }) => {
   await setupStudentLearningApiMock(page, {
     flashcardCompleted: true,
@@ -3290,6 +3378,7 @@ async function setupStudentLearningApiMock(
     includeAlternateQuizSet?: boolean;
     includeScaledQuizFigures?: boolean;
     includeNextLesson?: boolean;
+    includeVideoSummary?: boolean;
     omitFlashcardSet?: boolean;
     omitQuizSet?: boolean;
     omitTestSet?: boolean;
@@ -3297,6 +3386,7 @@ async function setupStudentLearningApiMock(
     quizStatusGate?: Promise<void>;
     quizHistoryCompletedItemCount?: number;
     quizHistorySetId?: string;
+    quizProgressRefreshGate?: Promise<void>;
     quizReviewQuestionCount?: number;
     quizQuestionIncludesMathExamples?: boolean;
     quizSubmitAggregateResult?: {
@@ -3382,6 +3472,9 @@ async function setupStudentLearningApiMock(
       });
     }
     if (method === "GET" && pathname === `/student/lessons/${lessonId}`) {
+      if (latestQuizAttempt && options.quizProgressRefreshGate) {
+        await options.quizProgressRefreshGate;
+      }
       return fulfillJson(route, 200, {
         data: lessonPayload(
           options.includeAlternateQuizSet,
@@ -3391,6 +3484,7 @@ async function setupStudentLearningApiMock(
           options.flashcardCardCount,
           options.omitFlashcardSet,
           options.omitQuizSet,
+          options.includeVideoSummary,
         ),
       });
     }
@@ -4021,6 +4115,7 @@ function lessonPayload(
   flashcardCardCount = 1,
   omitFlashcardSet = false,
   omitQuizSet = false,
+  includeVideoSummary = false,
 ) {
   return {
     id: lessonId,
@@ -4041,6 +4136,43 @@ function lessonPayload(
       contentJson: documentWithText("Kiến thức trọng tâm M7"),
       updatedAt: new Date().toISOString(),
     },
+    videoSummary: includeVideoSummary
+      ? {
+          id: "video-summary-m7",
+          lessonId,
+          contentJson: {
+            type: "lesson_summary_blocks",
+            version: 6,
+            data: {
+              title: "Video Summary M7",
+              objectives: ["Nắm được khái niệm và cách so sánh số hữu tỉ."],
+              sections: [
+                {
+                  order: 1,
+                  displayHeading: "Số hữu tỉ",
+                  startSeconds: 0,
+                  blocks: [
+                    {
+                      type: "knowledge",
+                      title: "Khái niệm số hữu tỉ",
+                      content: "Số hữu tỉ viết được dưới dạng phân số.",
+                      startSeconds: 0,
+                    },
+                    {
+                      type: "example",
+                      problem: "Ví dụ so sánh số hữu tỉ",
+                      solution: "Quy đồng mẫu số rồi so sánh.",
+                      answer: "Số thứ nhất lớn hơn.",
+                      startSeconds: 10,
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+          updatedAt: new Date().toISOString(),
+        }
+      : null,
     materials: [{ id: "material-hidden", title: "Tài liệu không được hiển thị" }],
     quizSets: omitQuizSet
       ? []

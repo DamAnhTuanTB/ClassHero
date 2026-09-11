@@ -55,16 +55,37 @@ const BRACED_THREE_POINT_ANGLE_PATTERN =
   /\\angle\s*\{([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})\}/gu;
 const THREE_POINT_ANGLE_PATTERN =
   /\\angle\s+([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})(?![A-Za-z0-9_'′″₀-₉])/gu;
+const MEASURED_BRACED_THREE_POINT_ANGLE_PATTERN =
+  /(?<![A-Za-z\\])m\s*\\angle\s*\{([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})\}/gu;
+const MEASURED_THREE_POINT_ANGLE_PATTERN =
+  /(?<![A-Za-z\\])m\s*\\angle\s+([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})(?![A-Za-z0-9_'′″₀-₉])/gu;
+const MEASURED_WIDEHAT_THREE_POINT_ANGLE_PATTERN =
+  /(?<![A-Za-z\\])m\s*\\widehat\{([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})\}/gu;
 
 /**
  * Normalize three-point angle notation without depending on a renderer-specific
  * geometry model. TeX figures own their labels and geometry independently.
  */
-export function normalizeLessonSummaryAngleNotation(
+export function normalizeThreePointAngleNotation(
   value: string,
   _legacyDiagramSpec?: unknown,
 ) {
   return value
+    .replace(
+      MEASURED_WIDEHAT_THREE_POINT_ANGLE_PATTERN,
+      (_, first: string, vertex: string, second: string) =>
+        `\\widehat{${first}${vertex}${second}}`,
+    )
+    .replace(
+      MEASURED_BRACED_THREE_POINT_ANGLE_PATTERN,
+      (_, first: string, vertex: string, second: string) =>
+        `\\widehat{${first}${vertex}${second}}`,
+    )
+    .replace(
+      MEASURED_THREE_POINT_ANGLE_PATTERN,
+      (_, first: string, vertex: string, second: string) =>
+        `\\widehat{${first}${vertex}${second}}`,
+    )
     .replace(
       BRACED_THREE_POINT_ANGLE_PATTERN,
       (_, first: string, vertex: string, second: string) =>
@@ -75,4 +96,12 @@ export function normalizeLessonSummaryAngleNotation(
       (_, first: string, vertex: string, second: string) =>
         `\\widehat{${first}${vertex}${second}}`,
     );
+}
+
+/** @deprecated Use the feature-neutral normalizer for new consumers. */
+export function normalizeLessonSummaryAngleNotation(
+  value: string,
+  legacyDiagramSpec?: unknown,
+) {
+  return normalizeThreePointAngleNotation(value, legacyDiagramSpec);
 }

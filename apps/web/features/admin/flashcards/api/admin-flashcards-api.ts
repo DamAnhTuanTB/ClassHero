@@ -229,7 +229,7 @@ export function reviewAllPendingAiFlashcards(setId: string, token: string) {
 
 export function reviewAdminFlashcardSet(
   setId: string,
-  reviewStatus: "APPROVED" | "NEEDS_REVIEW" | "HIDDEN",
+  reviewStatus: "DRAFT" | "APPROVED" | "NEEDS_REVIEW" | "HIDDEN",
   action: "SAVE" | "PUBLISH" | "WITHDRAW",
   token: string,
 ) {

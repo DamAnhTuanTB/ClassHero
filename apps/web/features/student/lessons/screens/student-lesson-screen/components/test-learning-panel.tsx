@@ -522,18 +522,20 @@ export function TestLearningPanel({
   const prerequisitesComplete = status.quiz.isCompleted && status.flashcard.isCompleted;
   const showQuizPrerequisiteAction = !status.quiz.isCompleted;
   const showFlashcardPrerequisiteAction = !status.flashcard.isCompleted;
-  const prerequisiteDescription = prerequisitesComplete
-    ? "Bài thi đã được mở khóa. Ôn tập lại Quiz và Flashcard để sẵn sàng thi nhé!"
-    : status.quiz.isCompleted
-      ? "Cần hoàn thành Flashcard để mở khóa bài thi."
-      : status.flashcard.isCompleted
-        ? "Cần hoàn thành Quiz để mở khóa bài thi."
-        : "Cần hoàn thành Quiz và Flashcard để mở khóa bài thi.";
   const completedAttemptId =
     latestSubmittedAttemptId ??
     status.latestSubmittedAttempt?.id ??
     status.bestAttempt?.id ??
     null;
+  const prerequisiteDescription = completedAttemptId
+    ? "Bài thi đã được hoàn thành. Cùng ôn tập lại nhé."
+    : prerequisitesComplete
+      ? "Bài thi đã được mở khóa. Ôn tập lại Quiz và Flashcard để sẵn sàng thi nhé!"
+      : status.quiz.isCompleted
+        ? "Cần hoàn thành Flashcard để mở khóa bài thi."
+        : status.flashcard.isCompleted
+          ? "Cần hoàn thành Quiz để mở khóa bài thi."
+          : "Cần hoàn thành Quiz và Flashcard để mở khóa bài thi.";
   const activeTestSet = status.sets[0];
   const hasTestQuestions = Boolean(activeTestSet && activeTestSet.questionCount > 0);
   const canStartTest = status.canStart && prerequisitesComplete && hasTestQuestions;
@@ -688,7 +690,7 @@ export function TestLearningPanel({
                 aria-busy={pendingAction === "start"}
                 disabled={!canStartTest || pendingAction === "start"}
                 onClick={() => void handleStart()}
-                className="col-span-2 inline-flex min-h-14 min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-2xl border-2 border-emerald-500 bg-white px-3 text-base font-black text-emerald-700 transition hover:bg-emerald-50 active:translate-y-[3px] disabled:cursor-not-allowed disabled:opacity-45 dark:border-emerald-400 dark:bg-[var(--theme-surface)] dark:text-emerald-300 sm:text-lg lg:col-span-1"
+                className="student-preserve-mobile-shadow col-span-2 inline-flex min-h-14 min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-2xl border-2 border-emerald-500 bg-white px-3 text-base font-black text-emerald-700 shadow-[0_3px_0_rgb(167_243_208),0_10px_16px_-13px_rgb(16_185_129_/_30%)] transition hover:bg-emerald-50 active:translate-y-[2px] active:shadow-[0_1px_0_rgb(167_243_208),0_5px_10px_-12px_rgb(16_185_129_/_24%)] disabled:cursor-not-allowed disabled:opacity-45 dark:border-emerald-400 dark:bg-[var(--theme-surface)] dark:text-emerald-300 dark:shadow-[0_3px_0_rgb(6_78_59_/_55%),0_10px_16px_-14px_rgb(16_185_129_/_20%)] sm:text-lg lg:col-span-1"
               >
                 <RefreshCcw className="h-5 w-5 shrink-0" aria-hidden="true" />
                 Làm bài thi mới

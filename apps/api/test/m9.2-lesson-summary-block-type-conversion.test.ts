@@ -2,11 +2,23 @@ import { describe, expect, it } from "vitest";
 
 import { getLessonSummaryProviderTransportOutputSchema } from "#api/modules/ai/types/lesson-summary.types";
 import { mapLessonSummaryProviderOutput } from "#api/modules/ai/utils/lesson-summary-mapper";
-import { applyLessonSummaryPhaseOneBlockEdits } from "#api/modules/ai/utils/lesson-summary-phase-one-editor";
+import {
+  applyLessonSummaryPhaseOneBlockEdits,
+  readLessonSummaryPhaseOneSnapshot,
+} from "#api/modules/ai/utils/lesson-summary-phase-one-editor";
 
 const lessonId = "00000000-0000-4000-8000-000000000201";
 
 describe("M9.2 lesson Summary block type conversion", () => {
+  it("hard-cuts raw Phase 1 snapshots to version 3", () => {
+    const fixture = createFixture();
+
+    expect(readLessonSummaryPhaseOneSnapshot(fixture.snapshot)).not.toBeNull();
+    expect(
+      readLessonSummaryPhaseOneSnapshot({ ...fixture.snapshot, version: 2 }),
+    ).toBeNull();
+  });
+
   it("persists a theory-to-note conversion only through the Phase 1 save path", () => {
     const fixture = createFixture();
     const blocks = structuredClone(fixture.mapped.phaseOneBlocks);
@@ -70,7 +82,7 @@ function createFixture() {
     12,
   ).parse({
     title: "Bài học thử nghiệm",
-    objectives: null,
+    objectives: ["Hiểu nội dung chính của đề mục."],
     theorySections: [
       {
         displayHeading: "Đề mục",
@@ -129,7 +141,7 @@ function createFixture() {
     mapped,
     snapshot: {
       type: "lesson_summary_phase_one_blocks" as const,
-      version: 2 as const,
+      version: 3 as const,
       providerOutput: output,
       blocks: mapped.phaseOneBlocks,
       providerPaths: mapped.phaseOneProviderPaths,

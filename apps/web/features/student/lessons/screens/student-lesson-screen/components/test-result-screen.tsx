@@ -241,7 +241,7 @@ export function TestResultScreen({
                   action.variant === "teal" &&
                     "bg-teal-600 text-white shadow-[0_4px_0_rgb(15_118_110)] active:translate-y-[3px] active:shadow-[0_1px_0_rgb(15_118_110)] enabled:hover:bg-teal-500 dark:bg-teal-700 dark:shadow-[0_4px_0_rgb(13_94_88)] dark:enabled:hover:bg-teal-600",
                   action.variant === "secondary" &&
-                    "student-mobile-border border border-emerald-500 bg-white text-emerald-700 shadow-[0_4px_0_rgb(167_243_208)] active:translate-y-[3px] active:shadow-[0_1px_0_rgb(167_243_208)] enabled:hover:bg-emerald-50 dark:border-emerald-400 dark:bg-[var(--theme-surface)] dark:text-emerald-300 dark:shadow-[0_4px_0_rgb(6_78_59)] dark:active:shadow-[0_1px_0_rgb(6_78_59)] dark:enabled:hover:bg-emerald-500/10",
+                    "student-mobile-border border border-emerald-200 bg-white text-emerald-700 shadow-[0_4px_0_rgb(167_243_208)] active:translate-y-[3px] active:shadow-[0_1px_0_rgb(167_243_208)] enabled:hover:bg-emerald-50 dark:border-emerald-400/30 dark:bg-[var(--theme-surface)] dark:text-emerald-300 dark:shadow-[0_4px_0_rgb(6_78_59)] dark:active:shadow-[0_1px_0_rgb(6_78_59)] dark:enabled:hover:bg-emerald-500/10",
                   action.fullWidth && "col-span-2",
                 )}
               >
@@ -266,7 +266,10 @@ export function TestResultScreen({
             type="button"
             onClick={onBack}
             aria-label="Quay về bài học"
-            className="student-preserve-mobile-shadow student-mobile-border col-span-2 inline-flex h-11 min-w-32 items-center justify-center justify-self-center gap-1.5 whitespace-nowrap rounded-xl border border-emerald-200 bg-white px-4 text-sm font-black text-slate-700 shadow-[0_3px_0_rgb(167_243_208)] transition hover:bg-emerald-50 hover:text-emerald-700 active:translate-y-[2px] active:shadow-[0_1px_0_rgb(167_243_208)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 dark:border-emerald-400/30 dark:bg-[var(--theme-surface)] dark:text-[var(--theme-text)] dark:shadow-[0_3px_0_rgb(6_78_59)] dark:hover:bg-[var(--theme-surface-soft)] dark:hover:text-emerald-300 dark:active:shadow-[0_1px_0_rgb(6_78_59)] dark:focus-visible:ring-emerald-500/30"
+            className={cn(
+              "student-preserve-mobile-shadow student-mobile-border inline-flex h-14 items-center justify-center justify-self-center gap-1.5 whitespace-nowrap rounded-xl border border-emerald-200 bg-white px-4 text-sm font-black text-emerald-700 shadow-[0_3px_0_rgb(167_243_208)] transition hover:bg-emerald-50 hover:text-emerald-700 active:translate-y-[2px] active:shadow-[0_1px_0_rgb(167_243_208)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 dark:border-emerald-400/30 dark:bg-[var(--theme-surface)] dark:text-emerald-300 dark:shadow-[0_3px_0_rgb(6_78_59)] dark:hover:bg-[var(--theme-surface-soft)] dark:hover:text-emerald-300 dark:active:shadow-[0_1px_0_rgb(6_78_59)] dark:focus-visible:ring-emerald-500/30",
+              isAllTimePassed && onNextLesson ? "w-full" : "col-span-2 w-1/2",
+            )}
           >
             <ChevronLeft
               className="h-5 w-5 shrink-0"
@@ -279,7 +282,7 @@ export function TestResultScreen({
             <button
               type="button"
               onClick={onNextLesson}
-              className="student-preserve-mobile-shadow col-span-2 inline-flex h-14 w-full items-center justify-center gap-2 whitespace-nowrap rounded-2xl bg-teal-600 px-2 text-sm font-black text-white shadow-[0_4px_0_rgb(15_118_110)] transition active:translate-y-[3px] active:shadow-[0_1px_0_rgb(15_118_110)] enabled:hover:bg-teal-500 dark:bg-teal-700 dark:shadow-[0_4px_0_rgb(13_94_88)] dark:enabled:hover:bg-teal-600 sm:px-3 sm:text-[17px]"
+              className="student-preserve-mobile-shadow inline-flex h-14 w-full items-center justify-center gap-2 whitespace-nowrap rounded-2xl bg-teal-600 px-2 text-sm font-black text-white shadow-[0_4px_0_rgb(15_118_110)] transition active:translate-y-[3px] active:shadow-[0_1px_0_rgb(15_118_110)] enabled:hover:bg-teal-500 dark:bg-teal-700 dark:shadow-[0_4px_0_rgb(13_94_88)] dark:enabled:hover:bg-teal-600 sm:px-3 sm:text-[17px]"
             >
               <ArrowRight className="h-5 w-5 shrink-0" aria-hidden="true" />
               Bài học kế tiếp

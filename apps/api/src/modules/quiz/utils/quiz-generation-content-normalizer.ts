@@ -4,7 +4,7 @@ import type {
 } from "#api/modules/quiz/types/quiz-generation.types";
 import { normalizeGeneratedQuizQuestionLatex } from "#api/modules/quiz/utils/quiz-generation-math-normalizer";
 
-const CONCLUSION_START_PATTERN = /Vậy(?=[\s,]|$)/gu;
+const CONCLUSION_START_PATTERN = /(?:Vậy|Vì vậy|Do đó|Suy ra)(?=[\s,]|$)/giu;
 
 /**
  * Keeps the final learner-facing conclusion in its own Markdown paragraph.

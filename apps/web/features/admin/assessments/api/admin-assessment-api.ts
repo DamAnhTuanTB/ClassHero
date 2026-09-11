@@ -139,11 +139,12 @@ export async function updateAdminAssessmentQuestion(
 export async function reviewAdminAssessmentQuestion(
   kind: AdminAssessmentKind,
   questionId: string,
+  reviewStatus: "APPROVED" | "NEEDS_REVIEW",
   token: string,
 ) {
   const question = await apiRequest<AdminQuizQuestion & { testSetId?: string }>(
     `${routes[kind].question(questionId)}/review`,
-    { method: "POST", body: { reviewStatus: "APPROVED" }, token },
+    { method: "POST", body: { reviewStatus }, token },
   );
   return normalizeQuestion(kind, question);
 }

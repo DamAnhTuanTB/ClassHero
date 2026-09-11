@@ -1,4 +1,9 @@
 import { createHash } from "node:crypto";
+import {
+  hasMalformedMathText,
+  normalizeLearnerMathTextSyntax,
+  normalizeThreePointAngleNotation,
+} from "@learning-path/shared";
 import { z } from "zod";
 
 import {
@@ -62,7 +67,7 @@ export function reconcileLessonSummaryReviewIssues(contentJson: JsonObject) {
     return contentJson;
   }
 
-  const data = { ...contentJson.data };
+  const data = normalizeRootLearnerText(contentJson.data);
   const targetGrade = typeof data.targetGrade === "number" ? data.targetGrade : null;
   const sections = Array.isArray(data.sections)
     ? data.sections.map((section, sectionIndex) =>
@@ -108,6 +113,9 @@ function reconcileSection(
   if (!isObject(value) || !Array.isArray(value.blocks)) return value;
   return {
     ...value,
+    ...(typeof value.displayHeading === "string"
+      ? { displayHeading: normalizeSummaryLearnerText(value.displayHeading) }
+      : {}),
     blocks: value.blocks.map((block, blockIndex) =>
       reconcileBlock(block, sectionIndex, blockIndex, targetGrade),
     ),
@@ -121,7 +129,8 @@ function reconcileBlock(
   targetGrade: number | null,
 ) {
   if (!isObject(value)) return value;
-  const blockWithoutIssues = omitReviewIssues(value);
+  const repairedBlock = normalizeBlockLearnerText(value);
+  const blockWithoutIssues = omitReviewIssues(repairedBlock);
   const parsedBlock = lessonSummaryMvpBlockSchema.safeParse(blockWithoutIssues);
   const normalizedBlock = parsedBlock.success ? parsedBlock.data : blockWithoutIssues;
   const existingIssues = parseIssues(value.reviewIssues);
@@ -137,6 +146,54 @@ function reconcileBlock(
   };
 }
 
+function normalizeRootLearnerText(data: JsonObject): JsonObject {
+  return {
+    ...data,
+    ...(typeof data.title === "string"
+      ? { title: normalizeSummaryLearnerText(data.title) }
+      : {}),
+    ...(Array.isArray(data.objectives)
+      ? {
+          objectives: data.objectives.map((objective) =>
+            typeof objective === "string"
+              ? normalizeSummaryLearnerText(objective)
+              : objective,
+          ),
+        }
+      : {}),
+  };
+}
+
+function normalizeBlockLearnerText(value: JsonObject): JsonObject {
+  const normalized = { ...value };
+  for (const field of ["title", "content", "problem", "solution", "answer"]) {
+    const candidate = value[field];
+    if (typeof candidate === "string") {
+      normalized[field] = normalizeSummaryLearnerText(candidate);
+    }
+  }
+
+  if (isObject(value.geometryStatement)) {
+    const geometryStatement = { ...value.geometryStatement };
+    for (const field of ["hypotheses", "conclusions"] as const) {
+      const statements = value.geometryStatement[field];
+      if (!Array.isArray(statements)) continue;
+      geometryStatement[field] = statements.map((statement) =>
+        typeof statement === "string"
+          ? normalizeSummaryLearnerText(statement)
+          : statement,
+      );
+    }
+    normalized.geometryStatement = geometryStatement;
+  }
+
+  return normalized;
+}
+
+function normalizeSummaryLearnerText(value: string) {
+  return normalizeLearnerMathTextSyntax(normalizeThreePointAngleNotation(value));
+}
+
 function validateRoot(data: JsonObject) {
   const issues: ReviewIssue[] = [];
   if (typeof data.title !== "string" || data.title.trim().length === 0) {
@@ -150,6 +207,20 @@ function validateRoot(data: JsonObject) {
         fingerprint: fingerprint(data.title),
       }),
     );
+  }
+  const rootTextCandidates = [
+    ...(typeof data.title === "string" ? [{ path: "title", value: data.title }] : []),
+    ...(Array.isArray(data.objectives)
+      ? data.objectives.flatMap((objective, index) =>
+          typeof objective === "string"
+            ? [{ path: `objectives.${index}`, value: objective }]
+            : [],
+        )
+      : []),
+  ];
+  for (const candidate of rootTextCandidates) {
+    if (!hasMalformedMathText(candidate.value)) continue;
+    issues.push(createMalformedLatexIssue(candidate.path, candidate.value));
   }
   return issues;
 }
@@ -171,20 +242,13 @@ function validateBlock(value: JsonObject, blockPath: string, targetGrade: number
   }
 
   for (const candidate of latexTextCandidates(value)) {
-    if (!hasMalformedLatex(candidate.value)) continue;
+    if (!hasMalformedMathText(candidate.value)) continue;
     issues.push(
-      createIssue({
-        code: "MALFORMED_LATEX",
-        path: `${blockPath}.${candidate.path}`,
-        message: "Công thức LaTeX đang thiếu hoặc thừa dấu phân cách hay dấu ngoặc.",
-        suggestion: "Sửa lại công thức để các dấu `$`, `{` và `}` cân bằng rồi lưu lại.",
-        technicalDetails: `Unbalanced LaTeX delimiters in ${candidate.path}.`,
-        fingerprint: fingerprint(candidate.value),
-      }),
+      createMalformedLatexIssue(`${blockPath}.${candidate.path}`, candidate.value),
     );
   }
 
-  const visual = Array.isArray(value.figures) ? value.figures[0] ?? null : null;
+  const visual = Array.isArray(value.figures) ? (value.figures[0] ?? null) : null;
   if (
     value.type === "example" &&
     typeof value.problem === "string" &&
@@ -233,39 +297,34 @@ function latexTextCandidates(value: JsonObject) {
     const candidate = value[field];
     if (typeof candidate === "string") candidates.push({ path: field, value: candidate });
   }
+  const geometryStatement = value.geometryStatement;
+  if (isObject(geometryStatement)) {
+    for (const field of ["hypotheses", "conclusions"] as const) {
+      const statements = geometryStatement[field];
+      if (!Array.isArray(statements)) continue;
+      statements.forEach((statement, index) => {
+        if (typeof statement === "string") {
+          candidates.push({
+            path: `geometryStatement.${field}.${index}`,
+            value: statement,
+          });
+        }
+      });
+    }
+  }
   return candidates;
 }
 
-function hasMalformedLatex(value: string) {
-  const dollarIndexes: number[] = [];
-  let braceDepth = 0;
-  let containsLatex = false;
-
-  for (let index = 0; index < value.length; index += 1) {
-    const character = value[index];
-    if (character === "$" && !isEscaped(value, index)) {
-      dollarIndexes.push(index);
-      containsLatex = true;
-      continue;
-    }
-    if ((character === "{" || character === "}") && !isEscaped(value, index)) {
-      containsLatex = true;
-      if (character === "{") braceDepth += 1;
-      else if (braceDepth === 0) return true;
-      else braceDepth -= 1;
-    }
-  }
-
-  if (!containsLatex) return false;
-  return dollarIndexes.length % 2 !== 0 || braceDepth !== 0;
-}
-
-function isEscaped(value: string, index: number) {
-  let slashCount = 0;
-  for (let cursor = index - 1; cursor >= 0 && value[cursor] === "\\"; cursor -= 1) {
-    slashCount += 1;
-  }
-  return slashCount % 2 === 1;
+function createMalformedLatexIssue(path: string, value: string) {
+  return createIssue({
+    code: "MALFORMED_LATEX",
+    path,
+    message: "Công thức LaTeX đang thiếu hoặc thừa dấu phân cách hay dấu ngoặc.",
+    suggestion:
+      "Sửa lại công thức để delimiter, dấu ngoặc và cặp begin/end cân bằng rồi lưu lại.",
+    technicalDetails: `Unbalanced LaTeX syntax in ${path}.`,
+    fingerprint: fingerprint(value),
+  });
 }
 
 function isFormalGeometryProof(problem: string, hasDiagram: boolean) {
@@ -400,7 +459,9 @@ function omitReviewIssues(value: JsonObject) {
 }
 
 function fingerprint(value: unknown) {
-  return createHash("sha256").update(JSON.stringify(value)).digest("hex");
+  return createHash("sha256")
+    .update(JSON.stringify(value) ?? "__undefined__")
+    .digest("hex");
 }
 
 function isObject(value: unknown): value is JsonObject {

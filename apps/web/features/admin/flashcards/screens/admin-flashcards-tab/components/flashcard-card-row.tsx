@@ -12,6 +12,7 @@ import {
   PlayCircle,
   Sparkles,
   Trash2,
+  Undo2,
 } from "lucide-react";
 import { AdminFigureCandidateProgress } from "@/components/admin/admin-figure-candidate-progress";
 import { TiptapContentView } from "@/components/common/content/tiptap-content-view";
@@ -51,7 +52,7 @@ export function FlashcardCardRow({
   onEdit: (card: AdminFlashcard) => void;
   onNext: () => void;
   onPrevious: () => void;
-  onReview: (card: AdminFlashcard) => void;
+  onReview: (card: AdminFlashcard, reviewStatus: "APPROVED" | "NEEDS_REVIEW") => void;
   onViewModeChange: (mode: FlashcardViewMode) => void;
   viewMode: FlashcardViewMode;
   isReviewing: boolean;
@@ -115,26 +116,40 @@ export function FlashcardCardRow({
                   AI
                 </span>
               ) : null}
-              {card.reviewStatus === "NEEDS_REVIEW" ? (
-                <button
-                  type="button"
-                  disabled={isReviewing}
-                  onClick={() => onReview(card)}
-                  className="theme-button-primary-subtle inline-flex min-h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-extrabold disabled:opacity-60"
-                >
-                  {isReviewing ? (
-                    <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-                  ) : (
-                    <CheckCircle2 className="size-3.5" aria-hidden="true" />
-                  )}
-                  Duyệt
-                </button>
-              ) : (
-                <span className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 text-xs font-extrabold text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+              <button
+                type="button"
+                disabled={isReviewing}
+                onClick={() =>
+                  onReview(
+                    card,
+                    card.reviewStatus === "APPROVED" ? "NEEDS_REVIEW" : "APPROVED",
+                  )
+                }
+                className={cn(
+                  "inline-flex min-h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-extrabold disabled:opacity-60",
+                  card.reviewStatus === "APPROVED"
+                    ? "theme-button-neutral"
+                    : "theme-button-primary-subtle",
+                )}
+                aria-keyshortcuts={
+                  isAiCard && card.reviewStatus !== "APPROVED" ? "Enter" : undefined
+                }
+              >
+                {isReviewing ? (
+                  <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                ) : card.reviewStatus === "APPROVED" ? (
+                  <Undo2 className="size-3.5" aria-hidden="true" />
+                ) : (
                   <CheckCircle2 className="size-3.5" aria-hidden="true" />
-                  Đã duyệt
-                </span>
-              )}
+                )}
+                {isReviewing
+                  ? card.reviewStatus === "APPROVED"
+                    ? "Đang hủy duyệt"
+                    : "Đang duyệt"
+                  : card.reviewStatus === "APPROVED"
+                    ? "Hủy duyệt"
+                    : "Duyệt"}
+              </button>
             </div>
             <div className="ml-auto flex shrink-0 gap-2">
               {isAiCard ? (

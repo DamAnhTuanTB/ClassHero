@@ -51,6 +51,11 @@ import {
 import { DeleteConfirmDialog } from "@/components/admin/courses/delete-confirm-dialog";
 import { ImmediateTooltip } from "@/components/common/ui/immediate-tooltip";
 import { VideoStartTimeBadge } from "@/components/common/content/video-start-time-badge";
+import {
+  omitJsonEditorFields,
+  restoreJsonEditorFields,
+} from "@/lib/json-editor-hidden-fields";
+import { resolveVisibleVideoTimelineIndexes } from "@/lib/video-player-time";
 
 // Define a type for any generic block (loose typing since it comes from JSON)
 type BlockData = any;
@@ -136,6 +141,8 @@ interface SummaryBlockRendererProps {
     block: BlockData;
   }) => React.ReactNode;
   onBlockEdit?: (input: { blockPath: string; block: BlockData }) => void;
+  editCurrentBlockJson?: boolean;
+  hiddenCurrentBlockJsonFields?: readonly string[];
   phaseOneBlockJsonByPath?: Readonly<Record<string, unknown>> | null;
   onPhaseOneBlockJsonChange?: (blockPath: string, value: unknown) => void;
   onBlockTypeChange?: (blockPath: string, targetType: ConvertibleBlockType) => void;
@@ -158,9 +165,14 @@ interface SummaryBlockRendererProps {
   hideSectionHeadings?: boolean;
   objectivesLabel?: string;
   onVideoSeek?: (seconds: number) => void;
+  videoStartTimeOffsetSeconds?: number;
+  videoEndTimeSeconds?: number;
+  filterVideoTimelineByPlaybackWindow?: boolean;
+  showVideoTimelineVisibilityMetadata?: boolean;
   anchorPrefix?: string;
   className?: string;
   alwaysShowEditingActions?: boolean;
+  preserveDisplayNumbers?: boolean;
 }
 
 const BLOCK_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
@@ -277,6 +289,8 @@ export function SummaryBlockRenderer({
   renderBlockImageActions,
   renderBlockSourceAction,
   onBlockEdit,
+  editCurrentBlockJson = false,
+  hiddenCurrentBlockJsonFields = [],
   phaseOneBlockJsonByPath,
   onPhaseOneBlockJsonChange,
   onBlockTypeChange,
@@ -286,13 +300,37 @@ export function SummaryBlockRenderer({
   renderStemFigure,
   hideObjectives = false,
   hideSectionHeadings = false,
-  objectivesLabel = "Mục tiêu học tập",
+  objectivesLabel = "Kiến thức sách giáo khoa",
   onVideoSeek,
   anchorPrefix,
   className,
   alwaysShowEditingActions = false,
+  preserveDisplayNumbers = false,
+  videoStartTimeOffsetSeconds = 0,
+  videoEndTimeSeconds,
+  filterVideoTimelineByPlaybackWindow = false,
+  showVideoTimelineVisibilityMetadata = false,
 }: SummaryBlockRendererProps) {
   const isReadOnly = !onChange;
+  const videoTimelineBlocks = data.sections.flatMap((section, sectionIndex) =>
+    section.blocks.map((block, blockIndex) => ({
+      path: `sections.${sectionIndex}.blocks.${blockIndex}`,
+      startSeconds: block.startSeconds,
+    })),
+  );
+  const hasCustomVideoPlaybackWindow =
+    videoStartTimeOffsetSeconds > 0 || Number.isFinite(videoEndTimeSeconds);
+  const visibleVideoBlockPaths =
+    hasCustomVideoPlaybackWindow &&
+    (filterVideoTimelineByPlaybackWindow || showVideoTimelineVisibilityMetadata)
+      ? new Set(
+          resolveVisibleVideoTimelineIndexes(
+            videoTimelineBlocks.map((block) => block.startSeconds),
+            videoStartTimeOffsetSeconds,
+            videoEndTimeSeconds,
+          ).map((index) => videoTimelineBlocks[index]!.path),
+        )
+      : null;
   const [draggedItem, setDraggedItem] = React.useState<{
     sectionIdx: number;
     blockIdx: number;
@@ -715,6 +753,15 @@ export function SummaryBlockRenderer({
 
       {/* Sections */}
       {data.sections?.map((section, idx) => {
+        if (
+          filterVideoTimelineByPlaybackWindow &&
+          visibleVideoBlockPaths &&
+          !section.blocks.some((_block, blockIndex) =>
+            visibleVideoBlockPaths.has(`sections.${idx}.blocks.${blockIndex}`),
+          )
+        ) {
+          return null;
+        }
         const isSectionEditing =
           viewMode === "SPLIT" || editingItems.has(`section-${idx}`);
         const mergeSectionIntoPrevious = () => {
@@ -1018,7 +1065,7 @@ export function SummaryBlockRenderer({
                 >
                   {!hideSectionHeadings && (
                     <h3
-                      className={`group flex items-center gap-3 text-xl font-bold text-slate-800 dark:text-slate-100 mb-0 ${viewMode !== "SPLIT" ? "flex-1" : ""}`}
+                      className={`group mb-0 flex items-center gap-3 text-lg font-bold text-slate-800 dark:text-slate-100 sm:text-xl ${viewMode !== "SPLIT" ? "flex-1" : ""}`}
                     >
                       <span className="flex-none bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 w-9 h-9 rounded-xl flex items-center justify-center text-base font-black border border-blue-200/50 dark:border-blue-800/50 shadow-sm">
                         {section.order || idx + 1}
@@ -1031,10 +1078,6 @@ export function SummaryBlockRenderer({
                         />
                         <span className="absolute bottom-0 left-0 w-12 h-1 bg-blue-500/20 dark:bg-blue-400/20 rounded-full group-hover:w-full transition-all duration-500 ease-out"></span>
                       </span>
-                      <VideoStartTimeBadge
-                        seconds={section.startSeconds}
-                        onSeek={onVideoSeek}
-                      />
                     </h3>
                   )}
 
@@ -1105,18 +1148,50 @@ export function SummaryBlockRenderer({
             <div className={alwaysShowEditingActions ? "space-y-3" : "space-y-4"}>
               {section.blocks?.map((block, bIdx) => {
                 const blockPath = `sections.${idx}.blocks.${bIdx}`;
-                const phaseOneBlockJson = phaseOneBlockJsonByPath?.[blockPath];
-                const hasPhaseOneBlockJson =
-                  typeof phaseOneBlockJson === "object" &&
-                  phaseOneBlockJson !== null &&
-                  !Array.isArray(phaseOneBlockJson);
+                const isHiddenFromVideoPlayback = Boolean(
+                  visibleVideoBlockPaths && !visibleVideoBlockPaths.has(blockPath),
+                );
+                if (filterVideoTimelineByPlaybackWindow && isHiddenFromVideoPlayback) {
+                  return null;
+                }
+                const editableBlockJson = editCurrentBlockJson
+                  ? omitJsonEditorFields(block, hiddenCurrentBlockJsonFields)
+                  : phaseOneBlockJsonByPath?.[blockPath];
+                const hasEditableBlockJson =
+                  typeof editableBlockJson === "object" &&
+                  editableBlockJson !== null &&
+                  !Array.isArray(editableBlockJson);
+                const updateEditableBlockJson = (value: unknown) => {
+                  if (!editCurrentBlockJson) {
+                    onPhaseOneBlockJsonChange?.(blockPath, value);
+                    return;
+                  }
+                  if (
+                    !onChange ||
+                    typeof value !== "object" ||
+                    value === null ||
+                    Array.isArray(value)
+                  ) {
+                    return;
+                  }
+                  const newData = structuredClone(data);
+                  const targetSection = newData.sections?.[idx];
+                  if (!targetSection?.blocks?.[bIdx]) return;
+                  targetSection.blocks[bIdx] = restoreJsonEditorFields(
+                    targetSection.blocks[bIdx],
+                    value as Record<string, unknown>,
+                    hiddenCurrentBlockJsonFields,
+                  ) as BlockData;
+                  onChange(newData);
+                };
                 const displayedBlockType = block.type;
                 runningCounts[displayedBlockType] =
                   (runningCounts[displayedBlockType] || 0) + 1;
 
                 // Only assign a number for "example" blocks, if there is more than 1 in the lesson
-                const computedDisplayNumber =
-                  displayedBlockType === "exercise"
+                const computedDisplayNumber = preserveDisplayNumbers
+                  ? block.displayNumber
+                  : displayedBlockType === "exercise"
                     ? runningCounts[displayedBlockType]
                     : displayedBlockType === "example" &&
                         (globalTypeCounts[displayedBlockType] ?? 0) > 1
@@ -1347,6 +1422,7 @@ export function SummaryBlockRenderer({
                         renderStemFigure={renderStemFigure}
                         showEditorialMetadata={showEditorialMetadata}
                         onVideoSeek={onVideoSeek}
+                        videoStartTimeOffsetSeconds={videoStartTimeOffsetSeconds}
                       />
                       {!isReadOnly &&
                       (viewMode === "SPLIT" || isBlockEditing) &&
@@ -1380,7 +1456,27 @@ export function SummaryBlockRenderer({
                           >
                             {alwaysShowEditingActions ? (
                               <VideoStartTimeBadge
+                                disabled={
+                                  showVideoTimelineVisibilityMetadata &&
+                                  isHiddenFromVideoPlayback
+                                }
+                                labelPrefix={
+                                  showVideoTimelineVisibilityMetadata &&
+                                  isHiddenFromVideoPlayback
+                                    ? "Bị ẩn · Gốc"
+                                    : undefined
+                                }
+                                offsetSeconds={
+                                  showVideoTimelineVisibilityMetadata &&
+                                  isHiddenFromVideoPlayback
+                                    ? 0
+                                    : videoStartTimeOffsetSeconds
+                                }
                                 seconds={blockToRender.startSeconds}
+                                showOriginalTime={
+                                  showVideoTimelineVisibilityMetadata &&
+                                  !isHiddenFromVideoPlayback
+                                }
                                 onSeek={onVideoSeek}
                               />
                             ) : null}
@@ -1674,26 +1770,17 @@ export function SummaryBlockRenderer({
                                 </div>
                               </ImmediateTooltip>
                             </div>
-                            {hasPhaseOneBlockJson ? (
+                            {hasEditableBlockJson ? (
                               <ReactJson
-                                src={phaseOneBlockJson as object}
+                                src={editableBlockJson as object}
                                 onEdit={(event) =>
-                                  onPhaseOneBlockJsonChange?.(
-                                    blockPath,
-                                    event.updated_src,
-                                  )
+                                  updateEditableBlockJson(event.updated_src)
                                 }
                                 onAdd={(event) =>
-                                  onPhaseOneBlockJsonChange?.(
-                                    blockPath,
-                                    event.updated_src,
-                                  )
+                                  updateEditableBlockJson(event.updated_src)
                                 }
                                 onDelete={(event) =>
-                                  onPhaseOneBlockJsonChange?.(
-                                    blockPath,
-                                    event.updated_src,
-                                  )
+                                  updateEditableBlockJson(event.updated_src)
                                 }
                                 theme="rjv-default"
                                 style={{ backgroundColor: "transparent" }}
@@ -1855,11 +1942,13 @@ function BlockItem({
   renderStemFigure,
   showEditorialMetadata,
   onVideoSeek,
+  videoStartTimeOffsetSeconds,
 }: {
   block: BlockData;
   renderStemFigure?: LessonSummaryFigureRenderer;
   showEditorialMetadata: boolean;
   onVideoSeek?: (seconds: number) => void;
+  videoStartTimeOffsetSeconds: number;
 }) {
   switch (block.type) {
     case "example":
@@ -1869,6 +1958,7 @@ function BlockItem({
           renderStemFigure={renderStemFigure}
           showEditorialMetadata={showEditorialMetadata}
           onVideoSeek={onVideoSeek}
+          videoStartTimeOffsetSeconds={videoStartTimeOffsetSeconds}
         />
       );
     case "exercise":
@@ -1877,6 +1967,8 @@ function BlockItem({
           block={block}
           renderStemFigure={renderStemFigure}
           showEditorialMetadata={showEditorialMetadata}
+          onVideoSeek={onVideoSeek}
+          videoStartTimeOffsetSeconds={videoStartTimeOffsetSeconds}
         />
       );
     case "knowledge":
@@ -1889,6 +1981,7 @@ function BlockItem({
           block={block}
           renderStemFigure={renderStemFigure}
           onVideoSeek={onVideoSeek}
+          videoStartTimeOffsetSeconds={videoStartTimeOffsetSeconds}
         />
       );
     default:
@@ -2020,10 +2113,12 @@ function BaseBlockContainer({
   block,
   children,
   onVideoSeek,
+  videoStartTimeOffsetSeconds,
 }: {
   block: BlockData;
   children: React.ReactNode;
   onVideoSeek?: (seconds: number) => void;
+  videoStartTimeOffsetSeconds: number;
 }) {
   const config = BLOCK_CONFIG[block.type] || {
     label: block.type,
@@ -2032,6 +2127,9 @@ function BaseBlockContainer({
   };
   const styles = COLOR_STYLES[config.color] || COLOR_STYLES.slate;
   const Icon = config.icon;
+  const videoEndTimeSeconds = Number.isFinite(block.videoSegmentEndSeconds)
+    ? block.videoSegmentEndSeconds
+    : undefined;
 
   const hideTitleTypes = ["note", "example", "summary"];
   const shouldShowTitle = block.title && !hideTitleTypes.includes(block.type);
@@ -2045,7 +2143,12 @@ function BaseBlockContainer({
           <Icon className="h-4 w-4 shrink-0" />
           {config.label} {block.displayNumber ? block.displayNumber : ""}
         </span>
-        <VideoStartTimeBadge seconds={block.startSeconds} onSeek={onVideoSeek} />
+        <VideoStartTimeBadge
+          endSeconds={videoEndTimeSeconds}
+          offsetSeconds={videoStartTimeOffsetSeconds}
+          seconds={block.startSeconds}
+          onSeek={onVideoSeek}
+        />
       </div>
       {shouldShowTitle && (
         <div className={`font-bold ${styles.text}`}>
@@ -2066,17 +2169,23 @@ function CalloutBlock({
   block,
   renderStemFigure,
   onVideoSeek,
+  videoStartTimeOffsetSeconds,
 }: {
   block: BlockData;
   renderStemFigure?: LessonSummaryFigureRenderer;
   onVideoSeek?: (seconds: number) => void;
+  videoStartTimeOffsetSeconds: number;
 }) {
   const content =
     block.type === "note"
       ? normalizeLessonSummaryNoteContent(block.content ?? "")
       : block.content;
   return (
-    <BaseBlockContainer block={block} onVideoSeek={onVideoSeek}>
+    <BaseBlockContainer
+      block={block}
+      onVideoSeek={onVideoSeek}
+      videoStartTimeOffsetSeconds={videoStartTimeOffsetSeconds}
+    >
       {content && (
         <MathpixMarkdownRenderer content={normalizeBlockMath(content, block)} />
       )}
@@ -2108,11 +2217,13 @@ function ExampleBlock({
   renderStemFigure,
   showEditorialMetadata,
   onVideoSeek,
+  videoStartTimeOffsetSeconds,
 }: {
   block: BlockData;
   renderStemFigure?: LessonSummaryFigureRenderer;
   showEditorialMetadata: boolean;
   onVideoSeek?: (seconds: number) => void;
+  videoStartTimeOffsetSeconds: number;
 }) {
   return (
     <LessonSummaryExampleCard
@@ -2122,6 +2233,12 @@ function ExampleBlock({
       renderFigure={renderStemFigure}
       showEditorialWarning={showEditorialMetadata}
       onVideoSeek={onVideoSeek}
+      videoEndTimeSeconds={
+        Number.isFinite(block.videoSegmentEndSeconds)
+          ? block.videoSegmentEndSeconds
+          : undefined
+      }
+      videoStartTimeOffsetSeconds={videoStartTimeOffsetSeconds}
     />
   );
 }
@@ -2130,10 +2247,14 @@ function ExerciseBlock({
   block,
   renderStemFigure,
   showEditorialMetadata,
+  onVideoSeek,
+  videoStartTimeOffsetSeconds,
 }: {
   block: BlockData;
   renderStemFigure?: LessonSummaryFigureRenderer;
   showEditorialMetadata: boolean;
+  onVideoSeek?: (seconds: number) => void;
+  videoStartTimeOffsetSeconds: number;
 }) {
   return (
     <LessonSummaryExerciseCard
@@ -2141,6 +2262,13 @@ function ExerciseBlock({
       displayNumber={block.displayNumber}
       renderFigure={renderStemFigure}
       showEditorialWarning={showEditorialMetadata}
+      onVideoSeek={onVideoSeek}
+      videoEndTimeSeconds={
+        Number.isFinite(block.videoSegmentEndSeconds)
+          ? block.videoSegmentEndSeconds
+          : undefined
+      }
+      videoStartTimeOffsetSeconds={videoStartTimeOffsetSeconds}
     />
   );
 }

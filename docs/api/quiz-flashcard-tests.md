@@ -40,6 +40,7 @@ Body:
 Behavior:
 
 - Server tự gán `sortOrder` tiếp theo trong lesson.
+- Bộ mới có `reviewStatus=DRAFT`; chỉ action `PUBLISH` mới phát hành cho học sinh.
 - Quiz set không nhận/trả `difficulty`; mức độ thuộc từng question và
   request sinh Quiz bằng AI.
 
@@ -474,6 +475,8 @@ Body:
   dùng để chấm; string có thể chứa LaTeX hoặc mhchem như
   `\frac{1}{2}`/`\ce{H2O}`.
 - Server tự gán `sortOrder` tiếp theo trong quiz set.
+- Câu tạo thủ công có `reviewStatus=NEEDS_REVIEW` và `publishedAt=null`; admin
+  phải duyệt câu trước khi `SAVE`/`PUBLISH` có thể đưa câu tới học sinh.
 
 #### `PATCH /admin/quiz-questions/:questionId`
 
@@ -613,10 +616,14 @@ tại`); mode edit yêu cầu revision hiện hành là `AI_TEX` và gửi sourc
 
 Role: `ADMIN`.
 
-Body:
+Body duyệt hoặc hủy duyệt:
 
 ```json
 { "reviewStatus": "APPROVED" }
+```
+
+```json
+{ "reviewStatus": "NEEDS_REVIEW" }
 ```
 
 Behavior:
@@ -627,6 +634,8 @@ Behavior:
   Khi response trả `APPROVED`, banner của câu được ẩn; endpoint không xóa hoặc
   sửa `generationIssues` vì metadata này vẫn cần cho audit lượt sinh.
 - Ghi audit log `QUIZ_QUESTION_REVIEWED`.
+- Hủy duyệt chuyển riêng câu về `NEEDS_REVIEW` và đặt `publishedAt=null`, vì vậy
+  câu không còn nằm trong bản học sinh cho tới lần duyệt và lưu/phát hành sau.
 - Câu vừa duyệt có `publishedAt=null`; nếu bộ đã phát hành, học sinh vẫn chỉ thấy
   bản câu đã được `Lưu`/`Phát hành` trước đó. Admin phải bấm `Lưu` của đúng bộ để
   đưa các câu mới duyệt hoặc mới tạo vào lượt phát hành gần nhất cho học sinh.
@@ -945,7 +954,8 @@ Body:
 Behavior:
 
 - Chỉ tạo cho lesson tồn tại.
-- Bộ thủ công dùng `source=ADMIN`, `reviewStatus=APPROVED`.
+- Bộ thủ công dùng `source=ADMIN`, `reviewStatus=DRAFT`; chỉ action `PUBLISH` mới
+  phát hành cho học sinh.
 - Server tự gán `sortOrder` tiếp theo và ghi audit log.
 
 #### `POST /admin/lessons/:lessonId/flashcard-sets/generate-ai`
@@ -1100,6 +1110,7 @@ Rules:
   hoặc nối bản ghi `ai_explanations`.
 - Difficulty của từng card chỉ nhận `EASY`, `MEDIUM`, `HARD`; server tự gán
   `sortOrder` tiếp theo nếu client không gửi.
+- Card tạo thủ công có `reviewStatus=NEEDS_REVIEW` và `publishedAt=null`.
 - Tạo card tăng `flashcard_sets.card_count` trong cùng transaction và ghi audit
   log.
 
@@ -1118,8 +1129,10 @@ Behavior:
 
 Role: `ADMIN`.
 
-Behavior: duyệt/ẩn riêng một Flashcard AI và ghi audit log; không tự cascade sang
-card khác trong bộ. `solutionJson` dùng chung review status của card.
+Behavior: duyệt hoặc hủy duyệt riêng một Flashcard thủ công/AI và ghi audit log;
+không tự cascade sang card khác trong bộ. Hủy duyệt chuyển card về
+`NEEDS_REVIEW`, đặt `publishedAt=null`; `solutionJson` dùng chung review status
+của card.
 
 #### `POST /admin/flashcard-sets/:setId/cards/review-all-ai`
 
@@ -1300,6 +1313,7 @@ Rules:
 - `durationSeconds` bắt buộc, từ `60` đến `14400` giây.
 - UI quản trị nhập thời gian theo phút rồi đổi sang giây trước khi gọi API.
 - Server tự gán `sortOrder` tiếp theo trong lesson.
+- Bộ mới có `reviewStatus=DRAFT`; chỉ action `PUBLISH` mới phát hành cho học sinh.
 - Không nhận difficulty ratio, total score hoặc points như capability Admin Test
   riêng; difficulty thuộc question như Quiz.
 
@@ -1391,6 +1405,7 @@ Body:
 Contract nội dung câu hỏi giống mục `10.2 Admin quiz question item-level CRUD`
 và hỗ trợ đủ bốn loại `MULTIPLE_CHOICE`, `TRUE_FALSE`,
 `MULTI_STATEMENT_TRUE_FALSE`, `TEXT_INPUT`.
+Câu tạo thủ công có `reviewStatus=NEEDS_REVIEW` và `publishedAt=null`.
 
 #### `PATCH /admin/test-questions/:questionId`
 
@@ -1405,15 +1420,19 @@ Behavior:
 
 Role: `ADMIN`.
 
-Body:
+Body duyệt hoặc hủy duyệt:
 
 ```json
 { "reviewStatus": "APPROVED" }
 ```
 
-Behavior giống endpoint duyệt item-level của Quiz: chỉ duyệt câu Test được chỉ
-định và lời giải liên kết, ghi audit log `TEST_QUESTION_REVIEWED`, đồng thời đưa
-bộ về `APPROVED` khi không còn câu nào chờ duyệt.
+```json
+{ "reviewStatus": "NEEDS_REVIEW" }
+```
+
+Behavior giống endpoint item-level của Quiz: chỉ duyệt/hủy duyệt câu Test được
+chỉ định và lời giải liên kết, ghi audit log `TEST_QUESTION_REVIEWED`, luôn đặt
+`publishedAt=null` và không tự phát hành bộ.
 
 #### `DELETE /admin/test-questions/:questionId`
 

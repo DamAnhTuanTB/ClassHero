@@ -28,7 +28,7 @@ M3.8 transcript/chapter + M7 student learning + M5 retrieval + M9 AI
     -> aggregate admin video analytics
 
 M3.8 transcript/chapter + M4.3 jobs + M9 provider/routing/budget/target context
-  -> M15.9 admin whole-video summary
+  -> M9.7 admin whole-video summary
 
 M3 course/chapter/lesson + M8 payment/enrollment
   -> full paid enrollment access and payment CTA after M8.4
@@ -48,24 +48,24 @@ M14 testing/hardening/deploy
 
 ## 2. Phụ thuộc theo milestone
 
-| Milestone | Phụ thuộc chính                                                     | Mở khóa                                                                 |
-| --------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| `M0`      | Docs/project decision                                               | Repo, tooling, Docker local                                             |
-| `M1`      | `M0`                                                                | Schema/model nền cho toàn hệ thống                                      |
-| `M2`      | `M1.2`, `M2.1`                                                      | Auth, RBAC, profile, protected APIs                                     |
-| `M3`      | `M1.3`, `M2.3`                                                      | Course/chapter/lesson APIs và UI public/student/admin                   |
-| `M4`      | `M1.2`, `M1.3`, `M2.3`, `M3.2`                                      | Upload, lesson document API, worker, PDF processing                     |
-| `M5`      | `M4.4`, API/env nền                                                 | Embedding, pgvector retrieval, hybrid search                            |
-| `M6`      | `M1.4`, `M2.3`, `M3.2`                                              | Quiz/flashcard/test CRUD và read-only lesson content                    |
-| `M7`      | `M3.2`, `M6.5`, `M2.3`                                              | Student lesson flow, attempts, progress, dashboard                      |
-| `M8`      | `M1.5`, `M2.3`, `M3.1`                                              | Discount, payment order, webhook, enrollment                            |
-| `M9`      | `M5.x`, `M9.1`, content modules                                     | AI generate, explanation cache, lesson chat                             |
-| `M10`     | Notification models, auth, event sources                            | In-app/realtime/email/Zalo notification                                 |
-| `M11`     | Parent-child link, progress/payment/news APIs                       | Parent portal                                                           |
-| `M12`     | Report/news models, auth, content modules                           | Report moderation, news/events                                          |
-| `M13`     | Progress/attempt/profile/file models                                | XP, leaderboard, profile, admin dashboard                               |
-| `M14`     | Implemented sensitive flows                                         | Tests, hardening, deploy, operations                                    |
-| `M15`     | `M3.8`, core `M7.1-M7.5`; AI tasks additionally need `M5.x`, `M9.x`; `M15.9` chỉ cần transcript + job/provider foundation | Smart video progress, contextual learning, adaptive review, video summary và analytics |
+| Milestone | Phụ thuộc chính                                                                                                                    | Mở khóa                                                                                        |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `M0`      | Docs/project decision                                                                                                              | Repo, tooling, Docker local                                                                    |
+| `M1`      | `M0`                                                                                                                               | Schema/model nền cho toàn hệ thống                                                             |
+| `M2`      | `M1.2`, `M2.1`                                                                                                                     | Auth, RBAC, profile, protected APIs                                                            |
+| `M3`      | `M1.3`, `M2.3`                                                                                                                     | Course/chapter/lesson APIs và UI public/student/admin                                          |
+| `M4`      | `M1.2`, `M1.3`, `M2.3`, `M3.2`                                                                                                     | Upload, lesson document API, worker, PDF processing                                            |
+| `M5`      | `M4.4`, API/env nền                                                                                                                | Embedding, pgvector retrieval, hybrid search                                                   |
+| `M6`      | `M1.4`, `M2.3`, `M3.2`                                                                                                             | Quiz/flashcard/test CRUD và read-only lesson content                                           |
+| `M7`      | `M3.2`, `M6.5`, `M2.3`                                                                                                             | Student lesson flow, attempts, progress, dashboard                                             |
+| `M8`      | `M1.5`, `M2.3`, `M3.1`                                                                                                             | Discount, payment order, webhook, enrollment                                                   |
+| `M9`      | `M5.x`, `M9.1`, content modules                                                                                                    | AI generate, explanation cache, lesson chat                                                    |
+| `M10`     | Notification models, auth, event sources                                                                                           | In-app/realtime/email/Zalo notification                                                        |
+| `M11`     | Parent-child link, progress/payment/news APIs                                                                                      | Parent portal                                                                                  |
+| `M12`     | Report/news models, auth, content modules                                                                                          | Report moderation, news/events                                                                 |
+| `M13`     | Progress/attempt/profile/file models                                                                                               | XP, leaderboard, profile, admin dashboard                                                      |
+| `M14`     | Implemented sensitive flows                                                                                                        | Tests, hardening, deploy, operations                                                           |
+| `M15`     | `M3.8`, core `M7.1-M7.5`; AI tasks additionally need `M5.x`, `M9.x`; Student Video Summary `M15.10` cần admin Video Summary `M9.7` | Smart video progress, contextual learning, adaptive review, student video summary và analytics |
 
 ## 3. Phụ thuộc cần nhớ khi chọn task
 
@@ -82,7 +82,7 @@ M14 testing/hardening/deploy
   hoặc prompt contract.
 - `M8.4` payment UI cần `M8.2` và `M8.3`; notification thật có thể chờ `M10.1`.
 - Thứ tự triển khai cụm AI là
-  `M9.1 -> M9.2 (Summary + TeX/TikZ) -> M9.8 -> M9.17 -> M9.18 -> M9.19 -> M9.20 -> M9.21 -> M9.22 -> M9.23 -> M9.24 -> M9.25 -> M9.26 -> M9.27 -> M9.4 -> M9.5 -> M9.6 -> M9.7`.
+  `M9.1 -> M9.2 (Summary + TeX/TikZ) -> M9.8 -> M9.17 -> M9.18 -> M9.19 -> M9.20 -> M9.21 -> M9.22 -> M9.23 -> M9.24 -> M9.25 -> M9.26 -> M9.27 -> M9.7 -> M9.4 -> M9.5 -> M9.6`.
 - Provider operations là lát dọc độc lập:
   `M9.9 -> M4.6 -> M9.10 -> M9.11 -> M9.12`; dùng nền `M9.1`, `M4.4` và admin shell. `M9.12` là bước hardening cuối, phải hoàn tất trước khi coi hard-stop là giới hạn tuyệt đối trong production.
   `M9.8` đứng ngay sau `M9.3` để admin kiểm thử generation trên UI và đã Done
@@ -93,7 +93,7 @@ M14 testing/hardening/deploy
   panel `M9.8`; Summary mới không còn phụ thuộc retrieval chunks `M5.3`.
 - `M9.17` phụ thuộc `M9.2`, panel `M9.8` và image manifest `M4.4`; chỉ thêm
   execution mode dùng crop SGK trực tiếp, không thay output Phase 1 hoặc chặn
-  các student flow `M9.4-M9.7`.
+  các student flow `M9.4-M9.6` hoặc admin Video Summary `M9.7`.
 - `M9.18` phụ thuộc `M9.17`, figure revision/R2 của `M9.2` và action frame
   `M9.8`; editor chỉ áp dụng raster SGK thành công, preview/apply local và không
   thêm AI provider hay background job.
@@ -128,7 +128,7 @@ M14 testing/hardening/deploy
 - `M9.4` và `M9.5` là `UI + API`: mỗi task phải kết thúc bằng flow học sinh bấm
   kiểm thử được, không tách UI sang `M9.8` hoặc một task chưa xác định.
 - `M9.6` AI chat chỉ nên hoàn thiện sau `M4.4`, `M5.2`, `M5.3`, `M9.1` và đi
-  sau `M9.5` để nhận context từ `Chat thêm với AI`; `M9.7` đi sau `M9.6`.
+  sau `M9.5` để nhận context từ `Chat thêm với AI`.
 - `M13.5` admin dashboard có thể dùng placeholder cho metric chưa có API, nhưng phải ghi rõ.
 - `M3.6` cần enrollment thật từ `M8.3` và worker foundation `M4.3`; không được kích hoạt clone trước khi job hoàn tất.
 - `M3.7` cần `M3.6`; `M7.8` cần `M3.6`, `M7.1`, `M7.5`; `M11.5` cần `M7.8`, `M11.1`, `M11.2`.
@@ -136,9 +136,12 @@ M14 testing/hardening/deploy
 - `M15.1-M15.3` được ưu tiên sau khi student lesson/quiz/test/completion ở `M7.1-M7.5` sẵn sàng; `M15.2` cần thêm notes `M7.6`.
 - `M15.4-M15.6` không được chạy trước nền transcript `M3.8`, retrieval `M5.x` và AI `M9.x` tương ứng.
 - `M15.7` chỉ suy luận difficulty từ nhiều tín hiệu học tập; `M15.8` chỉ hiển thị analytics tổng hợp có ngưỡng riêng tư.
-- `M15.9` độc lập với tracking/student surface `M15.1-M15.8`; task dùng saved
+- `M9.7` độc lập với tracking/student surface `M15.1-M15.8`; task dùng saved
   transcript toàn video, exact preview draft và text-only worker, không tái sử
   dụng private Lesson Summary core.
+- `M15.10` đi sau `M9.7`, `M6.5`, `M7.1`; chỉ giao bản Video Summary đã phát hành
+  qua student lesson aggregate và sub-tab Video; chế độ xem từng phần dùng trực
+  tiếp playback time và `startSeconds` đã có, không phụ thuộc tracking `M15.1`.
 - M15 không thay đổi rule completed của `M7.5`; watched percent/chapter mastery chỉ là tín hiệu hỗ trợ.
 - `M14.8` phụ thuộc các screen/query đã được implement ở từng feature; phần
   regression Playwright dùng nền `M14.3`, không chặn feature chưa có UI.

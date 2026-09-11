@@ -1,29 +1,16 @@
 "use client";
 
-import { useEffect, useState, type ComponentProps } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { isAiReasoningEffort } from "@learning-path/shared";
 import { toast } from "sonner";
-import {
-  CheckCircle2,
-  ChevronDown,
-  ChevronUp,
-  CircleAlert,
-  LoaderCircle,
-  Pencil,
-  RefreshCw,
-  Sparkles,
-  Trash2,
-} from "lucide-react";
+import { LoaderCircle, Pencil, RefreshCw, Sparkles, Trash2 } from "lucide-react";
 import { EditorDialogShell } from "@/components/admin/courses/editor-dialog-shell";
 import { OptionField } from "@/components/common/forms/option-field";
 import { TextField } from "@/components/common/forms/text-field";
 import { TextareaField } from "@/components/common/forms/textarea-field";
-import { TiptapContentView } from "@/components/common/content/tiptap-content-view";
-import { SummaryBlockRenderer } from "@/features/student/lessons/screens/student-lesson-screen/components/summary-block-renderer";
 import { getAdminAiJob } from "@/features/admin/ai-generation/api/admin-ai-generation-api";
 import { AiJobMetadata } from "@/features/admin/ai-generation/components/ai-job-metadata";
-import { AiJobTimer } from "@/features/admin/ai-generation/components/ai-job-timer";
 import {
   adminAiGenerationQueryKeys,
   useAdminAiGenerationPanel,
@@ -48,7 +35,7 @@ import {
 } from "@/features/admin/lessons/api/admin-video-summary-api";
 import { VideoSummaryPromptPreview } from "@/features/admin/lessons/components/video-summary-prompt-preview";
 import { VideoSummaryEditorDialog } from "@/features/admin/lessons/components/video-summary-editor-dialog";
-import { AdminLessonSummaryPublishActions } from "@/features/admin/ai-generation/components/admin-lesson-summary-publish-actions";
+import { prepareVideoSummaryPreviewRequest } from "@/features/admin/lessons/utils/video-summary-request";
 import { createTextTiptapDocument } from "@/lib/tiptap-rich-content";
 
 const initialRequest: VideoSummaryRequest = {
@@ -71,22 +58,30 @@ export function VideoSummaryDialog({
   lessonId,
   disabled,
   disabledReason,
+  generationRequestId,
   onVideoSeek,
+  showContent,
+  videoStartTimeOffsetSeconds = 0,
+  videoEndTimeSeconds,
 }: {
   lessonId: string;
   disabled: boolean;
   disabledReason: string;
+  generationRequestId: number;
   onVideoSeek?: (seconds: number) => void;
+  showContent: boolean;
+  videoStartTimeOffsetSeconds?: number;
+  videoEndTimeSeconds?: number;
 }) {
   const [open, setOpen] = useState(false);
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const handledGenerationRequestIdRef = useRef(0);
   const [request, setRequest] = useState(initialRequest);
   const [preview, setPreview] = useState<VideoSummaryPreview | null>(null);
   const [shouldPrepareInitialPreview, setShouldPrepareInitialPreview] = useState(false);
-  const [promptsAreDirty, setPromptsAreDirty] = useState(false);
+  const [isPreparingSubmission, setIsPreparingSubmission] = useState(false);
+  const hasAdminEditedSystemPromptRef = useRef(false);
+  const hasAdminEditedUserPromptRef = useRef(false);
   const [jobId, setJobId] = useState<string | null>(null);
-  const [jobQueuedAt, setJobQueuedAt] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const token = useAuthSessionStore((state) => state.session?.accessToken ?? "");
   const summary = useQuery({
@@ -98,6 +93,7 @@ export function VideoSummaryDialog({
   const modelConfiguration =
     modelConfigurationQuery.data?.videoSummaryConfiguration ??
     modelConfigurationQuery.data?.summaryConfiguration;
+  const panelJob = modelConfigurationQuery.data?.videoSummaryJob ?? null;
   const targetGrade = modelConfigurationQuery.data?.lesson.targetGrade ?? null;
   const resolvedModel = request.model ?? modelConfiguration?.resolvedModel ?? "";
   const selectedModel = modelConfiguration?.modelOptions.find(
@@ -128,25 +124,45 @@ export function VideoSummaryDialog({
     refetchInterval: (query) =>
       ["SUCCEEDED", "FAILED"].includes(query.state.data?.status ?? "") ? false : 1500,
   });
+  const trackedJobId = jobId ?? panelJob?.jobId ?? null;
+  const trackedJobStatus = jobId ? job.data?.status : panelJob?.status;
+  const isGenerating = trackedJobStatus === "QUEUED" || trackedJobStatus === "RUNNING";
   useEffect(() => {
-    if (!jobId || !["SUCCEEDED", "FAILED"].includes(job.data?.status ?? "")) return;
+    if (
+      !trackedJobId ||
+      !["SUCCEEDED", "FAILED", "CANCELLED"].includes(trackedJobStatus ?? "")
+    ) {
+      return;
+    }
     void Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["admin-video-summary", lessonId] }),
-      queryClient.invalidateQueries({
+      queryClient.refetchQueries({
+        queryKey: ["admin-video-summary", lessonId],
+        type: "active",
+      }),
+      queryClient.refetchQueries({
         queryKey: adminAiGenerationQueryKeys.panel(lessonId),
+        type: "active",
+      }),
+      queryClient.refetchQueries({
+        queryKey: ["admin-lesson", lessonId],
+        type: "active",
       }),
     ]);
-  }, [job.data?.status, jobId, lessonId, queryClient]);
+  }, [lessonId, queryClient, trackedJobId, trackedJobStatus]);
   const previewMutation = useMutation({
-    mutationFn: () => previewAdminVideoSummary(lessonId, request, token),
+    mutationFn: (previewRequest: VideoSummaryRequest) =>
+      previewAdminVideoSummary(lessonId, previewRequest, token),
     onSuccess: (data) => {
       setPreview(data);
       setRequest((current) => ({
         ...current,
-        systemInstructions: data.systemPrompt,
-        userPrompt: data.userPrompt,
+        systemInstructions: hasAdminEditedSystemPromptRef.current
+          ? current.systemInstructions
+          : data.systemPrompt,
+        userPrompt: hasAdminEditedUserPromptRef.current
+          ? current.userPrompt
+          : data.userPrompt,
       }));
-      setPromptsAreDirty(false);
       setShouldPrepareInitialPreview(false);
     },
     onError: () => setShouldPrepareInitialPreview(false),
@@ -160,27 +176,54 @@ export function VideoSummaryDialog({
     ) {
       return;
     }
-    previewMutation.mutate();
+    previewMutation.mutate(
+      prepareVideoSummaryPreviewRequest(request, {
+        preserveSystemPrompt: hasAdminEditedSystemPromptRef.current,
+        preserveUserPrompt: hasAdminEditedUserPromptRef.current,
+      }),
+    );
   }, [open, previewMutation, request.model, shouldPrepareInitialPreview]);
   const generateMutation = useMutation({
-    mutationFn: () =>
-      generateAdminVideoSummary(
+    mutationFn: async (currentRequest: VideoSummaryRequest) => {
+      const latestRequest = prepareVideoSummaryPreviewRequest(currentRequest, {
+        preserveSystemPrompt: hasAdminEditedSystemPromptRef.current,
+        preserveUserPrompt: hasAdminEditedUserPromptRef.current,
+      });
+      setIsPreparingSubmission(true);
+      const latestPreview = await previewAdminVideoSummary(
+        lessonId,
+        latestRequest,
+        token,
+      );
+      setPreview(latestPreview);
+      setRequest((current) => ({
+        ...current,
+        systemInstructions: hasAdminEditedSystemPromptRef.current
+          ? current.systemInstructions
+          : latestPreview.systemPrompt,
+        userPrompt: hasAdminEditedUserPromptRef.current
+          ? current.userPrompt
+          : latestPreview.userPrompt,
+      }));
+      setIsPreparingSubmission(false);
+      return generateAdminVideoSummary(
         lessonId,
         {
-          ...request,
-          requestDraftId: preview?.requestDraftId,
-          requestHash: preview?.requestHash,
+          ...latestRequest,
+          requestDraftId: latestPreview.requestDraftId,
+          requestHash: latestPreview.requestHash,
         },
         token,
-      ),
+      );
+    },
     onSuccess: (data) => {
       setJobId(data.jobId);
-      setJobQueuedAt(new Date().toISOString());
       setOpen(false);
       void queryClient.invalidateQueries({
         queryKey: adminAiGenerationQueryKeys.panel(lessonId),
       });
     },
+    onSettled: () => setIsPreparingSubmission(false),
   });
   const deleteMutation = useMutation({
     mutationFn: () => deleteAdminVideoSummary(lessonId, token),
@@ -216,7 +259,6 @@ export function VideoSummaryDialog({
       );
     },
     onSuccess: (_data, variables) => {
-      setEditorOpen(false);
       toast.success(
         variables.action === "SAVE"
           ? "Đã lưu nội dung chỉnh sửa"
@@ -236,7 +278,11 @@ export function VideoSummaryDialog({
   const close = () => {
     if (!isBusy) setOpen(false);
   };
-  const openDialog = () => {
+  const openDialog = useCallback(() => {
+    if (disabled) {
+      toast.error(disabledReason);
+      return;
+    }
     const model = modelConfiguration?.resolvedModel ?? undefined;
     setRequest({
       ...initialRequest,
@@ -248,19 +294,19 @@ export function VideoSummaryDialog({
       maxOutputTokens: modelConfiguration?.maxOutputTokens ?? 1200,
     });
     setPreview(null);
-    setPromptsAreDirty(false);
+    hasAdminEditedSystemPromptRef.current = false;
+    hasAdminEditedUserPromptRef.current = false;
     previewMutation.reset();
     setShouldPrepareInitialPreview(true);
     setOpen(true);
-  };
+  }, [disabled, disabledReason, modelConfiguration, previewMutation]);
 
-  const panelJob = modelConfigurationQuery.data?.videoSummaryJob ?? null;
-  const activeJobStatus = jobId ? (job.data?.status ?? "QUEUED") : panelJob?.status;
-  const activeJobCreatedAt = jobId
-    ? (job.data?.createdAt ?? jobQueuedAt)
-    : panelJob?.createdAt;
-  const isGenerating = activeJobStatus === "QUEUED" || activeJobStatus === "RUNNING";
-  const failedJob = activeJobStatus === "FAILED";
+  useEffect(() => {
+    if (generationRequestId === handledGenerationRequestIdRef.current) return;
+    handledGenerationRequestIdRef.current = generationRequestId;
+    openDialog();
+  }, [generationRequestId, openDialog]);
+
   const completedJob =
     summary.data?.aiGenerationId &&
     panelJob?.aiGenerationId === summary.data.aiGenerationId
@@ -269,187 +315,96 @@ export function VideoSummaryDialog({
   const currentSummaryContent = summary.data?.contentJson;
   const hasCurrentBlocksDocument =
     currentSummaryContent?.type === "lesson_summary_blocks" &&
-    currentSummaryContent.version === 5;
-  const editorInitialContent =
-    hasCurrentBlocksDocument || currentSummaryContent?.type === "doc"
-      ? currentSummaryContent
-      : createTextTiptapDocument("");
+    currentSummaryContent.version === 6;
+  const editorInitialContent = useMemo(
+    () =>
+      hasCurrentBlocksDocument || currentSummaryContent?.type === "doc"
+        ? currentSummaryContent
+        : createTextTiptapDocument(""),
+    [currentSummaryContent, hasCurrentBlocksDocument],
+  );
 
   return (
     <>
-      <section className="overflow-hidden rounded-xl border border-[var(--theme-border)] bg-white shadow-sm dark:bg-slate-950">
-        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--theme-border)] bg-[var(--theme-bg-subtle)] px-4 py-3">
-          <span className="inline-flex items-center gap-1 text-sm font-bold text-[var(--theme-text-strong)]">
-            Tổng quan video
-            <button
-              type="button"
-              aria-expanded={!isCollapsed}
-              aria-label={isCollapsed ? "Mở Tổng quan video" : "Thu gọn Tổng quan video"}
-              title={isCollapsed ? "Mở Tổng quan video" : "Thu gọn Tổng quan video"}
-              onClick={() => setIsCollapsed((current) => !current)}
-              className="grid h-8 w-8 place-items-center rounded-lg text-[var(--theme-text-muted)] transition hover:bg-[var(--theme-bg-hover)] hover:text-[var(--theme-text-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-primary)]"
-            >
-              {isCollapsed ? (
-                <ChevronDown className="h-4 w-4" aria-hidden="true" />
-              ) : (
-                <ChevronUp className="h-4 w-4" aria-hidden="true" />
-              )}
-            </button>
-          </span>
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setEditorOpen(true)}
-              className="theme-button-neutral inline-flex min-h-9 items-center gap-2 rounded-lg px-3 text-sm font-bold whitespace-nowrap"
-            >
-              <Pencil className="h-4 w-4" aria-hidden="true" />
-              Chỉnh sửa
-            </button>
-            <button
-              type="button"
-              disabled={disabled || isGenerating}
-              title={disabled ? disabledReason : undefined}
-              onClick={openDialog}
-              className="theme-button-primary-subtle inline-flex min-h-9 items-center gap-2 rounded-lg px-3 text-sm font-bold whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isGenerating ? (
-                <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
-              ) : (
-                <Sparkles className="h-4 w-4" aria-hidden="true" />
-              )}
-              {isGenerating ? "Đang tạo" : "Tóm tắt Video"}
-            </button>
-          </div>
-        </header>
-
-        {!isCollapsed && isGenerating && activeJobCreatedAt ? (
-          <div
-            className="flex items-center gap-2 border-b border-[var(--theme-primary-border)] bg-[var(--theme-primary-soft)] px-4 py-3 text-sm font-bold text-[var(--theme-primary)]"
-            role="status"
-          >
-            <LoaderCircle className="h-4 w-4 shrink-0 animate-spin" aria-hidden="true" />
-            <AiJobTimer
-              createdAt={activeJobCreatedAt}
-              prefix="AI đang tạo tóm tắt ("
-              suffix=")"
-            />
-          </div>
-        ) : null}
-
-        {!isCollapsed && failedJob ? (
-          <div
-            className="flex items-center justify-between gap-3 border-b border-[var(--theme-error-border)] bg-[var(--theme-error-bg)] px-4 py-3 text-sm font-semibold text-[var(--theme-error-text)]"
-            role="alert"
-          >
-            <span className="flex items-center gap-2">
-              <CircleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
-              {job.data?.error ?? panelJob?.error ?? "Chưa thể tạo tóm tắt video."}
-            </span>
-            <button
-              type="button"
-              onClick={openDialog}
-              className="theme-button-neutral min-h-9 rounded-lg px-3 text-sm font-bold whitespace-nowrap"
-            >
-              Thử lại
-            </button>
-          </div>
-        ) : null}
-
-        {!isCollapsed ? (
-          <div className="p-4 text-sm leading-relaxed text-[var(--theme-text)]">
-            {summary.data ? (
-              <>
-                <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--theme-success-text)]">
-                      <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+      {showContent ? (
+        <section data-testid="admin-video-summary-tab">
+          <VideoSummaryEditorDialog
+            displayMode="inline"
+            inlineHeader={
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-lg font-extrabold text-[var(--theme-text-strong)]">
+                    Tổng quan video
+                  </h3>
+                  {summary.data ? (
+                    <span
+                      className={`inline-flex min-h-7 items-center rounded-full border px-2.5 text-xs font-extrabold ${
+                        summary.data.reviewStatus === "APPROVED"
+                          ? "border-[var(--theme-success-border)] bg-[var(--theme-success-bg)] text-[var(--theme-success-text)]"
+                          : summary.data.reviewStatus === "NEEDS_REVIEW"
+                            ? "border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)] text-[var(--theme-warning-text)]"
+                            : "border-[var(--theme-border)] bg-[var(--theme-surface-soft)] text-[var(--theme-text-muted)]"
+                      }`}
+                    >
                       {summary.data.reviewStatus === "APPROVED"
                         ? "Đã phát hành"
                         : summary.data.reviewStatus === "HIDDEN"
                           ? "Đã thu hồi"
                           : "Bản nháp"}
                     </span>
-                    <AiJobMetadata job={completedJob} />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <AdminLessonSummaryPublishActions
-                      compact
-                      figureActionsBlocked={false}
-                      isPending={editMutation.isPending || deleteMutation.isPending}
-                      reviewStatus={summary.data.reviewStatus}
-                      showSaveAction={false}
-                      onSave={(action) =>
-                        editMutation.mutate({
-                          action,
-                          contentJson: summary.data!.contentJson,
-                        })
-                      }
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (window.confirm("Xóa bản tóm tắt video này?")) {
-                          deleteMutation.mutate();
-                        }
-                      }}
-                      disabled={deleteMutation.isPending || editMutation.isPending}
-                      className="theme-button-danger inline-flex min-h-10 items-center gap-1 rounded-lg px-3 text-xs font-bold disabled:opacity-60"
-                    >
-                      <Trash2 className="h-4 w-4" aria-hidden="true" />
-                      Xóa
-                    </button>
-                  </div>
+                  ) : null}
                 </div>
-                {summary.data.contentJson.type === "lesson_summary_blocks" &&
-                summary.data.contentJson.version === 5 &&
-                summary.data.contentJson.data ? (
-                  <SummaryBlockRenderer
-                    className="mt-0"
-                    data={
-                      summary.data.contentJson.data as ComponentProps<
-                        typeof SummaryBlockRenderer
-                      >["data"]
-                    }
-                    objectivesLabel="Các kiến thức sẽ học"
-                    anchorPrefix="video-summary"
-                    onVideoSeek={onVideoSeek}
-                    showTableOfContents
-                    viewMode="UI_ONLY"
-                  />
-                ) : (
-                  <TiptapContentView
-                    content={
-                      summary.data.contentJson.type === "doc"
-                        ? summary.data.contentJson
-                        : undefined
-                    }
-                    contentAlignment="left"
-                  />
-                )}
-              </>
-            ) : (
-              <p className="text-[var(--theme-text-muted)]">Chưa có Tổng quan video.</p>
-            )}
-          </div>
-        ) : null}
-      </section>
+                {summary.data ? <AiJobMetadata job={completedJob} /> : null}
+              </div>
+            }
+            inlineActions={
+              summary.data ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={openDialog}
+                    className="theme-button-primary-subtle inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-extrabold"
+                  >
+                    <Pencil className="h-4 w-4" aria-hidden="true" />
+                    Sửa
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm("Xóa bản tóm tắt video này?")) {
+                        deleteMutation.mutate();
+                      }
+                    }}
+                    disabled={deleteMutation.isPending || editMutation.isPending}
+                    className="theme-button-danger-subtle inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-extrabold disabled:opacity-60"
+                  >
+                    {deleteMutation.isPending ? (
+                      <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    )}
+                    Xóa
+                  </button>
+                </>
+              ) : null
+            }
+            initialContent={editorInitialContent}
+            isOpen
+            isSaving={editMutation.isPending}
+            lessonId={lessonId}
+            reviewStatus={summary.data?.reviewStatus}
+            subjectKey={modelConfigurationQuery.data?.lesson.subjectKey ?? null}
+            onClose={() => undefined}
+            onSave={(action, content) =>
+              editMutation.mutate({ action, contentJson: content })
+            }
+            onVideoSeek={onVideoSeek}
+            videoStartTimeOffsetSeconds={videoStartTimeOffsetSeconds}
+            videoEndTimeSeconds={videoEndTimeSeconds}
+          />
+        </section>
+      ) : null}
 
-      <VideoSummaryEditorDialog
-        initialContent={editorInitialContent}
-        isOpen={editorOpen}
-        isSaving={editMutation.isPending}
-        lessonId={lessonId}
-        reviewStatus={summary.data?.reviewStatus}
-        subjectKey={modelConfigurationQuery.data?.lesson.subjectKey ?? null}
-        onClose={() => setEditorOpen(false)}
-        onSave={(action, content) =>
-          editMutation.mutate({ action, contentJson: content })
-        }
-        onVideoSeek={(seconds) => {
-          setEditorOpen(false);
-          window.requestAnimationFrame(() => onVideoSeek?.(seconds));
-        }}
-      />
       <EditorDialogShell
         isOpen={open}
         onClose={close}
@@ -472,7 +427,6 @@ export function VideoSummaryDialog({
                   value={request.styleInstructions ?? ""}
                   helperText="Chọn một gợi ý để tự động điền, sau đó có thể sửa tùy ý."
                   onChange={(event) => {
-                    setPreview(null);
                     setRequest({
                       ...request,
                       styleInstructions: event.currentTarget.value,
@@ -488,7 +442,6 @@ export function VideoSummaryDialog({
                       key={option.value}
                       type="button"
                       onClick={() => {
-                        setPreview(null);
                         setRequest({
                           ...request,
                           style: option.value as VideoSummaryRequest["style"],
@@ -514,7 +467,6 @@ export function VideoSummaryDialog({
                   options={lengthOptions}
                   icon={null}
                   onChange={(value) => {
-                    setPreview(null);
                     setRequest({
                       ...request,
                       length: value as VideoSummaryRequest["length"],
@@ -529,12 +481,10 @@ export function VideoSummaryDialog({
                   pattern="[0-9]*"
                   value={request.targetWordCount ?? ""}
                   placeholder="Để trống nếu không giới hạn"
-                  helperText="Từ 80 đến 2.000 từ"
                   isOptional
                   icon={null}
                   onChange={(event) => {
                     const value = event.target.value.replace(/\D/g, "");
-                    setPreview(null);
                     setRequest({
                       ...request,
                       targetWordCount: value ? Number(value) : undefined,
@@ -550,7 +500,6 @@ export function VideoSummaryDialog({
                 placeholder="Ví dụ: Dùng câu ngắn, nhấn mạnh công thức, ứng dụng thực tế hoặc lỗi thường gặp"
                 isOptional
                 onChange={(event) => {
-                  setPreview(null);
                   setRequest({ ...request, extraInstructions: event.target.value });
                 }}
               />
@@ -570,7 +519,6 @@ export function VideoSummaryDialog({
                   icon={null}
                   disabled={modelConfigurationQuery.isLoading}
                   onChange={(value) => {
-                    setPreview(null);
                     setRequest({
                       ...request,
                       model: value,
@@ -603,7 +551,6 @@ export function VideoSummaryDialog({
                       ) {
                         return;
                       }
-                      setPreview(null);
                       setRequest({
                         ...request,
                         temperature: value === "" ? undefined : parsed,
@@ -624,7 +571,6 @@ export function VideoSummaryDialog({
                     )}
                     icon={null}
                     onChange={(value) => {
-                      setPreview(null);
                       setRequest({
                         ...request,
                         temperature: undefined,
@@ -646,7 +592,6 @@ export function VideoSummaryDialog({
                   wrapperClassName="sm:col-span-2"
                   onChange={(event) => {
                     const value = event.target.value.replace(/\D/g, "");
-                    setPreview(null);
                     setRequest({
                       ...request,
                       maxOutputTokens: value ? Number(value) : undefined,
@@ -658,14 +603,19 @@ export function VideoSummaryDialog({
 
             <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm font-semibold text-[var(--theme-text-muted)]">
-                {promptsAreDirty
-                  ? "Prompt đã thay đổi. Hãy cập nhật lại dữ liệu trước khi tạo."
-                  : "Xem lại dữ liệu theo các lựa chọn hiện tại."}
+                Xem lại dữ liệu theo các lựa chọn hiện tại.
               </p>
               <button
                 type="button"
                 disabled={previewMutation.isPending || isBusy || !request.model}
-                onClick={() => previewMutation.mutate()}
+                onClick={() =>
+                  previewMutation.mutate(
+                    prepareVideoSummaryPreviewRequest(request, {
+                      preserveSystemPrompt: hasAdminEditedSystemPromptRef.current,
+                      preserveUserPrompt: hasAdminEditedUserPromptRef.current,
+                    }),
+                  )
+                }
                 className="theme-button-primary-subtle inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-extrabold whitespace-nowrap disabled:opacity-60"
               >
                 <RefreshCw
@@ -686,22 +636,28 @@ export function VideoSummaryDialog({
             ) : null}
 
             {preview ? (
-              <VideoSummaryPromptPreview
-                preview={preview}
-                systemInstructions={request.systemInstructions ?? preview.systemPrompt}
-                userPrompt={request.userPrompt ?? preview.userPrompt}
-                onSystemInstructionsChange={(value) => {
-                  setRequest((current) => ({
-                    ...current,
-                    systemInstructions: value,
-                  }));
-                  setPromptsAreDirty(true);
-                }}
-                onUserPromptChange={(value) => {
-                  setRequest((current) => ({ ...current, userPrompt: value }));
-                  setPromptsAreDirty(true);
-                }}
-              />
+              <div
+                className={`relative overflow-hidden transition-opacity duration-200 ${
+                  previewMutation.isPending ? "opacity-50" : ""
+                }`}
+              >
+                <VideoSummaryPromptPreview
+                  preview={preview}
+                  systemInstructions={request.systemInstructions ?? preview.systemPrompt}
+                  userPrompt={request.userPrompt ?? preview.userPrompt}
+                  onSystemInstructionsChange={(value) => {
+                    hasAdminEditedSystemPromptRef.current = value.trim().length > 0;
+                    setRequest((current) => ({
+                      ...current,
+                      systemInstructions: value,
+                    }));
+                  }}
+                  onUserPromptChange={(value) => {
+                    hasAdminEditedUserPromptRef.current = value.trim().length > 0;
+                    setRequest((current) => ({ ...current, userPrompt: value }));
+                  }}
+                />
+              </div>
             ) : null}
             {previewMutation.isError ? (
               <div
@@ -726,8 +682,8 @@ export function VideoSummaryDialog({
             </button>
             <button
               type="button"
-              onClick={() => generateMutation.mutate()}
-              disabled={isBusy || isGenerating || !preview || promptsAreDirty}
+              onClick={() => generateMutation.mutate(request)}
+              disabled={isBusy || isGenerating || !request.model}
               className="theme-button-primary inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-5 text-sm font-extrabold whitespace-nowrap disabled:opacity-60 sm:w-auto"
             >
               {generateMutation.isPending ? (
@@ -735,7 +691,11 @@ export function VideoSummaryDialog({
               ) : (
                 <Sparkles className="h-4 w-4" aria-hidden="true" />
               )}
-              {generateMutation.isPending ? "Đang gửi yêu cầu" : "Bắt đầu tạo"}
+              {isPreparingSubmission
+                ? "Đang cập nhật dữ liệu"
+                : generateMutation.isPending
+                  ? "Đang gửi yêu cầu"
+                  : "Bắt đầu tạo"}
             </button>
           </footer>
         </div>

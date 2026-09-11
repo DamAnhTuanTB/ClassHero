@@ -1,6 +1,10 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { normalizeMissingInlineMathClosers } from "@learning-path/shared";
+import {
+  hasMalformedMathText,
+  normalizeMathTextLatexEnvironments,
+  normalizeMissingInlineMathClosers,
+} from "@learning-path/shared";
 import { Difficulty, QuestionType } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 
@@ -28,7 +32,10 @@ import {
   quizExplanationBlockSchema,
   quizFigureDecisionSchema,
 } from "#api/modules/quiz/types/quiz-generation.types";
-import { mapGeneratedQuizQuestion } from "#api/modules/quiz/utils/quiz-generation-mapper";
+import {
+  mapGeneratedQuizQuestion,
+  normalizeQuizLearnerText,
+} from "#api/modules/quiz/utils/quiz-generation-mapper";
 import {
   normalizeGeneratedQuizQuestionContent,
   normalizeQuizConclusionParagraph,
@@ -36,7 +43,6 @@ import {
 } from "#api/modules/quiz/utils/quiz-generation-content-normalizer";
 import {
   normalizeGeneratedQuizQuestionLatex,
-  normalizeQuizDisplayMathEnvironments,
   normalizeQuizInlineMathDelimiters,
 } from "#api/modules/quiz/utils/quiz-generation-math-normalizer";
 import {
@@ -838,6 +844,72 @@ describe("M9.3 Quiz-owned generation core", () => {
     expect(mapped).not.toHaveProperty("exampleBlock");
   });
 
+  it("removes the measurement prefix when normalizing three-point angle notation", () => {
+    const mapped = mapGeneratedQuizQuestion({
+      questionType: QuestionType.TRUE_FALSE,
+      difficulty: Difficulty.EASY,
+      hint: String.raw`Xét $m\angle DAB$.`,
+      explanation: {
+        problem: String.raw`Biết $m\angle DAB=70^\circ$.`,
+        solution: String.raw`Vậy $m\widehat{DAB}=70^\circ$.`,
+        isGeometry: true,
+      },
+      figure: {
+        requiresQuestionFigure: false,
+        solutionFigure: false,
+      },
+      correctAnswer: true,
+    });
+
+    expect(mapped.explanationBlock.problem).toBe(
+      String.raw`Biết $\widehat{DAB}=70^\circ$.`,
+    );
+    expect(mapped.explanationBlock.solution).toBe(
+      String.raw`Vậy $\widehat{DAB}=70^\circ$.`,
+    );
+    expect(JSON.stringify(mapped.hintJson)).not.toContain("m\\\\widehat");
+  });
+
+  it("normalizes recoverable math syntax and reports only remaining defects as warnings", () => {
+    expect(normalizeQuizLearnerText(String.raw`Biết $m\angle ABC=70^\circ$.`)).toBe(
+      String.raw`Biết $\widehat{ABC}=70^\circ$.`,
+    );
+
+    const mapped = mapGeneratedQuizQuestion({
+      questionType: QuestionType.TRUE_FALSE,
+      difficulty: Difficulty.EASY,
+      hint: "Xét biểu thức.",
+      explanation: {
+        problem: String.raw`Biểu thức $x_{1$ có hợp lệ không?`,
+        solution: "Ngoặc nhọn chưa cân bằng.\n\nVì vậy, mệnh đề sai.",
+        isGeometry: false,
+      },
+      figure: { requiresQuestionFigure: false, solutionFigure: false },
+      correctAnswer: false,
+    });
+
+    expect(mapped.recoveryIssues).toEqual([
+      expect.objectContaining({
+        code: "MALFORMED_LATEX",
+        blocking: false,
+        technicalDetails: "paths=explanation.problem",
+      }),
+    ]);
+  });
+
+  it("detects only deterministic delimiter, brace, environment and control defects", () => {
+    expect(
+      hasMalformedMathText(String.raw`$$\begin{aligned}x&=1\\y&=2\end{aligned}$$`),
+    ).toBe(false);
+    expect(hasMalformedMathText(String.raw`$x_{1$`)).toBe(true);
+    expect(hasMalformedMathText(String.raw`$$\begin{aligned}x&=1\end{split}$$`)).toBe(
+      true,
+    );
+    expect(hasMalformedMathText("Code `\\\\begin{aligned}`")).toBe(false);
+    expect(hasMalformedMathText(String.raw`Văn bản\)`)).toBe(true);
+    expect(hasMalformedMathText(`$x${String.fromCharCode(1)}$`)).toBe(true);
+  });
+
   it("maps each multi-statement solution into a separate labeled paragraph", () => {
     const mapped = mapGeneratedQuizQuestion({
       questionType: QuestionType.MULTI_STATEMENT_TRUE_FALSE,
@@ -891,6 +963,15 @@ describe("M9.3 Quiz-owned generation core", () => {
 
     expect(normalized).toBe("Giá trị này không bằng 11.\n\nVậy câu b) sai.");
     expect(normalizeQuizConclusionParagraph(normalized)).toBe(normalized);
+    expect(normalizeQuizConclusionParagraph("Lập luận đúng. Vì vậy, kết quả là 4.")).toBe(
+      "Lập luận đúng.\n\nVì vậy, kết quả là 4.",
+    );
+    expect(normalizeQuizConclusionParagraph("Lập luận đúng. Do đó, kết quả là 4.")).toBe(
+      "Lập luận đúng.\n\nDo đó, kết quả là 4.",
+    );
+    expect(normalizeQuizConclusionParagraph("Lập luận đúng. Suy ra kết quả là 4.")).toBe(
+      "Lập luận đúng.\n\nSuy ra kết quả là 4.",
+    );
     expect(normalizeQuizConclusionParagraph("Vậy câu b) sai.")).toBe("Vậy câu b) sai.");
     expect(
       normalizeQuizConclusionParagraph(
@@ -1178,7 +1259,7 @@ describe("M9.3 Quiz-owned generation core", () => {
     expect(request.systemPrompt).toContain("không giải lại riêng cho từng dữ kiện");
     expect(request.systemPrompt).toContain("Không tạo pool ứng viên lớn");
     expect(request.promptVersion).toBe("quiz-math-v89-semantic-review-only");
-    expect(request.schemaVersion).toBe("quiz-pdf-figure-schema-v38-compact-descriptions");
+    expect(request.schemaVersion).toBe("quiz-pdf-figure-schema-v39-math-syntax-contract");
     expect(request.promptVersion).toBe(QUIZ_PROMPT_VERSIONS.MATH);
     expect(request.schemaVersion).toBe(QUIZ_SCHEMA_VERSION);
     expect(request.systemPrompt).toContain(QUIZ_EQUALITY_CHAIN_LAYOUT_POLICY);
@@ -2958,25 +3039,25 @@ describe("M9.3 Quiz-owned generation core", () => {
   it("auto-closes missing LaTeX environments before the display delimiter", () => {
     const malformed = String.raw`Ta có:
 $$\begin{aligned}V&=\pi\int_3^5(25-x^2)\,dx\\&=\frac{52\pi}{3}.$$`;
-    const normalized = normalizeQuizDisplayMathEnvironments(malformed);
+    const normalized = normalizeMathTextLatexEnvironments(malformed);
 
     expect(normalized).toBe(String.raw`Ta có:
 $$\begin{aligned}V&=\pi\int_3^5(25-x^2)\,dx\\&=\frac{52\pi}{3}.\end{aligned}$$`);
-    expect(normalizeQuizDisplayMathEnvironments(normalized)).toBe(normalized);
+    expect(normalizeMathTextLatexEnvironments(normalized)).toBe(normalized);
   });
 
   it("repairs misplaced, nested and orphan LaTeX environment closers without throwing", () => {
     expect(
-      normalizeQuizDisplayMathEnvironments(
+      normalizeMathTextLatexEnvironments(
         String.raw`$$\begin{aligned}x&=1$$\end{aligned}$$`,
       ),
     ).toBe(String.raw`$$\begin{aligned}x&=1\end{aligned}$$`);
     expect(
-      normalizeQuizDisplayMathEnvironments(
+      normalizeMathTextLatexEnvironments(
         String.raw`$$\begin{aligned}\begin{cases}x=1\end{aligned}$$`,
       ),
     ).toBe(String.raw`$$\begin{aligned}\begin{cases}x=1\end{cases}\end{aligned}$$`);
-    expect(normalizeQuizDisplayMathEnvironments(String.raw`$$x=1\end{aligned}$$`)).toBe(
+    expect(normalizeMathTextLatexEnvironments(String.raw`$$x=1\end{aligned}$$`)).toBe(
       String.raw`$$x=1$$`,
     );
   });

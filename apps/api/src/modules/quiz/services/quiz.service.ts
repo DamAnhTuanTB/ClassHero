@@ -214,6 +214,7 @@ export class QuizService {
           lessonId,
           title: dto.title,
           source: ContentSource.ADMIN,
+          reviewStatus: ReviewStatus.DRAFT,
           sortOrder: (lastSet?.sortOrder ?? -1) + 1,
           createdById: userId,
           updatedById: userId,
@@ -456,7 +457,7 @@ export class QuizService {
           correctAnswerJson: toInputJson(dto.correctAnswerJson),
           hintJson: toNullableInputJson(dto.hintJson),
           gradingConfigJson: Prisma.DbNull,
-          reviewStatus: ReviewStatus.APPROVED,
+          reviewStatus: ReviewStatus.NEEDS_REVIEW,
           sortOrder: (lastQuestion?.sortOrder ?? -1) + 1,
         },
       });
@@ -467,6 +468,7 @@ export class QuizService {
         lessonId: set.lessonId,
         questionId: question.id,
         targetType: "QUIZ_QUESTION",
+        reviewStatus: ReviewStatus.NEEDS_REVIEW,
       });
 
       if (explanationId) {

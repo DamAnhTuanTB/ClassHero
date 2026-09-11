@@ -133,6 +133,8 @@ describe("M6.3 flashcard CRUD integration", () => {
     );
     primarySetId = primary.id;
     hiddenSetId = hidden.id;
+    expect(primary.reviewStatus).toBe(ReviewStatus.DRAFT);
+    expect(hidden.reviewStatus).toBe(ReviewStatus.DRAFT);
 
     await service.reviewSet(
       hiddenSetId,
@@ -176,6 +178,7 @@ describe("M6.3 flashcard CRUD integration", () => {
 
     expect(card.lessonId).toBe(lessonId);
     expect(card.flashcardSetId).toBe(primarySetId);
+    expect(card.reviewStatus).toBe(ReviewStatus.NEEDS_REVIEW);
 
     const cards = await service.listCardsBySet(primarySetId);
     expect(cards).toHaveLength(1);
@@ -219,11 +222,15 @@ describe("M6.3 flashcard CRUD integration", () => {
     );
     expect(restored.publishedAt).toBeNull();
 
-    const beforePublish = await service.listStudentSetsByLesson(
-      lessonId,
-      studentUserId,
+    const beforePublish = await service.listStudentSetsByLesson(lessonId, studentUserId);
+    expect(beforePublish).toEqual([]);
+
+    await service.reviewCard(
+      cardId,
+      actorUserId,
+      { reviewStatus: ReviewStatus.APPROVED },
+      context,
     );
-    expect(beforePublish[0]?.flashcards).toHaveLength(0);
 
     await service.reviewSet(
       primarySetId,
@@ -236,6 +243,31 @@ describe("M6.3 flashcard CRUD integration", () => {
       select: { publishedAt: true },
     });
     expect(publishedCard.publishedAt).toBeInstanceOf(Date);
+
+    await service.reviewCard(
+      cardId,
+      actorUserId,
+      { reviewStatus: ReviewStatus.NEEDS_REVIEW },
+      context,
+    );
+    await expect(
+      prisma.flashcard.findUniqueOrThrow({ where: { id: cardId } }),
+    ).resolves.toMatchObject({
+      publishedAt: null,
+      reviewStatus: ReviewStatus.NEEDS_REVIEW,
+    });
+    await service.reviewCard(
+      cardId,
+      actorUserId,
+      { reviewStatus: ReviewStatus.APPROVED },
+      context,
+    );
+    await service.reviewSet(
+      primarySetId,
+      actorUserId,
+      { action: "SAVE", reviewStatus: ReviewStatus.APPROVED },
+      context,
+    );
 
     const set = (await service.listAdminSetsByLesson(lessonId)).find(
       (item) => item.id === primarySetId,

@@ -181,7 +181,7 @@ export class FlashcardsService {
           title,
           difficulty: input.difficulty ?? Difficulty.MIXED,
           source: ContentSource.ADMIN,
-          reviewStatus: ReviewStatus.APPROVED,
+          reviewStatus: ReviewStatus.DRAFT,
           sortOrder: (lastSet?.sortOrder ?? -1) + 1,
           createdById: actorUserId,
           updatedById: actorUserId,
@@ -466,7 +466,7 @@ export class FlashcardsService {
               ? toFlashcardInputJson(input.solutionJson)
               : Prisma.JsonNull,
           difficulty: normalizeCardDifficulty(input.difficulty),
-          reviewStatus: ReviewStatus.APPROVED,
+          reviewStatus: ReviewStatus.NEEDS_REVIEW,
           sortOrder: input.sortOrder ?? (lastCard?.sortOrder ?? -1) + 1,
         },
         select: { id: true },

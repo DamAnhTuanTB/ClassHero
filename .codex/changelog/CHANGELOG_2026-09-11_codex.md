@@ -1,0 +1,1 @@
+- 2026-09-11: Enhanced AI learning-content normalization and review, completed admin/student Video Summary delivery with playback progress, refined lesson UI states, and aligned related contracts, migrations, documentation, and tests.

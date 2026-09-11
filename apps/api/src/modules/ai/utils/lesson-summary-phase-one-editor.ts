@@ -27,7 +27,7 @@ export type LessonSummaryPhaseOneLayoutOperation =
 
 export type LessonSummaryPhaseOneSnapshot = {
   type: "lesson_summary_phase_one_blocks";
-  version: 2;
+  version: 3;
   providerOutput: Record<string, unknown>;
   blocks: Record<string, unknown>;
   providerPaths: Record<string, string>;
@@ -41,7 +41,7 @@ export function readLessonSummaryPhaseOneSnapshot(
   value: unknown,
 ): LessonSummaryPhaseOneSnapshot | null {
   if (!isRecord(value)) return null;
-  if (value.type !== "lesson_summary_phase_one_blocks" || value.version !== 2) {
+  if (value.type !== "lesson_summary_phase_one_blocks" || value.version !== 3) {
     return null;
   }
   if (!isRecord(value.providerOutput) || !isRecord(value.blocks)) return null;

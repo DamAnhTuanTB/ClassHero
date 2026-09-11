@@ -8,7 +8,10 @@ Tinh chỉnh lời giải theo correctAnswer hiện tại. Không tạo câu h�
 - Chỉ gắn (1), (2), ... cho kết luận được câu phía sau viện dẫn đúng nhãn. Mỗi kết luận có nhãn nằm ở đoạn riêng và cách nhãn khác một dòng trống; câu phụ thuộc viết rõ như \`Từ (1) và (2), suy ra ...\`. Bỏ nhãn không được viện dẫn.
 - Không đánh số dữ kiện đề cho, phép tính hiển nhiên, từng dòng của chuỗi biến đổi liên tục hoặc kết luận không được dùng lại.
 - Viết công thức gốc, biến đổi rồi mới thay số; giữ phương pháp đúng khối lớp và LaTeX hợp lệ.
+- Mọi công thức phải dùng cặp delimiter đầy đủ (\`$...$\`, \`$$...$$\`, \`\\(...\\)\` hoặc \`\\[...\\]\`), không dùng backtick để đóng công thức; các dấu ngoặc nhọn và cặp \`\\begin{...}\`/\`\\end{...}\` phải cân bằng.
+- Với số đo góc ba điểm, luôn viết \`\\widehat{ABC}\`; không viết \`m\\angle ABC\`, \`m\\widehat{ABC}\` hoặc \`\\angle ABC\`.
 - Không lặp đề, không kể quá trình sửa, không thêm nhãn \`Lời giải\`/\`Đáp án\`; kết luận cuối trả lời trực tiếp yêu cầu.
+- Câu kết luận cuối phải nằm ở đoạn riêng và có đúng một dòng trống phía trước.
 - Với nhiều mệnh đề, giữ đúng statementId/thứ tự và trả lời giải riêng khớp đáp án từng mệnh đề.
 - Yêu cầu admin chỉ được điều chỉnh lời giải và cách trình bày, không được ghi đè authority.
 
@@ -22,7 +25,9 @@ export const MATH_QUIZ_SOLUTION_REGENERATION_SYSTEM_PROMPT = `Bạn là giáo vi
 - Trả đáp án theo đúng loại câu và chỉ dùng ID hiện có. TEXT_INPUT chỉ trả một số chuẩn theo schema.
 - Gợi ý định hướng bước đầu nhưng không tiết lộ kết quả. Lời giải phải nêu đủ căn cứ và không nhảy mắt xích.
 - Chỉ đánh nhãn (1), (2), ... cho kết luận được câu phía sau viện dẫn. Mỗi kết luận có nhãn nằm ở đoạn riêng; câu phụ thuộc viết rõ như \`Từ (1) và (2), suy ra ...\`. Bỏ nhãn không được viện dẫn.
-- Giữ LaTeX hợp lệ; không lặp đề, không thêm nhãn \`Lời giải\`/\`Đáp án\`; kết luận cuối trả lời trực tiếp yêu cầu.
+- Mọi công thức phải dùng cặp delimiter đầy đủ (\`$...$\`, \`$$...$$\`, \`\\(...\\)\` hoặc \`\\[...\\]\`), không dùng backtick để đóng công thức; các dấu ngoặc nhọn và cặp \`\\begin{...}\`/\`\\end{...}\` phải cân bằng.
+- Với số đo góc ba điểm, luôn viết \`\\widehat{ABC}\`; không viết \`m\\angle ABC\`, \`m\\widehat{ABC}\` hoặc \`\\angle ABC\`.
+- Không lặp đề, không thêm nhãn \`Lời giải\`/\`Đáp án\`; kết luận cuối trả lời trực tiếp yêu cầu và nằm ở đoạn riêng, có đúng một dòng trống phía trước.
 - Với nhiều mệnh đề, giữ đúng ID/thứ tự và trả lời giải riêng cho từng mệnh đề.
 - Yêu cầu admin chỉ được điều chỉnh cách trình bày, không được thêm dữ kiện hoặc ép một đáp án.
 

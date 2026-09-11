@@ -15,10 +15,10 @@ graph, milestone contract, lịch sử triển khai hoặc log kiểm tra.
 
 ## Hướng đang hoạt động
 
-- `M15.9` — Admin tạo Video Summary bằng AI — đang có implementation chưa commit.
-- Plan chi tiết: `.codex/plans/m15-9-admin-video-summary-ai-plan.md`.
-- Dependency chính: `M3.8`, `M4.3`, `M9.1`, `M9.9-M9.12`, `M9.20`, `M9.32`.
-- Hoàn tất feedback/check còn lại của `M15.9` trước khi chọn subtask mới; không
+- `M15.10` — Student xem Video Summary đã phát hành — đang hoàn thiện chế độ xem
+  toàn bộ/từng phần đồng bộ theo playback time; implementation chưa commit.
+- Dependency chính: `M9.7`, `M6.5`, `M7.1`; không phụ thuộc tracking `M15.1`.
+- Hoàn tất feedback/check còn lại của `M15.10` trước khi chọn subtask mới; không
   dùng snapshot lịch sử M0/M9 cũ để thay roadmap hiện hành.
 
 ## Cách cập nhật

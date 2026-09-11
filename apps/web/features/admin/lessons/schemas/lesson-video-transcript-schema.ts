@@ -4,11 +4,14 @@ export const transcriptTimestampPattern = /^(?:(?:\d+):)?(?:[0-5]?\d):(?:[0-5]\d
 
 export const transcriptSegmentSchema = z.object({
   endTime: z.number().nonnegative().optional(),
-  time: z.number().nonnegative().optional(),
-  timeString: z
+  sourceEndTime: z.number().nonnegative().optional(),
+  sourceTime: z.number().nonnegative().optional(),
+  sourceTimeString: z
     .string()
-    .min(1, "Vui lòng nhập thời gian")
+    .min(1, "Vui lòng nhập thời gian gốc")
     .regex(transcriptTimestampPattern, "Dùng định dạng MM:SS hoặc H:MM:SS"),
+  time: z.number().nonnegative().optional(),
+  timeString: z.string(),
   text: z
     .string()
     .trim()

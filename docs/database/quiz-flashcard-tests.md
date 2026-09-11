@@ -13,7 +13,7 @@ id uuid pk
 lesson_id uuid fk lessons.id
 title string
 source ContentSource default ADMIN
-review_status ReviewStatus default APPROVED
+review_status ReviewStatus default DRAFT
 is_reserve boolean default false
 generated_by_user_id uuid? fk users.id
 ai_generation_id uuid? fk ai_generations.id
@@ -29,6 +29,8 @@ deleted_at timestamp?
 Rules:
 
 - Bộ AI tạo do học sinh yêu cầu có `source = AI`, `review_status = NEEDS_REVIEW`, `is_reserve = true`.
+- Bộ do admin tạo mới bắt đầu ở `DRAFT`; chỉ action `PUBLISH` mới chuyển bộ sang
+  `APPROVED`.
 - Học sinh chỉ nhận bộ khi chính bộ đã được admin phát hành
   (`review_status = APPROVED`) và không dùng bộ reserve trực tiếp.
 - Action admin xóa cả Quiz set dùng hard delete. Service phải xóa
@@ -52,7 +54,7 @@ hint_json jsonb?
 grading_config_json jsonb?
 source_metadata_json jsonb?
 difficulty Difficulty default MEDIUM
-review_status ReviewStatus default APPROVED
+review_status ReviewStatus default NEEDS_REVIEW
 published_at timestamp?
 explanation_id uuid? fk ai_explanations.id
 sort_order int default 0
@@ -111,6 +113,9 @@ Rules:
 - Lời giải chi tiết do admin nhập tái sử dụng `ai_explanations`: `target_type=QUIZ_QUESTION`, `target_id=quiz_questions.id`, `source=ADMIN`, `review_status=APPROVED`; `quiz_questions.explanation_id` trỏ tới bản ghi này.
 - Khi admin sửa nội dung/correct answer/hint, service phải mark explanation stale hoặc xóa `explanation_id` theo AI/RAG spec.
 - `published_at` là watermark phát hành của từng câu, không phải snapshot JSON.
+- Câu do admin tạo thủ công bắt đầu ở `NEEDS_REVIEW`. Admin có thể duyệt sang
+  `APPROVED` hoặc hủy duyệt về `NEEDS_REVIEW`; cả hai lần chuyển đều giữ
+  `published_at=null` cho đến action `SAVE`/`PUBLISH` tiếp theo của bộ.
   Câu mới tạo, vừa sửa hoặc vừa duyệt có giá trị `null`; action `SAVE`/`PUBLISH`
   của bộ đóng dấu cho mọi câu `APPROVED` hiện tại. Student luôn lọc cả
   `review_status=APPROVED` và `published_at IS NOT NULL`.
@@ -225,7 +230,7 @@ lesson_id uuid fk lessons.id
 title string
 difficulty Difficulty default MIXED
 source ContentSource default ADMIN
-review_status ReviewStatus default APPROVED
+review_status ReviewStatus default DRAFT
 is_reserve boolean default false
 generated_by_user_id uuid? fk users.id
 ai_generation_id uuid? fk ai_generations.id
@@ -237,6 +242,9 @@ created_at timestamp
 updated_at timestamp
 deleted_at timestamp?
 ```
+
+- Bộ Flashcard do admin tạo mới bắt đầu ở `DRAFT`; chỉ action `PUBLISH` mới
+  chuyển bộ sang `APPROVED`.
 
 ### 8.2. `flashcards`
 
@@ -250,7 +258,7 @@ solution_json jsonb?
 hint_json jsonb?
 source_metadata_json jsonb?
 difficulty Difficulty default MEDIUM
-review_status ReviewStatus default APPROVED
+review_status ReviewStatus default NEEDS_REVIEW
 published_at timestamp?
 sort_order int default 0
 created_at timestamp
@@ -273,6 +281,8 @@ Rules:
   `published_at=null`; `SAVE`/`PUBLISH` gắn mốc cho card `APPROVED`, còn student
   chỉ đọc card `APPROVED` có watermark. `WITHDRAW` ẩn set nhưng không phá mốc để
   lần phát hành sau giữ được lịch sử ổn định.
+- Card do admin tạo thủ công bắt đầu ở `NEEDS_REVIEW`; action hủy duyệt đưa card
+  `APPROVED` về `NEEDS_REVIEW` và thu hồi watermark của riêng card.
 - Index `(flashcard_set_id, published_at)` phục vụ student selector và thống kê
   card đã duyệt nhưng chưa lưu.
 
@@ -423,7 +433,7 @@ duration_seconds int
 difficulty Difficulty default MIXED
 difficulty_ratio_json jsonb?
 source ContentSource default ADMIN
-review_status ReviewStatus default APPROVED
+review_status ReviewStatus default DRAFT
 is_reserve boolean default false
 generated_by_user_id uuid? fk users.id
 ai_generation_id uuid? fk ai_generations.id
@@ -439,6 +449,8 @@ deleted_at timestamp?
 
 Rules M6.6:
 
+- Bộ Test do admin tạo mới bắt đầu ở `DRAFT`; chỉ action `PUBLISH` mới chuyển bộ
+  sang `APPROVED`.
 - `duration_seconds` là cấu hình duy nhất khác Quiz trong Admin. Nó chỉ được
   ghi bởi create/update TestSet, luôn được server validate `60..14400`; không
   nhận từ AI generation/prompt request và không được prompt/output AI sở hữu.
@@ -464,7 +476,7 @@ grading_config_json jsonb?
 source_metadata_json jsonb?
 points numeric?
 difficulty Difficulty default MEDIUM
-review_status ReviewStatus default APPROVED
+review_status ReviewStatus default NEEDS_REVIEW
 published_at timestamp?
 explanation_id uuid? fk ai_explanations.id
 sort_order int default 0
@@ -478,6 +490,8 @@ Rules:
 - Nếu `points` null, service tính điểm bằng nhau để tổng là 10.
 - `published_at` là watermark phát hành dùng chung với Quiz. Câu mới/sửa/duyệt
   có `published_at=null`; chỉ `SAVE`/`PUBLISH` gắn mốc cho câu `APPROVED`.
+- Câu Test do admin tạo thủ công bắt đầu ở `NEEDS_REVIEW`; action hủy duyệt đưa
+  câu `APPROVED` về `NEEDS_REVIEW` và thu hồi watermark của riêng câu.
   Student chỉ đọc câu `APPROVED` đã có watermark. Index
   `(test_set_id, published_at)` phục vụ selector và thống kê chưa lưu.
 - Item AI lưu `source_metadata_json` cùng shape provenance với quiz question.

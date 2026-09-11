@@ -58,9 +58,8 @@ export function FlashcardSetTabs({
       {sets.map((set, setIndex) => {
         const isActive = set.id === activeSetId;
         const loadedCounts = countsBySetId[set.id];
-        const approvedCount = loadedCounts?.approved;
-        const pendingCount =
-          loadedCounts?.pending ?? set.pendingReviewCardCount ?? 0;
+        const totalCardCount = loadedCounts?.total ?? set.cardCount;
+        const isPublished = set.reviewStatus === "APPROVED";
         return (
           <button
             key={set.id}
@@ -73,28 +72,24 @@ export function FlashcardSetTabs({
             onClick={() => onSelect(set.id)}
             onKeyDown={(event) => handleKeyDown(event, setIndex)}
             className={cn(
-              "relative inline-flex min-h-16 shrink-0 flex-col items-start justify-center gap-1 whitespace-nowrap rounded-t-xl border border-b-0 px-4 text-sm font-extrabold transition",
+              "relative inline-flex min-h-16 shrink-0 flex-col items-center justify-center gap-1 whitespace-nowrap rounded-t-xl border border-b-0 px-4 text-center text-sm font-extrabold transition",
               isActive
                 ? "border-[var(--theme-primary)] bg-[var(--theme-bg)] text-[var(--theme-primary)]"
                 : "border-transparent text-[var(--theme-text-muted)] hover:bg-[var(--theme-surface-soft)] hover:text-[var(--theme-text-strong)]",
             )}
           >
             <span>{set.title}</span>
-            <span className="flex items-center gap-1.5 text-[10px] font-black leading-none">
-              {approvedCount === undefined ? (
-                <span className="rounded-full bg-[var(--theme-primary-subtle)] px-2 py-1 text-[var(--theme-primary)]">
-                  {set.cardCount} thẻ
-                </span>
-              ) : (
-                <span className="rounded-full bg-emerald-100 px-2 py-1 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-                  {approvedCount} đã duyệt
-                </span>
+            <span
+              className={cn(
+                "rounded-full px-2 py-1 text-[10px] font-black leading-none",
+                isPublished
+                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                  : "bg-[var(--theme-surface-soft)] text-[var(--theme-text-muted)]",
               )}
-              {pendingCount > 0 ? (
-                <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-                  {pendingCount} chờ duyệt
-                </span>
-              ) : null}
+            >
+              {isPublished
+                ? `Đã phát hành - ${totalCardCount} flashcard`
+                : "Chưa phát hành"}
             </span>
             {isActive ? (
               <span className="absolute inset-x-0 -bottom-px h-0.5 bg-[var(--theme-primary)]" />

@@ -25,12 +25,15 @@ export function getLessonSummarySectionAnchorId(
   sectionIndex: number,
   anchorPrefix?: string,
 ) {
-  return anchorPrefix ? `${anchorPrefix}-section-${sectionIndex}` : `section-${sectionIndex}`;
+  return anchorPrefix
+    ? `${anchorPrefix}-section-${sectionIndex}`
+    : `section-${sectionIndex}`;
 }
 
 export function LessonSummaryTableOfContents({
   accentTrigger = false,
   desktopBorderless = false,
+  alwaysShowLabel = false,
   hasObjectives,
   sections,
   customItems,
@@ -38,19 +41,44 @@ export function LessonSummaryTableOfContents({
   buttonClassName,
   onSectionClick,
   onCustomItemClick,
-  objectivesLabel = "Mục tiêu học tập",
+  objectivesLabel = "Kiến thức sách giáo khoa",
+  sectionLabel = "Lý thuyết",
+  customItemsLabel = "Bài tập",
+  navigationTabs,
+  activeNavigationTab,
+  onNavigationTabChange,
   anchorPrefix,
 }: {
   accentTrigger?: boolean;
   desktopBorderless?: boolean;
+  alwaysShowLabel?: boolean;
   hasObjectives: boolean;
-  sections?: Array<{ displayHeading: string; order: number }>;
+  sections?: Array<{
+    displayHeading: string;
+    order: number;
+    startSeconds?: number;
+    blocks?: Array<{ startSeconds?: number }>;
+  }>;
   customItems?: Array<{ title: string; anchorId: string; order?: number }>;
   title?: string;
   buttonClassName?: string;
-  onSectionClick?: (anchorId: string) => void;
+  onSectionClick?: (
+    anchorId: string,
+    section?: {
+      displayHeading: string;
+      order: number;
+      startSeconds?: number;
+      blocks?: Array<{ startSeconds?: number }>;
+    },
+    sectionIndex?: number,
+  ) => void;
   onCustomItemClick?: (anchorId: string) => void;
   objectivesLabel?: string;
+  sectionLabel?: string;
+  customItemsLabel?: string;
+  navigationTabs?: ReadonlyArray<{ id: string; label: string }>;
+  activeNavigationTab?: string;
+  onNavigationTabChange?: (tabId: string) => void;
   anchorPrefix?: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -101,7 +129,7 @@ export function LessonSummaryTableOfContents({
           isOpen || accentTrigger
             ? "bg-amber-100 text-amber-800 dark:bg-amber-500/25 dark:text-amber-200"
             : "bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50 dark:hover:text-amber-300",
-          buttonClassName
+          buttonClassName,
         )}
         onClick={() => setIsOpen((open) => !open)}
         title="Mục lục"
@@ -111,7 +139,7 @@ export function LessonSummaryTableOfContents({
           className="h-3.5 w-3.5 shrink-0 transition-transform group-hover:scale-110"
           aria-hidden="true"
         />
-        <span className="hidden md:inline">{title}</span>
+        <span className={alwaysShowLabel ? "inline" : "hidden md:inline"}>{title}</span>
       </button>
 
       {isOpen ? (
@@ -150,13 +178,42 @@ export function LessonSummaryTableOfContents({
               </button>
             ) : null}
           </div>
+          {navigationTabs?.length ? (
+            <div
+              aria-label="Chọn loại nội dung trong mục lục"
+              className="mx-2 mt-2 grid grid-cols-3 gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-800/70"
+              role="tablist"
+            >
+              {navigationTabs.map((tab) => {
+                const isActive = tab.id === activeNavigationTab;
+                return (
+                  <button
+                    key={tab.id}
+                    aria-selected={isActive}
+                    className={cn(
+                      "min-w-0 truncate rounded-lg px-2 py-2 text-xs font-extrabold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500",
+                      isActive
+                        ? "bg-white text-sky-700 shadow-sm dark:bg-slate-700 dark:text-sky-300"
+                        : "text-slate-500 hover:bg-white/70 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-700/70 dark:hover:text-slate-200",
+                    )}
+                    onClick={() => onNavigationTabChange?.(tab.id)}
+                    role="tab"
+                    type="button"
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
           <nav
             aria-label="Đi đến phần trong bài học"
             className="max-h-[min(60vh,28rem)] space-y-1 overflow-y-auto p-2"
           >
-            {hasObjectives || (sections && sections.length > 0) ? (
+            {!navigationTabs?.length &&
+            (hasObjectives || (sections && sections.length > 0)) ? (
               <div className="mb-1 px-3 text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                Lý thuyết
+                {sectionLabel}
               </div>
             ) : null}
 
@@ -179,13 +236,14 @@ export function LessonSummaryTableOfContents({
                       : "bg-[var(--theme-primary-soft)] text-[var(--theme-primary)]"
                   }`}
                 >
-                  <ListTree className="h-4 w-4" />
+                  <BookOpen className="h-4 w-4" aria-hidden="true" />
                 </span>
                 <span>{objectivesLabel}</span>
               </button>
             ) : null}
 
-            {sections && sections.length > 0 && (
+            {sections &&
+              sections.length > 0 &&
               sections.map((section, index) => {
                 const accentClass =
                   SECTION_ACCENT_CLASSES[index % SECTION_ACCENT_CLASSES.length] ??
@@ -197,7 +255,7 @@ export function LessonSummaryTableOfContents({
                     className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-bold text-[var(--theme-text)] transition hover:bg-[var(--theme-primary-soft)] hover:text-[var(--theme-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-primary)]"
                     onClick={() => {
                       setIsOpen(false);
-                      if (onSectionClick) onSectionClick(anchorId);
+                      if (onSectionClick) onSectionClick(anchorId, section, index);
                       else scrollToAnchor(anchorId);
                     }}
                     title={section.displayHeading}
@@ -221,14 +279,15 @@ export function LessonSummaryTableOfContents({
                     </span>
                   </button>
                 );
-              })
-            )}
+              })}
 
             {customItems && customItems.length > 0 && (
               <>
-                <div className="mb-1 mt-3 px-3 text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                  Bài tập
-                </div>
+                {!navigationTabs?.length ? (
+                  <div className="mb-1 mt-3 px-3 text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                    {customItemsLabel}
+                  </div>
+                ) : null}
                 {customItems.map((item, index) => {
                   const accentClass =
                     SECTION_ACCENT_CLASSES[index % SECTION_ACCENT_CLASSES.length] ??
@@ -267,6 +326,14 @@ export function LessonSummaryTableOfContents({
                 })}
               </>
             )}
+
+            {!hasObjectives &&
+            (!sections || sections.length === 0) &&
+            (!customItems || customItems.length === 0) ? (
+              <p className="px-3 py-5 text-center text-sm font-semibold leading-6 text-[var(--theme-text-muted)]">
+                Chưa có nội dung trong phần này.
+              </p>
+            ) : null}
           </nav>
         </div>
       ) : null}

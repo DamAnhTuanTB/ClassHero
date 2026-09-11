@@ -1,4 +1,4 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { AiGenerationType, ContentSource, Prisma, ReviewStatus } from "@prisma/client";
 import { UnrecoverableError } from "bullmq";
 import { PrismaService } from "#api/common/prisma/prisma.service";
@@ -9,8 +9,13 @@ import type {
 } from "#api/modules/ai/types/ai-generation.types";
 import { AiProviderCallService } from "#api/modules/ai/services/ai-provider-call.service";
 import {
+  alignVideoSummaryOutputToChapters,
+  buildVideoSummaryProviderOutputSchema,
   hasValidVideoSummaryCueStartTimes,
+  hasMatchingVideoSummaryChapters,
+  collectVideoSummaryOutputWarnings,
   toVideoSummaryBlocksDocument,
+  videoSummarySectionsToChapters,
   videoSummaryOutputSchema,
 } from "#api/modules/learning-paths/utils/video-summary-output";
 import { buildWholeFeatureUsageTarget } from "#api/modules/provider-operations/utils/provider-usage-target";
@@ -18,7 +23,10 @@ import {
   buildVideoSummarySource,
   serializeVideoSummarySourceText,
 } from "#api/modules/learning-paths/utils/video-summary-source";
-import { VIDEO_SUMMARY_PROMPT_VERSION } from "#api/modules/learning-paths/utils/video-summary-prompt";
+import {
+  buildVideoSummaryStructuredRequestPolicy,
+  VIDEO_SUMMARY_PROMPT_VERSION,
+} from "#api/modules/learning-paths/utils/video-summary-prompt";
 import { z } from "zod";
 
 const inputSchema = z.object({
@@ -28,6 +36,8 @@ const inputSchema = z.object({
 });
 @Injectable()
 export class VideoSummaryGenerationService {
+  private readonly logger = new Logger(VideoSummaryGenerationService.name);
+
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(AiProviderCallService) private readonly provider: AiProviderCallService,
@@ -58,6 +68,7 @@ export class VideoSummaryGenerationService {
       throw new UnrecoverableError(
         "AI_SOURCE_CONTEXT_STALE: Video hoặc transcript đã thay đổi sau khi tạo job.",
       );
+    const providerOutputSchema = buildVideoSummaryProviderOutputSchema(source.chapters);
     const output = await this.provider.generateStructured(
       {
         feature: AiGenerationType.VIDEO_SUMMARY,
@@ -74,6 +85,7 @@ export class VideoSummaryGenerationService {
         allowProviderFallback: false,
       },
       {
+        ...buildVideoSummaryStructuredRequestPolicy(),
         outputName: draft.schemaName,
         promptVersion: VIDEO_SUMMARY_PROMPT_VERSION,
         schemaVersion: draft.schemaVersion,
@@ -87,24 +99,54 @@ export class VideoSummaryGenerationService {
         ],
         maxTokens: context.providerRouteSnapshot?.maxOutputTokens ?? undefined,
       },
-      videoSummaryOutputSchema,
+      providerOutputSchema,
     );
-    const parsedOutput = videoSummaryOutputSchema.safeParse(output.data);
+    const providerParsedOutput = providerOutputSchema.safeParse(output.data);
+    if (!providerParsedOutput.success) {
+      throw new UnrecoverableError(
+        "VIDEO_SUMMARY_OUTPUT_INVALID: Kết quả AI không đúng cấu trúc chapter.",
+      );
+    }
+    const alignedOutput = alignVideoSummaryOutputToChapters(
+      providerParsedOutput.data,
+      source.chapters,
+    );
+    const structurallyParsedOutput = videoSummaryOutputSchema.safeParse(alignedOutput);
+    if (!structurallyParsedOutput.success) {
+      this.logger.error(
+        `Video Summary ${context.aiGenerationId} failed semantic validation: ${JSON.stringify(structurallyParsedOutput.error.issues)}`,
+      );
+      throw new UnrecoverableError(
+        "VIDEO_SUMMARY_OUTPUT_INVALID: Kết quả AI không đúng cấu trúc.",
+      );
+    }
+    const parsedOutput = structurallyParsedOutput.data;
+    if (!hasMatchingVideoSummaryChapters(parsedOutput, source.chapters)) {
+      throw new UnrecoverableError(
+        "VIDEO_SUMMARY_CHAPTERS_INVALID: Section không khớp các mốc thời gian video.",
+      );
+    }
     if (
-      !parsedOutput.success ||
       !hasValidVideoSummaryCueStartTimes(
-        parsedOutput.data,
+        parsedOutput,
         source.transcript.map((cue) => cue.time),
+        source.chapters,
       )
     ) {
       throw new UnrecoverableError(
         "VIDEO_SUMMARY_TIMELINE_INVALID: Timestamp của khối không khớp cue transcript.",
       );
     }
+    const warnings = collectVideoSummaryOutputWarnings(parsedOutput);
+    if (warnings.length > 0) {
+      this.logger.warn(
+        `Video Summary ${context.aiGenerationId} completed with ${warnings.length} review warning(s): ${warnings.map((warning) => warning.path).join(", ")}`,
+      );
+    }
     return {
       action: "VIDEO_SUMMARY",
-      output,
-      contextMetadata: { hashes: source.hashes },
+      output: { ...output, data: parsedOutput },
+      contextMetadata: { hashes: source.hashes, warnings },
     };
   }
   async persist(
@@ -113,47 +155,105 @@ export class VideoSummaryGenerationService {
   ): Promise<AiGenerationPersistenceResult> {
     if (!context.lessonId)
       throw new UnrecoverableError("Video summary persistence requires lessonId.");
+    const lessonId = context.lessonId;
     const parsed = videoSummaryOutputSchema.safeParse(prepared.output.data);
     if (!parsed.success)
       throw new UnrecoverableError(
         "VIDEO_SUMMARY_OUTPUT_INVALID: Kết quả AI không đúng cấu trúc.",
       );
     const hashes = readHashes(prepared.contextMetadata);
-    const contentJson = toVideoSummaryBlocksDocument(parsed.data);
-    const summary = await this.prisma.lessonVideoSummary.upsert({
-      where: { lessonId: context.lessonId },
-      create: {
-        lessonId: context.lessonId,
-        contentJson: contentJson as Prisma.InputJsonValue,
-        source: ContentSource.AI,
-        reviewStatus: ReviewStatus.NEEDS_REVIEW,
-        aiGenerationId: context.aiGenerationId,
-        sourceVideoUrlHash: hashes.videoUrl,
-        sourceTranscriptHash: hashes.transcript,
-        sourceChaptersHash: hashes.chapters,
-        sourcePlayerSettingsHash: hashes.playerSettings,
-        createdById: context.ownerUserId,
-        updatedById: context.ownerUserId,
-      },
-      update: {
-        contentJson: contentJson as Prisma.InputJsonValue,
-        source: ContentSource.AI,
-        reviewStatus: ReviewStatus.NEEDS_REVIEW,
-        aiGenerationId: context.aiGenerationId,
-        sourceVideoUrlHash: hashes.videoUrl,
-        sourceTranscriptHash: hashes.transcript,
-        sourceChaptersHash: hashes.chapters,
-        sourcePlayerSettingsHash: hashes.playerSettings,
-        staleAt: null,
-        updatedById: context.ownerUserId,
-        deletedAt: null,
-      },
+    const warnings = readWarnings(prepared.contextMetadata);
+    const contentJson = toVideoSummaryBlocksDocument(parsed.data, warnings);
+    const persistence = await this.prisma.$transaction(async (tx) => {
+      const lesson = await tx.lesson.findFirst({
+        where: { id: lessonId, deletedAt: null },
+        select: { videoUrl: true, customVideoSettings: true },
+      });
+      const currentSource = lesson && buildVideoSummarySource(lesson);
+      if (!currentSource || currentSource.hashes.source !== hashes.source) {
+        throw new UnrecoverableError(
+          "AI_SOURCE_CONTEXT_STALE: Video, transcript hoặc mốc thời gian đã thay đổi trước khi lưu.",
+        );
+      }
+
+      let finalSource = currentSource;
+      let generatedChapters = false;
+      if (currentSource.chapters.length === 0) {
+        const chapters = videoSummarySectionsToChapters(parsed.data);
+        const customVideoSettings = appendVideoSummaryChapters(
+          lesson.customVideoSettings,
+          chapters,
+        );
+        await tx.lesson.update({
+          where: { id: lessonId },
+          data: {
+            customVideoSettings,
+            updatedById: context.ownerUserId,
+          },
+        });
+        await tx.auditLog.create({
+          data: {
+            actorUserId: context.ownerUserId,
+            action: "LESSON_VIDEO_CHAPTERS_GENERATED_FROM_SUMMARY",
+            entityType: "Lesson",
+            entityId: lessonId,
+            before: lesson.customVideoSettings ?? undefined,
+            after: customVideoSettings,
+          },
+        });
+        const rebuiltSource = buildVideoSummarySource({
+          videoUrl: lesson.videoUrl,
+          customVideoSettings,
+        });
+        if (!rebuiltSource) {
+          throw new UnrecoverableError("VIDEO_SUMMARY_SOURCE_REBUILD_FAILED");
+        }
+        finalSource = rebuiltSource;
+        generatedChapters = true;
+      }
+
+      const summary = await tx.lessonVideoSummary.upsert({
+        where: { lessonId },
+        create: {
+          lessonId,
+          contentJson: contentJson as Prisma.InputJsonValue,
+          source: ContentSource.AI,
+          reviewStatus: ReviewStatus.NEEDS_REVIEW,
+          aiGenerationId: context.aiGenerationId,
+          sourceVideoUrlHash: finalSource.hashes.videoUrl,
+          sourceTranscriptHash: finalSource.hashes.transcript,
+          sourceChaptersHash: finalSource.hashes.chapters,
+          sourcePlayerSettingsHash: finalSource.hashes.playerSettings,
+          createdById: context.ownerUserId,
+          updatedById: context.ownerUserId,
+        },
+        update: {
+          contentJson: contentJson as Prisma.InputJsonValue,
+          source: ContentSource.AI,
+          reviewStatus: ReviewStatus.NEEDS_REVIEW,
+          aiGenerationId: context.aiGenerationId,
+          sourceVideoUrlHash: finalSource.hashes.videoUrl,
+          sourceTranscriptHash: finalSource.hashes.transcript,
+          sourceChaptersHash: finalSource.hashes.chapters,
+          sourcePlayerSettingsHash: finalSource.hashes.playerSettings,
+          staleAt: null,
+          updatedById: context.ownerUserId,
+          deletedAt: null,
+        },
+      });
+      return { summary, generatedChapters };
     });
+    const { summary, generatedChapters } = persistence;
     return {
       resourceType: "LESSON_VIDEO_SUMMARY",
       resourceId: summary.id,
       message: "Đã tạo tóm tắt video bằng AI.",
-      result: { lessonId: summary.lessonId, reviewStatus: summary.reviewStatus },
+      result: {
+        lessonId: summary.lessonId,
+        reviewStatus: summary.reviewStatus,
+        warnings,
+        generatedChapters,
+      },
     };
   }
 }
@@ -171,8 +271,41 @@ function readHashes(value: unknown) {
     !hashes?.videoUrl ||
     !hashes.transcript ||
     !hashes.chapters ||
-    !hashes.playerSettings
+    !hashes.playerSettings ||
+    !hashes.source
   )
     throw new UnrecoverableError("VIDEO_SUMMARY_SOURCE_HASHES_MISSING");
   return hashes;
+}
+
+function appendVideoSummaryChapters(
+  value: Prisma.JsonValue,
+  chapters: ReturnType<typeof videoSummarySectionsToChapters>,
+) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new UnrecoverableError("VIDEO_SUMMARY_PLAYER_SETTINGS_INVALID");
+  }
+  return { ...value, chapters } as Prisma.InputJsonValue;
+}
+
+function readWarnings(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+  const warnings = (value as { warnings?: unknown }).warnings;
+  return Array.isArray(warnings)
+    ? warnings.filter(
+        (
+          warning,
+        ): warning is ReturnType<typeof collectVideoSummaryOutputWarnings>[number] =>
+          Boolean(
+            warning &&
+            typeof warning === "object" &&
+            !Array.isArray(warning) &&
+            ((warning as { code?: unknown }).code === "UNRESOLVED_VISUAL_REFERENCE" ||
+              (warning as { code?: unknown }).code === "MALFORMED_LATEX") &&
+            typeof (warning as { path?: unknown }).path === "string" &&
+            typeof (warning as { message?: unknown }).message === "string" &&
+            (warning as { severity?: unknown }).severity === "WARNING",
+          ),
+      )
+    : [];
 }

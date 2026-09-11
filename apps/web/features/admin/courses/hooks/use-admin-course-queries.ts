@@ -231,6 +231,9 @@ export function useAdminCourseMutations() {
         queryClient.invalidateQueries({
           queryKey: adminAiGenerationQueryKeys.panel(variables.lessonId),
         });
+        queryClient.invalidateQueries({
+          queryKey: ["admin-video-summary", variables.lessonId],
+        });
       },
     }),
     updatePath: useMutation({

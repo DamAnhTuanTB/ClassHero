@@ -22,17 +22,22 @@ import {
 } from "#api/modules/learning-paths/utils/video-summary-source";
 import {
   buildVideoSummaryPrompts,
+  buildVideoSummaryStructuredRequestPolicy,
   resolveVideoSummarySubject,
   VIDEO_SUMMARY_PROMPT_VERSION,
   type VideoSummarySubject,
 } from "#api/modules/learning-paths/utils/video-summary-prompt";
-import { videoSummaryOutputSchema } from "#api/modules/learning-paths/utils/video-summary-output";
+import {
+  buildVideoSummaryProviderOutputSchema,
+  hasVideoSummaryBlock,
+  normalizeVideoSummaryDocument,
+  VIDEO_SUMMARY_DOCUMENT_VERSION,
+} from "#api/modules/learning-paths/utils/video-summary-output";
 import { AiModelRoutingService } from "#api/modules/provider-operations/services/ai-model-routing.service";
 import type { AiFeatureRoute } from "#api/modules/provider-operations/types/provider-operations.types";
 
 const schemaName = "video_summary_output";
-const schemaVersion = "5";
-const documentVersion = 5;
+const schemaVersion = "8";
 
 @Injectable()
 export class VideoSummariesService {
@@ -76,11 +81,12 @@ export class VideoSummariesService {
     const route = await this.resolveRoute(dto);
     const config = normalize(dto);
     const input = buildInput(source, config);
-    const format = buildAiStructuredTextFormat(videoSummaryOutputSchema, schemaName);
+    const outputSchema = buildVideoSummaryProviderOutputSchema(source.source.chapters);
+    const format = buildAiStructuredTextFormat(outputSchema, schemaName);
     const preview = await this.provider.previewStructuredRequest(
       { feature: AiGenerationType.VIDEO_SUMMARY, routeSnapshot: route },
       input,
-      videoSummaryOutputSchema,
+      outputSchema,
     );
     const snapshot = {
       lessonTitle: source.lesson.title,
@@ -191,7 +197,12 @@ export class VideoSummariesService {
         maxOutputTokens: route.maxOutputTokens,
       },
       routeSnapshot: route,
-      idempotencyKey: `video-summary:${lessonId}:${current.source.hashes.source}:${draft.requestHash}`,
+      idempotencyKey: buildVideoSummaryJobIdempotencyKey({
+        lessonId,
+        sourceHash: current.source.hashes.source,
+        requestHash: draft.requestHash,
+        requestDraftId: draft.id,
+      }),
       deduplicateActive: true,
       maxAttempts: 1,
     });
@@ -208,8 +219,19 @@ export class VideoSummariesService {
     dto: UpsertVideoSummaryDto,
     context: RequestContext = {},
   ) {
-    await this.lessonContext(lessonId);
+    const lessonContext = await this.lessonContext(lessonId);
     assertCurrentVideoSummaryDocument(dto.contentJson);
+    const currentSource = buildVideoSummarySource(lessonContext.lesson);
+    const approvedSourceBaseline =
+      dto.reviewStatus === ReviewStatus.APPROVED && currentSource
+        ? {
+            sourceVideoUrlHash: currentSource.hashes.videoUrl,
+            sourceTranscriptHash: currentSource.hashes.transcript,
+            sourceChaptersHash: currentSource.hashes.chapters,
+            sourcePlayerSettingsHash: currentSource.hashes.playerSettings,
+            staleAt: null,
+          }
+        : {};
     const before = await this.prisma.lessonVideoSummary.findUnique({
       where: { lessonId },
     });
@@ -220,6 +242,7 @@ export class VideoSummariesService {
         contentJson: dto.contentJson as Prisma.InputJsonValue,
         source: dto.source,
         reviewStatus: dto.reviewStatus,
+        ...approvedSourceBaseline,
         createdById: actorUserId,
         updatedById: actorUserId,
       },
@@ -227,6 +250,7 @@ export class VideoSummariesService {
         contentJson: dto.contentJson as Prisma.InputJsonValue,
         source: dto.source,
         reviewStatus: dto.reviewStatus,
+        ...approvedSourceBaseline,
         updatedById: actorUserId,
         deletedAt: null,
       },
@@ -255,9 +279,8 @@ export class VideoSummariesService {
     });
     if (!summary) return;
     await this.prisma.$transaction([
-      this.prisma.lessonVideoSummary.update({
+      this.prisma.lessonVideoSummary.delete({
         where: { id: summary.id },
-        data: { deletedAt: new Date(), updatedById: actorUserId },
       }),
       this.prisma.auditLog.create({
         data: {
@@ -358,6 +381,22 @@ function normalize(dto: GenerateVideoSummaryDto) {
     userPrompt: dto.userPrompt?.trim() || null,
   };
 }
+
+export function buildVideoSummaryJobIdempotencyKey(input: {
+  lessonId: string;
+  sourceHash: string;
+  requestHash: string;
+  requestDraftId: string;
+}) {
+  return [
+    "video-summary",
+    input.lessonId,
+    input.sourceHash,
+    input.requestHash,
+    input.requestDraftId,
+  ].join(":");
+}
+
 function buildInput(
   context: {
     lesson: { title: string };
@@ -375,6 +414,7 @@ function buildInput(
     configuration: config,
   });
   return {
+    ...buildVideoSummaryStructuredRequestPolicy(),
     outputName: schemaName,
     promptVersion: prompts.promptVersion,
     schemaVersion,
@@ -413,13 +453,17 @@ function serialize(summary: {
   createdAt: Date;
   updatedAt: Date;
 }) {
-  return { ...summary };
+  return {
+    ...summary,
+    contentJson: normalizeVideoSummaryDocument(summary.contentJson),
+  };
 }
 
 function assertCurrentVideoSummaryDocument(contentJson: Record<string, unknown>) {
   if (
     contentJson.type === "lesson_summary_blocks" &&
-    contentJson.version !== documentVersion
+    (contentJson.version !== VIDEO_SUMMARY_DOCUMENT_VERSION ||
+      hasVideoSummaryBlock(contentJson))
   ) {
     throwBadRequest(
       "VIDEO_SUMMARY_SCHEMA_VERSION_INVALID",

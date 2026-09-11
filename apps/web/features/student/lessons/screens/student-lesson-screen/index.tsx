@@ -8,9 +8,11 @@ import { StudentDetailMobileBrandBar } from "@/components/student/layout/student
 import { StudentCoursesHeader } from "@/components/student/courses/student-courses-header";
 import { StudentDataErrorState } from "@/components/student/student-data-error-state";
 import { usePracticeTabTransition } from "@/features/student/lessons/hooks/use-practice-tab-transition";
+import { useVideoPlaybackProgress } from "@/features/student/lessons/hooks/use-video-playback-progress";
 import { LessonNavigationControl } from "@/features/student/lessons/screens/student-lesson-screen/components/lesson-navigation-control";
 import { LessonSummaryPanel } from "@/features/student/lessons/screens/student-lesson-screen/components/lesson-summary-panel";
 import { LessonVideoPanel } from "@/features/student/lessons/screens/student-lesson-screen/components/lesson-video-panel";
+import type { CustomYoutubePlayerHandle } from "@/components/shared/custom-youtube-player";
 import { QuizCurtainTransition } from "@/features/student/lessons/screens/student-lesson-screen/components/quiz-curtain-transition";
 import { QuizLearningPanel } from "@/features/student/lessons/screens/student-lesson-screen/components/quiz-learning-panel";
 import { QuizRunnerLoadingScreen } from "@/features/student/lessons/screens/student-lesson-screen/components/quiz-runner-screen";
@@ -22,8 +24,10 @@ import type {
   StudentLesson,
   StudentLessonTab,
 } from "@/features/student/lessons/types/student-lesson-types";
+import { createVideoPlaybackSecondStore } from "@/features/student/lessons/utils/video-summary-playback";
 import { cn } from "@/lib/utils";
 import type { AppThemeMode } from "@/lib/theme-store";
+import type { VideoPlaybackWindow } from "@/lib/video-player-time";
 
 const loadFlashcardLearningPanel = () =>
   import("@/features/student/lessons/screens/student-lesson-screen/components/flashcard-learning-panel");
@@ -118,6 +122,10 @@ export function StudentLessonScreen({
   const [activeTab, setActiveTab] = useState<StudentLessonTab>(initialTab);
   const [learningSurface, setLearningSurface] = useState(initialLearningSurface);
   const [pendingTab, setPendingTab] = useState<StudentLessonTab | null>(null);
+  const [hasVideoPlaybackStarted, setHasVideoPlaybackStarted] = useState(false);
+  const [videoPlaybackStore] = useState(createVideoPlaybackSecondStore);
+  const [videoPlaybackWindow, setVideoPlaybackWindow] =
+    useState<VideoPlaybackWindow | null>(null);
   const [preparedQuizSetId, setPreparedQuizSetId] = useState<string | null>(
     initialLearningSurface?.kind === "quiz-runner" ||
       initialLearningSurface?.kind === "quiz-result"
@@ -125,6 +133,7 @@ export function StudentLessonScreen({
       : (initialLesson?.quizSets[0]?.id ?? null),
   );
   const tabRequestIdRef = useRef(0);
+  const videoPlayerRef = useRef<CustomYoutubePlayerHandle>(null);
   const {
     flashcardsQuery,
     isAuthHydrated,
@@ -136,7 +145,19 @@ export function StudentLessonScreen({
     testStatusQuery,
     testHistoryQuery,
     token,
+    userId,
   } = useStudentLessonQueries(lessonId, initialLesson);
+  const videoProgress = useVideoPlaybackProgress({
+    initialProgress: lessonQuery.data?.videoProgress ??
+      initialLesson?.videoProgress ?? {
+        lastPositionSeconds: null,
+        timelineVersion: null,
+        updatedAt: null,
+      },
+    lessonId,
+    token,
+    userId,
+  });
   const isInitialPending =
     lessonQuery.data === undefined && (!isAuthHydrated || lessonQuery.isLoading);
   const shouldShowFlashcardsLoading = useStableLoadingVisibility(isFlashcardsPending);
@@ -148,6 +169,10 @@ export function StudentLessonScreen({
     learningSurface?.kind === "flashcard-result";
   const isTestSurfaceResume =
     learningSurface?.kind === "test-runner" || learningSurface?.kind === "test-result";
+
+  useEffect(() => {
+    setHasVideoPlaybackStarted(false);
+  }, [lessonId]);
 
   useEffect(() => {
     if (!lessonQuery.data) return;
@@ -219,6 +244,15 @@ export function StudentLessonScreen({
     [activeTab, prepareQuizTab, selectTab],
   );
   const practiceTabTransition = usePracticeTabTransition(selectTab);
+  const handleVideoSeek = useCallback((seconds: number) => {
+    videoPlayerRef.current?.playFromPlaybackTime(seconds);
+  }, []);
+  const handleVideoPlaybackTimeChange = useCallback(
+    (seconds: number) => {
+      videoPlaybackStore.setPlaybackTime(seconds);
+    },
+    [videoPlaybackStore],
+  );
 
   if (isInitialPending) {
     if (isQuizSurfaceResume || isTestSurfaceResume) return <QuizRunnerLoadingScreen />;
@@ -322,11 +356,9 @@ export function StudentLessonScreen({
           </h1>
         </section>
 
-        <LessonVideoPanel lesson={lesson} />
-
         <nav
           aria-label="Nội dung buổi học"
-          className="relative mt-3 grid grid-cols-4 gap-2 px-1 py-5 sm:gap-3 sm:px-2 lg:mt-6 lg:px-3 lg:py-6"
+          className="relative mt-0 grid grid-cols-4 gap-2 px-1 pb-4 pt-3 sm:mt-3 sm:gap-3 sm:px-2 sm:py-5 lg:mt-2 lg:px-3 lg:py-3"
         >
           <svg
             aria-hidden="true"
@@ -406,9 +438,28 @@ export function StudentLessonScreen({
           })}
         </nav>
 
+        <LessonVideoPanel
+          ref={videoPlayerRef}
+          lesson={lesson}
+          onPlaybackProgressChange={videoProgress.trackPosition}
+          onPlaybackStateChange={(state) => {
+            if (state === "playing") setHasVideoPlaybackStarted(true);
+            videoProgress.handlePlaybackStateChange(state);
+          }}
+          onPlaybackTimeChange={handleVideoPlaybackTimeChange}
+          onPlaybackWindowChange={setVideoPlaybackWindow}
+          resumePositionSeconds={videoProgress.resumePositionSeconds}
+        />
+
         <div className="mt-4 min-h-40">
           {activeTab === "lesson" ? (
-            <LessonSummaryPanel lesson={lesson} />
+            <LessonSummaryPanel
+              hasVideoPlaybackStarted={hasVideoPlaybackStarted}
+              lesson={lesson}
+              playbackStore={videoPlaybackStore}
+              onVideoSeek={handleVideoSeek}
+              videoPlaybackEndTimeInSeconds={videoPlaybackWindow?.endTimeInSeconds}
+            />
           ) : activeTab === "quiz" ? (
             <QuizLearningPanel
               autoStart={practiceTabTransition.autoStartTarget === "quiz"}
@@ -563,7 +614,6 @@ function StudentLessonPageSkeleton({
         <div className="h-16 rounded-2xl bg-white dark:bg-[var(--theme-surface)]" />
         <div className="mt-5 h-5 w-52 rounded-full bg-slate-200 dark:bg-slate-700" />
         <div className="mt-4 h-8 w-3/4 rounded-full bg-slate-200 dark:bg-slate-700" />
-        <div className="mt-5 aspect-video rounded-[1.5rem] bg-slate-900" />
         <div className="mt-6 grid grid-cols-4 gap-3 px-2">
           {Array.from({ length: 4 }, (_, index) => (
             <div key={index} className="flex flex-col items-center gap-3">
@@ -572,6 +622,7 @@ function StudentLessonPageSkeleton({
             </div>
           ))}
         </div>
+        <div className="mt-5 aspect-video rounded-[1.5rem] bg-[var(--theme-skeleton)]" />
         <div className="mt-8">
           <LearningPanelSkeleton />
         </div>

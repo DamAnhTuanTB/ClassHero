@@ -20,6 +20,7 @@ import type {
   StudentTestHistory,
   StudentTestResult,
   StudentTestStatus,
+  StudentVideoProgress,
 } from "@/features/student/lessons/types/student-lesson-types";
 
 export function getStudentLesson(
@@ -31,6 +32,30 @@ export function getStudentLesson(
     cache: options.cache,
     token,
   });
+}
+
+export function getStudentVideoProgress(lessonId: string, token: string) {
+  return apiRequest<StudentVideoProgress>(
+    `/student/lessons/${encodeURIComponent(lessonId)}/video-progress`,
+    { token },
+  );
+}
+
+export function saveStudentVideoProgress(
+  lessonId: string,
+  positionSeconds: number,
+  token: string,
+  options?: { keepalive?: boolean },
+) {
+  return apiRequest<StudentVideoProgress>(
+    `/student/lessons/${encodeURIComponent(lessonId)}/video-progress`,
+    {
+      method: "PATCH",
+      body: { positionSeconds },
+      keepalive: options?.keepalive,
+      token,
+    },
+  );
 }
 
 export function startQuizAttempt(

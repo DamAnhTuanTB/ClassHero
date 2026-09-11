@@ -411,7 +411,7 @@ export class FlashcardGenerationJobService {
         lessonId,
         title: "Bộ flashcard 1",
         source: ContentSource.ADMIN,
-        reviewStatus: ReviewStatus.APPROVED,
+        reviewStatus: ReviewStatus.DRAFT,
         difficulty: Difficulty.MIXED,
         sortOrder: 0,
         createdById: actorUserId,

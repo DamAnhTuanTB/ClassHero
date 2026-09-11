@@ -34,20 +34,19 @@ describe("M3.8 YouTube video transcript", () => {
     ]);
   });
 
-  it("keeps only segments inside the playback window and maps them to trimmed time", () => {
+  it("keeps the complete source transcript so the UI can disable trimmed cues", () => {
     expect(
-      normalizeTranscriptSegments(
-        [
-          { offset: 4.9, duration: 1, lang: "vi", text: "Phần intro" },
-          { offset: 5, duration: 1, lang: "vi", text: "Bắt đầu bài học" },
-          { offset: 77.9, duration: 1, lang: "vi", text: "Kết bài" },
-          { offset: 78, duration: 1, lang: "vi", text: "Phần bị cắt cuối" },
-        ],
-        { startTime: 5, endTime: 78 },
-      ),
+      normalizeTranscriptSegments([
+        { offset: 4.9, duration: 1, lang: "vi", text: "Phần intro" },
+        { offset: 5, duration: 1, lang: "vi", text: "Bắt đầu bài học" },
+        { offset: 77.9, duration: 1, lang: "vi", text: "Kết bài" },
+        { offset: 78, duration: 1, lang: "vi", text: "Phần bị cắt cuối" },
+      ]),
     ).toEqual([
-      { endTime: 1, time: 0, text: "Bắt đầu bài học" },
-      { endTime: 73, time: 72.9, text: "Kết bài" },
+      { endTime: 5.9, time: 4.9, text: "Phần intro" },
+      { endTime: 6, time: 5, text: "Bắt đầu bài học" },
+      { endTime: 78.9, time: 77.9, text: "Kết bài" },
+      { endTime: 79, time: 78, text: "Phần bị cắt cuối" },
     ]);
   });
 
@@ -135,7 +134,7 @@ describe("M3.8 YouTube video transcript", () => {
     ]);
   });
 
-  it("keeps playback-relative chapters that fit inside the trimmed duration", () => {
+  it("maps source chapters to the trimmed timeline and keeps the active chapter", () => {
     const chapters = readVideoChapters({
       chapters: [
         { time: 0, title: "Giới thiệu" },
@@ -146,9 +145,8 @@ describe("M3.8 YouTube video transcript", () => {
     });
 
     expect(getPlaybackChapters(chapters, { startTime: 20, endTime: 80 })).toEqual([
-      { time: 0, title: "Giới thiệu" },
-      { time: 15, title: "1. Đơn thức" },
-      { time: 40, title: "2. Đơn thức đồng dạng" },
+      { time: 0, title: "1. Đơn thức" },
+      { time: 20, title: "2. Đơn thức đồng dạng" },
     ]);
   });
 });

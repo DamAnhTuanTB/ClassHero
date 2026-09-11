@@ -1,4 +1,4 @@
-import { Controller, Get, Inject, Param, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Inject, Param, Patch, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { UserRole } from "@prisma/client";
 import type { AuthenticatedUser } from "#api/common/auth/authenticated-request";
@@ -6,6 +6,7 @@ import { CurrentUser } from "#api/common/auth/current-user.decorator";
 import { JwtAuthGuard } from "#api/common/auth/jwt-auth.guard";
 import { Roles } from "#api/common/auth/roles.decorator";
 import { RolesGuard } from "#api/common/auth/roles.guard";
+import { SaveStudentVideoProgressDto } from "#api/modules/student-learning/dto/student-video-progress.dto";
 import { StudentLessonsService } from "#api/modules/student-learning/services/student-lessons.service";
 
 @ApiTags("student-learning")
@@ -23,6 +24,29 @@ export class StudentLessonsController {
   @ApiOperation({ summary: "Read one accessible lesson and its content metadata" })
   getLesson(@Param("lessonId") lessonId: string, @CurrentUser() user: AuthenticatedUser) {
     return this.studentLessonsService.getLessonContent(lessonId, user.id);
+  }
+
+  @Get(":lessonId/video-progress")
+  @ApiOperation({ summary: "Read the student's latest video playback position" })
+  getVideoProgress(
+    @Param("lessonId") lessonId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.studentLessonsService.getVideoProgress(lessonId, user.id);
+  }
+
+  @Patch(":lessonId/video-progress")
+  @ApiOperation({ summary: "Save the student's latest video playback position" })
+  saveVideoProgress(
+    @Param("lessonId") lessonId: string,
+    @Body() body: SaveStudentVideoProgressDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.studentLessonsService.saveVideoProgress(
+      lessonId,
+      user.id,
+      body.positionSeconds,
+    );
   }
 
   @Get(":lessonId/summary")

@@ -1,4 +1,4 @@
-import type { TiptapTextDocument } from "@learning-path/shared";
+import type { TiptapContent, TiptapTextDocument } from "@learning-path/shared";
 
 export type StudentLessonTab = "lesson" | "quiz" | "flashcard" | "test";
 export type StudentLearningSurface =
@@ -96,9 +96,16 @@ export type StudentLesson = {
   };
   summary: {
     id: string;
-    contentJson: TiptapTextDocument;
+    contentJson: TiptapContent;
     updatedAt: string;
   } | null;
+  videoSummary: {
+    id: string;
+    lessonId: string;
+    contentJson: TiptapContent;
+    updatedAt: string;
+  } | null;
+  videoProgress: StudentVideoProgress;
   quizSets: Array<{
     id: string;
     title: string;
@@ -119,6 +126,12 @@ export type StudentLesson = {
     previous: LessonNavigationItem | null;
     next: LessonNavigationItem | null;
   };
+};
+
+export type StudentVideoProgress = {
+  lastPositionSeconds: number | null;
+  timelineVersion: string | null;
+  updatedAt: string | null;
 };
 
 export type LessonNavigationItem = {

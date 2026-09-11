@@ -372,7 +372,7 @@ async function createGeneratedTestQuestion(
   return mapped.recoveryIssues.map((issue) => ({
     ...issue,
     questionIndex,
-    blocking: true,
+    blocking: false,
   }));
 }
 
@@ -390,10 +390,7 @@ async function sourceMetadata(
   return { sourceHash, sourceChunkIds: chunkIds, sources: chunks, ...extra };
 }
 
-async function nextTestSetSortOrder(
-  tx: Prisma.TransactionClient,
-  lessonId: string,
-) {
+async function nextTestSetSortOrder(tx: Prisma.TransactionClient, lessonId: string) {
   const record = await tx.testSet.findFirst({
     where: { lessonId, deletedAt: null },
     orderBy: { sortOrder: "desc" },

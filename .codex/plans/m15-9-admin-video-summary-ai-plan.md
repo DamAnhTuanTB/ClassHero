@@ -1,17 +1,20 @@
-# Kế hoạch M15.9 — Admin tạo bản tóm tắt toàn video bằng AI
+# Kế hoạch M9.7 — Admin tạo bản tóm tắt toàn video bằng AI
 
 Ngày lập: 2026-09-10
 
 Trạng thái: **Đã triển khai 2026-09-10; đã chạy live provider smoke test có kiểm
 soát và tiếp tục tinh chỉnh contract khối theo phản hồi owner.**
 
-Lệnh triển khai đề xuất: `/task-full M15.9`
+Trạng thái task canonical: **Done (`M9.7`)**.
+
+Tên file giữ mã lịch sử `m15-9` để không làm hỏng liên kết từ các phiên trước.
 
 ## 1. Mục tiêu
 
-Tại màn `/admin/lessons/[lessonId]`, section riêng `Tổng quan video` có nút
-`Tóm tắt Video`. Nút chỉ hoạt động khi lesson có video và transcript đã lưu có
-ít nhất một cue hợp lệ. Modal dùng chapter/mốc thời gian tùy chọn cùng toàn bộ
+Tại màn `/admin/lessons/[lessonId]`, panel `Tạo nội dung bằng AI` có card
+`Video` đứng trước card `Kiến thức`. Card chỉ hoạt động khi lesson có
+video và transcript đã lưu có ít nhất một cue hợp lệ. Modal dùng
+chapter/mốc thời gian tùy chọn cùng toàn bộ
 transcript đã chuẩn hóa để tạo một bản tóm tắt ngắn gọn bằng AI.
 
 Output cần:
@@ -20,15 +23,16 @@ Output cần:
   bài học trong luồng Sinh kiến thức.
 - Trả các khối Kiến thức/Ví dụ đúng thứ tự xuất hiện trong video và giải thích
   ngắn mỗi phần nói về điều gì; không bịa khối Ví dụ khi nguồn không có ví dụ.
-- Kết thúc bằng khối Tổng kết nêu người học có thể vận dụng hoặc giải quyết những
-  vấn đề nào sau khi xem.
-- Ưu tiên chia section theo chapter thật của video nếu đã cấu hình.
+- Nếu chapter thật đã được cấu hình, mỗi chapter bắt buộc ánh xạ một-một sang
+  section cùng thứ tự/title/time; chỉ khi chưa có chapter AI mới tự chia section
+  và backend ghi ngược các section thành mốc thời gian video sau khi persist.
 - Trình bày heading, đoạn văn, danh sách và xuống dòng mạch lạc.
 - Giữ công thức Toán/Lý/Hóa ở LaTeX canonical tương thích KaTeX/mhchem.
 
 ## 2. Quyết định phạm vi
 
-- Đây là subtask mới `M15.9`, nằm trong Smart Video Learning và thuộc scope đã
+- Đây là subtask `M9.7`, thuộc nhóm AI generation và dùng nguồn video/transcript;
+  phạm vi đã
   được owner chấp thuận.
 - Mode: `Database + API + worker + admin UI + AI contract`.
 - Video Summary là resource độc lập, không ghi đè:
@@ -44,7 +48,7 @@ Output cần:
 ```txt
 Lesson detail
   -> kiểm tra video + saved transcript
-  -> mở modal Tóm tắt Video bằng AI
+  -> card Video trong panel AI -> mở modal Tóm tắt Video bằng AI
   -> chỉnh style/length/model/instructions
   -> Xem dữ liệu
       -> backend resolve video/cut settings/chapters/transcript
@@ -57,7 +61,7 @@ Lesson detail
       -> validate schema + semantic invariants
       -> persist NEEDS_REVIEW atomically
   -> UI poll/resume job
-  -> render kết quả trong Tổng quan video
+  -> render và chỉnh sửa kết quả trong tab Video
   -> admin sửa/duyệt/sinh lại/xóa
 ```
 
@@ -84,8 +88,8 @@ Không tạo `VIDEO_SUMMARY/IMAGE`.
 
 ### 4.2. Output schema
 
-Structured output schema version 5, ánh xạ trực tiếp sang document
-`lesson_summary_blocks` version 5 để dùng đúng renderer của Sinh kiến thức:
+Structured output schema version 8, ánh xạ trực tiếp sang document
+`lesson_summary_blocks` version 6 để dùng đúng renderer của Sinh kiến thức:
 
 ```txt
 title
@@ -97,18 +101,19 @@ sections[]
   blocks[]
     knowledge: title, content, startSeconds
     example: problem, solution, answer, startSeconds
-    summary: content
 ```
 
-`objectives` luôn được renderer đặt ở đầu với nhãn `Các kiến thức sẽ học`, đúng
+`objectives` luôn được renderer đặt ở đầu với nhãn `Các kiến thức trong bài giảng`, đúng
 một ý chính cho mỗi section. Các
 `knowledge`/`example` giữ đúng mạch thời gian video và dùng nguyên màu sắc, bố
 cục, typography, công thức cùng quy tắc nội dung của khối Sinh kiến thức. Mỗi
-`example` bắt buộc đủ đề bài, lời giải và kết luận. Khối cuối luôn là `summary`.
-`startSeconds` của section/block phải tăng dần và khớp chính xác một cue
-transcript thật; AI không được tự bịa mốc hay ví dụ. Example phụ thuộc visual
-không thể tự đủ dữ kiện bằng text phải bị loại; Summary chỉ gồm bullet các dạng
-bài/nhiệm vụ có thể giải quyết.
+`example` bắt buộc đủ đề bài, lời giải và kết luận. Video Summary không có khối
+`summary` riêng.
+`startSeconds` của block phải tăng dần và khớp chính xác một cue transcript thật.
+Khi có chapter, `section.startSeconds` dùng chính xác time của chapter; khi không
+có chapter mới dùng cue sớm nhất của section. AI không được tự bịa mốc hay ví dụ.
+Example phụ thuộc visual
+không thể tự đủ dữ kiện bằng text phải bị loại.
 
 ## 5. Backend/API
 
@@ -163,7 +168,8 @@ re-export.
   admin nằm sau breakpoint.
 - Invariant bắt buộc: chỉ dùng nguồn lesson hiện tại; objectives đúng một ý cho
   mỗi section ở đầu;
-  knowledge/example đúng thứ tự và cùng contract Sinh kiến thức; summary ứng dụng ở cuối; chapter-aware; không
+  knowledge/example đúng thứ tự và cùng contract Sinh kiến thức; chapter ánh xạ
+  hai chiều với section; không
   bịa nội dung/ví dụ/timestamp; formula syntax hợp lệ; không lặp ý.
 - Schema/Zod kiểm shape và giới hạn count/length. Semantic validator kiểm section
   có căn cứ, timestamp nằm trong khoảng phát, outcome không vượt quá transcript.
@@ -178,9 +184,13 @@ Thay đổi chính:
 
 - Giữ section `Tổng quan buổi học` và dữ liệu Tiptap trên lesson như một phạm vi
   độc lập.
-- Header `Tổng quan video`: thêm nút `Tóm tắt Video`.
-- Disabled khi thiếu video hoặc thiếu saved transcript;
+- Panel AI có năm card theo thứ tự `Video`, `Kiến thức`, `Quiz`, `Flashcard`,
+  `Test`; tab nội dung thêm `Video` ngay trước `Kiến thức`.
+- Card `Video` disabled khi thiếu video hoặc thiếu saved transcript;
   hiển thị lý do bằng tooltip/helper, không chỉ bằng màu.
+- Bỏ section accordion `Tổng quan video`; tab `Video` hiển thị trực tiếp ba
+  chế độ UI/JSON/Song song và luồng chỉnh sửa khối giống `Kiến thức`.
+  Tiến trình/lỗi job chỉ hiển thị trên card AI, không lặp banner trong tab.
 - Modal lazy-load dùng `EditorDialogShell`, React Hook Form + Zod và shared form
   controls hiện có.
 - Fields: style, length, target word count, additional instructions, model,
@@ -189,13 +199,12 @@ Thay đổi chính:
   hiển thị chapter/timestamp/transcript, token và estimated cost.
 - Form/source đổi làm preview stale; submit pending chống double-click; mở lại
   modal resume đúng job đang chạy.
-- Trong `Tổng quan video`, render Video Summary bằng chính
-  `SummaryBlockRenderer` của Sinh kiến thức, có
-  loading/error/empty/needs-review/stale/success state và action sửa,
-  phát hành/thu hồi, sinh lại, xóa; có Mục lục, collapse và timestamp tua video.
-- Modal chỉnh sửa có `Chỉ xem UI | Chỉ xem JSON | Song song`, sửa khối Tiptap,
-  xóa/di chuyển khối và sửa/xóa/di chuyển đề mục. Tất cả thay đổi là local draft
-  cho tới khi admin bấm `Lưu nội dung`.
+- Trong tab `Video`, render Video Summary bằng chính `SummaryBlockRenderer`
+  của Sinh kiến thức, có empty/needs-review/stale/success state và action
+  sửa, phát hành/thu hồi, sinh lại, xóa; có Mục lục và timestamp tua video.
+- Tab hiển thị trực tiếp `Chỉ xem UI | Chỉ xem JSON | Song song`, sửa
+  khối Tiptap, xóa/di chuyển khối và sửa/xóa/di chuyển đề mục. Tất cả
+  thay đổi là local draft cho tới khi admin bấm `Lưu nội dung`.
 - Bổ sung nhóm `Tóm tắt Video` text-only tại `Admin -> Cài đặt AI`; không có tab
   Phase 2 ảnh.
 

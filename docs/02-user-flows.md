@@ -140,6 +140,11 @@ Acceptance Criteria:
 - `lesson_type` mặc định là `BASIC`; chỉ nhận `BASIC` hoặc `LIVE`.
 - `live_url` là optional, chỉ được giữ khi `lesson_type = LIVE`; khi chuyển về `BASIC`, backend clear field này.
 - Video URL chấp nhận YouTube hoặc Google Drive.
+- Khi Video URL sau chuẩn hóa khác URL đang lưu, kể cả đổi thành rỗng, backend
+  phải trong cùng transaction xóa Video Summary hiện hành, reset danh sách mốc
+  thời gian/chapter, transcript và ngôn ngữ transcript. Các cài đặt player độc
+  lập như cắt đầu/cuối, bước tua, watermark và letterbox được giữ nguyên. URL
+  không đổi sau chuẩn hóa thì không reset các dữ liệu này.
 - Course detail render một cây có thứ tự: chapter và lesson không thuộc chapter là sibling ở top-level; lesson trong chapter là node con. Thứ tự học đi theo depth-first từ trên xuống của cây này.
 - UI Student đánh số chapter bằng dãy riêng `1..n`, không dùng `order_index` top-level khi có lesson xen kẽ. Chip số hiển thị thứ tự; tiêu đề chapter dùng nguyên văn admin nhập và frontend không tự ghép thêm `Chương {n}.`.
 - Desktop hỗ trợ drag/drop; mobile và keyboard có action `Di chuyển` để chọn chapter/top-level và vị trí đích, không phụ thuộc duy nhất vào kéo thả.
@@ -157,9 +162,15 @@ Các bước:
 1. Admin mở màn chi tiết một buổi học có video YouTube.
 2. Admin mở panel `Bản chép lời video` cạnh khu vực cấu hình video và bấm `Lấy transcript từ YouTube`.
 3. Backend thử lấy toàn bộ caption công khai theo trình tự thời gian; ưu tiên tiếng Việt, nếu không có thì dùng ngôn ngữ công khai phù hợp đầu tiên.
-4. Backend đọc cấu hình player hiện tại, chỉ giữ các đoạn có timestamp nguồn nằm từ `startTimeInSeconds` đến `videoDuration - endTimeCutInSeconds`, rồi trừ `startTimeInSeconds` để ánh xạ về trục phát bắt đầu từ `0:00`. Nếu custom player bị tắt, giữ toàn bộ video và offset bằng `0`.
-5. Backend giữ nguyên từng cue caption mà YouTube trả về: `time = offset` và `endTime = offset + duration`, sau đó ánh xạ cả hai về trục phát sau cắt. Không chia lại text theo khoảng thời gian tự đặt.
-6. UI chỉ đưa kết quả vào form nháp, chèn header chapter kèm mốc thời gian trước đúng cụm transcript và chưa tự động ghi đè dữ liệu lesson.
+4. Backend đọc cấu hình player hiện tại để trả metadata khoảng phát, nhưng vẫn trả
+   đầy đủ chapter và cue theo timestamp của video gốc. Nếu custom player bị tắt,
+   khoảng phát là toàn bộ video.
+5. Backend giữ nguyên từng cue caption mà YouTube trả về: `time = offset` và
+   `endTime = offset + duration`; không chia lại text theo khoảng thời gian tự đặt.
+6. UI chỉ đưa kết quả vào form nháp, hiển thị cột `Thời gian` theo trục sau cắt và
+   `Thời gian gốc` theo video nguồn, chèn header chapter trước đúng cụm transcript
+   và chưa tự động ghi đè dữ liệu lesson. Chapter/cue ngoài khoảng phát vẫn hiện
+   theo đúng thứ tự nguồn nhưng toàn bộ control của mục đó ở trạng thái disabled.
 7. Khi video phát hoặc được tua, UI chọn cue có khoảng timestamp gốc `[time, endTime)` đang chứa thời gian hiện tại, làm nổi bật đoạn đó và tự cuộn bên trong danh sách để giữ đoạn active trong vùng nhìn.
 8. Admin tìm kiếm, duyệt, sửa mốc thời gian hoặc nội dung từng đoạn; có thể bấm action phát của một đoạn để player cộng lại phần cắt đầu, tua tới đúng timestamp nguồn và phát video.
 9. Admin bấm lưu; frontend cộng lại `startTimeInSeconds` để PATCH transcript theo timestamp nguồn ổn định.
@@ -169,9 +180,15 @@ Acceptance Criteria:
 - Chỉ hỗ trợ best-effort cho video YouTube có caption công khai; không chạy speech-to-text thay thế trong task này.
 - Không có caption hoặc YouTube từ chối truy cập phải trả lỗi thân thiện và không ảnh hưởng phát video hay transcript đã lưu.
 - Transcript được sắp xếp theo mốc thời gian tăng dần; mỗi đoạn có thời gian không âm và nội dung không rỗng.
-- Transcript chỉ chứa caption thuộc khoảng video học viên thực sự được xem; timestamp trên form thuộc trục phát sau cắt, trong đó đoạn đầu bắt đầu tại `0:00`, còn dữ liệu lưu giữ timestamp nguồn để ánh xạ lại nếu cấu hình cắt thay đổi.
+- Transcript và chapter lấy mới chứa đầy đủ dữ liệu của video gốc. Timestamp trên
+  form có hai cột: trục phát sau cắt bắt đầu tại `0:00` và trục nguồn; mục ngoài
+  khoảng phát không bị lọc nhưng phải disabled và không tham gia phát/highlight.
+- Với mục còn nằm trong khoảng phát, admin chỉ sửa `Thời gian gốc`; cột thời gian
+  sau cắt là read-only/disabled và cập nhật tức thì theo mốc nguồn vừa nhập.
 - Transcript lấy mới giữ nguyên ranh giới cue do YouTube cung cấp; độ dài mỗi đoạn có thể khác nhau. Timestamp được giữ tối đa 3 chữ số thập phân để action phát không làm tròn sai điểm bắt đầu.
-- Header chapter hiển thị tên và timestamp trên cùng trục phát sau cắt với transcript.
+- Chapter và transcript lưu timestamp nguồn ổn định; panel quản trị hiển thị cả
+  timestamp sau cắt và timestamp nguồn, còn player và Tổng quan video dùng trục
+  sau cắt.
 - Action phát của từng đoạn chỉ khả dụng khi timestamp hợp lệ; khi bấm, player ánh xạ mốc sau cắt về timestamp nguồn, được đưa vào vùng nhìn và phát từ mốc tương ứng.
 - Player chỉ thông báo thời gian qua listener nhẹ; panel chỉ đổi state khi chuyển sang đoạn transcript khác. Đoạn active có trạng thái `Đang phát`; auto-scroll chỉ tác động container transcript và tạm dừng khi admin đang tìm kiếm.
 - Nếu cue YouTube chồng thời gian, UI ưu tiên cue có timestamp bắt đầu mới nhất đã tới thay vì giữ cue cũ đến hết `duration`; mỗi thời điểm chỉ có một đoạn transcript active.
@@ -185,11 +202,14 @@ Actor: Admin.
 
 Các bước:
 
-1. Admin mở chi tiết một buổi học và xem section `Tổng quan buổi học`.
-2. Nút `Tóm tắt Video` chỉ được bật khi buổi học có video và transcript đã lưu
+1. Admin mở chi tiết một buổi học. Panel `Tạo nội dung bằng AI` hiển thị
+   card `Video` đầu tiên, ngay trước card `Kiến thức`.
+2. Card `Video` dùng cùng pattern trạng thái/chờ/lỗi với các card AI khác.
+   Action `Tạo mới` chỉ bật khi buổi học có video và transcript đã lưu
    có ít nhất một cue hợp lệ. Chapter/mốc thời gian là nguồn ưu tiên nhưng không
    bắt buộc; transcript đang sửa dở chưa lưu không được dùng.
-3. Admin mở modal, chọn phong cách, độ dài/số từ mục tiêu, model và thông số
+3. Admin bấm `Tạo mới` trên card `Video` để mở modal, chọn phong cách,
+   độ dài/số từ mục tiêu, model và thông số
    model tương tự modal `Tạo Kiến thức bằng AI`/`Tạo Quiz bằng AI`; có thể thêm
    yêu cầu riêng.
 4. Khi admin bấm `Xem dữ liệu`, backend dựng immutable preview từ đúng video,
@@ -198,24 +218,32 @@ Các bước:
    preview không gọi provider.
 5. Admin bấm `Tạo tóm tắt video`; backend kiểm tra preview chưa stale, reserve
    budget rồi enqueue background job. Ngay khi API nhận job, modal đóng và
-   section `Tổng quan buổi học` hiển thị trạng thái đang tạo cùng đồng hồ thời
+   card `Video` hiển thị trạng thái đang tạo cùng đồng hồ thời
    gian thực. Tải lại trang vẫn khôi phục job đang chạy và không tự tạo thêm lượt gọi.
-6. Worker tạo output theo đúng contract/renderer Sinh kiến thức: `Các kiến thức
-   sẽ học` ở đầu, đúng một ý chính cho mỗi section; các khối Kiến thức/Ví dụ bám đúng trình tự video; Ví dụ đủ
-   Đề bài/Lời giải/Kết luận; khối Tổng kết dạng bullet ở cuối. Mỗi khối Kiến
+6. Worker tạo output theo đúng contract Video Summary: `Các kiến thức trong bài
+giảng` ở đầu, đúng một ý chính cho mỗi section; các khối Kiến thức/Ví dụ bám
+   đúng trình tự video; Ví dụ đủ Đề bài/Lời giải/Kết luận. Mỗi khối Kiến
    thức/Ví dụ và mỗi section hiển thị thời điểm bắt đầu lấy từ cue transcript
    thật; bấm mốc sẽ tua/phát video. Ví dụ phụ thuộc hình mà không tự đủ dữ kiện
-   bằng text bị loại. Khối Tổng kết chỉ gồm bullet các dạng bài/nhiệm vụ có thể
-   giải quyết. Nếu nguồn không có ví dụ thì không tự bịa khối Ví dụ. Worker validate rồi lưu bản
-   tóm tắt ở trạng thái `NEEDS_REVIEW`. Khi hoàn tất, bản tóm tắt thay nội dung cũ trong chính section
-   `Tổng quan buổi học`; UI hiển thị model, Temperature hoặc Reasoning Effort,
+   bằng text bị loại. Nếu nguồn không có ví dụ thì không tự bịa khối Ví dụ.
+   Worker validate rồi lưu bản
+   tóm tắt ở trạng thái `NEEDS_REVIEW`. Khi hoàn tất, bản tóm tắt thay
+   nội dung cũ trong tab `Video`; UI hiển thị model, Temperature hoặc Reasoning Effort,
    chi phí thực tế và tổng thời gian tạo. Dữ liệu này không ghi vào Summary kiến
    thức sinh từ PDF.
-7. Admin xem, chỉnh sửa rồi lưu/phát hành/thu hồi bản tóm tắt. Modal chỉnh sửa có
-   ba chế độ UI/JSON/Song song và đầy đủ thao tác khối/đề mục như Sinh kiến thức;
-   thay đổi chỉ persist khi bấm `Lưu nội dung`. Nếu video URL, transcript, chapter
-   hoặc cấu hình cắt thay đổi, UI đánh dấu bản hiện tại đã cũ và yêu cầu sinh lại.
-8. Nút `Chỉnh sửa` của section mở Tiptap editor. Trường `Tổng quan buổi học`
+7. Admin mở tab `Video` đứng trước tab `Kiến thức` để xem, chỉnh sửa
+   rồi lưu/phát hành/thu hồi bản tóm tắt. Tab có ba chế độ `Chỉ xem UI`,
+   `Chỉ xem JSON`, `Song song` và đầy đủ thao tác khối/đề mục như
+   `Kiến thức`;
+   thay đổi chỉ persist khi bấm `Lưu nội dung`. Nếu transcript hoặc chapter đổi,
+   UI đánh dấu bản hiện tại đã cũ và yêu cầu sinh lại. Nếu Video URL đổi hoặc bị
+   xóa, backend xóa hẳn bản hiện hành và reset chapter/transcript thay vì giữ bản cũ.
+   Với bản chỉ stale do transcript/chapter đổi, admin vẫn có thể chỉnh sửa/rà
+   soát bản cũ rồi phát hành; thao tác
+   phát hành ghi nhận source hiện tại là baseline đã được admin duyệt và
+   xóa `staleAt` để student nhận bản này.
+8. Nút `Chỉnh sửa` của section `Tổng quan buổi học` mở Tiptap editor.
+   Trường `Tổng quan buổi học`
    trong modal thêm/sửa lesson cũng dùng cùng editor và cùng bản nội dung; mô tả
    text ngắn chỉ còn là fallback/preview tương thích cho dữ liệu cũ.
 
@@ -223,16 +251,21 @@ Acceptance Criteria:
 
 - Client không được gửi raw transcript/chapter tùy ý; backend tự resolve toàn bộ
   nguồn từ `lessonId` và khóa hash nguồn giữa preview với execute.
-- Output bắt đầu bằng Các kiến thức sẽ học, theo sau bởi các khối Kiến thức/Ví dụ
-  dùng cùng UI, màu sắc và quy tắc nội dung của Sinh kiến thức, rồi kết thúc bằng
-  Tổng kết; thứ tự và `startSeconds` của section/block phải bám cue transcript thật.
+- Output bắt đầu bằng Các kiến thức trong bài giảng, theo sau bởi các khối Kiến
+  thức/Ví dụ dùng cùng UI, màu sắc và quy tắc nội dung của Sinh kiến thức; không
+  có khối Tổng kết riêng. Thứ tự và `startSeconds` của section/block phải bám cue
+  transcript thật.
 - Đoạn văn, heading, danh sách và khoảng trắng mạch lạc; công thức Toán/Lý/Hóa
   dùng rich-text/LaTeX canonical để cùng renderer hiện có hiển thị đúng.
 - Video hoặc transcript thiếu/rỗng trả trạng thái disabled/lỗi thân thiện trước
   provider call; chapter rỗng không chặn generation.
 - Preview stale, output schema sai, budget không đủ hoặc provider lỗi không được
   ghi đè bản tóm tắt hợp lệ hiện hành.
-- Flow là admin-only trong `M15.9`; chưa tự mở thêm surface cho student.
+- Admin luôn xem và biên tập đầy đủ các khối Video Summary. Khối nằm
+  ngoài cửa sổ phát của học sinh hiển thị badge `Bị ẩn · Gốc <mốc>` dạng
+  disabled và không thể tua video; chỉ giao diện học sinh ẩn các khối này.
+- Flow tạo/sửa/phát hành là admin-only; student chỉ đọc bản đã phát
+  hành theo cửa sổ video được phép xem.
 
 ---
 
@@ -551,7 +584,9 @@ Các bước chung:
    sẽ thay block nhãn tâm do tool sở hữu nếu không có tham chiếu ngoài.
 10. Với Summary, output mới chỉ có năm loại block `knowledge`, `theorem`,
     `property`, `example`, `note`; mỗi theory đi liền một example, note giữ vị
-    trí phù hợp. Hình nguồn trực tiếp bổ trợ block ở phía trước hoặc phía sau thì
+    trí phù hợp. `objectives` là khối cấp cao do AI sinh và được đặt riêng ở đầu
+    giống Video Summary: đúng một ý cho mỗi section lý thuyết, cùng thứ tự; không
+    tạo ý cho section `Bài tập vận dụng`. Hình nguồn trực tiếp bổ trợ block ở phía trước hoặc phía sau thì
     Stage 1 bắt buộc tạo brief; backend không suy hình bằng tiêu đề/từ khóa.
     Example Hình học lớp 7–9 bắt buộc có bảng GT–KL; lớp 10–12 không có bảng này.
     Trong bước review, toolbar của `knowledge`, `property`, `theorem`, `note` cho
@@ -859,7 +894,8 @@ Các bước:
    transition chỉ mở ra khi route lesson đã commit.
 4. Backend kiểm tra quyền truy cập.
 5. UI hiển thị video, phiếu tài liệu, tóm tắt, quiz, flashcard, bài kiểm tra, ghi chú, comment riêng, chat AI, nút bài trước/bài tiếp theo.
-6. Student học nội dung.
+6. Student học nội dung; khi video YouTube đang phát, phím `ArrowLeft`/`ArrowRight`
+   tua lùi/tới theo bước tua của player và không chiếm phím khi đang nhập liệu.
 7. Student có thể tạo ghi chú/comment riêng.
 
 Acceptance Criteria:
@@ -894,15 +930,29 @@ Các bước:
 2. Nếu có lịch sử, UI cho chọn `Tiếp tục từ ...` hoặc `Xem lại từ đầu`.
 3. Khi video chạy, client mở playback session, gửi heartbeat nhẹ theo chu kỳ và flush khoảng đã xem khi pause, seek, đổi chapter, kết thúc hoặc rời trang.
 4. Student có thể tạo note theo timestamp, bấm note để quay lại mốc, làm checkpoint hoặc chọn `Hỏi đoạn này`/`Em chưa hiểu`.
-5. Context AI gồm timestamp hiện tại, chapter, một cửa sổ transcript lân cận và retrieval của đúng lesson; thiếu transcript thì fallback rõ ràng.
-6. Hệ thống cập nhật watched intervals/mastery và đề xuất chapter/đoạn nên ôn lại bằng nhiều tín hiệu.
-7. Student có thể tìm theo ý nghĩa trong transcript, bấm kết quả để phát từ đúng timestamp, hoặc bỏ qua recommendation.
+5. Trong sub-tab `Video`, Student chọn `Tất cả` để xem toàn bộ Video Summary hoặc
+   `Từng phần` để chỉ xem khối kiến thức/ví dụ có khoảng thời gian chứa thời điểm
+   video đang phát; bấm badge thời gian sẽ tua và phát video từ đúng mốc đó.
+6. Context AI gồm timestamp hiện tại, chapter, một cửa sổ transcript lân cận và retrieval của đúng lesson; thiếu transcript thì fallback rõ ràng.
+7. Hệ thống cập nhật watched intervals/mastery và đề xuất chapter/đoạn nên ôn lại bằng nhiều tín hiệu.
+8. Student có thể tìm theo ý nghĩa trong transcript, bấm kết quả để phát từ đúng timestamp, hoặc bỏ qua recommendation.
 
 Acceptance Criteria:
 
 - Tua thẳng tới cuối không làm watched percent thành 100%.
 - Resume, note, checkpoint, search result và AI source đều dùng timeline sau cắt mà học sinh nhìn thấy.
 - Video vẫn dùng được khi không có transcript.
+- Chế độ `Từng phần` dùng timeline phát sau cắt; một khối hoạt động từ
+  `startSeconds` của nó đến trước `startSeconds` của khối kế tiếp, khối cuối kéo
+  dài đến hết video và trước mốc đầu tiên hiển thị trạng thái chờ.
+- Chế độ `Tất cả` chỉ hiển thị khối đang bao phủ điểm bắt đầu đoạn
+  cắt và các khối nằm trong cửa sổ phát; các khối khác chỉ còn hiện
+  trong giao diện biên tập admin với nhãn bị ẩn.
+- Khối `Kiến thức bài giảng` chỉ hiển thị cho student khi mọi section đề mục lớn
+  của Video Summary còn ít nhất một khối trong cửa sổ phát; nếu đoạn cắt làm mất
+  hoàn toàn bất kỳ section nào thì ẩn khối này để tránh mô tả nội dung không còn xem được.
+- Chapter trên player và section Video Summary còn hiển thị cho student được đánh
+  lại liên tục từ `1` theo thứ tự sau cắt; admin và dữ liệu lưu vẫn giữ số gốc.
 - Chapter mastery không tự đánh dấu completed; completed vẫn theo `M7.5`.
 - Auto tracking không gửi request theo từng frame và không làm player/input bị giật.
 - Difficulty không được suy luận từ một event đơn lẻ; admin analytics chỉ hiển thị dữ liệu tổng hợp có ngưỡng riêng tư.

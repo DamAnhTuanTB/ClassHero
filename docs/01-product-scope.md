@@ -398,12 +398,24 @@ Mỗi buổi học gồm:
 - Phiếu tài liệu trước buổi học.
 - Ngày/giờ diễn ra hoặc ngày/giờ mở bài thi.
 - Link video bài giảng YouTube hoặc Google Drive.
-- Bản chép lời video tùy chọn theo từng mốc thời gian. Với video YouTube, admin có thể thử lấy caption công khai; hệ thống chỉ giữ phần nằm trong khoảng phát thực tế, ánh xạ timestamp về trục phát bắt đầu từ `0:00` sau khi cắt đầu/đuôi, gom các caption ngắn thành cụm dễ đọc, không gom qua ranh giới chapter, hiển thị tên/thời gian chapter, làm nổi bật và tự cuộn theo đoạn đang phát, đồng thời cho phát video từ từng mốc transcript trước khi admin duyệt/chỉnh sửa và lưu.
+- Với YouTube player tùy biến, khi video đang phát, học sinh có thể dùng phím mũi
+  tên trái/phải để tua lùi/tới theo đúng bước tua đã cấu hình.
+- Bản chép lời video tùy chọn theo từng mốc thời gian. Với video YouTube, admin có
+  thể thử lấy toàn bộ caption công khai và chapter của video gốc. UI hiển thị đồng
+  thời thời gian sau cắt và thời gian gốc; chapter/cue nằm ngoài khoảng phát vẫn
+  xuất hiện đầy đủ nhưng ở trạng thái disabled, không cho chỉnh sửa, xóa hoặc
+  phát. Các mục trong khoảng phát được ánh xạ về trục bắt đầu tại `0:00`, làm nổi
+  bật và tự cuộn theo đoạn đang phát, đồng thời cho phát video từ từng mốc trước
+  khi admin duyệt/chỉnh sửa và lưu.
 - Bản tóm tắt video AI tùy chọn, độc lập với `Tóm tắt bài học`: trình bày ngắn
-  gọn các phần nội dung chính, nội dung của từng phần và những vấn đề người học
-  có thể giải quyết sau khi xem. Output ưu tiên bám chapter đã cấu hình, hỗ trợ
-  công thức Toán/Lý/Hóa đúng rich-text/LaTeX và bị stale khi nguồn video,
-  transcript, chapter hoặc cấu hình cắt thay đổi.
+  gọn các phần nội dung chính và nội dung của từng phần. Output ưu tiên bám
+  chapter đã cấu hình, hỗ trợ
+  công thức Toán/Lý/Hóa đúng rich-text/LaTeX. Khi Video URL đổi hoặc bị xóa,
+  hệ thống xóa bản tóm tắt video hiện hành và reset chapter/transcript vì các dữ
+  liệu này không còn cùng nguồn; thay đổi riêng transcript/chapter làm bản tóm
+  tắt hiện hành bị stale. Ở giao diện học sinh, bản này
+  có chế độ xem toàn bộ hoặc chỉ hiện khối kiến thức/ví dụ đang ứng với thời gian
+  phát hiện tại của video.
 - PDF tài liệu sách giáo khoa/tài liệu bài học.
 - Tóm tắt bài học.
 - Quiz.

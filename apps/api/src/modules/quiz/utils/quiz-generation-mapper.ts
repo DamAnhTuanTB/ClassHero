@@ -1,6 +1,7 @@
 import {
-  normalizeMathTextLatexCommands,
-  normalizeMissingInlineMathClosers,
+  hasMalformedMathText,
+  normalizeLearnerMathTextSyntax,
+  normalizeThreePointAngleNotation,
   tokenizeMathText,
 } from "@learning-path/shared";
 import { QuestionType } from "@prisma/client";
@@ -10,11 +11,7 @@ import {
   type GeneratedQuizQuestion,
   type QuizExplanationBlock,
 } from "#api/modules/quiz/types/quiz-generation.types";
-
-const BRACED_THREE_POINT_ANGLE_PATTERN =
-  /\\angle\s*\{([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})\}/gu;
-const THREE_POINT_ANGLE_PATTERN =
-  /\\angle\s+([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})(?![A-Za-z0-9_'′″₀-₉])/gu;
+import { normalizeQuizInlineMathDelimiters } from "#api/modules/quiz/utils/quiz-generation-math-normalizer";
 
 export function toQuizTiptap(text: string) {
   return toQuizTiptapDocument(text, false);
@@ -25,9 +22,7 @@ export function toQuizSolutionTiptap(text: string) {
 }
 
 function toQuizTiptapDocument(text: string, parseStrongMarkdown: boolean) {
-  const normalizedText = normalizeMathTextLatexCommands(
-    normalizeMissingInlineMathClosers(normalizeQuizAngleNotation(text)),
-  );
+  const normalizedText = normalizeQuizLearnerText(text);
   const content: Array<Record<string, unknown>> = [];
   let inlineContent: Array<Record<string, unknown>> = [];
   const flushParagraph = () => {
@@ -66,8 +61,8 @@ export function mapGeneratedQuizQuestion(question: GeneratedQuizQuestion) {
   const solution = getGeneratedQuizSolutionText(question);
   const block: QuizExplanationBlock = {
     type: "quizExplanation",
-    problem: normalizeQuizAngleNotation(question.explanation.problem),
-    solution: normalizeQuizAngleNotation(solution),
+    problem: normalizeQuizLearnerText(question.explanation.problem),
+    solution: normalizeQuizLearnerText(solution),
     ...("isGeometry" in question.explanation
       ? { isGeometry: question.explanation.isGeometry }
       : {}),
@@ -80,11 +75,12 @@ export function mapGeneratedQuizQuestion(question: GeneratedQuizQuestion) {
     hintJson: question.hint ? toQuizTiptap(question.hint) : null,
     explanationJson: toQuizSolutionTiptap(block.solution),
     explanationBlock: block,
-    recoveryIssues: [] as Array<{
+    recoveryIssues: collectQuizMathSyntaxIssues(question) as Array<{
       classification: "REVIEWABLE";
       code: string;
       message: string;
       technicalDetails?: string;
+      blocking: false;
     }>,
   };
 
@@ -147,18 +143,44 @@ export function getGeneratedQuizSolutionText(question: GeneratedQuizQuestion) {
   throw new Error("Generated quiz explanation does not contain a solution.");
 }
 
-function normalizeQuizAngleNotation(value: string) {
-  return value
-    .replace(
-      BRACED_THREE_POINT_ANGLE_PATTERN,
-      (_, first: string, vertex: string, second: string) =>
-        `\\widehat{${first}${vertex}${second}}`,
-    )
-    .replace(
-      THREE_POINT_ANGLE_PATTERN,
-      (_, first: string, vertex: string, second: string) =>
-        `\\widehat{${first}${vertex}${second}}`,
-    );
+export function normalizeQuizLearnerText(value: string) {
+  return normalizeLearnerMathTextSyntax(
+    normalizeQuizInlineMathDelimiters(normalizeThreePointAngleNotation(value)),
+  );
+}
+
+function collectQuizMathSyntaxIssues(question: GeneratedQuizQuestion) {
+  const candidates: Array<{ path: string; value: string }> = [
+    { path: "explanation.problem", value: question.explanation.problem },
+    { path: "explanation.solution", value: getGeneratedQuizSolutionText(question) },
+    ...(question.hint ? [{ path: "hint", value: question.hint }] : []),
+    ...(question.questionType === QuestionType.MULTIPLE_CHOICE
+      ? question.options.map((option, index) => ({
+          path: `options.${index}.text`,
+          value: option.text,
+        }))
+      : []),
+    ...(question.questionType === QuestionType.MULTI_STATEMENT_TRUE_FALSE
+      ? question.statements.map((statement, index) => ({
+          path: `statements.${index}.text`,
+          value: statement.text,
+        }))
+      : []),
+  ];
+  const malformed = candidates.filter(({ value }) =>
+    hasMalformedMathText(normalizeQuizLearnerText(value)),
+  );
+  if (malformed.length === 0) return [];
+  return [
+    {
+      classification: "REVIEWABLE" as const,
+      code: "MALFORMED_LATEX",
+      message:
+        "Một số công thức LaTeX vẫn chưa cân bằng sau bước chuẩn hóa; cần admin kiểm tra.",
+      technicalDetails: `paths=${malformed.map(({ path }) => path).join(",")}`,
+      blocking: false as const,
+    },
+  ];
 }
 
 function parseStrongMarkdownText(value: string): Array<Record<string, unknown>> {

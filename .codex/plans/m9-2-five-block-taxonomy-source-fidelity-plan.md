@@ -379,10 +379,15 @@ Không được:
 
 ### 4.5. Objectives
 
-- Nếu nguồn có “Kiến thức, kĩ năng”, “Mục tiêu”, “Yêu cầu cần đạt” hoặc nhãn có
-  cùng chức năng, chỉ chuẩn hóa objectives từ phần đó.
-- Nếu nguồn không có phần tương ứng, trả `objectives=null`.
-- Không tự thêm mục tiêu giáo dục chung ngoài PDF packet.
+- `objectives` là field cấp cao do provider sinh và UI đặt thành khối riêng ở đầu,
+  cùng cấu trúc với Video Summary.
+- Trả đúng một objective cho mỗi theory section và theo cùng thứ tự. Mỗi ý mô tả
+  ngắn gọn kiến thức hoặc năng lực trọng tâm của section tương ứng, vẫn phải bám
+  PDF packet nhưng không bắt buộc sao chép `displayHeading` hay phụ thuộc tài liệu
+  có sẵn nhãn “Mục tiêu”.
+- Không tạo objective riêng cho Ví dụ, Luyện tập, Vận dụng, Bài tập, tiểu mục
+  hoặc section `Bài tập vận dụng`; không tự thêm mục tiêu giáo dục chung ngoài
+  phạm vi kiến thức của PDF packet.
 
 ## 5. Phạm vi code tối thiểu khi triển khai
 

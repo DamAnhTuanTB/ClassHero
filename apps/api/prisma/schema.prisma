@@ -546,6 +546,7 @@ model User {
   enrollmentsAsStudent            Enrollment[]              @relation("EnrollmentStudent")
   enrollmentsPaid                 Enrollment[]              @relation("EnrollmentPaidBy")
   lessonProgress                  LessonProgress[]          @relation("LessonProgressStudent")
+  videoPlaybackProgress           VideoPlaybackProgress[]   @relation("VideoPlaybackProgressStudent")
   generatedQuizSets               QuizSet[]                 @relation("QuizSetGeneratedBy")
   createdQuizSets                 QuizSet[]                 @relation("QuizSetCreatedBy")
   updatedQuizSets                 QuizSet[]                 @relation("QuizSetUpdatedBy")
@@ -881,6 +882,7 @@ model Lesson {
   summary                   LessonSummary?
   videoSummary              LessonVideoSummary?
   progressEntries           LessonProgress[]
+  videoPlaybackProgress     VideoPlaybackProgress[]
   quizSets                  QuizSet[]
   quizQuestions             QuizQuestion[]
   quizAttempts              QuizAttempt[]
@@ -1480,13 +1482,29 @@ model LessonProgress {
   @@map("lesson_progress")
 }
 
+model VideoPlaybackProgress {
+  id                  String   @id @default(uuid()) @db.Uuid
+  studentUserId       String   @map("student_user_id") @db.Uuid
+  studentUser         User     @relation("VideoPlaybackProgressStudent", fields: [studentUserId], references: [id], onDelete: Cascade)
+  lessonId            String   @map("lesson_id") @db.Uuid
+  lesson              Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  timelineVersion     String   @map("timeline_version") @db.VarChar(64)
+  lastPositionSeconds Float    @default(0) @map("last_position_seconds")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@unique([studentUserId, lessonId])
+  @@index([lessonId, updatedAt])
+  @@map("video_playback_progress")
+}
+
 model QuizSet {
   id                String         @id @default(uuid()) @db.Uuid
   lessonId          String         @map("lesson_id") @db.Uuid
   lesson            Lesson         @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   title             String
   source            ContentSource  @default(ADMIN)
-  reviewStatus      ReviewStatus   @default(APPROVED) @map("review_status")
+  reviewStatus      ReviewStatus   @default(DRAFT) @map("review_status")
   isReserve         Boolean        @default(false) @map("is_reserve")
   generatedByUserId String?        @map("generated_by_user_id") @db.Uuid
   generatedByUser   User?          @relation("QuizSetGeneratedBy", fields: [generatedByUserId], references: [id], onDelete: SetNull)
@@ -1527,7 +1545,7 @@ model QuizQuestion {
   gradingConfigJson  Json?               @map("grading_config_json")
   sourceMetadataJson Json?               @map("source_metadata_json")
   difficulty         Difficulty          @default(MEDIUM)
-  reviewStatus       ReviewStatus        @default(APPROVED) @map("review_status")
+  reviewStatus       ReviewStatus        @default(NEEDS_REVIEW) @map("review_status")
   publishedAt        DateTime?           @map("published_at")
   explanationId      String?             @map("explanation_id") @db.Uuid
   explanation        AiExplanation?      @relation("QuizQuestionExplanation", fields: [explanationId], references: [id], onDelete: SetNull)
@@ -1707,7 +1725,7 @@ model FlashcardSet {
   title             String
   difficulty        Difficulty              @default(MIXED)
   source            ContentSource           @default(ADMIN)
-  reviewStatus      ReviewStatus            @default(APPROVED) @map("review_status")
+  reviewStatus      ReviewStatus            @default(DRAFT) @map("review_status")
   isReserve         Boolean                 @default(false) @map("is_reserve")
   generatedByUserId String?                 @map("generated_by_user_id") @db.Uuid
   generatedByUser   User?                   @relation("FlashcardSetGeneratedBy", fields: [generatedByUserId], references: [id], onDelete: SetNull)
@@ -1746,7 +1764,7 @@ model Flashcard {
   hintJson           Json?                       @map("hint_json")
   sourceMetadataJson Json?                       @map("source_metadata_json")
   difficulty         Difficulty                  @default(MEDIUM)
-  reviewStatus       ReviewStatus                @default(APPROVED) @map("review_status")
+  reviewStatus       ReviewStatus                @default(NEEDS_REVIEW) @map("review_status")
   publishedAt        DateTime?                   @map("published_at")
   sortOrder          Int                         @default(0) @map("sort_order")
   createdAt          DateTime                    @default(now()) @map("created_at")
@@ -1934,7 +1952,7 @@ model TestSet {
   difficulty          Difficulty     @default(MIXED)
   difficultyRatioJson Json?          @map("difficulty_ratio_json")
   source              ContentSource  @default(ADMIN)
-  reviewStatus        ReviewStatus   @default(APPROVED) @map("review_status")
+  reviewStatus        ReviewStatus   @default(DRAFT) @map("review_status")
   isReserve           Boolean        @default(false) @map("is_reserve")
   generatedByUserId   String?        @map("generated_by_user_id") @db.Uuid
   generatedByUser     User?          @relation("TestSetGeneratedBy", fields: [generatedByUserId], references: [id], onDelete: SetNull)
@@ -1977,7 +1995,7 @@ model TestQuestion {
   sourceMetadataJson Json?               @map("source_metadata_json")
   points             Decimal?            @db.Decimal(5, 2)
   difficulty         Difficulty          @default(MEDIUM)
-  reviewStatus       ReviewStatus        @default(APPROVED) @map("review_status")
+  reviewStatus       ReviewStatus        @default(NEEDS_REVIEW) @map("review_status")
   publishedAt        DateTime?           @map("published_at")
   explanationId      String?             @map("explanation_id") @db.Uuid
   explanation        AiExplanation?      @relation("TestQuestionExplanation", fields: [explanationId], references: [id], onDelete: SetNull)

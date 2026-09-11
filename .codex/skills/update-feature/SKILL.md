@@ -1,117 +1,71 @@
 ---
 name: update-feature
-description: Update an existing feature in the Vietnamese learning-path project from commands like "/update-feature đổi thanh toán 12 tháng thành 6 tháng" or "/update-feature tính năng abc bây giờ làm như này". Use when Codex must identify the existing feature, update the right source-of-truth docs and roadmap task codes as a docs/planning-only step by default, keep the approved stack/MVP guardrails, update API/database/UI/AI/implementation docs as needed, avoid production code changes unless the owner explicitly asks to implement now, run docs checks, explain the planned changed technical flow, and suggest the next implementation task command with task code when possible.
+description: Update an existing feature in the Vietnamese learning-path project from `/update-feature ...`, `đổi tính năng ...`, or `sửa logic tính năng ...`. Update the affected source-of-truth docs and roadmap task codes by default; implement production behavior only when the owner explicitly asks to do it now.
 ---
 
-# Update Feature Runner
+# Update Feature
 
-Use this skill when the owner changes how an existing feature should work.
+Use for an intentional behavior change to an existing feature, not for a defect
+whose intended contract is unchanged. Ask one concise question only when the
+feature or desired behavior cannot be identified safely.
 
-## Command Parsing
+## Authority And Mode
 
-Accept:
+- Invoking `/update-feature` authorizes docs and planning changes, not production
+  code by itself.
+- Inspection, discussion, or a plan request without permission to save changes is
+  read-only: answer in chat and do not edit the repo.
+- Implement now only when the same request explicitly asks for implementation or
+  gives an unmistakable direct imperative to change the running feature. Otherwise
+  finish the docs update and recommend the appropriate `/task-*` command.
+- Never claim the feature is implemented when only its contract or plan changed.
 
-- `/update-feature <change description>`
-- `/update feature <change description>`
-- `đổi tính năng <feature> thành <new behavior>`
-- `sửa logic tính năng <description>`
+## Minimal Context
 
-If the change is too vague to identify the feature or desired behavior, ask one concise question.
+1. Apply the runtime `AGENTS.md`; do not reopen it mechanically.
+2. Search for the owning feature and task code. Read the affected product/flow
+   sections and the complete matching `docs/implementation/Mx.md` subtask block.
+3. Use the Task Routing Map in `AGENTS.md` to load only affected contract sections.
+   Read dependency, coverage, context, or execution-plan entries only when the
+   requested change can alter them.
+4. Inspect current code and direct call sites enough to confirm the real boundary,
+   then inspect `git status --short`.
+5. State a short plan covering behavior, affected sources/tasks, implementation
+   mode, cross-layer impact, and checks.
 
-## Required Startup
+Expand context only when evidence shows another contract or consumer is affected.
 
-Before editing:
+## Update Rules
 
-1. Apply the runtime-provided `AGENTS.md`; do not reopen it mechanically.
-2. Read only the affected product-scope and user-flow sections.
-3. Search the roadmap and read the matching subtask block if the feature maps to a milestone.
-4. Read only affected dependency-graph and coverage-matrix entries.
-5. Read only the affected sections/files in domain docs:
-   - UI: `docs/08-ui-pages-and-components.md`, `docs/11-ui-design-system.md`.
-   - API: `docs/05-api-contract.md` and matching `docs/api/` file.
-   - Database: `docs/04-database-model.md` and matching `docs/database/` file.
-   - AI/RAG: `docs/06-ai-rag-spec.md`.
-   - Env/integration: `docs/07-integration-and-env.md`.
-   - Performance/observability: `docs/12-performance-and-observability.md` if list/search/cache, latency-sensitive flow, database query, worker/job, AI call, or observability behavior changes.
-   - SEO/public discovery: `docs/13-seo-and-content-discovery.md` if public indexability, metadata, sitemap, robots, canonical, structured data or search-discovery behavior changes.
-6. Inspect existing code only enough to understand boundaries; do not plan production edits unless the owner explicitly asks to implement now.
-7. Inspect `git status --short`.
-8. Give a short plan: feature being changed, docs to update, task codes affected, checks, and whether implementation should be a later `/task-*` step.
+- Keep the approved stack and unrelated behavior unchanged. The owner's latest
+  scoped decision wins; report any conflict with existing MVP or contracts.
+- Update only sources whose facts change: product/flow, API, database, UI, AI/RAG,
+  env/integration, performance, SEO, source structure, and implementation docs.
+- Trace contract changes across every real consumer. For example, removing a field
+  normally requires checking UI, payload/types, API/service, DB/worker, tests, and
+  docs unless the owner explicitly requests a UI-only hide.
+- Prefer updating the existing task code that owns the feature. Add a code only for
+  independently implementable work; do not renumber existing codes without an
+  explicit request.
+- Update order, dependency graph, coverage matrix, context, or execution plan only
+  when that information actually changes. Record an ADR only for a durable decision.
+- Split large implementation work into scoped follow-up tasks. Do not perform a
+  destructive migration or production action without the authority required by
+  `AGENTS.md`.
 
-## Rules
+If implementation is explicitly requested, preserve this contract and follow the
+relevant task workflow for code edits and proportional verification.
 
-- Treat this as a feature behavior change, not a bug fix.
-- This skill is docs/planning-only by default.
-- A direct imperative that clearly asks to change the running feature now, such
-  as “bỏ field này cho tôi”, “sửa logic này” or “đổi thành behavior này”, counts
-  as an explicit implementation request unless the owner says they only want a
-  plan/discussion. Do not report the feature as changed when only docs changed.
-- If the owner only asks to inspect, discuss, or "lên kế hoạch" and does not
-  explicitly ask to save/update docs or invoke `/update-feature`, return the plan
-  in chat only. Do not edit repository docs, plans, context, roadmap, or code.
-- Do not edit production code unless the owner explicitly says to implement in the same request.
-- Do not change stack.
-- Do not add behavior outside the owner's requested change.
-- Update docs so they remain the source of truth before any later implementation.
-- If the requested change conflicts with MVP scope or previous docs, state the conflict and apply the owner's latest decision only within the requested feature.
-- If the change is large, split it into follow-up implementation tasks.
-- If data removal, destructive migration, payment, auth, security, or production-impacting behavior is involved, stop and ask before destructive action.
+## Verify And Finish
 
-## Documentation Updates
+- Docs-only: run formatting or docs validation when available and
+  `git diff --check` on the affected files.
+- With implementation: also run checks proportional to every changed layer.
+- Do not update the changelog or commit; those belong to `/commit`.
+- Before final, call `.codex/scripts/notify-task.sh` with `done`, `blocked`, or
+  `failed`; notification failure does not fail the task.
 
-When scope is clear:
-
-- Product/flow: update product scope and user flow docs.
-- API: update API index/file if request/response/side effect changes.
-- Database: update database index/file if schema/model meaning changes.
-- UI: update UI docs if screens/components/UX expectations change.
-- AI/RAG: update AI/RAG docs if prompts/schema/cache/retrieval behavior changes.
-- Performance/observability: update performance docs if budgets, cache/index/query/job/AI latency, or observability standards change.
-- SEO/public discovery: update SEO docs if index/noindex, metadata, sitemap, robots, canonical, structured data or public content discovery changes.
-- Implementation plan: update `docs/implementation/Mx.md` if subtask scope/Done changes; update `docs/09-implementation-plan.md` only if order/dependencies change.
-- Coverage/dependencies: update `docs/implementation/feature-coverage-matrix.md` or `docs/implementation/dependency-graph.md` when layer coverage, status, order, or dependency changes.
-- Decision log: add/update `docs/decisions/` only for important long-term decisions.
-
-## Task Code Rules
-
-If the feature change affects roadmap/subtask codes:
-
-- Prefer updating the existing task code that owns the feature, for example change scope/`Done khi` in `docs/implementation/M8.md` for `M8.3`.
-- Create a new task code only when the change creates a clearly separate piece of work that should be implemented/reviewed independently.
-- Do not renumber existing task codes unless the owner explicitly asks; renumbering breaks references.
-- If dependencies or execution order change, update `docs/09-implementation-plan.md`.
-- If feature coverage or dependency graph changes, update the matching helper docs.
-- If `.codex/plans/codex-execution-plan.md` exists and the change affects near-term execution order/TODOs, update it too.
-- Mention in the final response which task code was updated, added, or left unchanged.
-
-## Verification
-
-Run checks proportional to risk:
-
-- Docs-only by default: `git diff --check`.
-- If the owner explicitly requested implementation in the same request, run code checks proportional to changed code.
-
-Do not update changelog in this workflow. Changelog is written only during `/commit` for the commit being created.
-
-## Completion Notification
-
-Before the final response, call `.codex/scripts/notify-task.sh` from the repo root:
-
-- `done` when the feature update or plan is complete.
-- `blocked` when owner input is needed before continuing.
-- `failed` when docs/code checks fail and the task cannot be finished in this turn.
-
-Use a concrete task label such as `/update-feature <short feature>`. Keep the message short, outcome-focused, and free of secrets. Notification failure must not block the final response.
-
-## Final Response
-
-Include:
-
-- Feature changed and new behavior.
-- Docs updated.
-- Task code updated/added/left unchanged.
-- No production code changed, unless explicitly requested.
-- Planned technical flow after the change.
-- Checks run or skipped with reason.
-- Risks/TODO/ASSUMPTION.
-- Suggested next implementation command with task code when possible, for example `/task-ui Mx.y`, `/task-connect Mx.y`, or `/task-full Mx.y`; include the task `Mode` and a one-sentence description of what that implementation task does.
+Report the new behavior, sources changed, task-code decision, implementation
+status, technical flow, checks, and any risk or assumption. When code remains,
+suggest the next `/task-ui`, `/task-connect`, or `/task-full` command with its task
+code, Mode, and one-sentence scope.

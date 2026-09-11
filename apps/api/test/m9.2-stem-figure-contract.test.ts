@@ -9,6 +9,7 @@ import {
   getGeneratedTestOutputSchema,
   LESSON_CONTENT_PROMPT_VERSIONS,
 } from "#api/modules/ai/types/lesson-content-generation.types";
+import { mapGeneratedQuestion } from "#api/modules/ai/utils/lesson-content-generation-mapper";
 import {
   getLessonSummaryProviderTransportOutputSchema,
   LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION,
@@ -1269,6 +1270,51 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     );
   });
 
+  it("flags malformed LaTeX inside geometry GT/KL without blocking the Summary", () => {
+    const output = buildMathProviderOutput({
+      title: "Tứ giác nội tiếp",
+      displayHeading: "Góc đối",
+      theoryContent: "Hai góc đối có tổng bằng $180^\\circ$.",
+      illustrationProblem: "Chứng minh hai góc bù nhau.",
+    });
+    const mapped = mapLessonSummaryProviderOutput({
+      lessonId,
+      output,
+      packetPageCount: 1,
+      targetGrade: 9,
+      subjectKey: "MATH",
+    });
+    const malformed = structuredClone(mapped.content);
+    const example = malformed.sections[0]?.blocks[1];
+    if (!example || example.type !== "example") throw new Error("Expected example.");
+    example.isGeometry = true;
+    example.geometryStatement = {
+      hypotheses: [String.raw`$AB_{1$ là cạnh đã cho.`],
+      conclusions: ["Hai góc bù nhau."],
+    };
+
+    const reviewed = reconcileLessonSummaryReviewIssues({
+      type: "lesson_summary_blocks",
+      version: 3,
+      data: malformed,
+    });
+    const reviewedExample = (
+      reviewed.data as {
+        sections: Array<{ blocks: Array<{ reviewIssues?: ReviewIssue[] }> }>;
+      }
+    ).sections[0]?.blocks[1];
+
+    expect(reviewedExample?.reviewIssues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "MALFORMED_LATEX",
+          path: "sections.0.blocks.1.geometryStatement.hypotheses.0",
+          resolution: "FIX_ONLY",
+        }),
+      ]),
+    );
+  });
+
   it("keeps the exact Phase 1 provider object for every mapped Summary block", () => {
     const output = buildMathProviderOutput({
       title: "Phương trình đường thẳng",
@@ -1326,7 +1372,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       blocks,
       snapshot: {
         type: "lesson_summary_phase_one_blocks",
-        version: 2,
+        version: 3,
         providerOutput: output,
         blocks: mapped.phaseOneBlocks,
         providerPaths: mapped.phaseOneProviderPaths,
@@ -1343,6 +1389,102 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       content: "Nội dung đã sửa trên raw JSON.",
     });
     expect(result.mapped.figures).toEqual([]);
+  });
+
+  it("normalizes measured three-point angles and missing terminal math closers before persistence", () => {
+    const output = buildMathProviderOutput({
+      title: "Tứ giác nội tiếp",
+      displayHeading: "Tổng hai góc đối",
+      theoryContent: "Hai góc đối của tứ giác nội tiếp có tổng bằng $180^\\circ$.",
+      illustrationProblem: String.raw`Cho $ABCD$ nội tiếp đường tròn $(O)$. Biết $m\angle DAB=70^\circ$.`,
+    });
+    const item = output.theorySections[0]?.items[0];
+    if (!item || item.itemType !== "UNIT") throw new Error("Expected UNIT fixture.");
+    output.title = String.raw`Bài $m\angle ABC$`;
+    output.objectives[0] = String.raw`Hiểu $m\angle ABC$`;
+    output.theorySections[0]!.displayHeading = String.raw`1. Góc $m\angle ABC$`;
+    item.theory.title = String.raw`Số đo $m\angle ABC$`;
+    item.theory.content = String.raw`Ta có $m\angle ABC=70^\circ$.`;
+    item.example.solution = String.raw`Ta có $m\angle DAB+m\angle BCD=180^\circ$.`;
+    item.example.answer = String.raw`$m\angle BCD=110^\circ$.`;
+    item.example.isGeometry = true;
+    item.example.geometryStatement = {
+      hypotheses: [String.raw`Tứ giác $ABCD$ nội tiếp đường tròn $(O).`],
+      conclusions: [String.raw`Tính $\angle BCD$.`],
+    };
+    output.theorySections[0]!.items.push({
+      itemType: "NOTE",
+      note: {
+        type: "note",
+        content: String.raw`Lưu ý $m\angle ABC=70^\circ$.`,
+        sourcePageNumbers: [1],
+      },
+    });
+
+    const mapped = mapLessonSummaryProviderOutput({
+      lessonId,
+      output,
+      packetPageCount: 1,
+      targetGrade: 9,
+      subjectKey: "MATH",
+    });
+    const example = mapped.content.sections[0]?.blocks[1];
+
+    expect(mapped.content.title).toBe(String.raw`Bài $\widehat{ABC}$`);
+    expect(mapped.content.objectives[0]).toBe(String.raw`Hiểu $\widehat{ABC}$`);
+    expect(mapped.content.sections[0]?.displayHeading).toBe(
+      String.raw`Góc $\widehat{ABC}$`,
+    );
+    expect(mapped.content.sections[0]?.blocks[0]).toMatchObject({
+      type: "knowledge",
+      title: String.raw`Số đo $\widehat{ABC}$`,
+      content: String.raw`Ta có $\widehat{ABC}=70^\circ$.`,
+    });
+    expect(mapped.content.sections[0]?.blocks[2]).toMatchObject({
+      type: "note",
+      content: String.raw`$\widehat{ABC}=70^\circ$.`,
+    });
+
+    expect(example).toMatchObject({
+      type: "example",
+      problem: String.raw`Cho $ABCD$ nội tiếp đường tròn $(O)$. Biết $\widehat{DAB}=70^\circ$.`,
+      solution: String.raw`Ta có $\widehat{DAB}+\widehat{BCD}=180^\circ$.`,
+      answer: String.raw`$\widehat{BCD}=110^\circ$.`,
+      geometryStatement: {
+        hypotheses: [String.raw`Tứ giác $ABCD$ nội tiếp đường tròn $(O)$.`],
+        conclusions: [String.raw`Tính $\widehat{BCD}$.`],
+      },
+    });
+  });
+
+  it("normalizes Test text and keeps unrepairable LaTeX as a non-blocking warning", () => {
+    const mapped = mapGeneratedQuestion({
+      questionType: QuestionType.TRUE_FALSE,
+      difficulty: Difficulty.EASY,
+      example: {
+        problem: String.raw`Biết $m\angle ABC=70^\circ$.`,
+        solution: String.raw`Ngoặc $x_{1$ chưa cân bằng.`,
+        answer: "Sai.",
+        geometryStatement: {
+          hypotheses: [String.raw`$m\angle ABC=70^\circ$`],
+          conclusions: ["Mệnh đề sai."],
+        },
+      },
+      sourceChunkIds: [chunkId],
+      correctAnswer: false,
+    });
+
+    expect(mapped.exampleBlock.problem).toBe(String.raw`Biết $\widehat{ABC}=70^\circ$.`);
+    expect(mapped.exampleBlock.geometryStatement?.hypotheses[0]).toBe(
+      String.raw`$\widehat{ABC}=70^\circ$`,
+    );
+    expect(mapped.recoveryIssues).toEqual([
+      expect.objectContaining({
+        code: "MALFORMED_LATEX",
+        blocking: false,
+        technicalDetails: "paths=example.solution",
+      }),
+    ]);
   });
 
   it("accepts an admin GT/KL override even when the provider grade schema requires null", () => {
@@ -1372,7 +1514,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       blocks,
       snapshot: {
         type: "lesson_summary_phase_one_blocks",
-        version: 2,
+        version: 3,
         providerOutput: output,
         blocks: mapped.phaseOneBlocks,
         providerPaths: mapped.phaseOneProviderPaths,
@@ -1412,7 +1554,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     const prepared = prepareLessonSummaryPhaseOneLayoutEdits(
       {
         type: "lesson_summary_phase_one_blocks",
-        version: 2,
+        version: 3,
         providerOutput: output,
         blocks: mapped.phaseOneBlocks,
         providerPaths: mapped.phaseOneProviderPaths,
@@ -1468,7 +1610,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     const prepared = prepareLessonSummaryPhaseOneLayoutEdits(
       {
         type: "lesson_summary_phase_one_blocks",
-        version: 2,
+        version: 3,
         providerOutput: output,
         blocks: mapped.phaseOneBlocks,
         providerPaths: mapped.phaseOneProviderPaths,
@@ -1542,7 +1684,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     const prepared = prepareLessonSummaryPhaseOneLayoutEdits(
       {
         type: "lesson_summary_phase_one_blocks",
-        version: 2,
+        version: 3,
         providerOutput: output,
         blocks: mapped.phaseOneBlocks,
         providerPaths: mapped.phaseOneProviderPaths,
@@ -1596,7 +1738,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       blocks,
       snapshot: {
         type: "lesson_summary_phase_one_blocks",
-        version: 2,
+        version: 3,
         providerOutput: output,
         blocks: mapped.phaseOneBlocks,
         providerPaths: mapped.phaseOneProviderPaths,
@@ -1727,7 +1869,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
   it("accepts a local light-mode figure brief and maps it to a durable draft", () => {
     const providerOutput = lessonSummaryProviderTransportOutputSchema.parse({
       title: "Tam giác vuông",
-      objectives: ["Nhận biết tam giác vuông"],
+      objectives: ["Nhận biết tam giác vuông và tính chất góc vuông."],
       theorySections: [
         {
           displayHeading: "Tam giác vuông",
@@ -3742,7 +3884,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       allowed: ["hình học", "isGeometry", "geometryStatement", "GT–KL"],
       forbidden: ["circuitikz", "chemfig", "mhchem"],
       heading: "# SYSTEM PROMPT SINH KIẾN THỨC MÔN TOÁN",
-      promptVersion: "lesson-summary-math-v41-lesson-core-exercise-diversity",
+      promptVersion: "lesson-summary-math-v45-math-syntax-contract",
       forbiddenHeadings: [
         "SYSTEM PROMPT SINH KIẾN THỨC MÔN VẬT LÝ",
         "SYSTEM PROMPT SINH KIẾN THỨC MÔN HÓA HỌC",
@@ -3761,7 +3903,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
         "GT–KL",
       ],
       heading: "# SYSTEM PROMPT SINH KIẾN THỨC MÔN VẬT LÝ",
-      promptVersion: "lesson-summary-physics-v37-lesson-core-exercise-diversity",
+      promptVersion: "lesson-summary-physics-v40-math-syntax-contract",
       forbiddenHeadings: [
         "SYSTEM PROMPT SINH KIẾN THỨC MÔN TOÁN",
         "SYSTEM PROMPT SINH KIẾN THỨC MÔN HÓA HỌC",
@@ -3780,7 +3922,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
         "GT–KL",
       ],
       heading: "# SYSTEM PROMPT SINH KIẾN THỨC MÔN HÓA HỌC",
-      promptVersion: "lesson-summary-chemistry-v37-lesson-core-exercise-diversity",
+      promptVersion: "lesson-summary-chemistry-v40-math-syntax-contract",
       forbiddenHeadings: [
         "SYSTEM PROMPT SINH KIẾN THỨC MÔN TOÁN",
         "SYSTEM PROMPT SINH KIẾN THỨC MÔN VẬT LÝ",
@@ -3825,27 +3967,27 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     {
       subject: { key: "MATH" as const, name: "Toán", slug: "toan" },
       lessonTitle: "Phương trình bậc hai",
-      promptVersion: "lesson-summary-math-v41-lesson-core-exercise-diversity",
+      promptVersion: "lesson-summary-math-v45-math-syntax-contract",
     },
     {
       subject: { key: "MATH" as const, name: "Toán", slug: "toan" },
       lessonTitle: "Tứ giác nội tiếp",
-      promptVersion: "lesson-summary-math-v41-lesson-core-exercise-diversity",
+      promptVersion: "lesson-summary-math-v45-math-syntax-contract",
     },
     {
       subject: { key: "PHYSICS" as const, name: "Vật lý", slug: "vat-ly" },
       lessonTitle: "Công và công suất",
-      promptVersion: "lesson-summary-physics-v37-lesson-core-exercise-diversity",
+      promptVersion: "lesson-summary-physics-v40-math-syntax-contract",
     },
     {
       subject: { key: "CHEMISTRY" as const, name: "Hóa học", slug: "hoa-hoc" },
       lessonTitle: "Nồng độ dung dịch",
-      promptVersion: "lesson-summary-chemistry-v37-lesson-core-exercise-diversity",
+      promptVersion: "lesson-summary-chemistry-v40-math-syntax-contract",
     },
     {
       subject: { key: "GENERAL" as const, name: "Môn khác", slug: "mon-khac" },
       lessonTitle: "Bài học tổng quát",
-      promptVersion: "lesson-summary-general-v37-lesson-core-exercise-diversity",
+      promptVersion: "lesson-summary-general-v40-math-syntax-contract",
     },
   ])(
     "classifies real-world exercises and keeps AI-authored exercises diverse for $subject.name — $lessonTitle",
@@ -4477,6 +4619,9 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     });
 
     expect(request.systemPrompt).toContain("sourceTarget");
+    expect(request.systemPrompt).toContain("`$\\widehat{ABC}$`");
+    expect(request.systemPrompt).toContain("không viết `$m\\angle ABC$`");
+    expect(request.systemPrompt).toContain("không đổi cung thành góc");
     expect(request.systemPrompt).toContain("ảnh là thẩm quyền duy nhất");
     expect(request.systemPrompt).toContain(
       "Nội dung block chỉ dùng để nhận diện và kiểm tra đúng bài",
@@ -4515,11 +4660,9 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     expect(request.systemPrompt).toContain("`\\Leftrightarrow`");
     expect(request.systemPrompt).toContain("`\\iff`");
     expect(request.systemPrompt).toContain("`\\impliedby`");
-    expect(request.promptVersion).toBe(
-      "lesson-summary-math-v41-lesson-core-exercise-diversity",
-    );
+    expect(request.promptVersion).toBe("lesson-summary-math-v45-math-syntax-contract");
     expect(request.schemaVersion).toBe(
-      "lesson-summary-pdf-packet-six-block-schema-v29-exact-exercise-counts",
+      "lesson-summary-pdf-packet-six-block-schema-v33-math-syntax-warning",
     );
   });
 
@@ -4553,7 +4696,36 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     expect(providerSchema.safeParse(wrongAiProvenance).success).toBe(false);
     expect(providerSchema.safeParse(missingSourcePage).success).toBe(false);
     expect(providerSchema.safeParse({ ...base, theorySections: [] }).success).toBe(false);
-    expect(providerSchema.safeParse({ ...base, objectives: [] }).success).toBe(false);
+    const { objectives: _objectives, ...missingObjectives } = base;
+    expect(providerSchema.safeParse(missingObjectives).success).toBe(false);
+    const objectiveMismatch = {
+      ...base,
+      objectives: ["Mục tiêu 1", "Mục tiêu 2"],
+    };
+    expect(providerSchema.safeParse(objectiveMismatch).success).toBe(true);
+    const mappedMismatch = mapLessonSummaryProviderOutput({
+      lessonId,
+      output: providerSchema.parse(objectiveMismatch),
+      packetPageCount: 1,
+      targetGrade: 12,
+      subjectKey: "MATH",
+    });
+    expect(mappedMismatch.content.objectives).toEqual(objectiveMismatch.objectives);
+    expect(mappedMismatch.content.warningDetails).toEqual([
+      expect.objectContaining({
+        code: "OBJECTIVE_SECTION_COUNT_MISMATCH",
+        path: "objectives",
+        severity: "WARNING",
+      }),
+    ]);
+    expect(mappedMismatch.content.reviewIssues).toEqual([
+      expect.objectContaining({
+        code: "OBJECTIVE_SECTION_COUNT_MISMATCH",
+        resolution: "ACCEPT_OR_FIX",
+        accepted: false,
+      }),
+    ]);
+    expect(providerSchema.toJSONSchema()).toHaveProperty("properties.objectives");
 
     const structuredFormat = buildAiStructuredTextFormat(
       providerSchema,
@@ -4571,6 +4743,76 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
         }
       ).properties.theorySections.minItems,
     ).toBe(1);
+  });
+
+  it.each(["MATH", "PHYSICS", "CHEMISTRY", "GENERAL"] as const)(
+    "keeps AI-authored objectives aligned with ordered theory sections for %s",
+    (subjectKey) => {
+      const subjectPrompt = buildLessonSummarySubjectSystemPrompt({
+        key: subjectKey,
+        name: subjectKey,
+        slug: subjectKey.toLowerCase(),
+      });
+      const providerSchema = getLessonSummaryProviderTransportOutputSchema(subjectKey);
+      const serializedSchema = JSON.stringify(providerSchema.toJSONSchema());
+      expect(subjectPrompt).toContain("`objectives` là khối riêng ở đầu");
+      expect(subjectPrompt).toContain(
+        "trả đúng một ý cho mỗi `theorySections[]`, cùng thứ tự",
+      );
+      expect(subjectPrompt).not.toContain("Objectives chỉ lấy từ phần Mục tiêu");
+      expect(serializedSchema).toContain(
+        "đúng một ý ngắn gọn cho mỗi theorySections cùng vị trí",
+      );
+      expect(providerSchema.toJSONSchema()).toHaveProperty(
+        "properties.objectives.maxItems",
+        19,
+      );
+
+      const mathOutput = buildMathProviderOutput({
+        title: "Bài học có nhiều đề mục",
+        displayHeading: "1. Khái niệm chính",
+        theoryContent: "Nội dung khái niệm chính.",
+        illustrationProblem: "Minh họa khái niệm chính.",
+      });
+      const secondSection = structuredClone(mathOutput.theorySections[0]!);
+      secondSection.displayHeading = "2. Tính chất quan trọng";
+      secondSection.sourceEvidence.text = "Tính chất quan trọng";
+      mathOutput.theorySections.push(secondSection);
+      mathOutput.objectives = [
+        "Nhận biết khái niệm cốt lõi của bài học.",
+        "Vận dụng tính chất để giải quyết bài toán.",
+      ];
+      const output = providerSchema.parse(
+        subjectKey === "MATH" ? mathOutput : removeMathOnlyFields(mathOutput),
+      );
+
+      const mapped = mapLessonSummaryProviderOutput({
+        lessonId,
+        output,
+        packetPageCount: 1,
+        targetGrade: 9,
+        subjectKey,
+      });
+
+      expect(mapped.content.objectives).toEqual(mathOutput.objectives);
+      expect(mapped.content.objectives).not.toEqual([
+        "Khái niệm chính",
+        "Tính chất quan trọng",
+      ]);
+      expect(mapped.content.objectives).not.toContain("Bài tập vận dụng");
+      expect(mapped.content.sections.at(-1)?.displayHeading).toBe("Bài tập vận dụng");
+    },
+  );
+
+  it("keeps persisted objectives capacity aligned with theory sections", () => {
+    expect(lessonSummaryOutputSchema.toJSONSchema()).toHaveProperty(
+      "properties.objectives.anyOf.0.maxItems",
+      19,
+    );
+    expect(lessonSummaryOutputSchema.toJSONSchema()).toHaveProperty(
+      "properties.objectives.anyOf.0.items.maxLength",
+      500,
+    );
   });
 
   it("rejects any AI-generated display text field on a figure plan", () => {
@@ -4969,7 +5211,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
           LESSON_CONTENT_PROMPT_VERSIONS.MATH,
         );
         expect(resolveLessonContentPromptVersion(subject.key)).toBe(
-          "lesson-content-math-v13-exact-type-quota",
+          "lesson-content-math-v14-angle-notation",
         );
         expect(testPrompt).toContain("mỗi kết luận không phải dữ kiện đã cho");
         expect(testPrompt).toContain("Từ (1) và (2), suy ra");
@@ -5478,7 +5720,7 @@ function buildMathProviderOutput(input: {
 }) {
   return lessonSummaryProviderTransportOutputSchema.parse({
     title: input.title,
-    objectives: null,
+    objectives: [`Hiểu và vận dụng ${input.displayHeading}.`],
     theorySections: [
       {
         displayHeading: input.displayHeading,

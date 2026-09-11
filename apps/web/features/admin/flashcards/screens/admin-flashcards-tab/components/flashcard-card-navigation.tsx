@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Layers3, Sparkles } from "lucide-react";
+import { CheckCircle2, CircleHelp, Layers3, Sparkles } from "lucide-react";
 import type { KeyboardEvent } from "react";
 import type { AdminFlashcard } from "@/features/admin/flashcards/api/admin-flashcards-api";
 import {
@@ -50,9 +50,9 @@ export function FlashcardCardNavigation({
         <FlashcardNavigationGroup
           cards={pendingCards}
           globalCards={cards}
-          icon={Sparkles}
+          icon={CircleHelp}
           isPendingAi
-          label="AI chờ duyệt"
+          label="Chờ duyệt"
           onKeyDown={handleKeyDown}
           onSelect={onSelect}
           selectedCardId={selectedCardId}

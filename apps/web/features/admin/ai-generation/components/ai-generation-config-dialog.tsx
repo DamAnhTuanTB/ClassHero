@@ -1040,8 +1040,8 @@ function getDefaultValues(
       .slice(0, 20)
       .map((document) => document.id),
     style: "student_friendly",
-    useTextbookSourceImages: false,
-    autoEnhanceTextbookSourceImages: false,
+    useTextbookSourceImages: true,
+    autoEnhanceTextbookSourceImages: true,
     styleInstructions: getPresentationPreset("student_friendly", targetGrade),
     summaryLength: "standard",
     summaryTargetWordCount: "",

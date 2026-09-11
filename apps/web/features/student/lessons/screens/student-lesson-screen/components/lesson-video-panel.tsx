@@ -2,10 +2,15 @@
 
 import dynamic from "next/dynamic";
 import { ExternalLink, VideoOff } from "lucide-react";
-import { useCallback, useState } from "react";
+import { forwardRef, useCallback, useImperativeHandle, useRef, useState } from "react";
 import { StudentDataErrorState } from "@/components/student/student-data-error-state";
-import type { CustomVideoSettings } from "@/components/shared/custom-youtube-player";
+import type {
+  CustomVideoSettings,
+  CustomYoutubePlayerHandle,
+  VideoPlaybackState,
+} from "@/components/shared/custom-youtube-player";
 import type { StudentLesson } from "@/features/student/lessons/types/student-lesson-types";
+import type { VideoPlaybackWindow } from "@/lib/video-player-time";
 import { cn } from "@/lib/utils";
 
 const CustomYoutubePlayer = dynamic(() =>
@@ -14,20 +19,46 @@ const CustomYoutubePlayer = dynamic(() =>
   ),
 );
 
-export function LessonVideoPanel({
-  lesson,
-}: {
-  lesson: Pick<StudentLesson, "customVideoSettings" | "title" | "videoUrl">;
-}) {
+export const LessonVideoPanel = forwardRef<
+  CustomYoutubePlayerHandle,
+  {
+    lesson: Pick<StudentLesson, "customVideoSettings" | "title" | "videoUrl">;
+    onPlaybackProgressChange?: (timeInSeconds: number) => void;
+    onPlaybackStateChange?: (state: VideoPlaybackState) => void;
+    onPlaybackTimeChange?: (timeInSeconds: number) => void;
+    onPlaybackWindowChange?: (playbackWindow: VideoPlaybackWindow) => void;
+    resumePositionSeconds?: number | null;
+  }
+>(function LessonVideoPanel(
+  {
+    lesson,
+    onPlaybackProgressChange,
+    onPlaybackStateChange,
+    onPlaybackTimeChange,
+    onPlaybackWindowChange,
+    resumePositionSeconds,
+  },
+  ref,
+) {
   const videoUrl = lesson.videoUrl?.trim() ?? "";
   const isYoutubeVideo =
     videoUrl.includes("youtube.com") || videoUrl.includes("youtu.be");
   const [failedVideoUrl, setFailedVideoUrl] = useState<string | null>(null);
   const [reloadAttempt, setReloadAttempt] = useState(0);
+  const playerRef = useRef<CustomYoutubePlayerHandle>(null);
   const hasVideoError = Boolean(videoUrl) && failedVideoUrl === videoUrl;
   const handleVideoError = useCallback(() => {
     setFailedVideoUrl(videoUrl);
   }, [videoUrl]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      playFromPlaybackTime: (timeInSeconds) =>
+        playerRef.current?.playFromPlaybackTime(timeInSeconds) ?? false,
+    }),
+    [],
+  );
 
   function handleRetryVideo() {
     setFailedVideoUrl(null);
@@ -64,13 +95,21 @@ export function LessonVideoPanel({
         isYoutubeVideo ? (
           <CustomYoutubePlayer
             key={`${videoUrl}-${reloadAttempt}`}
+            ref={playerRef}
             videoUrl={videoUrl}
             settings={
               lesson.customVideoSettings as CustomVideoSettings | null | undefined
             }
             startButtonVariant="student"
+            enableArrowKeySeeking
+            renumberPlaybackChapters
+            resumePositionSeconds={resumePositionSeconds}
             title={lesson.title}
             onError={handleVideoError}
+            onPlaybackProgressChange={onPlaybackProgressChange}
+            onPlaybackStateChange={onPlaybackStateChange}
+            onPlaybackTimeChange={onPlaybackTimeChange}
+            onPlaybackWindowChange={onPlaybackWindowChange}
           />
         ) : (
           <div className="p-4 sm:p-5">
@@ -116,4 +155,4 @@ export function LessonVideoPanel({
       )}
     </section>
   );
-}
+});
