@@ -108,12 +108,13 @@ describe("M9.28 Flashcard-owned generation core", () => {
     });
 
     expect(systemPrompt).toContain("### II. NỘI DUNG CỦA MỖI THẺ");
-    expect(systemPrompt).toContain("Tình huống thực tế chỉ hợp lệ");
+    expect(systemPrompt).toContain("Chỉ kiểm tra ghi nhớ hoặc hiểu lý thuyết");
     expect(systemPrompt).toContain("`back` là câu trả lời trực tiếp");
     expect(systemPrompt).toContain("`solution` là lời giải đầy đủ");
     expect(systemPrompt).toContain("không lấy `back` làm tiền đề");
-    expect(systemPrompt).toContain("Mỗi đơn vị lập luận nằm trong một đoạn");
-    expect(systemPrompt).toContain("viết công thức gốc trước");
+    expect(systemPrompt).toContain("trình bày đủ các mắt xích suy luận");
+    expect(systemPrompt).toContain("Câu định nghĩa chỉ cần một căn cứ trực tiếp");
+    expect(systemPrompt).toContain("câu hỏi `vì sao`");
     expect(systemPrompt).toContain("`aligned`");
     expect(systemPrompt).toContain("`$\\widehat{ABC}$`");
     expect(systemPrompt).toContain("không viết `$m\\angle ABC$`");
@@ -173,6 +174,12 @@ describe("M9.28 Flashcard-owned generation core", () => {
       expect(prompt).toContain("`solution`");
       expect(prompt).toContain("`sourcePacketPageNumbers`");
       expect(prompt).toContain("`requiresSolutionFigure`");
+      expect(prompt).toContain("Chỉ kiểm tra ghi nhớ hoặc hiểu lý thuyết");
+      expect(prompt).toContain("`solution` là lời giải đầy đủ");
+      expect(prompt).toContain("Độ dài phải tương xứng với số mắt xích và độ khó");
+      expect(prompt).toContain("không rút thành một câu nhắc lại");
+      expect(prompt).toContain("Mỗi đơn vị lập luận nằm trong một đoạn");
+      expect(prompt).toContain("`aligned`");
       expect(prompt).not.toContain("`requiresFrontFigure`");
       expect(prompt).not.toContain("`requiresBackFigure`");
       expect(prompt).not.toContain("FLASHCARD_SOLUTION_STYLE_POLICY");
@@ -180,14 +187,22 @@ describe("M9.28 Flashcard-owned generation core", () => {
     }
 
     expect(FLASHCARD_PROMPT_VERSIONS).toEqual({
-      MATH: "flashcard_math_v8_angle_notation",
-      PHYSICS: "flashcard_physics_v7_solution_figure_only",
-      CHEMISTRY: "flashcard_chemistry_v7_solution_figure_only",
-      GENERAL: "flashcard_general_v7_solution_figure_only",
+      MATH: "flashcard_math_v14-quiz-style-solutions",
+      PHYSICS: "flashcard_physics_v13-quiz-style-solutions",
+      CHEMISTRY: "flashcard_chemistry_v13-quiz-style-solutions",
+      GENERAL: "flashcard_general_v13-quiz-style-solutions",
     });
+
+    const mathPrompt = buildFlashcardSystemPrompt({
+      subject: { key: "MATH", name: "Toán", slug: "toan" },
+    });
+    expect(mathPrompt).toContain("Với Số học và Đại số");
+    expect(mathPrompt).toContain("Với hàm số, tọa độ, đồ thị hoặc mô hình");
+    expect(mathPrompt).toContain("Với Hình học");
+    expect(mathPrompt).toContain("Với xác suất, thống kê và dữ liệu");
   });
 
-  it("keeps field descriptions concise and consistent with real-world cards", () => {
+  it("keeps field descriptions concise while requiring a full solution", () => {
     const format = resolveAiStructuredTextFormat(
       generatedFlashcardOutputSchema,
       "generated_flashcards",
@@ -195,20 +210,20 @@ describe("M9.28 Flashcard-owned generation core", () => {
     );
     const schemaText = JSON.stringify(format.format.schema);
 
-    expect(FLASHCARD_SCHEMA_VERSION).toBe("flashcard_v7_math_syntax_contract");
-    expect(schemaText).toContain("tình huống thực tế phù hợp");
+    expect(FLASHCARD_SCHEMA_VERSION).toBe("flashcard_v13-quiz-style-solutions");
+    expect(schemaText).toContain("chỉ kiểm tra ghi nhớ/hiểu lý thuyết");
+    expect(schemaText).toContain("Được hỏi trực tiếp hằng số hoặc kết quả cần nhớ");
+    expect(schemaText).toContain("không cho dữ kiện riêng để tính toán");
     expect(schemaText).toContain("cặp delimiter đầy đủ");
-    expect(schemaText).toContain(
-      "tuân thủ quy tắc nội dung, lập luận, định dạng trong system prompt",
-    );
-    expect(schemaText).not.toContain("Một câu hỏi lý thuyết ngắn");
+    expect(schemaText).toContain("Lời giải đầy đủ");
+    expect(schemaText).toContain("trình bày đủ các mắt xích cần thiết");
     expect(schemaText).not.toContain("Tách các đơn vị lập luận bằng một dòng trống");
   });
 
   it("normalizes Flashcard math and persists malformed syntax as a warning contract", () => {
-    expect(normalizeFlashcardLearnerText(String.raw`Tính $m\angle ABC=60^\circ$.`)).toBe(
-      String.raw`Tính $\widehat{ABC}=60^\circ$.`,
-    );
+    expect(
+      normalizeFlashcardLearnerText(String.raw`Ký hiệu $m\angle ABC$ nên viết thế nào?`),
+    ).toBe(String.raw`Ký hiệu $\widehat{ABC}$ nên viết thế nào?`);
     expect(
       collectFlashcardMathSyntaxWarnings({
         front: String.raw`Tính $x_{1$.`,
@@ -222,6 +237,12 @@ describe("M9.28 Flashcard-owned generation core", () => {
         paths: ["front"],
       }),
     ]);
+  });
+
+  it("checks only learner-text fields when a generated card carries typed metadata", () => {
+    const generatedCard = validOutput().cards[0];
+
+    expect(collectFlashcardMathSyntaxWarnings(generatedCard)).toEqual([]);
   });
 
   it("keeps a custom user prompt while appending existing fronts as reference data", () => {
@@ -326,6 +347,10 @@ describe("M9.28 Flashcard-owned generation core", () => {
       });
     const first = render(buildRequest("Mệnh đề", "Mệnh đề là gì?"));
     const second = render(buildRequest("Tập hợp", "Tập hợp là gì?"));
+    const changedContract = render({
+      ...buildRequest("Mệnh đề", "Mệnh đề là gì?"),
+      schemaVersion: "flashcard_v12-theory-recall-constants",
+    });
     const firstInput = Array.isArray(first.input) ? first.input : [];
     const secondInput = Array.isArray(second.input) ? second.input : [];
 
@@ -335,9 +360,10 @@ describe("M9.28 Flashcard-owned generation core", () => {
       JSON.stringify(secondInput.slice(1)),
     );
     expect(first.prompt_cache_key).toBe(second.prompt_cache_key);
+    expect(first.prompt_cache_key).not.toBe(changedContract.prompt_cache_key);
   });
 
-  it("rejects a non-question front, duplicate pair and wrong difficulty", () => {
+  it("warns without blocking a non-question front, duplicate pair and wrong difficulty", () => {
     const base = validOutput();
     const validate = (output: typeof base) =>
       validateGeneratedFlashcards({
@@ -348,28 +374,112 @@ describe("M9.28 Flashcard-owned generation core", () => {
         difficultyCounts: null,
       });
 
-    expect(() =>
+    expect(
       validate({
         ...base,
         cards: [{ ...base.cards[0], front: "Khái niệm mệnh đề" }],
-      }),
-    ).toThrow("AI_OUTPUT_FLASHCARD_FRONT_INVALID");
-    expect(() =>
+      }).map(({ code }) => code),
+    ).toContain("AI_OUTPUT_FLASHCARD_FRONT_INVALID");
+    expect(
       validate({
         ...base,
         cards: [{ ...base.cards[0], front: "Mệnh đề là gì?", back: "Mệnh đề là gì" }],
-      }),
-    ).toThrow("AI_OUTPUT_FLASHCARD_PAIR_INVALID");
-    expect(() =>
+      }).map(({ code }) => code),
+    ).toContain("AI_OUTPUT_FLASHCARD_PAIR_INVALID");
+    expect(
       validate({
         ...base,
         cards: [{ ...base.cards[0], difficulty: Difficulty.HARD }],
-      }),
-    ).toThrow("AI_OUTPUT_DIFFICULTY_MISMATCH");
+      }).map(({ code }) => code),
+    ).toContain("AI_OUTPUT_DIFFICULTY_MISMATCH");
   });
 
-  it("rejects page references outside the attached Flashcard PDF packet", () => {
-    expect(() =>
+  it("accepts theory-recall fronts and rejects exercises or declarative fragments", () => {
+    for (const front of [
+      "Hãy nêu định nghĩa tứ giác nội tiếp.",
+      "Điều kiện áp dụng định lý Pythagore là gì?",
+      "Hãy phân biệt đường kính và bán kính.",
+      "Hãy so sánh tính chất của hình thoi và hình vuông.",
+      "Hãy xác định điều kiện áp dụng định lý Pythagore.",
+      "Tính liên tục của hàm số được định nghĩa thế nào?",
+      "Công thức tính diện tích hình tròn là gì?",
+      "Hai cung tạo thành đường tròn có tổng số đo bằng bao nhiêu?",
+      "Tổng số đo của 2 góc đối nhau trong tứ giác nội tiếp đường tròn bằng bao nhiêu?",
+      "Tổng số đo 3 góc trong một tam giác bằng bao nhiêu?",
+      "Cặp góc nào bằng nhau trong cấu hình này?",
+    ]) {
+      expect(
+        validateGeneratedFlashcards({
+          output: { ...validOutput(), cards: [{ ...validOutput().cards[0], front }] },
+          requestedCount: 1,
+          packetPageCount: 2,
+          difficulty: Difficulty.EASY,
+          difficultyCounts: null,
+        }),
+      ).toEqual([]);
+    }
+    for (const [front, code] of [
+      ["Tính chất của tứ giác nội tiếp.", "AI_OUTPUT_FLASHCARD_FRONT_INVALID"],
+      ["Tính liên tục của hàm số.", "AI_OUTPUT_FLASHCARD_FRONT_INVALID"],
+      ["Hãy tính giá trị của biểu thức đã cho.", "AI_OUTPUT_FLASHCARD_THEORY_ONLY"],
+      ["Chứng minh mệnh đề sau.", "AI_OUTPUT_FLASHCARD_THEORY_ONLY"],
+      ["Tìm nghiệm của phương trình $x^2=4$.", "AI_OUTPUT_FLASHCARD_THEORY_ONLY"],
+      ["Xác định số đo góc $A$.", "AI_OUTPUT_FLASHCARD_THEORY_ONLY"],
+      [
+        "Cho hình chữ nhật có chiều dài $6$ cm. Chu vi bằng bao nhiêu?",
+        "AI_OUTPUT_FLASHCARD_THEORY_ONLY",
+      ],
+    ] as const) {
+      expect(
+        validateGeneratedFlashcards({
+          output: { ...validOutput(), cards: [{ ...validOutput().cards[0], front }] },
+          requestedCount: 1,
+          packetPageCount: 2,
+          difficulty: Difficulty.EASY,
+          difficultyCounts: null,
+        }).map((warning) => warning.code),
+      ).toContain(code);
+    }
+  });
+
+  it("warns for a source-figure-dependent front", () => {
+    const base = validOutput();
+    expect(
+      validateGeneratedFlashcards({
+        output: {
+          ...base,
+          cards: [
+            { ...base.cards[0], front: "Theo hình bên dưới, hãy xác định kết luận?" },
+          ],
+        },
+        requestedCount: 1,
+        packetPageCount: 2,
+        difficulty: Difficulty.EASY,
+        difficultyCounts: null,
+      }).map(({ code }) => code),
+    ).toContain("AI_OUTPUT_FLASHCARD_FRONT_CONTEXT_INVALID");
+  });
+
+  it("allows ordinary mathematical uses of hình and đồ thị without a deictic reference", () => {
+    const base = validOutput();
+    expect(
+      validateGeneratedFlashcards({
+        output: {
+          ...base,
+          cards: [
+            { ...base.cards[0], front: "Đồ thị trên đoạn $[0;1]$ có tính chất gì?" },
+          ],
+        },
+        requestedCount: 1,
+        packetPageCount: 2,
+        difficulty: Difficulty.EASY,
+        difficultyCounts: null,
+      }),
+    ).toEqual([]);
+  });
+
+  it("warns for page references outside the attached Flashcard PDF packet", () => {
+    expect(
       validateGeneratedFlashcards({
         output: {
           ...validOutput(),
@@ -379,13 +489,13 @@ describe("M9.28 Flashcard-owned generation core", () => {
         packetPageCount: 2,
         difficulty: Difficulty.EASY,
         difficultyCounts: null,
-      }),
-    ).toThrow("AI_OUTPUT_SOURCE_INVALID");
+      }).map(({ code }) => code),
+    ).toContain("AI_OUTPUT_SOURCE_INVALID");
   });
 
-  it("rejects duplicate fronts inside one generated batch", () => {
+  it("warns for duplicate fronts inside one generated batch", () => {
     const first = validOutput().cards[0];
-    expect(() =>
+    expect(
       validateGeneratedFlashcards({
         output: {
           title: "Mệnh đề",
@@ -395,8 +505,8 @@ describe("M9.28 Flashcard-owned generation core", () => {
         packetPageCount: 2,
         difficulty: Difficulty.EASY,
         difficultyCounts: null,
-      }),
-    ).toThrow("AI_OUTPUT_FLASHCARD_DUPLICATE");
+      }).map(({ code }) => code),
+    ).toContain("AI_OUTPUT_FLASHCARD_DUPLICATE");
   });
 
   it("renders Flashcard solution with the same paragraph and math structure as Quiz", () => {
@@ -483,7 +593,7 @@ describe("M9.28 Flashcard-owned generation core", () => {
     expect(edited.systemPrompt).toContain("currentSolutionLatexSource");
     expect(regenerated.outputName).toBe("solution_figure");
     expect(regenerated.promptCache?.namespace).toBe("solution-figure");
-    expect(FLASHCARD_FIGURE_SCHEMA_VERSION).toBe("solution-figure-schema-v1");
+    expect(FLASHCARD_FIGURE_SCHEMA_VERSION).toBe("solution-figure-schema-v2-visual-only");
 
     const processor = readFileSync(
       resolve(
@@ -532,7 +642,7 @@ describe("M9.28 Flashcard-owned generation core", () => {
       expect(request.systemPrompt).not.toContain("Tạo ảnh cho mặt trước");
       expect(request.systemPrompt).not.toContain("Tạo ảnh cho mặt sau");
       expect(request.promptVersion).toContain(subject.key.toLowerCase());
-      expect(request.promptVersion).toContain("v1-shared");
+      expect(request.promptVersion).toContain("v2-visual-only");
     }
   });
 

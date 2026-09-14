@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { studentVisibleFlashcardWhere } from "#api/modules/student-learning/selectors/student-visible-learning-content.where";
 
 export const adminFlashcardSetSelect = {
   id: true,
@@ -76,11 +77,7 @@ export const studentFlashcardSetSelect = {
   cardCount: true,
   sortOrder: true,
   flashcards: {
-    where: {
-      deletedAt: null,
-      reviewStatus: "APPROVED",
-      publishedAt: { not: null },
-    },
+    where: studentVisibleFlashcardWhere,
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     select: {
       id: true,

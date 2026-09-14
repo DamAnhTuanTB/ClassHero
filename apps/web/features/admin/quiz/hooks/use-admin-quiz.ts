@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 import { adminAssessmentQueryKeys } from "@/features/admin/assessments/hooks/use-admin-assessment";
+import { useAuthenticatedRealtime } from "@/components/common/realtime/authenticated-realtime-provider";
 import {
   getAdminQuizSets,
   createAdminQuizSet,
@@ -165,6 +166,7 @@ export function useAdminQuizQuestions(
 ) {
   const session = useAuthSessionStore((state) => state.session);
   const queryClient = useQueryClient();
+  const { status: realtimeStatus } = useAuthenticatedRealtime();
   const wasPollingFigureJobsRef = useRef(false);
 
   const query = useQuery({
@@ -176,7 +178,11 @@ export function useAdminQuizQuestions(
     enabled: enabled && !!session?.accessToken && !!setId,
     initialData,
     refetchInterval: (query) =>
-      hasActiveQuizFigureJobs(query.state.data) ? 2_000 : false,
+      hasActiveQuizFigureJobs(query.state.data)
+        ? realtimeStatus === "connected"
+          ? 60_000
+          : 3_000
+        : false,
     refetchIntervalInBackground: false,
   });
 

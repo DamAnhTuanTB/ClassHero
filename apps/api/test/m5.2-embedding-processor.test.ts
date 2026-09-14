@@ -82,6 +82,9 @@ function createPrismaMock() {
       update: vi.fn(async (input: unknown) => input),
       updateMany: vi.fn(async () => ({ count: 1 })),
     },
+    lessonVideoSummary: {
+      findFirst: vi.fn(async () => ({ id: "video-summary-1" })),
+    },
     aiGeneration: {
       findFirst: vi.fn(async () => ({
         id: "ai-generation-1",
@@ -211,6 +214,52 @@ describe("EmbeddingProcessor", () => {
         totalTokens: 30,
       }),
     });
+  });
+
+  it("embeds persisted Video Summary blocks without reading raw transcripts", async () => {
+    const chunks = makeChunks(2);
+    prisma.backgroundJob.findUnique.mockResolvedValueOnce(
+      makeBackgroundJob({
+        resourceType: "video_summary",
+        resourceId: "video-summary-1",
+        inputMeta: {
+          action: "EMBEDDING",
+          sourceType: "VIDEO_SUMMARY",
+          lessonId: "lesson-1",
+          videoSummaryId: "video-summary-1",
+          summaryHash: "summary-hash-1",
+        },
+      }),
+    );
+    prisma.$queryRaw.mockResolvedValueOnce(chunks);
+    aiService.createEmbedding.mockResolvedValueOnce({
+      vectors: chunks.map(() => new Array(1536).fill(0.1)),
+      model: "text-embedding-3-small",
+      dimensions: 1536,
+      usage: { promptTokens: 20, totalTokens: 20 },
+    });
+
+    await expect(processor.process(makeBullmqJob())).resolves.toMatchObject({
+      status: "SUCCEEDED",
+      resourceType: "video_summary",
+      resourceId: "video-summary-1",
+      details: { embeddedCount: 2 },
+    });
+
+    expect(prisma.lessonVideoSummary.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: "video-summary-1",
+        lessonId: "lesson-1",
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+    expect(prisma.lessonDocument.findFirst).not.toHaveBeenCalled();
+    expect(prisma.lessonDocument.update).not.toHaveBeenCalled();
+    expect(aiService.createEmbedding).toHaveBeenCalledWith({
+      texts: chunks.map((chunk) => chunk.content),
+    });
+    expect(prisma.$executeRaw).toHaveBeenCalledTimes(2);
   });
 
   it("batches large chunk sets", async () => {

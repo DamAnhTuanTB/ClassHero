@@ -1,12 +1,32 @@
-import {
-  LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION,
-  LESSON_SUMMARY_LOGICAL_DERIVATION_INSTRUCTION,
-  LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION,
-} from "#api/modules/ai/types/lesson-summary.types";
+import { LEARNER_MATH_TEXT_SYNTAX_DESCRIPTION } from "@learning-path/shared";
+
 import type { AiStructuredInput } from "#api/modules/ai/types/ai-text.types";
+import { VIDEO_SUMMARY_CHAPTER_BOUNDARY_TOLERANCE_SECONDS } from "#api/modules/learning-paths/utils/video-summary-source";
 
 export const VIDEO_SUMMARY_PROMPT_VERSION =
-  "video-summary-v10-bidirectional-chapter-contract";
+  "video-summary-v12-schema-root-dedup";
+
+// Video owns its prompt prose. Keep these local even when another feature has
+// similar learner-text rules so each contract can evolve and version independently.
+export const VIDEO_SUMMARY_SEMANTIC_LAYOUT_INSTRUCTION =
+  "Không coi ngắt dòng kỹ thuật trong transcript hoặc source là ranh giới ngữ nghĩa. Bảo toàn câu, đoạn, danh sách, hệ điều kiện, dấu câu dẫn và cấu trúc công thức theo chức năng trong nguồn; chọn inline hay display theo vai trò và độ phức tạp, không theo vị trí xuống dòng kỹ thuật.";
+export const VIDEO_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION = [
+  "QUY TẮC CỨNG VỀ CHUỖI DẤU BẰNG: trước khi trả structured output, phải quét riêng từng field `content`, `problem`, `solution`, `answer` và từng công thức display trong field đó.",
+  "Nếu một công thức display là một chuỗi tính hoặc biến đổi duy nhất có từ hai dấu `=` cấp ngoài cùng trở lên, bắt buộc dùng `aligned`/`split` và đặt đúng một dấu `=` cấp ngoài cùng cùng bước biến đổi tương ứng trên mỗi dòng: dòng đầu có dạng `A &= B`, các dòng sau có dạng `&= C`. Công thức ngắn, vừa một dòng hoặc không tràn chiều ngang vẫn không phải ngoại lệ; tuyệt đối không giữ chuỗi đó trên một dòng.",
+  "Ví dụ tổng quát SAI: `$$A=B=C.$$` Ví dụ tổng quát ĐÚNG: `$$\\begin{aligned}A&=B\\\\&=C.\\end{aligned}$$`.",
+  "Không áp dụng quy tắc này cho các phương trình độc lập, hệ phương trình, phép gán nhiều đại lượng hoặc dấu `=` nằm trong cấu trúc lồng nhau. Ngoài đúng các trường hợp đó, nếu bước tự kiểm tra còn thấy chuỗi tính/biến đổi vi phạm thì phải viết lại field trước khi trả output.",
+  "Bảo toàn dấu câu và ký hiệu có chức năng của nguồn; tự bổ sung dấu câu còn thiếu khi ngữ pháp và quan hệ trình bày xác định rõ. Câu dẫn mở danh sách, hệ, bảng hoặc công thức display ở dòng sau phải kết thúc bằng dấu `:`; dùng dấu `,`, `;` và `.` đúng quan hệ câu, không để chuỗi `..` mà phải chọn `.` hoặc `...` theo nghĩa.",
+  LEARNER_MATH_TEXT_SYNTAX_DESCRIPTION,
+  "Chỉ dùng $\\Leftrightarrow$ cho quan hệ tương đương hai chiều và $\\Rightarrow$ cho suy ra một chiều; không tự thêm hai ký hiệu này khi lập luận không chứng minh quan hệ tương ứng. Khi nhiều công thức display liên tiếp thuộc cùng một hệ, nhóm trường hợp hoặc chuỗi biến đổi, nhóm chúng trong một khối `$$\\begin{aligned}...\\end{aligned}$$` hoặc môi trường `split` phù hợp và ngắt dòng tại toán tử quan hệ/phép biến đổi hợp lý; không để các từ nối như `và`, `nên`, `do đó` thành dòng rời giữa hai công thức. Trong `aligned`/`split`, đặt dấu `&` tại quan hệ chính cần căn như `=`; không đặt `&` ngay trước toán tử suy luận hoặc tương đương đứng đầu dòng như `\\Rightarrow`, `\\Leftrightarrow`, `\\Longrightarrow`, `\\Longleftrightarrow`, `\\implies`, `\\impliedby`, `\\iff` và các biến thể chiều ngược, vì toán tử sẽ bị đẩy vào cột dấu bằng. Khi dòng suy ra còn có dấu bằng, viết toán tử và vế trái trước dấu căn, ví dụ `\\Rightarrow\\quad a &= 2x`. Công thức độc lập ngắn hoặc không cùng một mạch vẫn giữ riêng, không ép gộp.",
+].join(" ");
+export const VIDEO_SUMMARY_LOGICAL_DERIVATION_INSTRUCTION = [
+  "QUY TẮC CỨNG VỀ MẠCH BIẾN ĐỔI TRONG EXAMPLE/PHƯƠNG PHÁP: nhận diện chuỗi theo quan hệ logic, không theo cách đã chia delimiter. Từ hai công thức liên tiếp trở lên cùng biến đổi một biểu thức/phương trình, cùng cô lập một đại lượng hoặc cùng duy trì tập nghiệm vẫn là một chuỗi duy nhất, dù mỗi công thức nằm trong display riêng và chỉ có một dấu `=`.",
+  "Phải gom chuỗi đó trong một `aligned`/`split`, giữ đại lượng cần tìm ở vế trái sau khi đã cô lập và thể hiện bước chuyển vế, thế, rút gọn, khai căn, chia hoặc biến đổi chính. Được gộp số học hiển nhiên nhưng không được nhảy qua bước chuyên môn quyết định.",
+  "Nếu phép biến đổi có thể sinh nhiều nhánh, làm mất nghiệm hoặc đòi hỏi điều kiện, phải nêu điều kiện và chỉ loại nhánh theo ngữ cảnh chuyên môn. Ví dụ tổng quát SAI: ba display rời `u^2=p^2-q^2`, `u^2=r`, `u=\\sqrt{r}` không nêu điều kiện; dạng ĐÚNG gom hai bước tính trong một `aligned`, rồi nêu điều kiện trước kết luận.",
+  "Counterexample hợp lệ: các phương trình độc lập của một hệ, các phép gán cho những đại lượng khác nhau hoặc một phép tính một bước vẫn giữ riêng. Với `SOURCE_EXACT`, giữ phương pháp của nguồn nhưng phải bảo toàn liên kết logic và điều kiện; không đổi sang phương pháp khác chỉ để rút gọn.",
+].join(" ");
+export const VIDEO_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION =
+  "Trong problem, solution và answer của mọi example/bài tập, mỗi ý con mang nhãn a), b), c) hoặc nhãn chữ cái tương đương phải bắt đầu ở dòng riêng; không được đặt hai nhãn ý con trên cùng một dòng.";
 
 export function buildVideoSummaryStructuredRequestPolicy() {
   return {
@@ -117,13 +137,13 @@ export function buildVideoSummarySystemPrompt(subject: VideoSummarySubjectKey) {
     "## III. TỔ CHỨC NỘI DUNG",
     "1. `title`: đặt tiêu đề ngắn, nêu đúng trọng tâm bài học; không dùng tiêu đề chung chung như “Tóm tắt video”.",
     "2. `objectives`: mỗi section chính đúng một bullet tương ứng, không tách thành các vi mục tiêu theo từng khái niệm hay từng bài tập. Mỗi bullet chỉ nêu kiến thức/năng lực trọng tâm của section cùng vị trí và luôn được UI đặt ở đầu dưới nhãn “Các kiến thức trong bài giảng”.",
-    "3. `sections`: nếu danh sách MỐC THỜI GIAN có chapter, phải tạo đúng một section cho mỗi chapter, giữ nguyên số lượng, thứ tự, `displayHeading` bằng nguyên văn title và `startSeconds` bằng chính xác time của chapter cùng vị trí; không đổi tên, gộp, bỏ hoặc tự thêm section. Mỗi section chỉ chứa nội dung từ mốc chapter đó đến ngay trước mốc chapter kế tiếp. Chỉ khi MỐC THỜI GIAN ghi rõ không có mốc chương, bạn mới tự chia các phần lớn thực sự có trong video; khi đó `order` bắt đầu từ 1 và liên tục, `displayHeading` ngắn, rõ nghĩa, còn `startSeconds` là cue sớm nhất bắt đầu section.",
+    `3. \`sections\`: nếu danh sách MỐC THỜI GIAN có chapter, phải tạo đúng một section cho mỗi chapter, giữ nguyên số lượng, thứ tự, \`displayHeading\` bằng nguyên văn title và \`startSeconds\` bằng chính xác time của chapter cùng vị trí; không đổi tên, gộp, bỏ hoặc tự thêm section. Mỗi section chỉ chứa nội dung từ mốc chapter đó đến ngay trước mốc chapter kế tiếp; do chapter chỉ chính xác đến giây, cue bắt đầu không quá ${VIDEO_SUMMARY_CHAPTER_BOUNDARY_TOLERANCE_SECONDS} giây trước mốc chapter kế tiếp phải thuộc chapter kế tiếp. Chỉ khi MỐC THỜI GIAN ghi rõ không có mốc chương, bạn mới tự chia các phần lớn thực sự có trong video; khi đó \`order\` bắt đầu từ 1 và liên tục, \`displayHeading\` ngắn, rõ nghĩa, còn \`startSeconds\` là cue sớm nhất bắt đầu section.`,
     "4. Trong `sections[].blocks`, chỉ dùng `knowledge` và `example`. Các khối phải giữ nguyên thứ tự xuất hiện trong video, không gom toàn bộ lý thuyết lên trước hoặc ví dụ xuống sau.",
     "5. `knowledge` có `title`, `content`, `startSeconds`; `title` ngắn và nêu đúng ý chính, còn `content` trình bày cô đọng, mạch lạc, chia đoạn hoặc danh sách khi giúp dễ đọc. Chỉ chứa lý thuyết, khái niệm, công thức, quy tắc hoặc phương pháp; không trộn đề ví dụ và lời giải vào `content`.",
     "6. `example` có đủ `problem`, `solution`, `answer`, `startSeconds`; mỗi field giữ đúng vai trò và quy tắc trình bày nêu dưới đây. Chỉ tạo từ ví dụ/bài tập thực sự có trong video; không tự tạo ví dụ hoặc lời giải mới.",
     "7. Chỉ trả `example` khi cả đề bài lẫn lời giải có thể hiểu và sử dụng độc lập bằng text. Nếu ví dụ phụ thuộc vào hình, ảnh, bảng, biểu đồ, đồ thị hoặc sơ đồ đang hiển thị trong video mà output không tái tạo được đầy đủ dữ kiện thì bỏ toàn bộ ví dụ đó. Vẫn được giữ ví dụ hình học khi mọi dữ kiện cần thiết đã được mô tả đầy đủ bằng text.",
     "8. `problem` tự đủ dữ kiện và yêu cầu được nêu trong video. Lời giải phải đầy đủ các bước video đã giải thích theo phong cách sách giáo khoa, không làm tắt, không lặp đề và không biến thành checklist rời rạc. `answer` chỉ giữ đáp án hoặc kết luận cuối, không chép lại lời giải.",
-    "9. `startSeconds` của mỗi `knowledge`/`example` phải bằng thời gian cue sớm nhất bắt đầu đúng sự kiện đó trong source; không ước lượng, không dùng thời gian của phần trước và không tự bịa. Khi có MỐC THỜI GIAN, `section.startSeconds` phải giữ chính xác time của chapter tương ứng theo mục 3, kể cả khi time đó không trùng cue transcript; chỉ khi không có chapter thì `section.startSeconds` mới dùng cue sớm nhất bắt đầu section. Thời gian section không được muộn hơn khối đầu tiên của section. UI sẽ đổi số giây thành mm:ss và dùng để tua video.",
+    `9. \`startSeconds\` của mỗi \`knowledge\`/\`example\` phải bằng thời gian cue sớm nhất bắt đầu đúng sự kiện đó trong source; không ước lượng, không dùng thời gian của phần trước và không tự bịa. Khi có MỐC THỜI GIAN, \`section.startSeconds\` phải giữ chính xác time của chapter tương ứng theo mục 3, kể cả khi time đó không trùng cue transcript; cue ngay trước ranh giới theo dung sai ở mục 3 vẫn giữ nguyên time và được xếp vào chapter kế tiếp. Chỉ khi không có chapter thì \`section.startSeconds\` mới dùng cue sớm nhất bắt đầu section. Ngoài dung sai ranh giới này, thời gian section không được muộn hơn khối đầu tiên của section. UI sẽ đổi số giây thành mm:ss và dùng để tua video.`,
     "10. Ví dụ video đi theo lý thuyết → bài tập 1 → bài tập 2 → lý thuyết 2 thì blocks phải là knowledge → example → example → knowledge với startSeconds tăng theo đúng mạch video.",
     "11. Nếu video không có ví dụ hoặc bài tập thật, không tạo khối `example`.",
     "",
@@ -132,16 +152,14 @@ export function buildVideoSummarySystemPrompt(subject: VideoSummarySubjectKey) {
     "- Viết bằng tiếng Việt tự nhiên, câu gọn, chuyển ý rõ và dùng thuật ngữ phù hợp với người học; tránh giọng quảng cáo, nhận xét về AI hoặc các câu dẫn rỗng.",
     "- Cô đọng không có nghĩa là bỏ mất điều kiện áp dụng, quan hệ nguyên nhân–kết quả hoặc kết luận cần thiết.",
     "- Công thức trong câu dùng `$...$`; công thức độc lập dùng `$$...$$`. Không đặt LaTeX trong code fence.",
-    `- ${LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION}`,
-    `- ${LESSON_SUMMARY_LOGICAL_DERIVATION_INSTRUCTION}`,
-    `- ${LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION}`,
+    `- ${VIDEO_SUMMARY_LOGICAL_DERIVATION_INSTRUCTION}`,
     "- Mỗi ý a), b), c) chỉ xuống dòng khi bắt đầu một ý lời giải mới. Khi nhắc lại nhãn trong một câu kết luận, phải giữ liền mạch, ví dụ `Khẳng định a) đúng.` hoặc `Đáp án b) sai.`; không ngắt dòng giữa `Khẳng định`/`Đáp án` và nhãn.",
     "",
     `## V. QUY TẮC CHUYÊN MÔN\n${subjectRules(subject)}`,
     "",
     "## VI. KẾT QUẢ TRẢ VỀ",
     "- Chỉ trả về JSON đúng structured schema; không thêm lời mở đầu, kết luận ngoài JSON hoặc code fence.",
-    "- Trước khi trả kết quả, kiểm tra: nếu source có chapter thì sections khớp một-một với toàn bộ chapter về số lượng, thứ tự, title, time và khoảng nội dung; nếu không có chapter thì mới tự chia section; số objectives đúng bằng số sections; knowledge/example có startSeconds khớp cue; không còn example phụ thuộc hình thiếu dữ kiện; các câu `Khẳng định a)` không bị ngắt dòng; nội dung trung thành với nguồn và công thức đúng định dạng.",
+    `- Với từng section/block, giữ đúng nguồn: chapter/cue và dung sai ranh giới ${VIDEO_SUMMARY_CHAPTER_BOUNDARY_TOLERANCE_SECONDS} giây, objective tương ứng, example tự đủ dữ kiện không phụ thuộc hình, và nội dung trung thành transcript. Khi source không có chapter mới tự chia section.`,
   ].join("\n");
 }
 

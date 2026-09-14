@@ -1,19 +1,15 @@
 import { ExecutionContext, Inject, Injectable } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
-import { JwtService } from "@nestjs/jwt";
 import { AuthenticatedRequest } from "#api/common/auth/authenticated-request";
 import { JwtAuthGuard } from "#api/common/auth/jwt-auth.guard";
-import { PrismaService } from "#api/common/prisma/prisma.service";
-import { EnvConfig } from "#api/config/env.validation";
+import { AccessTokenIdentityService } from "#api/modules/auth/services/access-token-identity.service";
 
 @Injectable()
 export class OptionalJwtAuthGuard extends JwtAuthGuard {
   constructor(
-    @Inject(JwtService) jwtService: JwtService,
-    @Inject(ConfigService) configService: ConfigService<EnvConfig, true>,
-    @Inject(PrismaService) prisma: PrismaService,
+    @Inject(AccessTokenIdentityService)
+    accessTokenIdentity: AccessTokenIdentityService,
   ) {
-    super(jwtService, configService, prisma);
+    super(accessTokenIdentity);
   }
 
   async canActivate(context: ExecutionContext) {

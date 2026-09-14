@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger, Optional } from "@nestjs/common";
 import {
   BackgroundJobQueue,
   BackgroundJobStatus,
@@ -19,6 +19,7 @@ import type {
 import { getJobErrorMessage } from "#api/jobs/job-error";
 import { toJobJson } from "#api/jobs/job-json";
 import { ObjectStorageService } from "#api/modules/files/services/object-storage.service";
+import { RealtimeJobSnapshotPublisherService } from "#api/modules/realtime/services/realtime-job-snapshot-publisher.service";
 import {
   AiProviderCallService,
   type ResolvedAiStructuredRequestTrace,
@@ -86,6 +87,9 @@ export class QuizFigureRenderingProcessor {
     private readonly artifacts: QuizFigureArtifactService,
     @Inject(ObjectStorageService)
     private readonly storage: ObjectStorageService,
+    @Optional()
+    @Inject(RealtimeJobSnapshotPublisherService)
+    private readonly realtimeJobs?: RealtimeJobSnapshotPublisherService,
   ) {}
 
   async process(
@@ -124,6 +128,7 @@ export class QuizFigureRenderingProcessor {
         errorMessage: null,
       },
     });
+    await this.realtimeJobs?.publishById(durableJob.id);
 
     let attemptId: string | null = null;
     try {

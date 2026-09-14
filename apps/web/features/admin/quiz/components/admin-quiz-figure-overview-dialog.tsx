@@ -45,6 +45,7 @@ export function AdminQuizFigureOverviewDialog({
   pendingQuestions: AdminQuizQuestion[];
   setId: string;
 }) {
+  const assessmentLabel = assessmentKind === "test" ? "Test" : "Quiz";
   const [activeTab, setActiveTab] = useState<QuizFigureOverviewSection["id"]>(() =>
     hasQuizFigures(pendingQuestions) ? "pending-ai" : "approved",
   );
@@ -58,14 +59,14 @@ export function AdminQuizFigureOverviewDialog({
         title: "AI chờ duyệt",
       },
       {
-        emptyDescription: "Duyệt câu Quiz để chuyển ảnh sang nhóm này.",
-        emptyTitle: "Chưa có ảnh Quiz đã duyệt",
+        emptyDescription: `Duyệt câu ${assessmentLabel} để chuyển ảnh sang nhóm này.`,
+        emptyTitle: `Chưa có ảnh ${assessmentLabel} đã duyệt`,
         entries: buildOverviewEntries(approvedQuestions),
         id: "approved",
-        title: "Quiz đã duyệt",
+        title: `${assessmentLabel} đã duyệt`,
       },
     ],
-    [approvedQuestions, pendingQuestions],
+    [approvedQuestions, assessmentLabel, pendingQuestions],
   );
   const entries = useMemo(
     () => sections.flatMap((section) => section.entries),
@@ -107,14 +108,14 @@ export function AdminQuizFigureOverviewDialog({
 
   return (
     <EditorDialogShell
-      ariaLabel="Toàn bộ hình Quiz"
+      ariaLabel={`Toàn bộ hình ${assessmentLabel}`}
       isOpen={isOpen}
       onClose={onClose}
       panelClassName="max-w-6xl"
     >
       <header className="theme-dialog-header flex min-h-16 shrink-0 items-center px-4 py-3 pr-20 sm:px-6 sm:pr-20">
         <h2 className="text-lg font-extrabold text-[var(--theme-text-strong)]">
-          Toàn bộ hình Quiz
+          Toàn bộ hình {assessmentLabel}
         </h2>
       </header>
 
@@ -122,7 +123,7 @@ export function AdminQuizFigureOverviewDialog({
         <AdminFigureStatusCounts figures={figures} />
 
         <div
-          aria-label="Phân loại hình Quiz"
+          aria-label={`Phân loại hình ${assessmentLabel}`}
           className="mb-4 grid grid-cols-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-1"
           role="tablist"
         >

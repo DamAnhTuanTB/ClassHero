@@ -29,6 +29,8 @@ describe("VideoSummariesService hard delete", () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
+      {} as never,
     );
 
     await expect(
@@ -69,6 +71,8 @@ describe("VideoSummariesService hard delete", () => {
     };
     const service = new VideoSummariesService(
       prisma as never,
+      {} as never,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,

@@ -21,12 +21,12 @@ export interface FlashcardSubjectSnapshot {
   slug: string;
 }
 
-export const FLASHCARD_SCHEMA_VERSION = "flashcard_v7_math_syntax_contract";
+export const FLASHCARD_SCHEMA_VERSION = "flashcard_v13-quiz-style-solutions";
 export const FLASHCARD_PROMPT_VERSIONS: Record<FlashcardSubjectKey, string> = {
-  MATH: "flashcard_math_v8_angle_notation",
-  PHYSICS: "flashcard_physics_v7_solution_figure_only",
-  CHEMISTRY: "flashcard_chemistry_v7_solution_figure_only",
-  GENERAL: "flashcard_general_v7_solution_figure_only",
+  MATH: "flashcard_math_v14-quiz-style-solutions",
+  PHYSICS: "flashcard_physics_v13-quiz-style-solutions",
+  CHEMISTRY: "flashcard_chemistry_v13-quiz-style-solutions",
+  GENERAL: "flashcard_general_v13-quiz-style-solutions",
 };
 export const FLASHCARD_MIN_OUTPUT_TOKENS = 1_000;
 export const FLASHCARD_MAX_OUTPUT_TOKENS = 32_000;
@@ -45,7 +45,7 @@ export const generatedFlashcardOutputSchema = z
             difficulty: z.enum([Difficulty.EASY, Difficulty.MEDIUM, Difficulty.HARD]),
             front: learnerText(
               1_500,
-              "Một câu hỏi ngắn, đơn nghĩa, không lộ đáp án và kiểm tra đúng một đơn vị kiến thức theo system prompt; có thể hỏi trực tiếp hoặc dùng tình huống thực tế phù hợp.",
+              "Câu hỏi ngắn, đơn nghĩa, tự đủ bằng text, không lộ đáp án và chỉ kiểm tra ghi nhớ/hiểu lý thuyết. Được hỏi trực tiếp hằng số hoặc kết quả cần nhớ của một tính chất; không cho dữ kiện riêng để tính toán, giải bài, chứng minh, dựng/vẽ, xử lý cấu hình riêng hoặc tham chiếu hình nguồn.",
             ),
             back: learnerText(
               3_000,
@@ -53,7 +53,7 @@ export const generatedFlashcardOutputSchema = z
             ),
             solution: learnerText(
               10_000,
-              "Lời giải đầy đủ được xây dựng trực tiếp để trả lời `front`; không diễn giải lại `back` và phải tuân thủ quy tắc nội dung, lập luận, định dạng trong system prompt.",
+              "Lời giải đầy đủ, trực tiếp cho `front`: nêu căn cứ và điều kiện, trình bày đủ các mắt xích cần thiết rồi kết luận nhất quán với `back`; không lấy `back` làm tiền đề hoặc diễn giải lại `back`.",
             ),
             sourcePacketPageNumbers: z
               .array(z.number().int().positive())
@@ -65,7 +65,7 @@ export const generatedFlashcardOutputSchema = z
             requiresSolutionFigure: z
               .boolean()
               .describe(
-                "True chỉ khi một hình minh họa riêng thực sự giúp theo dõi hoặc hiểu lời giải chi tiết; hình sẽ được tạo từ front và solution.",
+                "True chỉ khi sơ đồ lý thuyết thực sự giúp hiểu cấu trúc hoặc quan hệ kiến thức; không dùng hình để giải bài hay cấu hình riêng.",
               ),
           })
           .strict(),

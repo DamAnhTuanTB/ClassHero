@@ -13,6 +13,7 @@ import {
 } from "react";
 import { toast } from "sonner";
 import { StudentDataErrorState } from "@/components/student/student-data-error-state";
+import type { AiChatEntryContext } from "@/features/student/ai-chat/utils/ai-chat-link";
 import {
   getCurrentQuizAttempt,
   getQuizHistory,
@@ -126,6 +127,14 @@ export function QuizLearningPanel({
       questionCount: 0,
     } satisfies StudentQuizSet);
   const quizSetId = activeQuizSet.id;
+  const aiChatContext =
+    lesson.access.mode === "ENROLLMENT"
+      ? ({
+          scopeType: "COURSE",
+          learningPathId: lesson.learningPath.id,
+          surfaceLessonId: lesson.id,
+        } satisfies AiChatEntryContext)
+      : undefined;
   const isAuthHydrated = useAuthSessionStore((state) => state.isHydrated);
   const attemptStatusQuery = useQuery({
     queryKey: studentQuizAttemptStatusQueryKey(quizSetId, userId),
@@ -802,6 +811,7 @@ export function QuizLearningPanel({
   if (review && reviewOrigin === "RESULT") {
     return renderWithCurtain(
       <QuizReviewScreen
+        aiChatContext={aiChatContext}
         backLabel="Quay lại kết quả Quiz"
         review={review}
         displayScope={reviewDisplayScope}
@@ -985,6 +995,7 @@ export function QuizLearningPanel({
         </section>
         {review && reviewOrigin === "HISTORY" ? (
           <QuizReviewScreen
+            aiChatContext={aiChatContext}
             backLabel="Quay lại lịch sử Quiz"
             currentIndex={reviewIndex}
             displayScope={reviewDisplayScope}
@@ -1020,6 +1031,17 @@ export function QuizLearningPanel({
 
   return renderWithCurtain(
     <QuizRunnerScreen
+      aiChatContext={{
+        scopeType: "COURSE",
+        learningPathId: lesson.learningPath.id,
+        surfaceLessonId: lesson.id,
+        activeActivity: {
+          activityType: "QUIZ_ATTEMPT",
+          activityId: attempt.id,
+          targetType: "QUIZ_QUESTION",
+          targetId: question.id,
+        },
+      }}
       attempt={attempt}
       currentIndex={currentIndex}
       answer={answer}

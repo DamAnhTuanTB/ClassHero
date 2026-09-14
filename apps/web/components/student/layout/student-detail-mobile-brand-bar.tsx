@@ -4,8 +4,14 @@ import { ChevronLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { ClassHeroLogo } from "@/components/common/brand/classhero-logo";
 import { useAutoHidingStudentHeader } from "@/components/student/layout/use-auto-hiding-student-header";
+import { StudentAiChatHeaderTrigger } from "@/features/student/ai-chat/components/student-ai-chat-header-trigger";
+import type { AiChatEntryContext } from "@/features/student/ai-chat/utils/ai-chat-link";
 
-export function StudentDetailMobileBrandBar() {
+export function StudentDetailMobileBrandBar({
+  aiChatContext,
+}: {
+  aiChatContext?: AiChatEntryContext;
+}) {
   const router = useRouter();
   const headerRef = useAutoHidingStudentHeader();
 
@@ -28,6 +34,12 @@ export function StudentDetailMobileBrandBar() {
           <div className="inline-flex min-w-0 items-center">
             <ClassHeroLogo className="h-10 max-w-[9rem]" priority />
           </div>
+          {aiChatContext ? (
+            <StudentAiChatHeaderTrigger
+              context={aiChatContext}
+              testId="student-ai-chat-trigger-mobile"
+            />
+          ) : null}
         </div>
       </header>
     </>

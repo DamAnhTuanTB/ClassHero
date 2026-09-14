@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { Inject, Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger, Optional } from "@nestjs/common";
 import {
   AiGenerationType,
   BackgroundJobQueue,
@@ -21,6 +21,7 @@ import type {
 import { getJobErrorMessage } from "#api/jobs/job-error";
 import { toJobJson } from "#api/jobs/job-json";
 import { AiProviderCallService } from "#api/modules/ai/services/ai-provider-call.service";
+import { RealtimeJobSnapshotPublisherService } from "#api/modules/realtime/services/realtime-job-snapshot-publisher.service";
 import type { AiStructuredInput } from "#api/modules/ai/types/ai-text.types";
 import { FlashcardFigureArtifactService } from "#api/modules/flashcards/services/flashcard-figure-artifact.service";
 import { FlashcardTexRendererClientService } from "#api/modules/flashcards/services/flashcard-tex-renderer-client.service";
@@ -61,6 +62,9 @@ export class FlashcardFigureRenderingProcessor {
     private readonly renderer: FlashcardTexRendererClientService,
     @Inject(FlashcardFigureArtifactService)
     private readonly artifacts: FlashcardFigureArtifactService,
+    @Optional()
+    @Inject(RealtimeJobSnapshotPublisherService)
+    private readonly realtimeJobs?: RealtimeJobSnapshotPublisherService,
   ) {}
 
   async process(
@@ -104,6 +108,7 @@ export class FlashcardFigureRenderingProcessor {
         errorMessage: null,
       },
     });
+    await this.realtimeJobs?.publishById(job.id);
     let attemptId: string | null = null;
     try {
       const figure = await this.prisma.flashcardFigure.findFirstOrThrow({

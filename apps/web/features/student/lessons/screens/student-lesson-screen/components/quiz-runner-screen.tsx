@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { ClassHeroLogo } from "@/components/common/brand/classhero-logo";
 import { TiptapContentView } from "@/components/common/content/tiptap-content-view";
+import { StudentAiChatHeaderTrigger } from "@/features/student/ai-chat/components/student-ai-chat-header-trigger";
+import type { AiChatEntryContext } from "@/features/student/ai-chat/utils/ai-chat-link";
 import { useDocumentScrollLock } from "@/features/student/lessons/hooks/use-document-scroll-lock";
 import { AssessmentQuestionCard } from "@/features/student/lessons/screens/student-lesson-screen/components/assessment-question-card";
 import { AssessmentExplanationPanel } from "@/features/student/lessons/screens/student-lesson-screen/components/assessment-explanation-panel";
@@ -104,6 +106,7 @@ export function QuizRunnerLoadingScreen() {
 }
 
 export function QuizRunnerScreen({
+  aiChatContext,
   answer,
   answeredQuestionIds,
   attempt,
@@ -126,6 +129,7 @@ export function QuizRunnerScreen({
   onToggleHint,
   pendingAction,
 }: {
+  aiChatContext: AiChatEntryContext;
   answer: StudentAnswer | undefined;
   answeredQuestionIds: ReadonlyArray<string>;
   attempt: QuizAttempt;
@@ -192,9 +196,7 @@ export function QuizRunnerScreen({
   const totalCount = attempt.questions.length;
   const questionNumber = question?.questionNumber ?? currentIndex + 1;
   const isLast = currentIndex === totalCount - 1;
-  const isAnswerComplete = question
-    ? isStudentAnswerComplete(question, answer)
-    : false;
+  const isAnswerComplete = question ? isStudentAnswerComplete(question, answer) : false;
   const progressPercent = ((currentIndex + 1) / Math.max(totalCount, 1)) * 100;
   const answeredQuestionIdSet = new Set(answeredQuestionIds);
   const handledQuestionIdSet = new Set(handledQuestionIds);
@@ -378,6 +380,10 @@ export function QuizRunnerScreen({
             <ChevronLeft className="h-8 w-8" strokeWidth={2.8} aria-hidden="true" />
           </button>
           <ClassHeroLogo className="h-10 max-w-[9rem]" priority />
+          <StudentAiChatHeaderTrigger
+            context={aiChatContext}
+            testId="student-ai-chat-trigger-quiz-runner"
+          />
         </div>
       </header>
 

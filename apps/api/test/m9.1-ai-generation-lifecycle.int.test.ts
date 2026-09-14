@@ -6,6 +6,8 @@ import {
   AiProviderName,
   BackgroundJobQueue,
   BackgroundJobStatus,
+  ProviderCatalogCategory,
+  ProviderUsageStatus,
 } from "@prisma/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -19,6 +21,7 @@ describe("M9.1 AI generation PostgreSQL lifecycle", () => {
   let lifecycle: AiGenerationLifecycleService;
   let backgroundJobId: string;
   let aiGenerationId: string;
+  let interruptedUsageEventId: string;
 
   beforeAll(async () => {
     prisma = new PrismaService(new ConfigService() as ConfigService<EnvConfig, true>);
@@ -48,6 +51,11 @@ describe("M9.1 AI generation PostgreSQL lifecycle", () => {
   });
 
   afterAll(async () => {
+    if (interruptedUsageEventId) {
+      await prisma.providerUsageEvent.deleteMany({
+        where: { id: interruptedUsageEventId },
+      });
+    }
     if (aiGenerationId) {
       await prisma.aiGeneration.deleteMany({ where: { id: aiGenerationId } });
     }
@@ -83,6 +91,19 @@ describe("M9.1 AI generation PostgreSQL lifecycle", () => {
     expect(running.status).toBe(BackgroundJobStatus.RUNNING);
     expect(running.attempts).toBe(1);
     expect(running.aiGenerations[0]?.status).toBe(AiGenerationStatus.RUNNING);
+
+    const interruptedUsageEvent = await prisma.providerUsageEvent.create({
+      data: {
+        category: ProviderCatalogCategory.AI_MODEL,
+        provider: AiProviderName.OPENAI,
+        status: ProviderUsageStatus.RUNNING,
+        aiGenerationId,
+        backgroundJobId,
+        feature: AiGenerationType.SUMMARY,
+      },
+      select: { id: true },
+    });
+    interruptedUsageEventId = interruptedUsageEvent.id;
 
     await lifecycle.markSucceeded(
       context,
@@ -130,6 +151,16 @@ describe("M9.1 AI generation PostgreSQL lifecycle", () => {
       totalTokens: 14,
       outputHash: expect.stringMatching(/^[a-f0-9]{64}$/),
       outputJson: { status: "provider-raw" },
+    });
+    await expect(
+      prisma.providerUsageEvent.findUniqueOrThrow({
+        where: { id: interruptedUsageEventId },
+        select: { status: true, errorCode: true, finishedAt: true },
+      }),
+    ).resolves.toMatchObject({
+      status: ProviderUsageStatus.FAILED,
+      errorCode: "BACKGROUND_JOB_FINISHED_WITH_UNSETTLED_USAGE",
+      finishedAt: expect.any(Date),
     });
   });
 

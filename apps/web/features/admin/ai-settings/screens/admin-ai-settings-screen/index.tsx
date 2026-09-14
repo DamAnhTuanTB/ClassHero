@@ -33,6 +33,7 @@ import { ModelConfigurationsTab } from "@/features/admin/ai-settings/screens/adm
 import { ProviderCatalogTab } from "@/features/admin/ai-settings/screens/admin-ai-settings-screen/components/provider-catalog-tab";
 import { UsageCostTab } from "@/features/admin/ai-settings/screens/admin-ai-settings-screen/components/usage-cost-tab";
 import type {
+  AiChatRuntimeSettings,
   AiFeatureConfiguration,
   ProviderBudget,
   UsageGranularity,
@@ -161,8 +162,15 @@ export function AdminAiSettingsScreen() {
     await queryClient.invalidateQueries({ queryKey: ["provider-operations"] });
   };
   const configurationMutation = useMutation({
-    mutationFn: (configurations: AiFeatureConfiguration[]) =>
-      updateAiConfigurations(configurations, token),
+    mutationFn: (input: {
+      configurations: AiFeatureConfiguration[];
+      chatSettings?: AiChatRuntimeSettings;
+    }) =>
+      updateAiConfigurations(
+        input.configurations,
+        token,
+        input.chatSettings,
+      ),
     onSuccess: async () => {
       await refreshAll();
       toast.success("Đã lưu mô hình AI");
@@ -362,7 +370,12 @@ export function AdminAiSettingsScreen() {
                 <ModelConfigurationsTab
                   data={configurationsQuery.data}
                   isSaving={configurationMutation.isPending}
-                  onSave={(items) => configurationMutation.mutate(items)}
+                  onSave={(configurations, chatSettings) =>
+                    configurationMutation.mutate({
+                      configurations,
+                      chatSettings,
+                    })
+                  }
                 />
               )
             ) : null}

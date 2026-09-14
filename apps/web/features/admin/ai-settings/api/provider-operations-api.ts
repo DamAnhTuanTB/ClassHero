@@ -2,6 +2,7 @@ import { apiRequest } from "@/lib/api-client";
 import type {
   AccountingSettings,
   AiConfigurationsResponse,
+  AiChatRuntimeSettings,
   AiFeatureConfiguration,
   AuditItem,
   OcrSettings,
@@ -30,6 +31,7 @@ export const getAiConfigurations = (token: string) =>
 export const updateAiConfigurations = (
   configurations: AiFeatureConfiguration[],
   token: string,
+  chatSettings?: AiChatRuntimeSettings,
 ) =>
   apiRequest<AiConfigurationsResponse>(`${basePath}/ai-configurations`, {
     method: "PUT",
@@ -46,9 +48,23 @@ export const updateAiConfigurations = (
         maxOutputTokens: configuration.maxOutputTokens,
         fallbackTemperature: configuration.fallbackTemperature,
         fallbackReasoningEffort: configuration.fallbackReasoningEffort,
+        fallbackMaxInputTokens: configuration.fallbackMaxInputTokens,
         fallbackMaxOutputTokens: configuration.fallbackMaxOutputTokens,
         expectedVersion: configuration.version,
       })),
+      ...(chatSettings?.embeddingCatalogItemId
+        ? {
+            chatSettings: {
+              embeddingCatalogItemId: chatSettings.embeddingCatalogItemId,
+              maxImagesPerMessage: chatSettings.maxImagesPerMessage,
+              maxImageBytes: chatSettings.maxImageBytes,
+              allowedImageMimeTypes: chatSettings.allowedImageMimeTypes,
+              studentDailyMessageLimit: chatSettings.studentDailyMessageLimit,
+              studentDailyImageLimit: chatSettings.studentDailyImageLimit,
+              expectedVersion: chatSettings.version,
+            },
+          }
+        : {}),
     },
   });
 

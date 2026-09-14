@@ -38,7 +38,9 @@ export const generatedQuizSolutionFigureSchema = generatedSolutionFigureSchema;
 
 export const generatedQuizFigureRefinementSchema = z
   .object({
-    latexSource: quizFigureLatexSourceSchema,
+    latexSource: quizFigureLatexSourceSchema.describe(
+      "Source chỉ chứa hình và nhãn ngắn cần để đọc biểu diễn. Không chép nguyên văn đề/lời giải, chuỗi suy luận, phép tính trung gian hoặc đáp án thành khối chữ trên canvas.",
+    ),
   })
   .strict();
 
@@ -108,7 +110,7 @@ export function buildQuizFigureRefinementInput(input: {
       input.subject,
       mode,
     )}`,
-    schemaVersion: "quiz-figure-refinement-schema-v3-independent-solution",
+    schemaVersion: "quiz-figure-refinement-schema-v4-visual-only",
     schemaReferenceStrategy: "auto",
     promptCache: {
       namespace: `quiz-figure-refinement-${input.subject.key.toLowerCase()}`,
@@ -161,14 +163,14 @@ function resolveQuizFigureRefinementPromptVersion(
 ) {
   if (mode === "SOLUTION") {
     return subject.key === "MATH"
-      ? "v39-single-semantic-check"
+      ? "v41-visual-only-solution"
       : subject.key === "PHYSICS"
-        ? "v26-single-semantic-check"
-        : "v25-single-semantic-check";
+        ? "v27-visual-only-solution"
+        : "v26-visual-only-solution";
   }
 
   return subject.key === "MATH"
-    ? "v39-single-semantic-check"
+    ? "v40-marker-policy-dedup"
     : subject.key === "PHYSICS"
       ? "v26-single-semantic-check"
       : "v25-single-semantic-check";

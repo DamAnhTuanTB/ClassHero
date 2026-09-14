@@ -12,6 +12,7 @@ import type {
   AiStructuredOutput,
   AiTextInput,
   AiTextOutput,
+  AiTextStreamEvent,
 } from "#api/modules/ai/types/ai-text.types";
 import { parseAiStructuredOutput } from "#api/modules/ai/utils/ai-output-validation";
 import { buildAiUserPrompt } from "#api/modules/ai/utils/ai-prompt";
@@ -83,6 +84,12 @@ export class GeminiProvider implements AiProvider {
       providerUsageRaw: response.usageMetadata,
       latencyMs: Date.now() - startedAt,
     };
+  }
+
+  async *streamText(input: AiTextInput): AsyncGenerator<AiTextStreamEvent> {
+    const output = await this.generateText(input);
+    yield { type: "delta", delta: output.text };
+    yield { type: "completed", output };
   }
 
   async generateStructured<TOutput>(

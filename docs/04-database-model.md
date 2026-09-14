@@ -76,6 +76,10 @@ Nếu task không đổi database, chỉ cần đọc file chi tiết liên quan
 | `M14.x` | File liên quan đến flow được test/harden/deploy |
 | `M15.x` | `progress-enrollment`, `notes-gamification-audit`, `quiz-flashcard-tests`, `learning-paths-lessons`, `ai-rag-chat`, `background-jobs`, `indexes-and-checklist`; thêm `provider-operations` khi có AI |
 
+`M9.34` mở rộng session Chat trong `ai-rag-chat` cho owner Admin simulation,
+normalized selected scope và immutable turn trace; default model vẫn nằm duy nhất
+trong `provider-operations`, session override không tạo configuration global mới.
+
 ---
 
 ## 5. Khi sửa docs database

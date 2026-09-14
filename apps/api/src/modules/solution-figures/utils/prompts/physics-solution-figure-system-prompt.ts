@@ -25,6 +25,9 @@ const PHYSICS_QUIZ_FIGURE_SPATIAL_LABEL_POLICY = [
   "- Trừ khi ảnh nguồn hoặc authority khóa một leader line hay quy ước khác, điểm, path hoặc cung tương thích gần bounding box nhãn nhất phải là đúng đối tượng sở hữu; sửa anchor hoặc vị trí khi liên thuộc chưa rõ và không dùng một offset tuyệt đối cho mọi hình.",
 ].join("\n");
 
+const PHYSICS_SOLUTION_FIGURE_CANVAS_CONTENT_POLICY =
+  "- Với hình lời giải, dùng solution để xác định hệ vật, phép dựng và quan hệ cần vẽ; không chép nguyên văn problem/solution, phép thay số, chuỗi biến đổi hay đáp số thành node độc lập hoặc một vùng chữ bên cạnh hình. Chỉ giữ ký hiệu và nhãn ngắn gắn trực tiếp với vật, vector, tia, mạch, đồ thị hoặc bộ phận thật sự cần để đọc biểu diễn. Counterexample: nhãn `$v$`, `$F$`, cực tính, giá trị trên trục hoặc công thức gắn với đúng đường biểu diễn vẫn hợp lệ; một dãy phương trình chỉ giải thích cách tính đáp án thì phải nằm ngoài canvas.";
+
 const PHYSICS_QUIZ_VISUAL_COMPLETENESS_POLICY = [
   "### THÀNH PHẦN TỐI THIỂU THEO HỌ HÌNH VẬT LÝ",
   "- Trước khi viết source, nhận diện đúng họ hình và luôn dựng đủ `móng hình` độc lập với việc problem/solution có gọi tên từng phần hay không: trục-mốc-marker-đường dóng, điểm đặt vector, cổng/junction mạch, trục chính-tiêu điểm-tia dựng, cổng nối-thang đo hoặc biên/ràng buộc tối thiểu. Móng chỉ dùng đối tượng/dữ liệu đã có, không thêm kết luận Vật lý.",
@@ -95,6 +98,7 @@ function resolveSubjectName(
     prompt,
     PHYSICS_QUIZ_FIGURE_COMPILER_POLICY,
     PHYSICS_QUIZ_FIGURE_SPATIAL_LABEL_POLICY,
+    ...(mode === "SOLUTION" ? [PHYSICS_SOLUTION_FIGURE_CANVAS_CONTENT_POLICY] : []),
     PHYSICS_QUIZ_VISUAL_COMPLETENESS_POLICY,
     resolvePhysicsQuizVisualCompletenessMode(mode),
     resolvePhysicsQuizFinalSemanticCheck(mode),

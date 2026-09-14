@@ -1,9 +1,11 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Optional } from "@nestjs/common";
 import {
   AiGenerationStatus,
   BackgroundJobQueue,
   BackgroundJobStatus,
   Prisma,
+  ProviderBudgetReservationStatus,
+  ProviderUsageStatus,
 } from "@prisma/client";
 import { UnrecoverableError } from "bullmq";
 
@@ -22,6 +24,7 @@ import {
   normalizeJobError,
   type JobProvider,
 } from "#api/jobs/job-error";
+import { RealtimeEventPublisherService } from "#api/modules/realtime/services/realtime-event-publisher.service";
 
 const lifecycleJobSelect = {
   id: true,
@@ -46,9 +49,29 @@ const lifecycleJobSelect = {
   },
 } satisfies Prisma.BackgroundJobSelect;
 
+const realtimeBackgroundJobSelect = {
+  id: true,
+  lessonId: true,
+  ownerUserId: true,
+  queue: true,
+  status: true,
+  attempts: true,
+  resourceType: true,
+  resourceId: true,
+  updatedAt: true,
+} satisfies Prisma.BackgroundJobSelect;
+
+const TERMINAL_JOB_UNSETTLED_USAGE_ERROR =
+  "BACKGROUND_JOB_FINISHED_WITH_UNSETTLED_USAGE";
+
 @Injectable()
 export class AiGenerationLifecycleService {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Optional()
+    @Inject(RealtimeEventPublisherService)
+    private readonly realtimePublisher?: RealtimeEventPublisherService,
+  ) {}
 
   async load(backgroundJobId: string): Promise<AiGenerationLifecycleRecord> {
     const record = await this.prisma.backgroundJob.findUnique({
@@ -86,7 +109,7 @@ export class AiGenerationLifecycleService {
     bullmqJobId: string,
   ): Promise<void> {
     const startedAt = new Date();
-    await this.prisma.$transaction([
+    const [backgroundJob] = await this.prisma.$transaction([
       this.prisma.backgroundJob.update({
         where: { id: context.backgroundJobId },
         data: {
@@ -97,6 +120,7 @@ export class AiGenerationLifecycleService {
           startedAt,
           finishedAt: null,
         },
+        select: realtimeBackgroundJobSelect,
       }),
       this.prisma.aiGeneration.update({
         where: { id: context.aiGenerationId },
@@ -109,6 +133,7 @@ export class AiGenerationLifecycleService {
         },
       }),
     ]);
+    await this.realtimePublisher?.publishBackgroundJobStatus(backgroundJob);
   }
 
   async markSucceeded(
@@ -130,8 +155,8 @@ export class AiGenerationLifecycleService {
     const usage = prepared.output.usage;
     const recordedOutput = prepared.recordedOutput ?? prepared.output.data;
 
-    await this.prisma.$transaction([
-      this.prisma.backgroundJob.update({
+    const backgroundJob = await this.prisma.$transaction(async (transaction) => {
+      const updatedJob = await transaction.backgroundJob.update({
         where: { id: context.backgroundJobId },
         data: {
           status: BackgroundJobStatus.SUCCEEDED,
@@ -141,8 +166,9 @@ export class AiGenerationLifecycleService {
           errorMessage: null,
           finishedAt,
         },
-      }),
-      this.prisma.aiGeneration.update({
+        select: realtimeBackgroundJobSelect,
+      });
+      await transaction.aiGeneration.update({
         where: { id: context.aiGenerationId },
         data: {
           status: AiGenerationStatus.SUCCEEDED,
@@ -161,8 +187,15 @@ export class AiGenerationLifecycleService {
           errorMessage: null,
           finishedAt,
         },
-      }),
-    ]);
+      });
+      await this.closeUnsettledUsage(
+        transaction,
+        context.backgroundJobId,
+        finishedAt,
+      );
+      return updatedJob;
+    });
+    await this.realtimePublisher?.publishBackgroundJobStatus(backgroundJob);
 
     return result;
   }
@@ -178,8 +211,8 @@ export class AiGenerationLifecycleService {
     const providerFailure = isAiProviderOutputError(error) ? error.details : null;
     const usage = providerFailure?.usage;
 
-    await this.prisma.$transaction([
-      this.prisma.backgroundJob.update({
+    const backgroundJob = await this.prisma.$transaction(async (transaction) => {
+      const updatedJob = await transaction.backgroundJob.update({
         where: { id: context.backgroundJobId },
         data: {
           status: isFinalAttempt
@@ -190,8 +223,9 @@ export class AiGenerationLifecycleService {
           errorMessage: message,
           finishedAt,
         },
-      }),
-      this.prisma.aiGeneration.update({
+        select: realtimeBackgroundJobSelect,
+      });
+      await transaction.aiGeneration.update({
         where: { id: context.aiGenerationId },
         data: {
           status: isFinalAttempt ? AiGenerationStatus.FAILED : AiGenerationStatus.QUEUED,
@@ -210,8 +244,45 @@ export class AiGenerationLifecycleService {
             : {}),
           finishedAt,
         },
-      }),
-    ]);
+      });
+      if (finishedAt) {
+        await this.closeUnsettledUsage(
+          transaction,
+          context.backgroundJobId,
+          finishedAt,
+        );
+      }
+      return updatedJob;
+    });
+    await this.realtimePublisher?.publishBackgroundJobStatus(backgroundJob);
+  }
+
+  private async closeUnsettledUsage(
+    transaction: Prisma.TransactionClient,
+    backgroundJobId: string,
+    finishedAt: Date,
+  ) {
+    await transaction.providerUsageEvent.updateMany({
+      where: {
+        backgroundJobId,
+        status: ProviderUsageStatus.RUNNING,
+      },
+      data: {
+        status: ProviderUsageStatus.FAILED,
+        errorCode: TERMINAL_JOB_UNSETTLED_USAGE_ERROR,
+        finishedAt,
+      },
+    });
+    await transaction.providerBudgetReservation.updateMany({
+      where: {
+        backgroundJobId,
+        status: ProviderBudgetReservationStatus.RESERVED,
+      },
+      data: {
+        status: ProviderBudgetReservationStatus.UNCERTAIN,
+        heartbeatAt: finishedAt,
+      },
+    });
   }
 }
 

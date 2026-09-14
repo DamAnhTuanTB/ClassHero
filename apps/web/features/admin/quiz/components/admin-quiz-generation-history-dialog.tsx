@@ -13,7 +13,10 @@ import {
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
 import { EditorDialogShell } from "@/components/admin/courses/editor-dialog-shell";
-import type { AdminQuizSet } from "@/features/admin/quiz/api/admin-quiz-api";
+import type {
+  AdminQuizAssessmentKind,
+  AdminQuizSet,
+} from "@/features/admin/quiz/api/admin-quiz-api";
 import {
   formatDateTime,
   formatVnd,
@@ -32,16 +35,19 @@ const AdminAiGenerationUsageDialog = dynamic(
 type QuizGeneration = NonNullable<AdminQuizSet["aiGenerations"]>[number];
 
 export function AdminQuizGenerationHistoryDialog({
+  assessmentKind,
   isOpen,
   onClose,
   quizSet,
 }: {
+  assessmentKind: AdminQuizAssessmentKind;
   isOpen: boolean;
   onClose: () => void;
   quizSet: AdminQuizSet;
 }) {
   const [selectedGenerationId, setSelectedGenerationId] = useState<string | null>(null);
   const generations = quizSet.aiGenerations ?? [];
+  const assessmentLabel = assessmentKind === "test" ? "Test" : "Quiz";
   const totals = useMemo(
     () =>
       generations.reduce(
@@ -68,13 +74,13 @@ export function AdminQuizGenerationHistoryDialog({
       >
         <header className="theme-dialog-header flex min-h-16 shrink-0 items-center px-4 py-3 pr-16 sm:px-5">
           <h2 className="truncate text-lg font-extrabold text-[var(--theme-text-strong)]">
-            Lịch sử sinh Quiz bằng AI
+            Lịch sử sử dụng AI của {assessmentLabel}
           </h2>
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
           <div className="grid gap-3 sm:grid-cols-3">
-            <SummaryCard label="Tổng lần sinh" value={formatNumber(generations.length)} />
+            <SummaryCard label="Tổng tác vụ AI" value={formatNumber(generations.length)} />
             <SummaryCard label="Tổng lượt gọi" value={formatNumber(totals.usageEvents)} />
             <SummaryCard label="Tổng chi phí thực tế" value={formatVnd(totals.costVnd)} />
           </div>
@@ -98,10 +104,11 @@ export function AdminQuizGenerationHistoryDialog({
                     <Coins className="size-5" aria-hidden="true" />
                   </span>
                   <p className="mt-3 font-extrabold text-[var(--theme-text-strong)]">
-                    Chưa có lần sinh bằng AI
+                    Chưa có tác vụ AI
                   </p>
                   <p className="mt-1 text-sm font-medium text-[var(--theme-text-muted)]">
-                    Chi phí sẽ được ghi nhận sau khi bộ Quiz được sinh bằng AI.
+                    Chi phí sẽ được ghi nhận khi bộ {assessmentLabel} dùng AI để
+                    sinh nội dung, sửa lời giải hoặc tạo hình.
                   </p>
                 </div>
               </div>
@@ -163,7 +170,7 @@ function GenerationRow({
         <span className="min-w-0">
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <strong className="text-sm font-extrabold text-[var(--theme-text-strong)]">
-              Lần sinh {index}
+              Tác vụ {index}
             </strong>
             <span
               className={cn(

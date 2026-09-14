@@ -17,6 +17,7 @@ import {
 } from "#api/jobs/background-job-queues";
 import { parseRedisConnection } from "#api/jobs/redis-connection";
 import { FlashcardFigureRenderingProcessor } from "#api/workers/processors/flashcard-figure-rendering.processor";
+import { RealtimeJobSnapshotPublisherService } from "#api/modules/realtime/services/realtime-job-snapshot-publisher.service";
 
 @Injectable()
 export class FlashcardFigureRenderingWorkerService
@@ -31,6 +32,8 @@ export class FlashcardFigureRenderingWorkerService
     private readonly config: ConfigService<EnvConfig, true>,
     @Inject(FlashcardFigureRenderingProcessor)
     private readonly processor: FlashcardFigureRenderingProcessor,
+    @Inject(RealtimeJobSnapshotPublisherService)
+    private readonly realtimeJobs: RealtimeJobSnapshotPublisherService,
   ) {}
 
   onModuleInit() {
@@ -51,10 +54,14 @@ export class FlashcardFigureRenderingWorkerService
         removeOnFail: { age: 30 * 24 * 60 * 60, count: 5_000 },
       },
     );
+    this.worker.on("completed", (job) => {
+      void this.realtimeJobs.publishById(job.data.backgroundJobId);
+    });
     this.worker.on("failed", (job, error) => {
       this.logger.error(
         `Flashcard figure job ${job?.id ?? "unknown"} failed: ${error.message}`,
       );
+      if (job) void this.realtimeJobs.publishById(job.data.backgroundJobId);
     });
     this.logger.log(
       `Flashcard figure worker started on queue="${queueName}" concurrency=${concurrency}.`,

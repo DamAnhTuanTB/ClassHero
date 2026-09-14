@@ -1,6 +1,10 @@
 "use client";
 
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  backgroundJobStatusChangedEventSchema,
+  realtimeSocketEvents,
+} from "@learning-path/shared";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -40,6 +44,7 @@ import type {
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { computeAutofillRanges } from "@/features/admin/courses/utils/autofill-page-ranges";
+import { useAuthenticatedRealtime } from "@/components/common/realtime/authenticated-realtime-provider";
 
 const EMPTY_SOURCE_DOCUMENTS: AdminSourceDocumentApi[] = [];
 const EMPTY_SOURCE_PAGES: AdminSourceDocumentPageApi[] = [];
@@ -87,6 +92,7 @@ export function useAdminCourseDocumentsManager(
   options: { loadAllSourcePages?: boolean } = {},
 ) {
   const queryClient = useQueryClient();
+  const { socket: realtimeSocket, status: realtimeStatus } = useAuthenticatedRealtime();
   const session = useAuthSessionStore((state) => state.session);
   const token = session?.accessToken ?? "";
   const userId = session?.user.id;
@@ -108,8 +114,12 @@ export function useAdminCourseDocumentsManager(
     enabled: Boolean(token && path),
     refetchInterval: (query) => {
       const data = query.state.data;
-      if (!data) return 5_000;
-      return data.some((doc) => doc.status === "PROCESSING") ? 5_000 : false;
+      if (!data) return realtimeStatus === "connected" ? 60_000 : 5_000;
+      return data.some((doc) => doc.status === "PROCESSING")
+        ? realtimeStatus === "connected"
+          ? 60_000
+          : 5_000
+        : false;
     },
     refetchIntervalInBackground: false,
   });
@@ -124,7 +134,12 @@ export function useAdminCourseDocumentsManager(
     ),
     queryFn: () => listAdminSourceDocumentPages(selectedSourceDocument?.id ?? "", token),
     enabled: Boolean(token && selectedSourceDocument?.id),
-    refetchInterval: selectedSourceDocument?.status === "PROCESSING" ? 5_000 : false,
+    refetchInterval:
+      selectedSourceDocument?.status === "PROCESSING"
+        ? realtimeStatus === "connected"
+          ? 60_000
+          : 5_000
+        : false,
     refetchIntervalInBackground: false,
   });
   const sourcePages = sourcePagesQuery.data ?? EMPTY_SOURCE_PAGES;
@@ -157,8 +172,12 @@ export function useAdminCourseDocumentsManager(
     enabled: Boolean(token && path),
     refetchInterval: (query) => {
       const data = query.state.data;
-      if (!data) return 5_000;
-      return data.some((doc) => doc.status === "PROCESSING") ? 5_000 : false;
+      if (!data) return realtimeStatus === "connected" ? 60_000 : 5_000;
+      return data.some((doc) => doc.status === "PROCESSING")
+        ? realtimeStatus === "connected"
+          ? 60_000
+          : 5_000
+        : false;
     },
     refetchIntervalInBackground: false,
   });
@@ -202,6 +221,36 @@ export function useAdminCourseDocumentsManager(
     dialogState?.type === "lesson-upload"
       ? (lessons.find((item) => item.lesson.id === dialogState.lessonId) ?? null)
       : null;
+
+  useEffect(() => {
+    if (!realtimeSocket || realtimeStatus !== "connected") return;
+
+    const handleDocumentJobStatus = (rawEvent: unknown) => {
+      const parsed = backgroundJobStatusChangedEventSchema.safeParse(rawEvent);
+      if (!parsed.success) return;
+      if (
+        parsed.data.resourceType !== "SOURCE_DOCUMENT" &&
+        parsed.data.resourceType !== "LESSON_DOCUMENT" &&
+        parsed.data.resourceType !== "lesson_document"
+      ) {
+        return;
+      }
+
+      void queryClient.invalidateQueries({ queryKey: adminCourseDocumentQueryKeys.all });
+    };
+
+    realtimeSocket.on(
+      realtimeSocketEvents.backgroundJobStatusChanged,
+      handleDocumentJobStatus,
+    );
+    return () => {
+      realtimeSocket.off(
+        realtimeSocketEvents.backgroundJobStatusChanged,
+        handleDocumentJobStatus,
+      );
+    };
+  }, [queryClient, realtimeSocket, realtimeStatus]);
+
   // Sync selected source document
   useEffect(() => {
     if (sourceDocuments.length === 0) {

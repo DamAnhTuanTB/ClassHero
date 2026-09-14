@@ -27,7 +27,7 @@ export function buildQuizSolutionRefinementInput(input: CommonInput): AiStructur
     : "single";
   return {
     systemPrompt: resolveQuizSolutionRefinementSystemPrompt(input.subject.key),
-    userPrompt: buildUserPrompt("Hãy tinh chỉnh lời giải Quiz hiện tại.", {
+    userPrompt: buildUserPrompt("Hãy tinh chỉnh lời giải hiện tại.", {
       subject: input.subject.name,
       targetGrade: input.targetGrade,
       questionType: input.question.questionType,

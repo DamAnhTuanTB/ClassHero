@@ -22,6 +22,9 @@ describe("QuizService generation cost summary", () => {
     const prisma = {
       quizSet: { findMany: vi.fn(async () => [quizSet]) },
       quizQuestion: {
+        findMany: vi.fn(async () => [
+          { id: "quiz-question-1", quizSetId: quizSet.id },
+        ]),
         groupBy: vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([]),
       },
       aiGeneration: {
@@ -29,6 +32,7 @@ describe("QuizService generation cost summary", () => {
           {
             id: "generation-succeeded",
             targetId: quizSet.id,
+            targetType: "QUIZ_SET",
             status: AiGenerationStatus.SUCCEEDED,
             model: "gpt-5.6-luna",
             inputMetaJson: null,
@@ -38,7 +42,8 @@ describe("QuizService generation cost summary", () => {
           },
           {
             id: "generation-failed",
-            targetId: quizSet.id,
+            targetId: "quiz-question-1",
+            targetType: "QUIZ_SOLUTION_REFINEMENT",
             status: AiGenerationStatus.FAILED,
             model: "gpt-5.6-luna",
             inputMetaJson: null,
@@ -71,7 +76,13 @@ describe("QuizService generation cost summary", () => {
       expect.objectContaining({
         where: expect.objectContaining({
           type: AiGenerationType.QUIZ,
-          targetId: { in: [quizSet.id] },
+          OR: expect.arrayContaining([
+            { targetType: "QUIZ_SET", targetId: { in: [quizSet.id] } },
+            {
+              targetType: "QUIZ_SOLUTION_REFINEMENT",
+              targetId: { in: ["quiz-question-1"] },
+            },
+          ]),
         }),
       }),
     );

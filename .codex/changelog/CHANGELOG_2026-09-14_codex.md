@@ -1,1 +1,2 @@
 - 2026-09-14: Refined Codex paid-provider coverage, budget, and multi-agent workflow guardrails across the repository and AI content skills.
+- 2026-09-14: Added the shared Student/Admin AI Chat and realtime job runtime, expanded provider and generation contracts, and aligned migrations, UI, documentation, live-test tooling, and regression coverage.

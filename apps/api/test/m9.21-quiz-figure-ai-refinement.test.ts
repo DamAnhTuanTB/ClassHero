@@ -38,9 +38,7 @@ describe("M9.21 Quiz figure AI refinement", () => {
       });
 
       expect(input.inputImages).toEqual([{ imageUrl, detail: "high" }]);
-      expect(input.schemaVersion).toBe(
-        "quiz-figure-refinement-schema-v3-independent-solution",
-      );
+      expect(input.schemaVersion).toBe("quiz-figure-refinement-schema-v4-visual-only");
       expect(JSON.parse(input.userPrompt)).toEqual({
         figurePlan: plan,
         targetGrade: 8,
@@ -87,8 +85,9 @@ describe("M9.21 Quiz figure AI refinement", () => {
     expect(input.systemPrompt).toContain("dùng cả solution và problem");
     expect(input.systemPrompt).not.toContain("sau đó mới đến problem");
     expect(input.promptVersion).toBe(
-      "quiz-figure-math-solution-refinement-comprehensive-v39-single-semantic-check",
+      "quiz-figure-math-solution-refinement-comprehensive-v41-visual-only-solution",
     );
+    expect(input.schemaVersion).toBe("quiz-figure-refinement-schema-v4-visual-only");
   });
 
   it("uses the same full-source refinement schema in the worker", async () => {

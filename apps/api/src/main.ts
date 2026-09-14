@@ -8,6 +8,7 @@ import { HttpExceptionFilter } from "#api/common/errors/http-exception.filter";
 import { createValidationException } from "#api/common/validation/validation-error";
 import { EnvConfig, parseCorsOrigins } from "#api/config/env.validation";
 import { setupSwagger } from "#api/config/swagger";
+import { RealtimeSocketIoAdapter } from "#api/modules/realtime/adapters/realtime-socket-io.adapter";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -28,6 +29,13 @@ async function bootstrap() {
     origin: corsOrigins,
     credentials: true,
   });
+  app.useWebSocketAdapter(
+    new RealtimeSocketIoAdapter(
+      app,
+      corsOrigins,
+      configService.get("SOCKET_IO_PATH", { infer: true }),
+    ),
+  );
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

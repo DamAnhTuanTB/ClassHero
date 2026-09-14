@@ -403,7 +403,11 @@ export function AdminBlockImageActions({
             try {
               await createMutation.mutateAsync(input);
               if (input.figure) commitTransientTarget(input.figure);
-              toast.success("Đã bắt đầu tạo hình mới bằng AI.");
+              toast.success(
+                input.referenceImageMode === "CURRENT_ONLY"
+                  ? "Đã bắt đầu chỉnh sửa hình bằng AI."
+                  : "Đã bắt đầu tạo hình mới bằng AI.",
+              );
               setDialog(null);
               setTarget(null);
               setAiTargetMode(null);

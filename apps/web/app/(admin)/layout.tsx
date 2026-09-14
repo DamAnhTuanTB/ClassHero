@@ -3,6 +3,7 @@ import { AuthenticatedRouteGuard } from "@/components/common/auth/authenticated-
 import { getServerAuthUser } from "@/features/auth/session/server-auth-session";
 import { getServerThemeMode } from "@/lib/server-theme";
 import "@/app/(admin)/admin-theme.css";
+import { AuthenticatedRealtimeProvider } from "@/components/common/realtime/authenticated-realtime-provider";
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const [initialThemeMode, serverAuthUser] = await Promise.all([
@@ -18,7 +19,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       data-theme-root="true"
     >
       <AuthenticatedRouteGuard allowedRoles={["ADMIN"]} initialUser={initialUser}>
-        {children}
+        <AuthenticatedRealtimeProvider>{children}</AuthenticatedRealtimeProvider>
       </AuthenticatedRouteGuard>
     </div>
   );

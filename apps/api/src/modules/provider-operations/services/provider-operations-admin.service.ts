@@ -4,6 +4,7 @@ import { normalizeAiReasoningEffortLevels } from "@learning-path/shared";
 import {
   AiGenerationType,
   AiModelPurpose,
+  AiProviderName,
   Prisma,
   ProviderBudgetScope,
   ProviderCatalogCategory,
@@ -33,6 +34,11 @@ import type { UpdateAiConfigurationsDto } from "#api/modules/provider-operations
 import type { UpdateOcrSettingsDto } from "#api/modules/provider-operations/dto/update-ocr-settings.dto";
 import type { UpdateProviderBudgetsDto } from "#api/modules/provider-operations/dto/update-provider-budgets.dto";
 import { AiModelRoutingService } from "#api/modules/provider-operations/services/ai-model-routing.service";
+import {
+  AiChatRuntimeSettingsService,
+  hasEmbeddingCapability,
+  readEmbeddingDimensions,
+} from "#api/modules/provider-operations/services/ai-chat-runtime-settings.service";
 import { ProviderUsageService } from "#api/modules/provider-operations/services/provider-usage.service";
 import { lockProviderBudgetScopes } from "#api/modules/provider-operations/utils/provider-budget-lock";
 import { getProviderBudgetPeriod } from "#api/modules/provider-operations/utils/provider-budget-period";
@@ -47,6 +53,7 @@ const MANAGED_AI_FEATURES = [
   AiGenerationType.QUIZ,
   AiGenerationType.FLASHCARD,
   AiGenerationType.TEST,
+  AiGenerationType.CHAT,
 ] as const;
 const MANAGED_AI_PURPOSES = [AiModelPurpose.TEXT, AiModelPurpose.IMAGE] as const;
 const MANAGED_AI_CONFIGURATION_KEYS: ReadonlyArray<{
@@ -70,6 +77,7 @@ const MANAGED_AI_CONFIGURATION_KEYS: ReadonlyArray<{
     feature: AiGenerationType.TEST,
     purpose,
   })),
+  { feature: AiGenerationType.CHAT, purpose: AiModelPurpose.TEXT },
 ];
 
 @Injectable()
@@ -81,6 +89,8 @@ export class ProviderOperationsAdminService {
     @Inject(ProviderUsageService)
     private readonly usage: ProviderUsageService,
     private readonly configService: ConfigService<EnvConfig, true>,
+    @Inject(AiChatRuntimeSettingsService)
+    private readonly chatRuntimeSettings: AiChatRuntimeSettingsService,
   ) {}
 
   async overview() {
@@ -365,7 +375,7 @@ export class ProviderOperationsAdminService {
   }
 
   async aiConfigurations() {
-    const [configurations, catalog] = await Promise.all([
+    const [configurations, catalog, chatSettings] = await Promise.all([
       this.prisma.aiFeatureModelConfig.findMany({
         where: { feature: { in: [...MANAGED_AI_FEATURES] } },
         include: {
@@ -378,6 +388,7 @@ export class ProviderOperationsAdminService {
         where: { category: ProviderCatalogCategory.AI_MODEL },
         include: { priceVersions: { orderBy: { effectiveFrom: "desc" }, take: 1 } },
       }),
+      this.chatRuntimeSettings.get(),
     ]);
 
     // Sort models by status (ACTIVE first), provider, and then by release date (effectiveFrom desc)
@@ -412,6 +423,7 @@ export class ProviderOperationsAdminService {
           maxOutputTokens: config?.maxOutputTokens ?? null,
           fallbackTemperature: config?.fallbackTemperature?.toNumber() ?? null,
           fallbackReasoningEffort: config?.fallbackReasoningEffort ?? null,
+          fallbackMaxInputTokens: config?.fallbackMaxInputTokens ?? null,
           fallbackMaxOutputTokens: config?.fallbackMaxOutputTokens ?? null,
           version: config?.version ?? 0,
           updatedAt: config?.updatedAt ?? new Date(),
@@ -426,6 +438,7 @@ export class ProviderOperationsAdminService {
         status: item.status,
         credentialConfigured: this.routing.isCredentialConfigured(item.provider),
       })),
+      chatSettings,
     };
   }
 
@@ -446,7 +459,7 @@ export class ProviderOperationsAdminService {
     ) {
       throwBadRequest(
         "AI_CONFIGURATION_FEATURE_INVALID",
-        "Chỉ được cấu hình Sinh kiến thức, Tóm tắt video, Quiz, Flashcard và Bài kiểm tra theo phase được hỗ trợ.",
+        "Chỉ được cấu hình Sinh kiến thức, Tóm tắt video, Quiz, Flashcard, Bài kiểm tra và Chat AI theo phase được hỗ trợ.",
       );
     }
 
@@ -547,6 +560,7 @@ export class ProviderOperationsAdminService {
             maxOutputTokens: item.maxOutputTokens,
             fallbackTemperature: item.fallbackTemperature,
             fallbackReasoningEffort: item.fallbackReasoningEffort ?? null,
+            fallbackMaxInputTokens: item.fallbackMaxInputTokens,
             fallbackMaxOutputTokens: item.fallbackMaxOutputTokens,
             updatedByUserId: actorUserId,
             version: 1,
@@ -560,6 +574,7 @@ export class ProviderOperationsAdminService {
             maxOutputTokens: item.maxOutputTokens,
             fallbackTemperature: item.fallbackTemperature,
             fallbackReasoningEffort: item.fallbackReasoningEffort ?? null,
+            fallbackMaxInputTokens: item.fallbackMaxInputTokens,
             fallbackMaxOutputTokens: item.fallbackMaxOutputTokens,
             updatedByUserId: actorUserId,
             version: { increment: 1 },
@@ -570,6 +585,78 @@ export class ProviderOperationsAdminService {
             actorUserId,
             action: "AI_FEATURE_MODEL_CONFIGURATION_UPDATED",
             entityType: "AiFeatureModelConfig",
+            entityId: after.id,
+            before: before ? toJson(before) : undefined,
+            after: toJson(after),
+          },
+        });
+      }
+
+      if (dto.chatSettings) {
+        const embeddingModel = await transaction.providerCatalogItem.findUnique({
+          where: { id: dto.chatSettings.embeddingCatalogItemId },
+          select: {
+            id: true,
+            category: true,
+            provider: true,
+            status: true,
+            capabilitiesJson: true,
+          },
+        });
+        const embeddingDimensions = this.configService.get(
+          "OPENAI_EMBEDDING_DIMENSIONS",
+          { infer: true },
+        );
+        if (
+          !embeddingModel ||
+          embeddingModel.category !== ProviderCatalogCategory.AI_MODEL ||
+          embeddingModel.provider !== AiProviderName.OPENAI ||
+          embeddingModel.status !== ProviderCatalogStatus.ACTIVE ||
+          !hasEmbeddingCapability(embeddingModel.capabilitiesJson) ||
+          readEmbeddingDimensions(
+            embeddingModel.capabilitiesJson,
+            embeddingDimensions,
+          ) !== embeddingDimensions ||
+          !this.routing.isCredentialConfigured(embeddingModel.provider)
+        ) {
+          throwBadRequest(
+            "AI_CHAT_EMBEDDING_MODEL_INVALID",
+            "Model embedding phải là model OpenAI đang hoạt động, có credential và tương thích vector space hiện tại.",
+          );
+        }
+
+        const before = await transaction.aiChatRuntimeSetting.findUnique({
+          where: { singletonKey: "default" },
+        });
+        if ((before?.version ?? 0) !== dto.chatSettings.expectedVersion) {
+          throwConflict(
+            "AI_CHAT_RUNTIME_SETTINGS_VERSION_CONFLICT",
+            "Thiết lập mặc định Chat AI đã thay đổi ở nơi khác. Vui lòng tải lại.",
+            { currentVersion: before?.version ?? 0 },
+          );
+        }
+        const data = {
+          embeddingCatalogItemId: dto.chatSettings.embeddingCatalogItemId,
+          maxImagesPerMessage: dto.chatSettings.maxImagesPerMessage,
+          maxImageBytes: BigInt(dto.chatSettings.maxImageBytes),
+          allowedImageMimeTypes: dto.chatSettings.allowedImageMimeTypes,
+          studentDailyMessageLimit: dto.chatSettings.studentDailyMessageLimit,
+          studentDailyImageLimit: dto.chatSettings.studentDailyImageLimit,
+          updatedByUserId: actorUserId,
+        };
+        const after = before
+          ? await transaction.aiChatRuntimeSetting.update({
+              where: { id: before.id },
+              data: { ...data, version: { increment: 1 } },
+            })
+          : await transaction.aiChatRuntimeSetting.create({
+              data: { singletonKey: "default", ...data },
+            });
+        await transaction.auditLog.create({
+          data: {
+            actorUserId,
+            action: "AI_CHAT_RUNTIME_SETTINGS_UPDATED",
+            entityType: "AiChatRuntimeSetting",
             entityId: after.id,
             before: before ? toJson(before) : undefined,
             after: toJson(after),
@@ -1288,7 +1375,11 @@ function hasCapability(value: Prisma.JsonValue | null, feature: AiGenerationType
 }
 
 function toJson(value: unknown): Prisma.InputJsonValue {
-  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+  return JSON.parse(
+    JSON.stringify(value, (_key, nestedValue) =>
+      typeof nestedValue === "bigint" ? nestedValue.toString() : nestedValue,
+    ),
+  ) as Prisma.InputJsonValue;
 }
 
 function startOfMonthInHoChiMinh(date: Date) {

@@ -25,6 +25,11 @@ const envSchema = z
     WORKER_CONCURRENCY_DIAGRAM: z.coerce.number().int().positive().default(3),
     WORKER_CONCURRENCY_NOTIFICATION: z.coerce.number().int().positive().default(3),
     CORS_ORIGINS: z.string().min(1).default("http://localhost:3000"),
+    SOCKET_IO_PATH: z.string().min(1).default("/socket.io"),
+    REALTIME_JOB_EVENTS_ENABLED: z
+      .enum(["true", "false"])
+      .transform((value) => value === "true")
+      .default(true),
     LOG_LEVEL: z.enum(["error", "warn", "log", "debug", "verbose"]).default("debug"),
     FILE_STORAGE_PROVIDER: z
       .enum(["minio_local", "cloudflare_r2"])
@@ -85,6 +90,31 @@ const envSchema = z
       .max(1_000)
       .default(120),
     MAX_IMAGE_UPLOAD_MB: z.coerce.number().positive().default(10),
+    MAX_CHAT_IMAGE_UPLOAD_MB: z.coerce.number().positive().max(10).default(10),
+    AI_CHAT_MAX_IMAGES_PER_MESSAGE: z.coerce.number().int().positive().max(5).default(5),
+    AI_CHAT_MAX_CONTEXT_TOKENS: z.coerce.number().int().positive().default(4_000),
+    AI_CHAT_MAX_INPUT_TOKENS: z.coerce.number().int().positive().default(20_000),
+    AI_CHAT_MAX_OUTPUT_TOKENS: z.coerce.number().int().positive().default(1_200),
+    AI_CHAT_MAX_HISTORY_TOKENS: z.coerce.number().int().positive().default(3_000),
+    AI_CHAT_RECENT_MESSAGE_COUNT: z.coerce.number().int().min(2).max(30).default(10),
+    AI_CHAT_ORPHAN_IMAGE_TTL_HOURS: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(720)
+      .default(24),
+    AI_CHAT_ORPHAN_IMAGE_CLEANUP_INTERVAL_MINUTES: z.coerce
+      .number()
+      .int()
+      .min(5)
+      .max(1_440)
+      .default(60),
+    AI_CHAT_ORPHAN_IMAGE_CLEANUP_BATCH_SIZE: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(1_000)
+      .default(100),
     MAX_AVATAR_UPLOAD_MB: z.coerce.number().positive().default(5),
     OCR_PROVIDER: z.enum(["mathpix"]).default("mathpix"),
     OCR_PAID_ENABLED: z.coerce.boolean().default(false),

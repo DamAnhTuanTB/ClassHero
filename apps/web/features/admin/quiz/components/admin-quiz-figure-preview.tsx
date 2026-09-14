@@ -34,6 +34,7 @@ export function AdminQuizFigurePreview({
 }) {
   const imageUrl = useStableImageUrl(figure.currentRevision?.deliveryFile?.publicUrl);
   const roleLabel = role === "QUESTION" ? "Hình đề" : "Hình lời giải";
+  const assessmentLabel = assessmentKind === "test" ? "Test" : "Quiz";
   const isProcessing = PROCESSING_STATUSES.has(figure.status);
   const displayPercent = getStemFigureDisplayPercent(
     figure.currentRevision?.displayScale ??
@@ -50,7 +51,7 @@ export function AdminQuizFigurePreview({
         setId={setId}
       >
         <figure
-          aria-label={`${roleLabel} Quiz`}
+          aria-label={`${roleLabel} ${assessmentLabel}`}
           className="mx-auto w-full max-w-2xl rounded-xl border border-[var(--theme-border)] bg-white p-3 shadow-sm dark:bg-white"
           data-testid={`admin-quiz-${role.toLowerCase()}-figure`}
         >

@@ -66,6 +66,7 @@ describe("ProviderOperationsAdminService price condition inheritance", () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
 
     await service.createPriceVersion("catalog-item", "admin-user", {

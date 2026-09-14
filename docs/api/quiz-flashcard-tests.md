@@ -1518,8 +1518,31 @@ Behavior:
 - Kiểm tra đã đến `exam_open_at`.
 - Kiểm tra enrollment và prerequisite Quiz + Flashcard.
 - Chọn bộ đề phù hợp.
-- Tạo attempt.
+- Trong cùng transaction, chuyển mọi Test attempt `IN_PROGRESS` cũ của student
+  sang `CANCELLED`, sau đó tạo attempt mới.
 - Trả câu hỏi không kèm đáp án đúng.
+
+#### `GET /student/test-attempts/active-status`
+
+Role: `STUDENT`.
+
+Behavior:
+
+- Trả `{ "isActive": boolean }` cho trạng thái Test toàn tài khoản để các icon
+  Chat AI ở tab khác cập nhật khi cửa sổ được focus.
+- Trước khi trả, tự chuyển attempt quá
+  `startedAt + testSet.durationSeconds + 60 giây grace` sang `CANCELLED`.
+
+#### `POST /student/test-attempts/:attemptId/cancel`
+
+Role: `STUDENT`.
+
+Behavior:
+
+- Chỉ hủy attempt thuộc student hiện tại và đang `IN_PROGRESS`.
+- Idempotent với attempt đã kết thúc; trả 404 nếu attempt không thuộc student.
+- Frontend gọi khi student xác nhận thoát runner hoặc rời/reload trang bằng
+  request `keepalive`.
 
 #### `POST /student/test-attempts/:attemptId/submit`
 

@@ -6,7 +6,10 @@ import {
   supportsOpenAiTemperature,
 } from "#api/modules/ai/utils/ai-openai-model-capabilities";
 import { buildAiUserPrompt } from "#api/modules/ai/utils/ai-prompt";
-import { buildOpenAiPromptCacheFields } from "#api/modules/ai/utils/ai-prompt-cache";
+import {
+  buildOpenAiPromptCacheFields,
+  buildOpenAiTextPromptCacheFields,
+} from "#api/modules/ai/utils/ai-prompt-cache";
 
 export const OPENAI_PREVIEW_FILE_ID =
   "<file_id returned by the OpenAI Files API at runtime>";
@@ -101,7 +104,39 @@ export function buildOpenAiStructuredResponseRequest<
   };
 }
 
-function buildExplicitPromptCacheInput(
+export function buildOpenAiTextResponseRequest(input: {
+  request: AiTextInput;
+  model: string;
+  contractVersion: string;
+  responseInput?: OpenAiResponseInput;
+}) {
+  const { request, model } = input;
+  const responseInput = input.responseInput ?? buildOpenAiResponseInput(request);
+  const promptCacheFields = buildOpenAiTextPromptCacheFields({
+    request,
+    model,
+    contractVersion: input.contractVersion,
+  });
+  const usesExplicitPromptCache =
+    promptCacheFields.prompt_cache_options?.mode === "explicit";
+  return {
+    model,
+    ...(usesExplicitPromptCache ? {} : { instructions: request.systemPrompt }),
+    input: usesExplicitPromptCache
+      ? buildExplicitPromptCacheInput(request.systemPrompt, responseInput)
+      : responseInput,
+    ...promptCacheFields,
+    ...(request.temperature === undefined || !supportsOpenAiTemperature(model)
+      ? {}
+      : { temperature: request.temperature }),
+    ...(request.reasoningEffort && supportsOpenAiReasoningEffort(model)
+      ? { reasoning: { effort: request.reasoningEffort } }
+      : {}),
+    ...(request.maxTokens === undefined ? {} : { max_output_tokens: request.maxTokens }),
+  };
+}
+
+export function buildExplicitPromptCacheInput(
   systemPrompt: string,
   responseInput: OpenAiResponseInput,
 ): OpenAI.Responses.ResponseInput {

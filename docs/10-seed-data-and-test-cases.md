@@ -460,6 +460,14 @@ Integration test có thể dùng test database riêng.
 
 Không gọi provider thật trong CI mặc định.
 
+Khi owner yêu cầu live test, test plan phải chọn và chạy bộ case cần thiết
+đủ bao phủ các trường hợp chính và rủi ro quan trọng trong acceptance
+matrix của phạm vi thay đổi. Không cần chạy mọi tổ hợp tương đương,
+nhưng phải ghi lý do gộp case. Bằng chứng mock/cache không được tính thay
+cho case có acceptance phụ thuộc provider thật. Nếu budget guard làm bộ
+coverage cần thiết chưa hoàn tất, ghi `Not run` cho từng case còn lại và
+không báo live test pass.
+
 ---
 
 ## 13. Seed command đề xuất

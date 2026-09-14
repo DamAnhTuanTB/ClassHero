@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
 
-import type { AiStructuredInput } from "#api/modules/ai/types/ai-text.types";
+import type {
+  AiStructuredInput,
+  AiTextInput,
+} from "#api/modules/ai/types/ai-text.types";
 
 type OpenAiPromptCacheFields = {
   prompt_cache_key?: string;
@@ -57,6 +60,37 @@ export function buildOpenAiPromptCacheFields(input: {
     fields.prompt_cache_retention = "24h";
   }
 
+  return fields;
+}
+
+export function buildOpenAiTextPromptCacheFields(input: {
+  request: AiTextInput;
+  model: string;
+  contractVersion: string;
+}): OpenAiPromptCacheFields {
+  const configuration = input.request.promptCache;
+  if (!configuration) return {};
+
+  const fields: OpenAiPromptCacheFields = {};
+  if (configuration.keyEnabled) {
+    fields.prompt_cache_key = [
+      normalizeNamespace(configuration.namespace),
+      shortHash(input.model, 8),
+      shortHash(input.contractVersion, 8),
+      shortHash(input.request.systemPrompt, 12),
+    ].join(":");
+  }
+
+  if (supportsOpenAiExplicitPromptCaching(input.model)) {
+    fields.prompt_cache_options = { mode: "explicit", ttl: "30m" };
+    return fields;
+  }
+  if (
+    configuration.retention === "24h" &&
+    supportsOpenAiExtendedPromptCacheRetention(input.model)
+  ) {
+    fields.prompt_cache_retention = "24h";
+  }
   return fields;
 }
 

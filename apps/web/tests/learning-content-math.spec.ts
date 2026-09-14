@@ -98,6 +98,8 @@ const LATEX_COMMAND_NAMES_THAT_MUST_NOT_TOUCH_PROSE = [
   "triangle",
   "left",
   "right",
+  "quad",
+  "qquad",
 ] as const;
 
 test("normalizes and renders supported Math, Chemistry, and Physics commands", () => {
@@ -201,6 +203,48 @@ test("không biến từ trùng tên lệnh LaTeX trong văn xuôi thành công 
   expect(renderedProse).not.toContain("\\tan");
 });
 
+test("renders Mathpix itemize commands as readable Markdown lists", () => {
+  const content = String.raw`\section*{BÀI TẬP}
+\begin{itemize}
+\item[9.18.] Cho \(A B C D\) là tứ giác nội tiếp.
+a) \(\widehat{A}=60^\circ\);
+\item[9.19.] Chứng minh hai góc bằng nhau.
+\end{itemize}`;
+
+  const normalized = normalizeMathpixMarkdown(content);
+  const html = MathpixMarkdownModel.markdownToHTML(normalized, { htmlTags: true });
+
+  expect(normalized).toContain("- **9.18.** Cho");
+  expect(normalized).toContain("  a) ");
+  expect(normalized).not.toContain("\\begin{itemize}");
+  expect(normalized).not.toContain("\\item[");
+  expect(normalized).not.toContain("\\end{itemize}");
+  expect(html).toContain("<ul>");
+  expect(html).toContain("<li>");
+  expect(html).toContain("9.18.");
+  expect(html).not.toContain("\\begin{itemize}");
+  expect(html).not.toContain("\\item[");
+});
+
+test("preserves LaTeX list examples inside fenced code", () => {
+  const content = [
+    "```latex",
+    String.raw`\begin{itemize}`,
+    String.raw`\item[1.] Ví dụ`,
+    String.raw`\end{itemize}`,
+    "```",
+  ].join("\n");
+
+  expect(normalizeMathpixMarkdown(content)).toBe(content);
+});
+
+test("leaves an unbalanced Mathpix list unchanged", () => {
+  const content = String.raw`\begin{itemize}
+\item[1.] Ví dụ chưa có lệnh đóng`;
+
+  expect(normalizeMathpixMarkdown(content)).toBe(content);
+});
+
 test("loại khoảng trắng sát delimiter để Mathpix nhận đúng inline math", () => {
   const malformed = String.raw`Vì $ a\cdot(-4)^2=a\cdot4^2=-7 $.`;
   const normalized = normalizeMathpixMarkdown(malformed);
@@ -227,6 +271,47 @@ test("loại khoảng trắng sát delimiter để Mathpix nhận đúng inline 
   expect(normalizeMathpixMarkdown(String.raw`Giữ $a\ $ nguyên vẹn.`)).toBe(
     String.raw`Giữ $a\ $ nguyên vẹn.`,
   );
+});
+
+test("renders multiline display math with a standalone relation sign as math", () => {
+  const content = String.raw`Các tính chất:
+
+$$
+\int kf(x)\,\mathrm{d}x
+=
+k\int f(x)\,\mathrm{d}x
+\quad (k\ne 0),
+$$
+
+Và hàm lũy thừa:
+
+$$
+\int x^\alpha\,\mathrm{d}x
+=
+\frac{x^{\alpha+1}}{\alpha+1}+C
+\quad (\alpha\ne -1).
+$$`;
+
+  const normalized = normalizeMathpixMarkdown(content);
+  expect(normalized).toContain(
+    String.raw`$$\int kf(x)\,\mathrm{d}x = k\int f(x)\,\mathrm{d}x \quad (k\ne 0),$$`,
+  );
+  expect(normalized).toContain(
+    String.raw`$$\int x^\alpha\,\mathrm{d}x = \dfrac{x^{\alpha+1}}{\alpha+1}+C \quad (\alpha\ne -1).$$`,
+  );
+  expect(normalizeMathpixMarkdown(normalized)).toBe(normalized);
+
+  const html = MathpixMarkdownModel.markdownToHTML(normalized, {
+    htmlTags: true,
+    outMath: {
+      include_latex: true,
+      include_svg: false,
+      output_format: "latex",
+    },
+  });
+  expect(html.match(/class="math-block/gu)).toHaveLength(2);
+  expect(html).not.toContain("<h1");
+  expect(html).not.toContain("<h2");
 });
 
 test("tự đóng inline math khi model để công thức tràn sang văn xuôi", () => {
@@ -354,11 +439,26 @@ test("chỉ bỏ slash escape dư và không nuốt row separator đứng trư�
   expect(normalizeLearningContentLatexCommandEscapes(String.raw`\\\\widehat{C}`)).toBe(
     String.raw`\\\widehat{C}`,
   );
+  expect(normalizeLearningContentLatexCommandEscapes(String.raw`\\qquad`)).toBe(
+    String.raw`\qquad`,
+  );
 
   const rowBeforeAlignmentMarker = String.raw`x&=1\\&=2`;
   expect(normalizeLearningContentLatexCommandEscapes(rowBeforeAlignmentMarker)).toBe(
     rowBeforeAlignmentMarker,
   );
+});
+
+test("sửa lệnh giãn cách bị JSON double-escape trong lời giải", () => {
+  const malformed = String.raw`Vì các bán kính bằng nhau:
+
+$$OA=OB,\\qquad OB=OC,\\qquad OC=OD,\\qquad OD=OA.$$`;
+  const repaired = String.raw`Vì các bán kính bằng nhau:
+
+$$OA=OB,\qquad OB=OC,\qquad OC=OD,\qquad OD=OA.$$`;
+
+  expect(normalizeMathpixMarkdown(malformed)).toBe(repaired);
+  expect(normalizeMathpixMarkdown(repaired)).toBe(repaired);
 });
 
 test("pipeline Mathpix giữ đủ ba dòng của các lời giải Quiz bị lỗi thực tế", () => {
@@ -435,6 +535,8 @@ test("pipeline Mathpix giữ row separator ở mọi lệnh từng được hỗ
     "int",
     "ce",
     "pu",
+    "quad",
+    "qquad",
   ];
 
   for (const command of commands) {

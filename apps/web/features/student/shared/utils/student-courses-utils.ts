@@ -25,8 +25,7 @@ type AudienceRibbonTone =
   | "grade-11"
   | "grade-12";
 
-type TargetAudienceOption =
-  StudentCourseCatalogOptionsApi["targetAudiences"][number];
+type TargetAudienceOption = StudentCourseCatalogOptionsApi["targetAudiences"][number];
 
 const targetAudienceSectionOrder = [
   "GRADE_12",
@@ -64,7 +63,8 @@ const domainBadgeClassesByName: Record<string, string> = {
   "hoa hoc": "bg-orange-50 text-orange-700 dark:bg-orange-950/50 dark:text-orange-300",
   "tieng anh": "bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300",
   toan: "bg-blue-50 text-blue-700 dark:bg-[var(--theme-primary-soft)] dark:text-[var(--theme-primary)]",
-  "vat ly": "bg-teal-50 text-teal-700 dark:bg-[var(--theme-success-bg)] dark:text-teal-300",
+  "vat ly":
+    "bg-teal-50 text-teal-700 dark:bg-[var(--theme-success-bg)] dark:text-teal-300",
 };
 
 const fallbackDomainBadgeClasses = [
@@ -115,16 +115,11 @@ const targetAudienceTextClassesByCode: Record<string, string> = {
 };
 
 const targetAudienceBadgeClassesByCode: Record<string, string> = {
-  ALL_STUDENTS:
-    "!border-0 bg-[hsl(215_98%_91%)] dark:bg-[hsl(215_74%_20%/.6)]",
-  HIGH_SCHOOL:
-    "!border-0 bg-[hsl(228_94%_91%)] dark:bg-[hsl(228_74%_20%/.6)]",
-  PRIMARY_SCHOOL:
-    "!border-0 bg-[hsl(202_98%_92%)] dark:bg-[hsl(202_74%_20%/.6)]",
-  SECONDARY_SCHOOL:
-    "!border-0 bg-[hsl(219_96%_93%)] dark:bg-[hsl(219_74%_20%/.6)]",
-  WORKING_ADULT:
-    "!border-0 bg-[hsl(232_92%_92%)] dark:bg-[hsl(232_72%_20%/.6)]",
+  ALL_STUDENTS: "!border-0 bg-[hsl(215_98%_91%)] dark:bg-[hsl(215_74%_20%/.6)]",
+  HIGH_SCHOOL: "!border-0 bg-[hsl(228_94%_91%)] dark:bg-[hsl(228_74%_20%/.6)]",
+  PRIMARY_SCHOOL: "!border-0 bg-[hsl(202_98%_92%)] dark:bg-[hsl(202_74%_20%/.6)]",
+  SECONDARY_SCHOOL: "!border-0 bg-[hsl(219_96%_93%)] dark:bg-[hsl(219_74%_20%/.6)]",
+  WORKING_ADULT: "!border-0 bg-[hsl(232_92%_92%)] dark:bg-[hsl(232_72%_20%/.6)]",
 };
 
 export function getGradeTextClass(grade: number) {
@@ -196,6 +191,18 @@ export function getPurchasedCourses(courses: StudentCourse[]) {
   );
 }
 
+export function getVisibleCourseLessonCtaIds(
+  courses: Array<Pick<StudentCourse, "access" | "isUnderMaintenance" | "nextLesson">>,
+) {
+  return courses.flatMap((course) =>
+    course.access === "enrolled" &&
+    course.isUnderMaintenance !== true &&
+    course.nextLesson
+      ? [course.nextLesson.id]
+      : [],
+  );
+}
+
 export function getExploreAllCourseSections(
   courses: StudentCourse[],
   studentGrade: number | null,
@@ -210,7 +217,12 @@ export function getExploreAllCourseSections(
       const audience = getRecommendedAudience(course, studentGrade, targetAudiences);
 
       return audience
-        ? [[course.id, { code: audience.code, grade: audience.grade, name: audience.name }]]
+        ? [
+            [
+              course.id,
+              { code: audience.code, grade: audience.grade, name: audience.name },
+            ],
+          ]
         : [];
     }),
   );
@@ -311,10 +323,7 @@ function getAudienceSectionTitle(audience: TargetAudienceOption) {
 
 function getAudienceRibbonTone(audience: TargetAudienceOption): AudienceRibbonTone {
   if (audience.grade !== null) {
-    return `grade-${audience.grade}` as Extract<
-      AudienceRibbonTone,
-      `grade-${number}`
-    >;
+    return `grade-${audience.grade}` as Extract<AudienceRibbonTone, `grade-${number}`>;
   }
 
   const toneByCode: Record<string, AudienceRibbonTone> = {

@@ -27,7 +27,6 @@ import {
   QUIZ_SCHEMA_VERSION,
   QUIZ_SCHOOLBOOK_SOLUTION_STYLE_POLICY,
   QUIZ_SUBPART_LINEBREAK_POLICY,
-  generatedQuizSourceCoverageAuditSchema,
   resolveQuizOutputTokenFloor,
   quizExplanationBlockSchema,
   quizFigureDecisionSchema,
@@ -152,7 +151,7 @@ describe("M9.3 Quiz-owned generation core", () => {
     expect(request.systemPrompt).not.toContain("CĂN CỨ HIỂN THỊ CHO KẾT LUẬN TRUNG GIAN");
     expect(request.systemPrompt).not.toContain("số đo lớn hơn là chiều dài");
     expect(request.systemPrompt).not.toContain(
-      "khung nhiệm vụ hoặc mạch suy luận chính chưa xuất hiện",
+      "mục tiêu hoặc mạch suy luận chính chưa xuất hiện",
     );
     expect(request.userPrompt).not.toContain("KIỂM TRA CUỐI VỀ ĐA DẠNG CẤU TRÚC");
     expect(request.userPrompt).not.toContain("KIỂM TRA CUỐI VỀ TÍNH MỚI CẤU TRÚC");
@@ -267,18 +266,11 @@ describe("M9.3 Quiz-owned generation core", () => {
       existingQuestionReferences,
     });
 
-    expect(request.userPrompt).toContain("BẮT BUỘC ĐỐI CHIẾU");
+    expect(request.userPrompt).toContain("DỮ LIỆU THAM CHIẾU");
+    expect(request.systemPrompt).toContain("lập một chữ ký ba trục");
+    expect(request.systemPrompt).toContain("đối chiếu chữ ký với ví dụ/bài tập PDF");
     expect(request.systemPrompt).toContain(
-      "Loại câu chỉ là định dạng trả lời, không phải dạng bài",
-    );
-    expect(request.systemPrompt).toContain(
-      "Cùng một mẫu biểu thức với toán tử ở các vị trí tương ứng vẫn là cùng dạng",
-    );
-    expect(request.systemPrompt).toContain(
-      "chỉ được tái sử dụng nhóm đó khi candidate đổi thực chất ít nhất hai trong ba trục",
-    );
-    expect(request.systemPrompt).toContain(
-      "Chỉ riêng việc hai câu đều dùng biến, điểm hoặc nhiều mệnh đề chưa đủ kết luận chúng cùng dạng",
+      "Biến thể hợp lệ phải thay đổi thực chất mục tiêu hoặc quan hệ chi phối/scaffold",
     );
     expect(request.userPrompt).not.toContain("Dựa trên đúng ngân hàng vừa đọc");
     expect(request.userPrompt).toContain(existingQuestionReferences[0]!);
@@ -311,6 +303,32 @@ describe("M9.3 Quiz-owned generation core", () => {
     ).toHaveLength(1);
   });
 
+  it("keeps a larger existing bank dynamic while using one sequential signature pass", () => {
+    const existingQuestionReferences = Array.from({ length: 40 }, (_, index) =>
+      JSON.stringify([QuestionType.TRUE_FALSE, `Câu ngân hàng ${index + 1}.`]),
+    );
+    const request = buildQuizStructuredInput({
+      lessonId: "lesson-large-bank",
+      lessonTitle: "Số hữu tỉ",
+      documentIds: [documentId],
+      sourceHash,
+      packet: { filename: "quiz-source.pdf", bytes: Buffer.from("pdf-fixture") },
+      configuration: requestConfiguration(),
+      existingQuestionReferences,
+    });
+
+    expect(request.userPrompt).toContain(existingQuestionReferences[0]!);
+    expect(request.userPrompt).toContain(existingQuestionReferences.at(-1)!);
+    expect(
+      request.userPrompt.match(/EXISTING_QUIZ_QUESTIONS_JSONL_BEGIN/gu),
+    ).toHaveLength(1);
+    expect(
+      request.systemPrompt.match(/QUY TẮC CỨNG VỀ TUYỂN CHỌN TUẦN TỰ VÀ TÍNH MỚI/gu),
+    ).toHaveLength(1);
+    expect(request.systemPrompt).toContain("đúng lượt cục bộ của candidate này");
+    expect(request.systemPrompt).not.toContain("rà từng candidate với toàn bộ ngân hàng");
+  });
+
   it("keeps the existing-question list after the stable GPT-5.6 cache breakpoint", () => {
     const buildRequest = (problem: string, promptVersion?: string) => {
       const request = buildQuizStructuredInput({
@@ -330,7 +348,6 @@ describe("M9.3 Quiz-owned generation core", () => {
           questionCount: 1,
           questionTypes: [QuestionType.TRUE_FALSE],
           difficulty: Difficulty.EASY,
-          includeSourceCoverageAudit: true,
         }),
         request.outputName,
         request.schemaReferenceStrategy,
@@ -354,7 +371,7 @@ describe("M9.3 Quiz-owned generation core", () => {
     expect(JSON.stringify(first.input[0])).toContain("prompt_cache_breakpoint");
     expect(JSON.stringify(first.input[0])).toContain("số đo lớn hơn là chiều dài");
     expect(JSON.stringify(first.input[0])).toContain(
-      "khung nhiệm vụ hoặc mạch suy luận chính chưa xuất hiện",
+      "mục tiêu hoặc mạch suy luận chính chưa xuất hiện",
     );
     expect(JSON.stringify(first.input[0])).not.toContain("Số 2 là số chẵn.");
     expect(first.prompt_cache_key).not.toBe(previousContract.prompt_cache_key);
@@ -427,72 +444,16 @@ describe("M9.3 Quiz-owned generation core", () => {
       }).success,
     ).toBe(false);
 
-    const coverageSchema = getGeneratedQuizOutputSchema({
-      subjectKey: "MATH",
-      questionCount: 1,
-      includeSourceCoverageAudit: true,
-    });
-    const validCoverageAudit = {
-      sourceHasAssessableRealWorldApplication: true,
-      sourceApplicationFamily:
-        "Dùng quan hệ hình học của lesson để mô hình hóa một nhu cầu đo đạc.",
-      realWorldQuestions: [
-        {
-          questionNumber: 1,
-          newContext: "Một phương án đo đạc mới trong đời sống.",
-          modelingRole:
-            "Dữ kiện đo được phải chuyển thành quan hệ chuyên môn trước khi tính.",
-        },
-      ],
-    };
     expect(
-      coverageSchema.safeParse({
-        ...output,
-        sourceCoverageAudit: validCoverageAudit,
-      }).success,
-    ).toBe(true);
-    expect(
-      generatedQuizSourceCoverageAuditSchema.shape.sourceHasAssessableRealWorldApplication
-        .description,
-    ).toContain("bắt buộc dùng trọng tâm lesson");
-    expect(
-      generatedQuizSourceCoverageAuditSchema.shape.sourceApplicationFamily.description,
-    ).toContain("trọng tâm lesson bắt buộc");
-    expect(
-      generatedQuizSourceCoverageAuditSchema.shape.realWorldQuestions.element.shape
-        .modelingRole.description,
-    ).toContain("vì sao phải dùng trọng tâm lesson");
-    expect(coverageSchema.safeParse(output).success).toBe(false);
-    expect(
-      coverageSchema.safeParse({
+      schema.safeParse({
         ...output,
         sourceCoverageAudit: {
-          ...validCoverageAudit,
+          sourceHasAssessableRealWorldApplication: true,
+          sourceApplicationFamily: "Không nhận tự khai báo coverage từ provider.",
           realWorldQuestions: [],
         },
       }).success,
     ).toBe(false);
-    expect(
-      coverageSchema.safeParse({
-        ...output,
-        sourceCoverageAudit: {
-          ...validCoverageAudit,
-          realWorldQuestions: [
-            { ...validCoverageAudit.realWorldQuestions[0], questionNumber: 2 },
-          ],
-        },
-      }).success,
-    ).toBe(false);
-    expect(
-      coverageSchema.safeParse({
-        ...output,
-        sourceCoverageAudit: {
-          sourceHasAssessableRealWorldApplication: false,
-          sourceApplicationFamily: null,
-          realWorldQuestions: [],
-        },
-      }).success,
-    ).toBe(true);
     expect(
       schema.safeParse({ ...output, title: "Field không được sử dụng" }).success,
     ).toBe(false);
@@ -672,23 +633,18 @@ describe("M9.3 Quiz-owned generation core", () => {
 
       expect(prompt).toContain("PDF nguồn xác định biên kiến thức và kỹ năng");
       expect(prompt).toContain("không phải danh sách mẫu bài phải sao chép");
-      expect(prompt).toContain("Với từ hai câu trở lên, ít nhất một câu");
-      expect(prompt).toContain(
-        "Phải loại bỏ và biên soạn lại câu dự kiến nếu nó giữ nguyên hoặc tương đương gần như toàn bộ chữ ký này",
-      );
+      expect(prompt).toContain("với từ hai câu trở lên, ít nhất một câu");
+      expect(prompt).toContain("Hai candidate là trùng khái niệm");
       expect(prompt).toContain(
         "Không ánh xạ một-một hoặc chuyển đổi máy móc một ví dụ/bài tập nguồn sang mọi loại câu",
       );
       expect(prompt).toContain(
         "câu kết luận cuối của từng `statementSolutions[i].solution` phải khớp đúng `statements[i].value`",
       );
-      expect(prompt).toContain("Bao phủ các phần nội dung và dạng bài đều nhất có thể");
-      expect(prompt).toContain("nếu số câu đủ thì mỗi phần và dạng có ít nhất một câu");
+      expect(prompt).toContain("Bao phủ các phần và dạng bài đều nhất có thể");
+      expect(prompt).toContain("soạn candidate thay thế rồi mới thêm chữ ký");
       expect(prompt).toContain(
-        "nếu số câu không đủ thì không lặp khi vẫn còn phần hoặc dạng phù hợp chưa có câu",
-      );
-      expect(prompt).toContain(
-        "không được làm mất một phần nội dung chính, một dạng bài cần có để bao phủ PDF",
+        "không được làm mất coverage phần nội dung, dạng bài hay ứng dụng thực tế",
       );
       expect(prompt).toContain(
         "câu ứng dụng thực tế mới được sáng tạo từ họ bài ứng dụng",
@@ -696,9 +652,7 @@ describe("M9.3 Quiz-owned generation core", () => {
       expect(prompt).toContain(
         "câu chỉ nêu một hình, vật, chất, đại lượng hoặc hệ chuyên môn trừu tượng kèm số đo/đơn vị",
       );
-      expect(prompt).toContain(
-        "chỉ đặt `sourceHasAssessableRealWorldApplication=true` khi họ bài trong nguồn vừa đạt định nghĩa thực tế vừa buộc dùng một trọng tâm của lesson hiện tại",
-      );
+      expect(prompt).not.toContain("sourceCoverageAudit");
       expect(prompt).toContain(
         "Mỗi câu chỉ hợp lệ khi buộc dùng ít nhất một trọng tâm của bài hiện tại",
       );
@@ -1187,35 +1141,23 @@ describe("M9.3 Quiz-owned generation core", () => {
     expect(request.systemPrompt).toContain(
       "nội dung học liệu cần đọc và hiểu theo ngữ cảnh",
     );
-    expect(request.systemPrompt).toContain(
-      "ví dụ đã giải, bài tập, câu hỏi ôn tập và bài vận dụng",
-    );
+    expect(request.systemPrompt).toContain("ví dụ/bài tập PDF");
     expect(request.systemPrompt).toContain("điền lần lượt đúng số vị trí được yêu cầu");
-    expect(request.systemPrompt).toContain("chỉ chọn chữ ký chưa dùng");
+    expect(request.systemPrompt).toContain("đúng lượt cục bộ của candidate này");
     expect(request.systemPrompt).toContain(
       "không phải danh sách mẫu bài phải sao chép hoặc ánh xạ một-một",
     );
     expect(request.systemPrompt).toContain(
-      "nếu số câu đủ thì mỗi phần và dạng có ít nhất một câu",
+      "Bao phủ các phần và dạng bài đều nhất có thể",
     );
-    expect(request.systemPrompt).toContain(
-      "nếu số câu không đủ thì không lặp khi vẫn còn phần hoặc dạng phù hợp chưa có câu",
-    );
-    expect(request.systemPrompt).toContain(
-      "không trả chữ ký hay kế hoạch phân bổ trong output",
-    );
+    expect(request.systemPrompt).toContain("soạn candidate thay thế rồi mới thêm chữ ký");
+    expect(request.systemPrompt).toContain("Không trả chữ ký hay kế hoạch phân bổ");
     expect(request.systemPrompt).toContain("không phải lý do để xóa coverage bắt buộc");
+    expect(request.systemPrompt).toContain("đối chiếu chữ ký với ví dụ/bài tập PDF");
+    expect(request.systemPrompt).toContain("lập một chữ ký ba trục");
     expect(request.systemPrompt).toContain(
-      "tự đối chiếu câu dự kiến đó với từng ví dụ đã giải",
+      "Biến thể hợp lệ phải thay đổi thực chất mục tiêu hoặc quan hệ chi phối/scaffold",
     );
-    expect(request.systemPrompt).toContain("chữ ký nội dung của mỗi cặp");
-    expect(request.systemPrompt).toContain("thêm yêu cầu làm tròn");
-    expect(request.systemPrompt).toContain(
-      "phải thay đổi thật sự ít nhất hai chiều trong bốn chiều",
-    );
-    expect(request.systemPrompt).toContain("Ví dụ không hợp lệ theo mẫu tổng quát");
-    expect(request.systemPrompt).toContain("Counterexample hợp lệ theo mẫu tổng quát");
-    expect(request.systemPrompt).toContain("phải bỏ câu đó và biên soạn một câu mới");
     expect(request.systemPrompt).toContain(
       "Coverage ứng dụng thực tế là một trục độc lập",
     );
@@ -1233,7 +1175,7 @@ describe("M9.3 Quiz-owned generation core", () => {
       "quy tắc tính mới không được xóa nghĩa vụ tối thiểu về ứng dụng thực tế",
     );
     expect(request.systemPrompt).toContain(
-      "nếu nguồn có bài thực tế phù hợp mà output chưa có câu thực tế",
+      "output bắt buộc phải có ít nhất một câu ứng dụng thực tế mới",
     );
     expect(request.systemPrompt).toContain(
       "Nếu PDF không có bài ứng dụng thực tế có thể đánh giá",
@@ -1255,11 +1197,27 @@ describe("M9.3 Quiz-owned generation core", () => {
     expect(request.maxTokens).toBe(12_000);
     expect(request.userPrompt).not.toContain("KIỂM TRA CUỐI VỀ TÍNH MỚI CẤU TRÚC");
     expect(request.userPrompt).not.toContain("candidate");
-    expect(request.systemPrompt).toContain("chỉ với mỗi câu đã được chọn vào output");
-    expect(request.systemPrompt).toContain("không giải lại riêng cho từng dữ kiện");
-    expect(request.systemPrompt).toContain("Không tạo pool ứng viên lớn");
-    expect(request.promptVersion).toBe("quiz-math-v89-semantic-review-only");
-    expect(request.schemaVersion).toBe("quiz-pdf-figure-schema-v39-math-syntax-contract");
+    expect(request.systemPrompt).toContain("LƯỢT TỰ GIẢI VÀ KIỂM CHỨNG THEO TỪNG CÂU");
+    expect(request.systemPrompt).not.toContain("LƯỢT KIỂM TRA NHẤT QUÁN CUỐI CHO CẢ BỘ");
+    expect(request.systemPrompt).toContain("cấm audit hoặc tự giải lại toàn bộ bộ câu");
+    expect(request.systemPrompt).toContain("soạn candidate thay thế rồi mới thêm chữ ký");
+    expect(request.systemPrompt).toContain("tập con hoặc tập cha chặt");
+    expect(request.systemPrompt).toContain(
+      "phần chung đã tự quyết định đáp án hoặc scaffold lời giải thiết yếu",
+    );
+    expect(request.systemPrompt).toContain(
+      "thêm một ràng buộc thực sự đổi điều kiện đánh giá hoặc bắt buộc một scaffold thiết yếu khác thì không phải trùng",
+    );
+    expect(request.systemPrompt).toContain("đảo công thức chỉ để hỏi đại lượng khác");
+    expect(request.systemPrompt).toContain("cùng quan hệ chi phối theo cùng scaffold");
+    expect(request.systemPrompt).toContain("rút bớt bước từ cùng chuỗi chứng minh");
+    expect(request.systemPrompt).toContain(
+      "Mỗi premise, dữ kiện chuyên môn hoặc định lượng",
+    );
+    expect(request.systemPrompt).toContain("$(ax+b)^\\circ$");
+    expect(request.systemPrompt).toContain("Cấm pool lớn");
+    expect(request.promptVersion).toBe("quiz-math-v91-local-candidate-quality-gate");
+    expect(request.schemaVersion).toBe("quiz-pdf-figure-schema-v41-no-self-audit");
     expect(request.promptVersion).toBe(QUIZ_PROMPT_VERSIONS.MATH);
     expect(request.schemaVersion).toBe(QUIZ_SCHEMA_VERSION);
     expect(request.systemPrompt).toContain(QUIZ_EQUALITY_CHAIN_LAYOUT_POLICY);
@@ -1308,7 +1266,7 @@ describe("M9.3 Quiz-owned generation core", () => {
       "$$\\begin{aligned}A&=B\\\\&=C.\\end{aligned}$$",
     );
     expect(request.systemPrompt).toContain(
-      "phải chuyển chuỗi inline hoặc display một dòng đó thành display nhiều dòng",
+      "chuỗi inline hoặc display một dòng vi phạm phải được chuyển thành display nhiều dòng",
     );
     expect(request.systemPrompt).toContain("Bài tính lấy công thức làm chính");
     expect(request.systemPrompt).toContain(
@@ -1342,7 +1300,7 @@ describe("M9.3 Quiz-owned generation core", () => {
       "mặc định phải đặt `requiresQuestionFigure=true`",
     );
     expect(request.systemPrompt).toContain(
-      "không được trả mọi `requiresQuestionFigure=false`",
+      "không được đều có `requiresQuestionFigure=false`",
     );
     expect(request.systemPrompt).toContain("Counterexample được phép không có hình");
     expect(request.systemPrompt).toContain(
@@ -1509,7 +1467,9 @@ describe("M9.3 Quiz-owned generation core", () => {
     expect(physicsRequest.systemPrompt).not.toContain("SYSTEM PROMPT QUIZ MÔN TOÁN");
     expect(physicsRequest.systemPrompt).not.toContain("SYSTEM PROMPT QUIZ MÔN HÓA HỌC");
     expect(physicsRequest.systemPrompt).not.toContain("$\\widehat{ABC}$");
-    expect(physicsRequest.promptVersion).toBe("quiz-physics-v84-semantic-review-only");
+    expect(physicsRequest.promptVersion).toBe(
+      "quiz-physics-v86-local-candidate-quality-gate",
+    );
 
     const chemistryRequest = buildQuizStructuredInput({
       lessonId: "lesson-chemistry-core",
@@ -1536,7 +1496,7 @@ describe("M9.3 Quiz-owned generation core", () => {
     expect(chemistryRequest.systemPrompt).not.toContain("vector hoặc lực");
     expect(chemistryRequest.systemPrompt).toContain("hình học phân tử");
     expect(chemistryRequest.promptVersion).toBe(
-      "quiz-chemistry-v84-semantic-review-only",
+      "quiz-chemistry-v86-local-candidate-quality-gate",
     );
   });
 
@@ -1571,14 +1531,12 @@ describe("M9.3 Quiz-owned generation core", () => {
     expect(request.userPrompt).toContain(
       "phân bổ chính xác MULTIPLE_CHOICE=2, TRUE_FALSE=2, MULTI_STATEMENT_TRUE_FALSE=1, TEXT_INPUT=1",
     );
-    expect(request.systemPrompt).toContain("Không tạo pool ứng viên lớn");
-    expect(request.systemPrompt).toContain("không so lại toàn bộ mọi cặp");
+    expect(request.systemPrompt).toContain("Cấm pool lớn");
+    expect(request.systemPrompt).toContain("cấm audit hoặc tự giải lại toàn bộ bộ câu");
     expect(request.systemPrompt).toContain(
-      "nếu số câu đủ thì mỗi phần và dạng có ít nhất một câu",
+      "Bao phủ các phần và dạng bài đều nhất có thể",
     );
-    expect(request.systemPrompt).toContain(
-      "nếu số câu không đủ thì không lặp khi vẫn còn phần hoặc dạng phù hợp chưa có câu",
-    );
+    expect(request.systemPrompt).toContain("soạn candidate thay thế rồi mới thêm chữ ký");
     expect(request.systemPrompt).toContain(
       "chỉ gắn tên một vật thể trang trí vào bài thuần túy không đủ",
     );
@@ -1596,7 +1554,7 @@ describe("M9.3 Quiz-owned generation core", () => {
       "Một bài vận dụng có sẵn trong PDF nhưng vẫn giải được nguyên vẹn chỉ bằng kiến thức đã học trước đó không được tính",
     );
     expect(request.systemPrompt).toContain(
-      "chỉ đặt `sourceHasAssessableRealWorldApplication=true` khi họ bài trong nguồn vừa đạt định nghĩa thực tế vừa buộc dùng một trọng tâm của lesson hiện tại",
+      "output bắt buộc phải có ít nhất một câu ứng dụng thực tế mới",
     );
     expect(request.systemPrompt).toContain(
       "phải viết công thức gốc trước, sau đó biến đổi công thức, rồi mới thay số",
@@ -1615,21 +1573,17 @@ describe("M9.3 Quiz-owned generation core", () => {
     for (const subject of subjects) {
       const prompt = buildQuizSubjectSystemPrompt(subject);
 
-      expect(prompt).toContain("Với từ hai câu trở lên, ít nhất một câu");
-      expect(prompt).toContain("khung nhiệm vụ hoặc mạch suy luận chính chưa xuất hiện");
-      expect(prompt).toContain("chỉ chọn chữ ký chưa dùng");
-      expect(prompt).toContain("Không tạo pool ứng viên lớn");
-      expect(prompt).toContain("không so lại toàn bộ mọi cặp");
-      expect(prompt).toContain("chiều hỏi-tìm");
-      expect(prompt).toContain("nối thêm phép tính phụ");
-      expect(prompt).toContain(
-        "Chỉ lặp nhóm khi lesson thật sự không còn nhóm hợp lệ khác",
-      );
+      expect(prompt).toContain("với từ hai câu trở lên, ít nhất một câu");
+      expect(prompt).toContain("mục tiêu hoặc mạch suy luận chính chưa xuất hiện");
+      expect(prompt).toContain("chữ ký ba trục");
+      expect(prompt).toContain("đúng lượt cục bộ của candidate này");
+      expect(prompt).toContain("Cấm pool lớn");
+      expect(prompt).toContain("cấm audit hoặc tự giải lại toàn bộ bộ câu");
       expect(prompt).not.toContain("Được chủ động biên soạn dạng bài mới");
     }
   });
 
-  it("requires an independent mathematical verification before grading data is emitted", () => {
+  it("uses one direct mathematical verification before grading data is emitted", () => {
     const prompt = buildQuizSubjectSystemPrompt({
       key: "MATH",
       name: "Toán",
@@ -1637,17 +1591,17 @@ describe("M9.3 Quiz-owned generation core", () => {
     });
 
     expect(prompt).toContain("### II. KIỂM CHỨNG TOÁN HỌC");
-    expect(prompt).toContain("tự giải từng câu từ dữ kiện gốc");
+    expect(prompt).toContain("LƯỢT TỰ GIẢI VÀ KIỂM CHỨNG THEO TỪNG CÂU");
     expect(prompt).toContain(
       "kiểm tra đủ toàn bộ giả thiết của nó trên đúng cấu hình đang xét",
     );
-    expect(prompt).toContain("ít nhất một phép kiểm tra độc lập");
-    expect(prompt).toContain("kiểm tra cận trên/cận dưới hoặc trường hợp biên");
+    expect(prompt).toContain("không dựng một lời giải thứ hai");
+    expect(prompt).toContain("cận hoặc trường hợp biên");
     expect(prompt).toContain(
       "phải xác định kết quả đúng trước rồi mới đối chiếu với `options`",
     );
     expect(prompt).toContain(
-      "không chứng minh chúng đúng nếu tất cả cùng dựa trên một giả định sai",
+      "Candidate còn kết quả mâu thuẫn hoặc giả thiết chưa được xác lập",
     );
     expect(prompt).toContain(
       "chỉ vì một số đỉnh của một hình chữ nhật nằm trên đường tròn hoặc cung tròn",
@@ -1674,7 +1628,7 @@ describe("M9.3 Quiz-owned generation core", () => {
     expect(prompt).toContain("mọi nhãn đã gắn phải được viện dẫn ít nhất một lần");
     expect(prompt).toContain("không đặt hai kết luận mang nhãn cùng dòng");
     expect(prompt).toContain("Nếu mạch là $A\\Rightarrow B$");
-    expect(prompt).toContain("bỏ mọi nhãn không có tham chiếu về sau");
+    expect(prompt).toContain("Trong cùng lượt viết mạch suy luận");
     expect(prompt).toContain("Từ căn cứ thứ hai, suy ra $Q=k$. (1)");
     expect(prompt).toContain("Theo định lý, suy ra $Q=R$.");
     expect(prompt).toContain("Từ (1), suy ra $R=k$.");
@@ -1712,13 +1666,13 @@ describe("M9.3 Quiz-owned generation core", () => {
     expect(first.systemPrompt).toBe(second.systemPrompt);
     expect(first.systemPrompt).toContain("số đo lớn hơn là chiều dài");
     expect(first.userPrompt).not.toBe(second.userPrompt);
-    expect(first.promptVersion).toBe("quiz-math-v89-semantic-review-only");
+    expect(first.promptVersion).toBe("quiz-math-v91-local-candidate-quality-gate");
     expect(second.promptVersion).toBe(first.promptVersion);
     expect(second.schemaVersion).toBe(first.schemaVersion);
     expect(second.promptCache).toEqual(first.promptCache);
   });
 
-  it("requires subject-specific independent verification for every non-Math Quiz prompt", () => {
+  it("keeps one subject-specific direct verification for every non-Math Quiz prompt", () => {
     const cases = [
       {
         subject: {
@@ -1729,7 +1683,7 @@ describe("M9.3 Quiz-owned generation core", () => {
         heading: "### II. KIỂM CHỨNG VẬT LÝ",
         requiredVocabulary: [
           "hệ quy chiếu",
-          "phân tích thứ nguyên và đơn vị",
+          "đối chiếu thứ nguyên, đơn vị",
           "tính khả thi vật lý",
         ],
         forbiddenVocabulary: ["hóa trị/số oxi hóa", "bảo toàn nguyên tố"],
@@ -1756,8 +1710,8 @@ describe("M9.3 Quiz-owned generation core", () => {
         },
         heading: "### II. KIỂM CHỨNG CHUYÊN MÔN",
         requiredVocabulary: [
-          "đối chiếu ngược từng kết luận với dữ kiện và PDF nguồn",
-          "thử một phản ví dụ hoặc trường hợp biên",
+          "đối chiếu kết luận với dữ kiện và căn cứ nguồn",
+          "một trường hợp biên",
           "không biến tương quan thành nhân quả",
         ],
         forbiddenVocabulary: ["hóa trị/số oxi hóa", "hệ quy chiếu"],
@@ -1768,17 +1722,15 @@ describe("M9.3 Quiz-owned generation core", () => {
       const prompt = buildQuizSubjectSystemPrompt(testCase.subject);
 
       expect(prompt).toContain(testCase.heading);
-      expect(prompt).toContain("tự giải từng câu từ dữ kiện gốc");
-      expect(prompt).toContain("ít nhất một phép kiểm tra độc lập");
-      expect(prompt).toContain("Không chỉ đọc lại");
+      expect(prompt).toContain("LƯỢT TỰ GIẢI VÀ KIỂM CHỨNG THEO TỪNG CÂU");
+      expect(prompt).toContain("không dựng một lời giải thứ hai");
+      expect(prompt).toContain("không chỉ đọc lại");
       expect(prompt).toContain(
         "phải xác định kết quả đúng trước rồi mới đối chiếu với `options`",
       );
       expect(prompt).toContain("phải kiểm chứng riêng từng mệnh đề");
-      expect(prompt).toContain(
-        "Sự nhất quán giữa `options`, `correctOptionId`, `solution` không chứng minh chúng đúng",
-      );
-      expect(prompt).toContain("không được trả câu đó");
+      expect(prompt).toContain("Candidate còn kết quả mâu thuẫn");
+      expect(prompt).toContain("không hợp lệ và phải được thay");
       for (const vocabulary of testCase.requiredVocabulary) {
         expect(prompt).toContain(vocabulary);
       }
@@ -1787,11 +1739,15 @@ describe("M9.3 Quiz-owned generation core", () => {
       }
     }
 
-    expect(QUIZ_PROMPT_VERSIONS.PHYSICS).toBe("quiz-physics-v84-semantic-review-only");
-    expect(QUIZ_PROMPT_VERSIONS.CHEMISTRY).toBe(
-      "quiz-chemistry-v84-semantic-review-only",
+    expect(QUIZ_PROMPT_VERSIONS.PHYSICS).toBe(
+      "quiz-physics-v86-local-candidate-quality-gate",
     );
-    expect(QUIZ_PROMPT_VERSIONS.GENERAL).toBe("quiz-general-v84-semantic-review-only");
+    expect(QUIZ_PROMPT_VERSIONS.CHEMISTRY).toBe(
+      "quiz-chemistry-v86-local-candidate-quality-gate",
+    );
+    expect(QUIZ_PROMPT_VERSIONS.GENERAL).toBe(
+      "quiz-general-v86-local-candidate-quality-gate",
+    );
   });
 
   it("leaves deterministic JSON and LaTeX cleanup to structured output and the normalizer", () => {
@@ -2838,7 +2794,7 @@ describe("M9.3 Quiz-owned generation core", () => {
     expect(request.systemPrompt).not.toContain("solution rồi problem");
     expect(request.systemPrompt).toContain("hoàn toàn độc lập với hình đề");
     expect(request.outputName).toBe("solution_figure");
-    expect(request.promptVersion).toBe("solution-figure-math-v1-shared");
+    expect(request.promptVersion).toBe("solution-figure-math-v2-visual-only");
     expect(
       generatedQuizSolutionFigureSchema.safeParse({
         latexSource: "\\begin{tikzpicture}\\draw (0,0)--(1,0);\\end{tikzpicture}",
@@ -2849,27 +2805,27 @@ describe("M9.3 Quiz-owned generation core", () => {
   it.each([
     {
       subject: { key: "MATH", name: "Toán", slug: "toan" },
-      createVersion: "solution-figure-math-v1-shared",
+      createVersion: "solution-figure-math-v2-visual-only",
       refinementVersion:
-        "quiz-figure-math-solution-refinement-comprehensive-v39-single-semantic-check",
+        "quiz-figure-math-solution-refinement-comprehensive-v41-visual-only-solution",
     },
     {
       subject: { key: "PHYSICS", name: "Vật lý", slug: "vat-ly" },
-      createVersion: "solution-figure-physics-v1-shared",
+      createVersion: "solution-figure-physics-v2-visual-only",
       refinementVersion:
-        "quiz-figure-physics-solution-refinement-comprehensive-v26-single-semantic-check",
+        "quiz-figure-physics-solution-refinement-comprehensive-v27-visual-only-solution",
     },
     {
       subject: { key: "CHEMISTRY", name: "Hóa học", slug: "hoa-hoc" },
-      createVersion: "solution-figure-chemistry-v1-shared",
+      createVersion: "solution-figure-chemistry-v2-visual-only",
       refinementVersion:
-        "quiz-figure-chemistry-solution-refinement-comprehensive-v25-single-semantic-check",
+        "quiz-figure-chemistry-solution-refinement-comprehensive-v26-visual-only-solution",
     },
     {
       subject: { key: "GENERAL", name: "Sinh học", slug: "sinh-hoc" },
-      createVersion: "solution-figure-general-v1-shared",
+      createVersion: "solution-figure-general-v2-visual-only",
       refinementVersion:
-        "quiz-figure-general-solution-refinement-comprehensive-v25-single-semantic-check",
+        "quiz-figure-general-solution-refinement-comprehensive-v26-visual-only-solution",
     },
   ] as const)(
     "states the $subject.key solution authority clearly in create/edit and refinement prompts",
@@ -2892,11 +2848,52 @@ describe("M9.3 Quiz-owned generation core", () => {
         expect(input.systemPrompt).toMatch(/d(?:ùng|ựa)[^\n]*cả solution và problem/u);
         expect(input.systemPrompt).not.toContain("solution rồi problem");
         expect(input.systemPrompt).not.toContain("sau đó mới đến problem");
+        expect(input.systemPrompt).toContain("không chép nguyên văn problem/solution");
+        expect(input.systemPrompt).toContain("một vùng chữ bên cạnh hình");
+        expect(input.systemPrompt).toContain("phải nằm ngoài canvas");
       }
       expect(createInput.promptVersion).toBe(createVersion);
       expect(refinementInput.promptVersion).toBe(refinementVersion);
     },
   );
+
+  it("keeps the worked solution outside the canvas while preserving owned visual labels", () => {
+    const math = buildSolutionFigureInput({
+      subject: { key: "MATH", name: "Toán", slug: "toan" },
+      plan: {
+        version: 2,
+        role: "SOLUTION",
+        problem: "Một hình chữ nhật nội tiếp đường tròn có bán kính 13 m.",
+        solution:
+          "Dựng đường chéo là đường kính 26 m rồi dùng định lí Pythagore để tính chu vi.",
+      },
+    });
+    const questionRefinement = buildQuizFigureRefinementInput({
+      subject: { key: "MATH", name: "Toán", slug: "toan" },
+      plan: { version: 1, role: "QUESTION", problem: "Vẽ đồ thị $y=x^2$." },
+      currentLatexSource:
+        "\\begin{tikzpicture}\\draw plot coordinates {(0,0) (1,1)};\\end{tikzpicture}",
+      currentImageDataUrl: "data:image/png;base64,aW1hZ2U=",
+    });
+    const schemaDescriptions = collectJsonSchemaDescriptions(
+      resolveAiStructuredTextFormat(
+        generatedQuizSolutionFigureSchema,
+        "solution_figure",
+        "inline",
+      ).format.schema,
+    );
+
+    expect(math.systemPrompt).toContain(
+      "một dãy phương trình chỉ giải thích cách tính đáp án thì phải nằm ngoài canvas",
+    );
+    expect(math.systemPrompt).toContain("công thức hàm gắn với đúng đồ thị");
+    expect(questionRefinement.systemPrompt).not.toContain(
+      "không chép nguyên văn problem/solution",
+    );
+    expect(schemaDescriptions).toContain(
+      "Source chỉ vẽ đối tượng và quan hệ trực quan của lời giải. Không chép nguyên văn đề/lời giải, chuỗi suy luận, phép tính trung gian hoặc đáp án thành khối chữ trên canvas; nhãn và công thức ngắn chỉ hợp lệ khi gắn trực tiếp với thành phần cần đọc của hình.",
+    );
+  });
 
   it("accepts complete question and solution sources without an extension marker", () => {
     const questionSource = "\\begin{tikzpicture}\\draw (0,0)--(1,0);\\end{tikzpicture}";
@@ -2919,6 +2916,50 @@ describe("M9.3 Quiz-owned generation core", () => {
     expect(first.promptVersion).toBe(second.promptVersion);
     expect(first.promptCache).toEqual(second.promptCache);
     expect(first.userPrompt).not.toBe(second.userPrompt);
+
+    const structuredTextFormat = resolveAiStructuredTextFormat(
+      generatedQuizSolutionFigureSchema,
+      "solution_figure",
+      "inline",
+    ).format;
+    const firstSerialized = buildOpenAiStructuredResponseRequest({
+      request: first,
+      model: "gpt-5.6-luna",
+      structuredTextFormat,
+    });
+    const secondSerialized = buildOpenAiStructuredResponseRequest({
+      request: second,
+      model: "gpt-5.6-luna",
+      structuredTextFormat,
+    });
+    const previousContract = buildOpenAiStructuredResponseRequest({
+      request: {
+        ...first,
+        promptVersion: "solution-figure-math-v1-shared",
+        schemaVersion: "solution-figure-schema-v1",
+      },
+      model: "gpt-5.6-luna",
+      structuredTextFormat,
+    });
+
+    expect(firstSerialized.prompt_cache_key).toBe(secondSerialized.prompt_cache_key);
+    expect(firstSerialized.prompt_cache_key).not.toBe(previousContract.prompt_cache_key);
+    expect(firstSerialized.prompt_cache_options).toEqual({
+      mode: "explicit",
+      ttl: "30m",
+    });
+    expect(Array.isArray(firstSerialized.input)).toBe(true);
+    expect(Array.isArray(secondSerialized.input)).toBe(true);
+    if (!Array.isArray(firstSerialized.input) || !Array.isArray(secondSerialized.input)) {
+      return;
+    }
+    expect(firstSerialized.input[0]).toEqual(secondSerialized.input[0]);
+    expect(JSON.stringify(firstSerialized.input[0])).toContain(
+      "không chép nguyên văn problem/solution",
+    );
+    expect(firstSerialized.input[1]).not.toEqual(secondSerialized.input[1]);
+    expect(JSON.stringify(firstSerialized.input[1])).toContain("Đề A");
+    expect(JSON.stringify(secondSerialized.input[1])).toContain("Đề B");
   });
 
   it("keeps Math, Physics and Chemistry Quiz figure prompts independent", () => {

@@ -17,6 +17,8 @@ import type { AuthenticatedUser } from "#api/common/auth/authenticated-request";
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import { EnvConfig } from "#api/config/env.validation";
 import { ObjectStorageService } from "#api/modules/files/services/object-storage.service";
+import { AiChatRuntimeSettingsService } from "#api/modules/provider-operations/services/ai-chat-runtime-settings.service";
+import { hasActiveStudentTestAttempt } from "#api/modules/tests/utils/test-attempt-activity";
 import type {
   FileResponse,
   UploadedFileBuffer,
@@ -58,6 +60,8 @@ export class FilesService {
     private readonly prisma: PrismaService,
     @Inject(ObjectStorageService)
     private readonly objectStorage: ObjectStorageService,
+    @Inject(AiChatRuntimeSettingsService)
+    private readonly chatRuntimeSettings: AiChatRuntimeSettingsService,
   ) {}
 
   async uploadFile({
@@ -74,7 +78,16 @@ export class FilesService {
     }
 
     this.assertCanUpload(actor.role, purpose);
-    this.assertFileAllowed(file, purpose);
+    if (
+      purpose === FilePurpose.CHAT_IMAGE &&
+      (await hasActiveStudentTestAttempt(this.prisma, actor.id))
+    ) {
+      throwForbidden(
+        "AI_CHAT_BLOCKED_DURING_TEST",
+        "Không thể tải ảnh Chat AI trong khi bạn đang làm bài thi.",
+      );
+    }
+    await this.assertFileAllowed(file, purpose);
 
     const objectKey = this.objectStorage.createObjectKey({
       environment: this.configService.get("NODE_ENV", { infer: true }),
@@ -125,6 +138,16 @@ export class FilesService {
 
     if (!file) {
       throwNotFound("NOT_FOUND", "Không tìm thấy file");
+    }
+
+    if (
+      file.purpose === FilePurpose.CHAT_IMAGE &&
+      (await hasActiveStudentTestAttempt(this.prisma, actor.id))
+    ) {
+      throwForbidden(
+        "AI_CHAT_BLOCKED_DURING_TEST",
+        "Không thể xem ảnh Chat AI trong khi bạn đang làm bài thi.",
+      );
     }
 
     this.assertCanRead(actor, file);
@@ -180,14 +203,17 @@ export class FilesService {
       role === UserRole.ADMIN &&
       (purpose === FilePurpose.LESSON_DOCUMENT ||
         purpose === FilePurpose.EDITOR_IMAGE ||
-        purpose === FilePurpose.QUESTION_IMAGE)
+        purpose === FilePurpose.QUESTION_IMAGE ||
+        purpose === FilePurpose.CHAT_IMAGE)
     ) {
       return;
     }
 
     if (
       role === UserRole.STUDENT &&
-      (purpose === FilePurpose.AVATAR || purpose === FilePurpose.NOTE_IMAGE)
+      (purpose === FilePurpose.AVATAR ||
+        purpose === FilePurpose.NOTE_IMAGE ||
+        purpose === FilePurpose.CHAT_IMAGE)
     ) {
       return;
     }
@@ -210,7 +236,9 @@ export class FilesService {
 
     if (
       file.uploadedById === actor.id &&
-      (file.purpose === FilePurpose.AVATAR || file.purpose === FilePurpose.NOTE_IMAGE)
+      (file.purpose === FilePurpose.AVATAR ||
+        file.purpose === FilePurpose.NOTE_IMAGE ||
+        file.purpose === FilePurpose.CHAT_IMAGE)
     ) {
       return;
     }
@@ -218,9 +246,13 @@ export class FilesService {
     throwForbidden("FORBIDDEN", "Bạn không có quyền xem file này");
   }
 
-  private assertFileAllowed(file: UploadedFileBuffer, purpose: FilePurpose) {
-    const maxSizeBytes = this.getMaxSizeBytes(purpose);
-    const allowedMimeTypes = this.getAllowedMimeTypes(purpose);
+  private async assertFileAllowed(file: UploadedFileBuffer, purpose: FilePurpose) {
+    const chatSettings =
+      purpose === FilePurpose.CHAT_IMAGE ? await this.chatRuntimeSettings.get() : null;
+    const maxSizeBytes = chatSettings?.maxImageBytes ?? this.getMaxSizeBytes(purpose);
+    const allowedMimeTypes = chatSettings
+      ? new Set<string>(chatSettings.allowedImageMimeTypes)
+      : this.getAllowedMimeTypes(purpose);
 
     if (!allowedMimeTypes.has(file.mimetype)) {
       throwBadRequest("FILE_TYPE_NOT_ALLOWED", "Định dạng file chưa được hỗ trợ");
@@ -247,6 +279,12 @@ export class FilesService {
     if (purpose === FilePurpose.AVATAR) {
       return this.megabytesToBytes(
         this.configService.get("MAX_AVATAR_UPLOAD_MB", { infer: true }),
+      );
+    }
+
+    if (purpose === FilePurpose.CHAT_IMAGE) {
+      return this.megabytesToBytes(
+        this.configService.get("MAX_CHAT_IMAGE_UPLOAD_MB", { infer: true }),
       );
     }
 

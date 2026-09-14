@@ -307,7 +307,9 @@ Thực hiện như một phần còn lại của `M9.2`, không tạo milestone 
    compile/repair/validator.
 7. Chuyển smoke/test fixture sang snippet, chạy typecheck, focused test, Docker
    renderer smoke và build liên quan.
-8. Chỉ chạy live provider test khi owner duyệt trước số request và chi phí.
+8. Chỉ chạy live provider test khi owner yêu cầu; yêu cầu đó đã là phê duyệt chi
+   phí, nên Codex tự chọn số request/ngân sách hợp lý và chạy không cần xác nhận
+   lần hai.
 
 ## Acceptance criteria
 

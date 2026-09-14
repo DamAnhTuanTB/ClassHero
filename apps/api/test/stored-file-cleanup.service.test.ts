@@ -22,6 +22,8 @@ describe("StoredFileCleanupService", () => {
         id: { in: ["file-1", "shared-file"] },
         stemFigureDeliveries: { none: {} },
         quizFigureDeliveries: { none: {} },
+        flashcardFigureDeliveries: { none: {} },
+        aiChatMessageAttachments: { none: {} },
       },
       select: { id: true },
     });

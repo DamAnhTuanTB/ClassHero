@@ -61,6 +61,7 @@ export function AdminQuizFigureCodeDialog({
   setId: string;
 }) {
   const mutations = useAdminQuizFigureMutations(setId, assessmentKind);
+  const assessmentLabel = assessmentKind === "test" ? "Test" : "Quiz";
   const [source, setSource] = useState("");
   const [caption, setCaption] = useState("");
   const [result, setResult] = useState<{
@@ -111,7 +112,9 @@ export function AdminQuizFigureCodeDialog({
         questionId,
         figure,
         latexSource: sourceOverride,
-        altText: figure.currentRevision?.altText ?? roleLabel(figure.role),
+        altText:
+          figure.currentRevision?.altText ??
+          roleLabel(figure.role, assessmentLabel),
         caption: caption.trim() || null,
       });
       setResult(compiled);
@@ -440,7 +443,7 @@ export function AdminQuizFigureCodeDialog({
             }}
           />
           <label className="border-t border-[var(--theme-border)] p-3 text-xs font-bold text-[var(--theme-text)]">
-            Caption
+            Chú thích
             <input
               className="mt-1 min-h-10 w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] px-3 text-sm"
               maxLength={500}
@@ -468,7 +471,7 @@ export function AdminQuizFigureCodeDialog({
               </div>
             ) : previewUrl ? (
               <img
-                alt={caption.trim() || roleLabel(figure.role)}
+                alt={caption.trim() || roleLabel(figure.role, assessmentLabel)}
                 className="object-contain transition-[width,height] duration-200 motion-reduce:transition-none"
                 data-testid="stem-figure-draft-preview-image"
                 src={previewUrl}
@@ -529,6 +532,8 @@ function createQuizFigureStarterSource() {
   ].join("\n");
 }
 
-function roleLabel(role: AdminQuizFigure["role"]) {
-  return role === "QUESTION" ? "Hình minh họa đề Quiz" : "Hình lời giải Quiz";
+function roleLabel(role: AdminQuizFigure["role"], assessmentLabel: "Quiz" | "Test") {
+  return role === "QUESTION"
+    ? `Hình minh họa đề ${assessmentLabel}`
+    : `Hình lời giải ${assessmentLabel}`;
 }

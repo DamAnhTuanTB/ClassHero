@@ -27,8 +27,30 @@ import {
 
 const malformedDisplay = String.raw`$$\begin{aligned}x&=1\\&=2.$$`;
 const repairedDisplay = String.raw`$$\begin{aligned}x&=1\\&=2.\end{aligned}$$`;
+const doubledSpacingCommands = String.raw`$$OA=OB,\\qquad OB=OC,\\quad OC=OD.$$`;
+const repairedSpacingCommands = String.raw`$$OA=OB,\qquad OB=OC,\quad OC=OD.$$`;
+const missingCloserBeforeProseAndDisplay = String.raw`Khi đó các cạnh là $7\ \text{cm}$ và $9\ \text{cm}. Khi đó:
+
+$$R'=\frac{\sqrt{130}}{2}\ \text{cm}.$$`;
+const repairedCloserBeforeProseAndDisplay = String.raw`Khi đó các cạnh là $7\ \text{cm}$ và $9\ \text{cm}$. Khi đó:
+
+$$R'=\frac{\sqrt{130}}{2}\ \text{cm}.$$`;
 
 describe("shared learner math text auto-repair", () => {
+  it("repairs doubled spacing-command escapes without consuming row separators", () => {
+    const validRowBeforeCommand = String.raw`$$\begin{aligned}x&=1\\\qquad y&=2\end{aligned}$$`;
+
+    expect(normalizeLearnerMathTextSyntax(doubledSpacingCommands)).toBe(
+      repairedSpacingCommands,
+    );
+    expect(normalizeLearnerMathTextSyntax(repairedSpacingCommands)).toBe(
+      repairedSpacingCommands,
+    );
+    expect(normalizeLearnerMathTextSyntax(validRowBeforeCommand)).toBe(
+      validRowBeforeCommand,
+    );
+  });
+
   it("repairs display environments to a stable result without touching code or prose", () => {
     expect(normalizeMathTextLatexEnvironments(malformedDisplay)).toBe(repairedDisplay);
     expect(normalizeLearnerMathTextSyntax(repairedDisplay)).toBe(repairedDisplay);
@@ -54,6 +76,33 @@ describe("shared learner math text auto-repair", () => {
     expect(normalizeLearnerMathTextSyntax("Xét $ X + 1 là một biểu thức.")).toBe(
       "Xét $ X + 1 là một biểu thức.",
     );
+  });
+
+  it("closes inline math before a prose transition followed by display math", () => {
+    const repaired = normalizeLearnerMathTextSyntax(
+      missingCloserBeforeProseAndDisplay,
+    );
+
+    expect(repaired).toBe(repairedCloserBeforeProseAndDisplay);
+    expect(normalizeLearnerMathTextSyntax(repaired)).toBe(repaired);
+    expect(hasMalformedMathText(repaired)).toBe(false);
+
+    const mapped = mapGeneratedQuizQuestion({
+      questionType: QuestionType.TRUE_FALSE,
+      difficulty: Difficulty.MEDIUM,
+      hint: "So sánh hai bán kính.",
+      explanation: {
+        problem: "Kiểm tra sự thay đổi của bán kính.",
+        solution: missingCloserBeforeProseAndDisplay,
+        isGeometry: false,
+      },
+      figure: { requiresQuestionFigure: false, solutionFigure: false },
+      correctAnswer: false,
+    });
+    expect(mapped.explanationBlock.solution).toBe(
+      repairedCloserBeforeProseAndDisplay,
+    );
+    expect(mapped.recoveryIssues).toEqual([]);
   });
 
   it("applies the shared repair before Summary review warnings are reconciled", () => {
@@ -82,7 +131,7 @@ describe("shared learner math text auto-repair", () => {
                 type: "example",
                 exampleKind: "ILLUSTRATION",
                 problem: "Giải phương trình $x=1$.",
-                solution: "Ta được $x=1$.",
+                solution: missingCloserBeforeProseAndDisplay,
                 answer: "$x=1$.",
                 origin: "SOURCE_ADAPTED",
                 sourcePageNumbers: [1],
@@ -109,6 +158,10 @@ describe("shared learner math text auto-repair", () => {
     expect(mapped.content.sections[0]?.blocks[0]).toMatchObject({
       type: "knowledge",
       content: repairedDisplay,
+    });
+    expect(mapped.content.sections[0]?.blocks[1]).toMatchObject({
+      type: "example",
+      solution: repairedCloserBeforeProseAndDisplay,
     });
 
     const reviewed = reconcileLessonSummaryReviewIssues({
@@ -205,6 +258,12 @@ describe("shared learner math text auto-repair", () => {
 
   it("applies the shared repair to Video Summary before warning collection", () => {
     expect(normalizeVideoSummaryTextLayout(malformedDisplay)).toBe(repairedDisplay);
+    expect(normalizeVideoSummaryTextLayout(doubledSpacingCommands)).toBe(
+      repairedSpacingCommands,
+    );
+    expect(
+      normalizeVideoSummaryTextLayout(missingCloserBeforeProseAndDisplay),
+    ).toBe(repairedCloserBeforeProseAndDisplay);
     const output = videoSummaryProviderOutputSchema.parse({
       title: "Phương trình",
       objectives: ["Giải phương trình"],
@@ -218,7 +277,7 @@ describe("shared learner math text auto-repair", () => {
               type: "knowledge",
               title: "Biến đổi",
               startSeconds: 0,
-              content: malformedDisplay,
+              content: missingCloserBeforeProseAndDisplay,
             },
           ],
         },
@@ -229,29 +288,38 @@ describe("shared learner math text auto-repair", () => {
 
   it("applies the shared repair to Quiz and removes its recoverable warning", () => {
     expect(normalizeQuizLearnerText(malformedDisplay)).toBe(repairedDisplay);
+    expect(normalizeQuizLearnerText(doubledSpacingCommands)).toBe(
+      repairedSpacingCommands,
+    );
     const mapped = mapGeneratedQuizQuestion({
       questionType: QuestionType.TRUE_FALSE,
       difficulty: Difficulty.EASY,
       hint: "Biến đổi từng bước.",
       explanation: {
         problem: "Phương trình có nghiệm $x=1$.",
-        solution: malformedDisplay,
+        solution: doubledSpacingCommands,
         isGeometry: false,
       },
       figure: { requiresQuestionFigure: false, solutionFigure: false },
       correctAnswer: true,
     });
-    expect(mapped.explanationBlock.solution).toBe(repairedDisplay);
+    expect(mapped.explanationBlock.solution).toBe(repairedSpacingCommands);
     expect(mapped.recoveryIssues).toEqual([]);
   });
 
   it("applies the shared repair to Flashcard and removes its recoverable warning", () => {
     expect(normalizeFlashcardLearnerText(malformedDisplay)).toBe(repairedDisplay);
+    expect(normalizeFlashcardLearnerText(doubledSpacingCommands)).toBe(
+      repairedSpacingCommands,
+    );
+    expect(normalizeFlashcardLearnerText(missingCloserBeforeProseAndDisplay)).toBe(
+      repairedCloserBeforeProseAndDisplay,
+    );
     expect(
       collectFlashcardMathSyntaxWarnings({
         front: "Giải phương trình sau.",
         back: "$x=2$.",
-        solution: malformedDisplay,
+        solution: missingCloserBeforeProseAndDisplay,
       }),
     ).toEqual([]);
   });
@@ -262,14 +330,16 @@ describe("shared learner math text auto-repair", () => {
       difficulty: Difficulty.EASY,
       example: {
         problem: "Phương trình có nghiệm $x=1$.",
-        solution: malformedDisplay,
+        solution: missingCloserBeforeProseAndDisplay,
         answer: "Đúng.",
         geometryStatement: null,
       },
       sourceChunkIds: ["00000000-0000-4000-8000-000000000002"],
       correctAnswer: true,
     });
-    expect(mapped.exampleBlock.solution).toBe(repairedDisplay);
+    expect(mapped.exampleBlock.solution).toBe(
+      repairedCloserBeforeProseAndDisplay,
+    );
     expect(mapped.recoveryIssues).toEqual([]);
   });
 });

@@ -322,6 +322,206 @@ export class EmbeddingJobEnqueuer implements OnModuleDestroy {
     }
   }
 
+  async enqueueVideoSummaryEmbeddingJob(params: {
+    lessonId: string;
+    videoSummaryId: string;
+    summaryHash: string;
+    ownerUserId?: string;
+  }): Promise<{ jobId: string }> {
+    const chunkCount = await this.prisma.videoSummaryChunk.count({
+      where: {
+        videoSummaryId: params.videoSummaryId,
+        lessonId: params.lessonId,
+        summaryHash: params.summaryHash,
+      },
+    });
+    if (chunkCount <= 0) {
+      throw new Error(
+        `Cannot enqueue embedding for video summary ${params.videoSummaryId} without current chunks.`,
+      );
+    }
+
+    const idempotencyKey = [
+      "embedding",
+      "video-summary",
+      params.videoSummaryId,
+      params.summaryHash,
+    ].join(":");
+    const embeddingConfig = this.aiService.getEmbeddingConfig();
+    let durableJobId: string | null = null;
+    let aiGenerationId: string | null = null;
+
+    try {
+      let durableJob = await this.prisma.backgroundJob.findUnique({
+        where: { idempotencyKey },
+      });
+      if (durableJob?.status === BackgroundJobStatus.SUCCEEDED) {
+        return { jobId: durableJob.id };
+      }
+      if (
+        durableJob?.bullmqJobId &&
+        (durableJob.status === BackgroundJobStatus.QUEUED ||
+          durableJob.status === BackgroundJobStatus.RUNNING)
+      ) {
+        return { jobId: durableJob.id };
+      }
+      if (!durableJob) {
+        durableJob = await this.prisma.backgroundJob.create({
+          data: {
+            queue: BackgroundJobQueue.EMBEDDING,
+            status: BackgroundJobStatus.QUEUED,
+            idempotencyKey,
+            lessonId: params.lessonId,
+            resourceType: "video_summary",
+            resourceId: params.videoSummaryId,
+            ownerUserId: params.ownerUserId ?? null,
+            inputMeta: {
+              action: "EMBEDDING",
+              sourceType: "VIDEO_SUMMARY",
+              lessonId: params.lessonId,
+              videoSummaryId: params.videoSummaryId,
+              summaryHash: params.summaryHash,
+            },
+            maxAttempts: 3,
+          },
+        });
+      } else if (
+        durableJob.status === BackgroundJobStatus.FAILED ||
+        durableJob.status === BackgroundJobStatus.CANCELLED
+      ) {
+        durableJob = await this.prisma.backgroundJob.update({
+          where: { id: durableJob.id },
+          data: {
+            status: BackgroundJobStatus.QUEUED,
+            attempts: 0,
+            bullmqJobId: null,
+            result: undefined,
+            errorMessage: null,
+            startedAt: null,
+            finishedAt: null,
+          },
+        });
+      }
+      durableJobId = durableJob.id;
+
+      const existingAiGeneration = await this.prisma.aiGeneration.findFirst({
+        where: {
+          backgroundJobId: durableJob.id,
+          type: AiGenerationType.EMBEDDING,
+        },
+        select: { id: true },
+        orderBy: { createdAt: "asc" },
+      });
+      if (existingAiGeneration) {
+        const updatedGeneration = await this.prisma.aiGeneration.update({
+          where: { id: existingAiGeneration.id },
+          data: {
+            status: AiGenerationStatus.QUEUED,
+            provider: AiProviderName.OPENAI,
+            model: embeddingConfig.model,
+            retryCount: 0,
+            errorMessage: null,
+            startedAt: null,
+            finishedAt: null,
+          },
+          select: { id: true },
+        });
+        aiGenerationId = updatedGeneration.id;
+      } else {
+        const createdGeneration = await this.prisma.aiGeneration.create({
+          data: {
+            type: AiGenerationType.EMBEDDING,
+            status: AiGenerationStatus.QUEUED,
+            provider: AiProviderName.OPENAI,
+            model: embeddingConfig.model,
+            lessonId: params.lessonId,
+            backgroundJobId: durableJob.id,
+            createdByUserId: params.ownerUserId ?? null,
+            targetType: "VIDEO_SUMMARY",
+            targetId: params.videoSummaryId,
+            inputHash: params.summaryHash,
+            inputMetaJson: {
+              videoSummaryId: params.videoSummaryId,
+              summaryHash: params.summaryHash,
+              chunkCount,
+              dimensions: embeddingConfig.dimensions,
+            },
+          },
+          select: { id: true },
+        });
+        aiGenerationId = createdGeneration.id;
+      }
+
+      const queue = this.getQueue();
+      const existingBullmqJob = await queue.getJob(durableJob.id);
+      if (existingBullmqJob) {
+        const state = await existingBullmqJob.getState();
+        if (state === "failed" || state === "completed") {
+          await existingBullmqJob.remove();
+        }
+      }
+      const bullmqJob = await queue.add(
+        getBullmqJobName(BackgroundJobQueue.EMBEDDING),
+        { backgroundJobId: durableJob.id },
+        {
+          jobId: durableJob.id,
+          attempts: 3,
+          backoff: { type: "exponential", delay: 10_000 },
+          removeOnComplete: {
+            age: REMOVE_ON_COMPLETE_SECONDS,
+            count: 1_000,
+          },
+          removeOnFail: {
+            age: REMOVE_ON_FAIL_SECONDS,
+            count: 5_000,
+          },
+        },
+      );
+      await this.prisma.backgroundJob.update({
+        where: { id: durableJob.id },
+        data: { bullmqJobId: String(bullmqJob.id ?? durableJob.id) },
+      });
+
+      this.logger.log(
+        `Enqueued EMBEDDING job ${durableJob.id} for video summary=${params.videoSummaryId}, lesson=${params.lessonId}, chunks=${chunkCount}`,
+      );
+      return { jobId: durableJob.id };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const finishedAt = new Date();
+      const updates: Array<Promise<unknown>> = [];
+      if (durableJobId) {
+        updates.push(
+          this.prisma.backgroundJob.update({
+            where: { id: durableJobId },
+            data: {
+              status: BackgroundJobStatus.FAILED,
+              errorMessage: `Không enqueue được video summary embedding job: ${message}`,
+              finishedAt,
+            },
+          }),
+        );
+      }
+      if (aiGenerationId) {
+        updates.push(
+          this.prisma.aiGeneration.update({
+            where: { id: aiGenerationId },
+            data: {
+              status: AiGenerationStatus.FAILED,
+              errorMessage: message,
+              finishedAt,
+            },
+          }),
+        );
+      }
+      await Promise.all(updates);
+      this.logger.error(
+        `Failed to enqueue video summary EMBEDDING job for summary=${params.videoSummaryId}: ${message}`,
+      );
+      throw error;
+    }
+  }
+
   private getQueue(): Queue<BackgroundJobBullmqData, BackgroundJobBullmqResult> {
     if (!this.queue) {
       this.queue = new Queue(getBullmqQueueName(BackgroundJobQueue.EMBEDDING), {

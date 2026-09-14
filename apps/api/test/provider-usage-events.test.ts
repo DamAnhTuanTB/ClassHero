@@ -65,6 +65,7 @@ describe("ProviderOperationsAdminService usage events", () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
     const query = new ProviderUsageEventsQueryDto();
     query.aiGenerationId = aiGenerationId;

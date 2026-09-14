@@ -377,6 +377,10 @@ export type StudentTestAttempt = {
   questions: StudentAssessmentQuestion[];
 };
 
+export type StudentActiveTestStatus = {
+  isActive: boolean;
+};
+
 export type StudentTestResult = AttemptSummary & {
   durationSeconds: number;
   score: number;

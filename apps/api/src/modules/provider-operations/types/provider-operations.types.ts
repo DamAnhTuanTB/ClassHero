@@ -37,8 +37,24 @@ export type AiFeatureRoute = {
   reasoningEffort: string | null;
   maxInputTokens?: number | null;
   maxOutputTokens: number | null;
+  fallbackTemperature?: number | null;
+  fallbackReasoningEffort?: string | null;
+  fallbackMaxInputTokens?: number | null;
+  fallbackMaxOutputTokens?: number | null;
   candidates: ProviderRouteCandidate[];
   hasConfiguration: boolean;
+};
+
+export type AiFeatureRouteOverride = {
+  primaryCatalogItemId?: string;
+  fallbackCatalogItemId?: string | null;
+  temperature?: number | null;
+  reasoningEffort?: string | null;
+  maxInputTokens?: number;
+  maxOutputTokens?: number;
+  fallbackTemperature?: number | null;
+  fallbackReasoningEffort?: string | null;
+  fallbackMaxOutputTokens?: number | null;
 };
 
 export type ProviderUsageAmounts = {

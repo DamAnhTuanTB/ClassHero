@@ -2,6 +2,8 @@
 
 import { ArrowLeft, ArrowRight, CheckCircle2, ChevronLeft } from "lucide-react";
 import { ClassHeroLogo } from "@/components/common/brand/classhero-logo";
+import { StudentAiChatHeaderTrigger } from "@/features/student/ai-chat/components/student-ai-chat-header-trigger";
+import type { AiChatEntryContext } from "@/features/student/ai-chat/utils/ai-chat-link";
 import { useDocumentScrollLock } from "@/features/student/lessons/hooks/use-document-scroll-lock";
 import { AssessmentQuestionCard } from "@/features/student/lessons/screens/student-lesson-screen/components/assessment-question-card";
 import { AssessmentExplanationPanel } from "@/features/student/lessons/screens/student-lesson-screen/components/assessment-explanation-panel";
@@ -14,6 +16,7 @@ import { cn } from "@/lib/utils";
 export function QuizReviewScreen({
   accent = "sky",
   activityLabel = "Quiz",
+  aiChatContext,
   backLabel = "Quay lại kết quả Quiz",
   currentIndex,
   displayScope,
@@ -22,10 +25,12 @@ export function QuizReviewScreen({
   review,
   reviewTitle,
   stackedOverDialog = false,
+  targetType = "QUIZ_QUESTION",
   testId = "quiz-review-screen",
 }: {
   accent?: "emerald" | "sky";
   activityLabel?: string;
+  aiChatContext?: AiChatEntryContext;
   backLabel?: string;
   currentIndex: number;
   displayScope: "ALL" | "INCORRECT";
@@ -34,6 +39,7 @@ export function QuizReviewScreen({
   review: AssessmentReview;
   reviewTitle?: string;
   stackedOverDialog?: boolean;
+  targetType?: "QUIZ_QUESTION" | "TEST_QUESTION";
   testId?: string;
 }) {
   useDocumentScrollLock();
@@ -56,6 +62,13 @@ export function QuizReviewScreen({
     question !== undefined && currentIndex >= visibleQuestionCount - 1;
   const progressPercent =
     (visibleQuestionNumber / Math.max(visibleQuestionCount, 1)) * 100;
+  const currentAiChatContext =
+    aiChatContext?.scopeType === "COURSE" && question
+      ? ({
+          ...aiChatContext,
+          target: { targetType, targetId: question.id },
+        } satisfies AiChatEntryContext)
+      : aiChatContext;
 
   function handleQuestionSelect(questionId: string) {
     const nextIndex = visibleQuestions.findIndex((item) => item.id === questionId);
@@ -96,6 +109,12 @@ export function QuizReviewScreen({
             <ChevronLeft className="h-8 w-8" strokeWidth={2.8} aria-hidden="true" />
           </button>
           <ClassHeroLogo className="h-10 max-w-[9rem]" priority />
+          {currentAiChatContext ? (
+            <StudentAiChatHeaderTrigger
+              context={currentAiChatContext}
+              testId="student-ai-chat-trigger-review"
+            />
+          ) : null}
         </div>
       </header>
 

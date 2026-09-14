@@ -37,6 +37,7 @@ import { VideoSummaryPromptPreview } from "@/features/admin/lessons/components/v
 import { VideoSummaryEditorDialog } from "@/features/admin/lessons/components/video-summary-editor-dialog";
 import { prepareVideoSummaryPreviewRequest } from "@/features/admin/lessons/utils/video-summary-request";
 import { createTextTiptapDocument } from "@/lib/tiptap-rich-content";
+import { useAuthenticatedRealtime } from "@/components/common/realtime/authenticated-realtime-provider";
 
 const initialRequest: VideoSummaryRequest = {
   style: "student_friendly",
@@ -84,6 +85,7 @@ export function VideoSummaryDialog({
   const [jobId, setJobId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const token = useAuthSessionStore((state) => state.session?.accessToken ?? "");
+  const { status: realtimeStatus } = useAuthenticatedRealtime();
   const summary = useQuery({
     queryKey: ["admin-video-summary", lessonId],
     queryFn: () => getAdminVideoSummary(lessonId, token),
@@ -118,11 +120,17 @@ export function VideoSummaryDialog({
     );
   }, [modelConfiguration, open, request.model]);
   const job = useQuery({
-    queryKey: ["admin-video-summary-job", jobId],
+    queryKey: adminAiGenerationQueryKeys.job(jobId ?? "idle"),
     queryFn: () => getAdminAiJob(jobId ?? "", token),
     enabled: Boolean(jobId && token),
     refetchInterval: (query) =>
-      ["SUCCEEDED", "FAILED"].includes(query.state.data?.status ?? "") ? false : 1500,
+      ["SUCCEEDED", "FAILED", "CANCELLED"].includes(
+        query.state.data?.status ?? "",
+      )
+        ? false
+        : realtimeStatus === "connected"
+          ? 60_000
+          : 3_000,
   });
   const trackedJobId = jobId ?? panelJob?.jobId ?? null;
   const trackedJobStatus = jobId ? job.data?.status : panelJob?.status;

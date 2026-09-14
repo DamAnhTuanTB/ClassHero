@@ -43,6 +43,9 @@ import { FlashcardFiguresService } from "#api/modules/flashcards/services/flashc
 import { StemFiguresModule } from "#api/modules/stem-figures/stem-figures.module";
 import { StemFigureRenderingProcessor } from "#api/workers/processors/stem-figure-rendering.processor";
 import { StemFigureRenderingWorkerService } from "#api/workers/services/stem-figure-rendering-worker.service";
+import { RealtimeCoreModule } from "#api/modules/realtime/realtime-core.module";
+import { AiChatImageCleanupService } from "#api/workers/services/ai-chat-image-cleanup.service";
+import { VideoSummaryIndexService } from "#api/modules/learning-paths/services/video-summary-index.service";
 
 @Module({
   imports: [
@@ -54,6 +57,7 @@ import { StemFigureRenderingWorkerService } from "#api/workers/services/stem-fig
     FilesModule,
     StemFiguresModule,
     QuizFiguresModule,
+    RealtimeCoreModule,
   ],
   providers: [
     DocumentProcessingProcessor,
@@ -91,6 +95,8 @@ import { StemFigureRenderingWorkerService } from "#api/workers/services/stem-fig
     StemFigureRenderingWorkerService,
     QuizFigureRenderingProcessor,
     QuizFigureRenderingWorkerService,
+    AiChatImageCleanupService,
+    VideoSummaryIndexService,
   ],
 })
 export class WorkerModule {}

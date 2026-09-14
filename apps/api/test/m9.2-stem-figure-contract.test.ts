@@ -2952,7 +2952,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     });
 
     const request = generateStructured.mock.calls[0]?.[1];
-    expect(request.promptVersion).toBe("solution-figure-math-v1-shared");
+    expect(request.promptVersion).toBe("solution-figure-math-v2-visual-only");
     expect(request.inputImages).toEqual([]);
     expect(request.userPrompt).toContain('"aiMode":"EDIT_CURRENT"');
     expect(request.userPrompt).toContain("currentSolutionLatexSource");
@@ -3738,7 +3738,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     expect(request.systemPrompt).toContain("problem bổ sung cấu hình và dữ kiện ban đầu");
     expect(request.systemPrompt).not.toContain("solution rồi problem");
     expect(request.systemPrompt).toContain("QUY TẮC HÌNH TOÁN CHO LỜI GIẢI");
-    expect(request.promptVersion).toBe("solution-figure-math-v1-shared");
+    expect(request.promptVersion).toBe("solution-figure-math-v2-visual-only");
     expect(request.inputImages).toEqual([]);
   });
 
@@ -3884,7 +3884,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       allowed: ["hình học", "isGeometry", "geometryStatement", "GT–KL"],
       forbidden: ["circuitikz", "chemfig", "mhchem"],
       heading: "# SYSTEM PROMPT SINH KIẾN THỨC MÔN TOÁN",
-      promptVersion: "lesson-summary-math-v45-math-syntax-contract",
+      promptVersion: "lesson-summary-math-v46-local-quality-pass",
       forbiddenHeadings: [
         "SYSTEM PROMPT SINH KIẾN THỨC MÔN VẬT LÝ",
         "SYSTEM PROMPT SINH KIẾN THỨC MÔN HÓA HỌC",
@@ -3903,7 +3903,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
         "GT–KL",
       ],
       heading: "# SYSTEM PROMPT SINH KIẾN THỨC MÔN VẬT LÝ",
-      promptVersion: "lesson-summary-physics-v40-math-syntax-contract",
+      promptVersion: "lesson-summary-physics-v41-local-quality-pass",
       forbiddenHeadings: [
         "SYSTEM PROMPT SINH KIẾN THỨC MÔN TOÁN",
         "SYSTEM PROMPT SINH KIẾN THỨC MÔN HÓA HỌC",
@@ -3922,7 +3922,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
         "GT–KL",
       ],
       heading: "# SYSTEM PROMPT SINH KIẾN THỨC MÔN HÓA HỌC",
-      promptVersion: "lesson-summary-chemistry-v40-math-syntax-contract",
+      promptVersion: "lesson-summary-chemistry-v41-local-quality-pass",
       forbiddenHeadings: [
         "SYSTEM PROMPT SINH KIẾN THỨC MÔN TOÁN",
         "SYSTEM PROMPT SINH KIẾN THỨC MÔN VẬT LÝ",
@@ -3967,27 +3967,27 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     {
       subject: { key: "MATH" as const, name: "Toán", slug: "toan" },
       lessonTitle: "Phương trình bậc hai",
-      promptVersion: "lesson-summary-math-v45-math-syntax-contract",
+      promptVersion: "lesson-summary-math-v46-local-quality-pass",
     },
     {
       subject: { key: "MATH" as const, name: "Toán", slug: "toan" },
       lessonTitle: "Tứ giác nội tiếp",
-      promptVersion: "lesson-summary-math-v45-math-syntax-contract",
+      promptVersion: "lesson-summary-math-v46-local-quality-pass",
     },
     {
       subject: { key: "PHYSICS" as const, name: "Vật lý", slug: "vat-ly" },
       lessonTitle: "Công và công suất",
-      promptVersion: "lesson-summary-physics-v40-math-syntax-contract",
+      promptVersion: "lesson-summary-physics-v41-local-quality-pass",
     },
     {
       subject: { key: "CHEMISTRY" as const, name: "Hóa học", slug: "hoa-hoc" },
       lessonTitle: "Nồng độ dung dịch",
-      promptVersion: "lesson-summary-chemistry-v40-math-syntax-contract",
+      promptVersion: "lesson-summary-chemistry-v41-local-quality-pass",
     },
     {
       subject: { key: "GENERAL" as const, name: "Môn khác", slug: "mon-khac" },
       lessonTitle: "Bài học tổng quát",
-      promptVersion: "lesson-summary-general-v40-math-syntax-contract",
+      promptVersion: "lesson-summary-general-v41-local-quality-pass",
     },
   ])(
     "classifies real-world exercises and keeps AI-authored exercises diverse for $subject.name — $lessonTitle",
@@ -4348,7 +4348,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       },
     });
     expect(request.systemPrompt).toContain(
-      LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION,
+      "QUY TẮC CỨNG VỀ CHUỖI DẤU BẰNG: trong local pass của chính block",
     );
     expect(request.systemPrompt).toContain("phải kết thúc bằng dấu `:`");
     expect(request.systemPrompt).toContain("$\\Leftrightarrow$");
@@ -4364,7 +4364,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     expect(request.systemPrompt).toContain(
       "Ví dụ tổng quát ĐÚNG: `$$\\begin{aligned}A&=B\\\\&=C.\\end{aligned}$$`",
     );
-    expect(request.systemPrompt).toContain("phải viết lại field trước khi trả output");
+    expect(request.systemPrompt).toContain("field phải giữ đúng quy tắc này");
     expect(request.systemPrompt).toContain(
       "Không áp dụng quy tắc này cho các phương trình độc lập",
     );
@@ -4626,7 +4626,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     expect(request.systemPrompt).toContain(
       "Nội dung block chỉ dùng để nhận diện và kiểm tra đúng bài",
     );
-    expect(request.systemPrompt).toContain("inventory toàn bộ hình/crop");
+    expect(request.systemPrompt).toContain("inventory nguồn duy nhất");
     expect(request.systemPrompt).toContain("Không được trả mọi figures=[]");
     expect(request.systemPrompt).toContain(
       "Dòng chú thích trong tài liệu nguồn chỉ là bằng chứng nhận diện hình",
@@ -4649,7 +4649,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     );
     expect(request.systemPrompt).toContain("type=exercise");
     expect(request.systemPrompt).toContain("không được thay bài đó bằng bài AI khác");
-    expect(request.systemPrompt).toContain("figures/sourceReferences bị bỏ mất");
+    expect(request.systemPrompt).toContain("gắn figure liên quan ngay lúc đó");
     expect(request.systemPrompt).not.toContain("figure brief");
     expect(request.systemPrompt).not.toContain("brief hình");
     expect(request.systemPrompt).not.toContain("theo đề, brief");
@@ -4660,9 +4660,9 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     expect(request.systemPrompt).toContain("`\\Leftrightarrow`");
     expect(request.systemPrompt).toContain("`\\iff`");
     expect(request.systemPrompt).toContain("`\\impliedby`");
-    expect(request.promptVersion).toBe("lesson-summary-math-v45-math-syntax-contract");
+    expect(request.promptVersion).toBe("lesson-summary-math-v46-local-quality-pass");
     expect(request.schemaVersion).toBe(
-      "lesson-summary-pdf-packet-six-block-schema-v33-math-syntax-warning",
+      "lesson-summary-pdf-packet-six-block-schema-v35-local-figure-policy",
     );
   });
 
@@ -5195,7 +5195,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       expect(serializedInput).toContain(
         "giới thiệu đúng một lần trước lần dùng đầu tiên",
       );
-      expect(flashcardSystemPrompt).toContain("`front` là một câu hỏi ngắn, rõ ràng");
+      expect(flashcardSystemPrompt).toContain("`front` là câu hỏi ngắn, rõ ràng");
       expect(flashcardSystemPrompt).toContain("`back` là câu trả lời trực tiếp");
       expect(flashcardSystemPrompt).toContain("`solution`");
       expect(flashcardPrompt).toContain("### NHIỆM VỤ TẠO FLASHCARD");

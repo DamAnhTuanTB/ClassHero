@@ -207,6 +207,7 @@ export class FlashcardGenerationJobService {
           sourceHash: source.sourceHash,
           targetFlashcardSetId: targetSet?.id ?? null,
           generationConfiguration: configuration,
+          promptVersion: request.promptVersion,
         }),
         modelConfigJson: json({ routeSnapshot: route, imageRouteSnapshot: imageRoute }),
         costEstimateJson: json(estimatedCost),
@@ -316,6 +317,24 @@ export class FlashcardGenerationJobService {
     const subjectKey = flashcardSubjectKeySchema.parse(readRequiredString(sourceSnapshot.subjectKey, "subjectKey"));
     const subjectName = readRequiredString(sourceSnapshot.subjectName, "subjectName");
     const subjectSlug = readRequiredString(sourceSnapshot.subjectSlug, "subjectSlug");
+    const subject = { key: subjectKey, name: subjectName, slug: subjectSlug };
+    const currentFormat = resolveAiStructuredTextFormat(
+      generatedFlashcardOutputSchema,
+      "generated_flashcards",
+      "ref_v2",
+    );
+    const currentPromptVersion = resolveFlashcardPromptVersion(subject);
+    if (
+      readNullableString(sourceSnapshot.promptVersion) !== currentPromptVersion ||
+      draft.schemaName !== "generated_flashcards" ||
+      draft.schemaVersion !== FLASHCARD_SCHEMA_VERSION ||
+      draft.schemaHash !== hashAiValue(currentFormat.format.schema)
+    ) {
+      throw badRequestException(
+        "AI_INPUT_SNAPSHOT_STALE",
+        "Prompt hoặc schema Flashcard đã thay đổi; hãy cập nhật dữ liệu gửi AI.",
+      );
+    }
     const inputMeta = {
       requestDraftId: draft.id,
       requestHash: draft.requestHash,
@@ -337,7 +356,7 @@ export class FlashcardGenerationJobService {
       lessonId,
       targetType: "FLASHCARD_SET",
       targetId: targetFlashcardSetId,
-      promptVersion: resolveFlashcardPromptVersion({ key: subjectKey, name: subjectName, slug: subjectSlug }),
+      promptVersion: currentPromptVersion,
       schemaVersion: FLASHCARD_SCHEMA_VERSION,
       inputFingerprint: { lessonId, ...inputMeta },
       inputMeta,

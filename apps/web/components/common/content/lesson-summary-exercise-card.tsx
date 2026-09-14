@@ -13,6 +13,7 @@ export function LessonSummaryExerciseCard({
   block,
   displayNumber,
   showEditorialWarning = false,
+  showAiAuthoredBadge = false,
   renderFigure,
   onVideoSeek,
   videoEndTimeSeconds,
@@ -21,6 +22,7 @@ export function LessonSummaryExerciseCard({
   block: LessonSummaryProblemBlockData & { type: "exercise" };
   displayNumber: number | string;
   showEditorialWarning?: boolean;
+  showAiAuthoredBadge?: boolean;
   renderFigure?: LessonSummaryFigureRenderer;
   onVideoSeek?: (seconds: number) => void;
   videoEndTimeSeconds?: number;
@@ -36,6 +38,11 @@ export function LessonSummaryExerciseCard({
           <NotebookPen className="h-4 w-4" aria-hidden="true" />
           Bài tập {displayNumber}
         </span>
+        {showAiAuthoredBadge && block.origin === "AI_AUTHORED" ? (
+          <span className="inline-flex shrink-0 items-center rounded-full border border-[var(--theme-info-border)] bg-[var(--theme-info-bg)] px-2 py-0.5 text-[10px] font-extrabold normal-case tracking-normal text-[var(--theme-info-text)]">
+            New
+          </span>
+        ) : null}
         <VideoStartTimeBadge
           endSeconds={videoEndTimeSeconds}
           offsetSeconds={videoStartTimeOffsetSeconds}

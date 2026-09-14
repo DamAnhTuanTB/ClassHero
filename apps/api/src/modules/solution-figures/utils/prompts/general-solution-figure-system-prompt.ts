@@ -25,6 +25,9 @@ const GENERAL_QUIZ_FIGURE_SPATIAL_LABEL_POLICY = [
   "- Trừ khi ảnh nguồn hoặc authority khóa một leader line hay quy ước khác, điểm, path hoặc cung tương thích gần bounding box nhãn nhất phải là đúng đối tượng sở hữu; sửa anchor hoặc vị trí khi liên thuộc chưa rõ và không dùng một offset tuyệt đối cho mọi hình.",
 ].join("\n");
 
+const GENERAL_SOLUTION_FIGURE_CANVAS_CONTENT_POLICY =
+  "- Với hình lời giải, dùng solution để xác định đối tượng, cấu trúc và quan hệ cần vẽ; không chép nguyên văn problem/solution, chuỗi suy luận, phép tính hay đáp án thành node độc lập hoặc một vùng chữ bên cạnh hình. Chỉ giữ tên, trạng thái, mốc, category và legend ngắn gắn trực tiếp với đối tượng, connector, vùng, trục hoặc bảng và thật sự cần để đọc biểu diễn. Counterexample: nhãn node, bước quy trình, mốc thời gian, category trục hoặc nội dung ô bảng cần thiết vẫn hợp lệ; một khối chữ chỉ kể lại cách tìm đáp án thì phải nằm ngoài canvas.";
+
 const GENERAL_QUIZ_VISUAL_COMPLETENESS_POLICY = [
   "### THÀNH PHẦN TỐI THIỂU CHO BIỂU DIỄN TỔNG QUÁT",
   "- Trước khi viết source, nhận diện loại biểu diễn và luôn dựng đủ `móng hình` độc lập với việc problem/solution có gọi tên từng phần hay không: ranh giới node/vùng, connector/topology, baseline-trục-tick-zero, marker dữ liệu hoặc legend mẫu tối thiểu. Móng chỉ dùng đối tượng/dữ liệu đã có và không mượn quy ước riêng của môn khác.",
@@ -88,6 +91,7 @@ function resolveSubjectName(
     prompt,
     GENERAL_QUIZ_FIGURE_COMPILER_POLICY,
     GENERAL_QUIZ_FIGURE_SPATIAL_LABEL_POLICY,
+    ...(mode === "SOLUTION" ? [GENERAL_SOLUTION_FIGURE_CANVAS_CONTENT_POLICY] : []),
     GENERAL_QUIZ_VISUAL_COMPLETENESS_POLICY,
     resolveGeneralQuizVisualCompletenessMode(mode),
     resolveGeneralQuizFinalSemanticCheck(mode),

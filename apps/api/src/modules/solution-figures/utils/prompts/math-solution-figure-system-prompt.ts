@@ -29,6 +29,9 @@ const MATH_QUIZ_FIGURE_SPATIAL_LABEL_POLICY = [
   "- Vạch chia trục/hệ trục, marker điểm dựng và marker đầu mút mở-đóng không phải vạch đánh dấu đoạn bằng nhau nên không được phân nhóm theo quy tắc này.",
 ].join("\n");
 
+const MATH_SOLUTION_FIGURE_CANVAS_CONTENT_POLICY =
+  "- Với hình lời giải, dùng solution để xác định đối tượng, phép dựng và quan hệ cần vẽ; không chép nguyên văn problem/solution, phép tính trung gian, chuỗi biến đổi hay đáp số thành node độc lập hoặc một vùng chữ bên cạnh hình. Chỉ giữ nhãn ngắn gắn trực tiếp với đối tượng và thật sự cần để đọc biểu diễn. Counterexample: công thức hàm gắn với đúng đồ thị, giá trị trên trục, số đo trên cạnh-cung hoặc nội dung ô của bảng Toán học vẫn hợp lệ; một dãy phương trình chỉ giải thích cách tính đáp án thì phải nằm ngoài canvas.";
+
 const MATH_QUIZ_ANGLE_MARKER_POLICY = [
   "### CHIỀU QUÉT VÀ NHÓM CUNG GÓC",
   "- Trong TikZ, `angle=X--V--Y` luôn quét ngược chiều kim đồng hồ từ tia `VX` đến tia `VY` trong hệ tọa độ có trục y hướng lên; góc cực `0, 90, 180, 270` cũng tăng ngược chiều kim đồng hồ. Phải dựa trên tọa độ cuối thực tế, không dựa vào tên điểm, thứ tự chữ cái hoặc comment.",
@@ -123,6 +126,7 @@ function resolveSubjectName(
     prompt,
     MATH_QUIZ_FIGURE_COMPILER_POLICY,
     MATH_QUIZ_FIGURE_SPATIAL_LABEL_POLICY,
+    ...(mode === "SOLUTION" ? [MATH_SOLUTION_FIGURE_CANVAS_CONTENT_POLICY] : []),
     MATH_QUIZ_ANGLE_MARKER_POLICY,
     MATH_QUIZ_VISUAL_COMPLETENESS_POLICY,
     resolveMathQuizVisualCompletenessMode(mode),
@@ -169,8 +173,6 @@ const MATH_QUIZ_REFINEMENT_SYSTEM_PROMPT = [
   "- Coi tên gọi/định nghĩa của đối tượng cùng mọi quan hệ và số đo trong authority là một hệ ràng buộc duy nhất. Source tinh chỉnh chỉ hợp lệ khi thỏa đồng thời toàn bộ hệ; cấm giữ hoặc tạo một loại hình khác, đổi nghĩa khoảng cách hay sửa nhãn số để che tọa độ không khớp.",
   "- CỔNG THOÁT ANCHOR CŨ: với mỗi điểm/nút nằm trên đoạn đo và mỗi nhãn đo gần vị trí dọc của điểm/nút đó, phải chọn lại phía đặt từ mô hình ràng buộc thay vì sao chép anchor/offset của candidate. Nếu hai nửa mặt phẳng đều khả dụng, source cuối bắt buộc đặt tên điểm/nút và nhãn đo ở hai phía pháp tuyến đối diện; việc chỉ viết lại cú pháp, giảm/tăng offset hoặc trượt nhẹ nhưng vẫn giữ cùng phía là tinh chỉnh thất bại. Chỉ được giữ cùng phía khi authority khóa bố cục hoặc bounding box ở phía đối diện thật sự chạm/che nội dung mang nghĩa.",
   "- Mọi số đo nhìn thấy phải đúng với tọa độ cuối. Với TikZ angle=X--V--Y, kiểm tra đúng miền quét từ tia VX đến VY; cung góc, dấu vuông góc và vạch bằng nhau phải neo đúng đối tượng, đúng hướng và không bị méo.",
-  "- Với vạch đánh dấu các đoạn bằng nhau, phải chia các đoạn thành từng nhóm quan hệ bằng nhau từ authority trước khi nhìn candidate. Các đoạn cùng nhóm dùng cùng kiểu và số vạch; các nhóm độc lập dùng marker khác nhau, trừ khi authority khẳng định chúng cùng một nhóm. Không gộp hai nhóm chỉ vì mỗi nhóm đều phát sinh từ quan hệ trung điểm. Counterexample: mọi đoạn được authority khẳng định cùng bằng nhau được dùng chung marker group. Vạch chia trục/hệ trục, marker điểm dựng và marker đầu mút mở-đóng không thuộc quy tắc này.",
-  "- Trong refinement, marker của quan hệ `M` là trung điểm `AB` phải là một cặp gọn nằm trong `AM` và `MB` (hoặc tại `.25`/`.75` trên toàn `AB`), không được bó 2–5 vạch tại `.5` chồng lên điểm/tên `M`; mỗi glyph tối đa hai nét. Cung của hai góc có số đo khác nhau, kể cả cùng đỉnh, phải khác marker group; ưu tiên `\\pic` tia có tên, còn `\\draw ... arc` thủ công phải có độ quét literal khớp authority.",
   "- Tên điểm, nhãn độ dài, marker và nét phải tách nhau, không chồng, chạm, bị cắt hoặc bị đẩy sang đối tượng khác làm sai liên thuộc. Mọi nhãn độ dài, bán kính hoặc đường kính phải neo vào đúng path sở hữu bằng node trên path hoặc coordinate nội suy từ đúng hai đầu mút; khoảng hở pháp tuyến chỉ vừa đủ tách chữ khỏi nét. Khi va chạm, trượt dọc path bằng `pos`, đổi phía rồi mới tăng nhẹ khoảng hở; nếu buộc phải đặt xa thì dùng leader line, cấm để nhãn trôi tự do trong vùng trắng. Mọi đường tròn hình học phải có đúng một marker tại tâm; tâm chưa được authority đặt tên giữ marker không nhãn, còn `$(O)$` không bao giờ là nhãn canvas. Lệnh `circle` dùng làm chấm điểm/node/marker không phải đường tròn hình học.",
   "- Đồ thị, hệ trục, đường số, miền nghiệm, bảng biến thiên, bảng xét dấu, bảng dữ liệu và biểu đồ phải đúng trục, mốc, hàng/cột, dấu, chiều, giá trị và đơn vị được nêu.",
   "- Không dùng marker mũi tên/chevron hoặc câu chữ trên canvas để khẳng định hai đường song song; mũi tên chỉ mang nghĩa trục, tia, vector hoặc luồng biến đổi khi authority yêu cầu.",

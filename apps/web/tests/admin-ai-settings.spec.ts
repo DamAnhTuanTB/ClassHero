@@ -6,7 +6,11 @@ const model = {
   provider: "OPENAI",
   externalKey: "gpt-4.1-mini",
   displayName: "GPT-4.1 mini",
-  capabilities: { structuredOutput: true },
+  capabilities: {
+    features: ["SUMMARY", "QUIZ", "FLASHCARD", "TEST", "CHAT"],
+    structuredOutput: true,
+    aiConfiguration: "TEMPERATURE",
+  },
   status: "ACTIVE",
   credentialConfigured: true,
 };
@@ -36,6 +40,13 @@ const models = [
     externalKey,
     displayName,
   })),
+  {
+    ...model,
+    id: "model-text-embedding-3-small",
+    externalKey: "text-embedding-3-small",
+    displayName: "Text Embedding 3 Small",
+    capabilities: { features: ["EMBEDDING"], dimensions: [1536] },
+  },
 ];
 const price = {
   id: "price-openai",
@@ -123,12 +134,99 @@ test.describe("Admin Cài đặt AI", () => {
   test("đặt giới hạn input và output ở Thiết lập mặc định", async ({ page }) => {
     await page.goto("/admin/ai-settings");
 
-    await expect(page.getByLabel("Giới hạn token đầu vào").first()).toHaveValue(
-      "200000",
+    const featureNavigation = page.getByRole("navigation", {
+      name: "Chọn tính năng cần thiết lập",
+    });
+    await expect(
+      page.getByRole("heading", { name: "Tóm tắt video bằng AI" }),
+    ).toBeVisible();
+    await expect(featureNavigation.getByRole("button")).toHaveText([
+      "Tóm tắt video bằng AI",
+      "Sinh Kiến thức",
+      "Sinh câu hỏi ôn tập",
+      "Sinh thẻ ghi nhớ",
+      "Sinh bài kiểm tra",
+      "Chat với AI",
+    ]);
+    await expect(page.getByLabel("Giới hạn token đầu vào").first()).toHaveValue("200000");
+    await expect(page.getByLabel("Giới hạn token đầu ra").first()).toHaveValue("4096");
+
+    await page.getByRole("combobox", { name: "Mô hình thay thế" }).click();
+    await page.getByRole("option", { name: "GPT-5.6 Sol" }).click();
+    await expect(page.getByLabel("Giới hạn token đầu vào")).toHaveCount(2);
+    const videoFallbackInputLimit = page
+      .getByLabel("Giới hạn token đầu vào")
+      .last();
+    await expect(videoFallbackInputLimit).toHaveValue("200000");
+    await videoFallbackInputLimit.fill("150000");
+
+    await featureNavigation.getByRole("button", { name: "Sinh Kiến thức" }).click();
+    const phaseOneCard = page.locator("article").filter({
+      has: page.getByRole("heading", { name: "Phase 1 · Tạo nội dung" }),
+    });
+    const phaseTwoCard = page.locator("article").filter({
+      has: page.getByRole("heading", { name: "Phase 2 · Tạo hình" }),
+    });
+    const [phaseOneBox, phaseTwoBox] = await Promise.all([
+      phaseOneCard.boundingBox(),
+      phaseTwoCard.boundingBox(),
+    ]);
+    expect(phaseOneBox).not.toBeNull();
+    expect(phaseTwoBox).not.toBeNull();
+    if (!phaseOneBox || !phaseTwoBox) throw new Error("Không đo được hai card phase.");
+    expect(phaseTwoBox.y).toBeGreaterThanOrEqual(phaseOneBox.y + phaseOneBox.height);
+
+    await featureNavigation.getByRole("button", { name: "Chat với AI" }).click();
+    await expect(page.getByRole("heading", { name: "Chat với AI" })).toBeVisible();
+    await expect(page.getByText("Tạo câu trả lời", { exact: true })).toBeVisible();
+    await expect(page.getByLabel("Giới hạn token đầu vào")).toHaveValue("20000");
+    const chatOutputLimit = page.getByLabel("Giới hạn token đầu ra").first();
+    await expect(chatOutputLimit).toHaveValue("1200");
+    await chatOutputLimit.fill("1500");
+
+    const updateResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === "PUT" &&
+        response.url().endsWith("/admin/provider-operations/ai-configurations"),
     );
-    await expect(page.getByLabel("Giới hạn token đầu ra").first()).toHaveValue(
-      "4096",
-    );
+    await page.getByRole("button", { name: "Lưu thay đổi" }).click();
+    const updateRequest = (await updateResponse).request();
+    const updateBody = updateRequest.postDataJSON() as {
+      configurations: Array<{
+        feature: string;
+        purpose: string;
+        fallbackMaxInputTokens: number | null;
+        maxOutputTokens: number;
+      }>;
+      chatSettings: {
+        embeddingCatalogItemId: string;
+        maxImagesPerMessage: number;
+        maxImageBytes: number;
+        studentDailyMessageLimit: number;
+        studentDailyImageLimit: number;
+      };
+    };
+    expect(updateBody.configurations).toHaveLength(10);
+    expect(
+      updateBody.configurations.find(
+        (configuration) =>
+          configuration.feature === "CHAT" && configuration.purpose === "TEXT",
+      ),
+    ).toMatchObject({ maxOutputTokens: 1500 });
+    expect(
+      updateBody.configurations.find(
+        (configuration) =>
+          configuration.feature === "VIDEO_SUMMARY" &&
+          configuration.purpose === "TEXT",
+      ),
+    ).toMatchObject({ fallbackMaxInputTokens: 150000 });
+    expect(updateBody.chatSettings).toMatchObject({
+      embeddingCatalogItemId: "model-text-embedding-3-small",
+      maxImagesPerMessage: 5,
+      maxImageBytes: 10 * 1024 * 1024,
+      studentDailyMessageLimit: 20,
+      studentDailyImageLimit: 20,
+    });
 
     await page.getByRole("tab", { name: "Quản lý model" }).click();
     await expect(page.getByLabel("Giới hạn token đầu vào")).toHaveCount(0);
@@ -136,7 +234,7 @@ test.describe("Admin Cài đặt AI", () => {
   });
 
   for (const theme of ["light", "dark"] as const) {
-    test(`hiển thị cấu hình model, OCR, chi phí và bảng giá ở theme ${theme}`, async ({
+    test(`hiển thị cấu hình model, chi phí và quản lý model ở theme ${theme}`, async ({
       page,
     }) => {
       await page.addInitScript((initialTheme) => {
@@ -149,29 +247,23 @@ test.describe("Admin Cài đặt AI", () => {
       await expect(page.getByText("Chi phí tháng này")).toBeVisible();
       await expect(page.getByText("245.000 VNĐ")).toBeVisible();
       await expect(
+        page.getByRole("button", { name: "Sinh câu hỏi ôn tập" }),
+      ).toBeVisible();
+      await page.getByRole("button", { name: "Sinh câu hỏi ôn tập" }).click();
+      await expect(
         page.getByRole("heading", { name: "Sinh câu hỏi ôn tập" }),
       ).toBeVisible();
       await expect(page.getByRole("button", { name: "Lưu thay đổi" })).toBeEnabled();
       await expect(page.getByLabel("Giới hạn token đầu vào").first()).toHaveValue(
         "200000",
       );
-      await expect(page.getByLabel("Giới hạn token đầu ra").first()).toHaveValue(
-        "4096",
-      );
+      await expect(page.getByLabel("Giới hạn token đầu ra").first()).toHaveValue("4096");
       await page.getByRole("combobox", { name: "Mô hình chính" }).first().click();
       await expect(page.getByRole("option", { name: "GPT-5.6 Terra" })).toBeVisible();
       await expect(page.getByRole("option", { name: "Gemini 3.6 Flash" })).toBeVisible();
       await page.keyboard.press("Escape");
 
-      await page.getByRole("tab", { name: "Đọc tài liệu" }).click();
-      await expect(page.getByText("Dịch vụ đọc tài liệu")).toBeVisible();
-      await expect(page.getByText("Giá đọc tài liệu hiện tại")).toBeVisible();
-      const fxRateField = page.getByLabel("Tỷ giá VNĐ cho 1 USD");
-      await expect(fxRateField).toHaveValue("25.500");
-      await expect(fxRateField.locator("..").getByText("VNĐ")).toBeVisible();
-      await expect(page.getByRole("button", { name: "Lưu thiết lập" })).toBeEnabled();
-
-      await page.getByRole("tab", { name: "Chi phí" }).click();
+      await page.getByRole("tab", { name: "Chi phí sử dụng" }).click();
       await expect(
         page.getByRole("heading", { name: "Chi phí theo thời gian" }),
       ).toBeVisible();
@@ -201,7 +293,7 @@ test.describe("Admin Cài đặt AI", () => {
       await expect(page.getByText("Tạo hình minh họa · Thành công")).toBeVisible();
       await expect(page.getByText("Tổng 7 lượt: 8.614 VNĐ")).toBeVisible();
 
-      await page.getByRole("tab", { name: "Bảng giá" }).click();
+      await page.getByRole("tab", { name: "Quản lý model" }).click();
       await expect(
         page.getByRole("heading", { name: "OpenAI", exact: true }),
       ).toBeVisible();
@@ -210,11 +302,6 @@ test.describe("Admin Cài đặt AI", () => {
       ).toBeVisible();
       await expect(page.getByRole("heading", { name: "GPT-4.1 mini" })).toBeVisible();
       await expect(page.getByText("≈ 10.200 VNĐ").first()).toBeVisible();
-      await expect(page.getByText("Áp dụng từ 03-08-2026").first()).toBeVisible();
-      await expect(
-        page.getByRole("link", { name: "Nguồn giá chính thức" }).first(),
-      ).toHaveAttribute("href", "https://openai.com/api/pricing/");
-      await expect(page.getByRole("heading", { name: "Lịch sử thay đổi" })).toBeVisible();
 
       await page.getByRole("button", { name: "Cập nhật giá" }).first().click();
       const dialog = page.getByRole("dialog", {
@@ -222,13 +309,7 @@ test.describe("Admin Cài đặt AI", () => {
       });
       await expect(dialog).toBeVisible();
       await expectDialogFitsViewport(page, dialog);
-      await dialog.getByLabel("Đường dẫn nguồn giá").fill("");
-      await dialog.getByRole("button", { name: "Lưu bảng giá" }).click();
-      await expect(dialog.getByText("Nhập đường dẫn nguồn giá")).toBeVisible();
-      await expect(dialog).toBeVisible();
-      await dialog
-        .getByLabel("Đường dẫn nguồn giá")
-        .fill("https://openai.com/api/pricing/");
+      await dialog.getByLabel("Giá (USD)").first().fill("0.5");
       await dialog.getByRole("button", { name: "Lưu bảng giá" }).click();
       await expect(dialog).toBeHidden();
 
@@ -332,17 +413,71 @@ async function setupProviderOperationsMock(page: Page) {
     if (path.endsWith("/ai-configurations"))
       return fulfillJson(route, 200, {
         data: {
-          configurations: ["SUMMARY", "QUIZ", "FLASHCARD", "TEST"].map((feature) => ({
-            feature,
-            primaryCatalogItemId: model.id,
-            fallbackCatalogItemId: null,
-            temperature: 0.2,
-            maxInputTokens: 200_000,
-            maxOutputTokens: 4096,
-            version: 1,
-            updatedAt: now,
-          })),
+          configurations: [
+            ...["SUMMARY", "QUIZ", "FLASHCARD", "TEST"].flatMap((feature) =>
+              ["TEXT", "IMAGE"].map((purpose) => ({
+                feature,
+                purpose,
+                primaryCatalogItemId: model.id,
+                fallbackCatalogItemId: null,
+                temperature: 0.2,
+                reasoningEffort: null,
+                maxInputTokens: 200_000,
+                maxOutputTokens: 4096,
+                fallbackTemperature: null,
+                fallbackReasoningEffort: null,
+                fallbackMaxInputTokens: null,
+                fallbackMaxOutputTokens: null,
+                version: 1,
+                updatedAt: now,
+              })),
+            ),
+            {
+              feature: "VIDEO_SUMMARY",
+              purpose: "TEXT",
+              primaryCatalogItemId: model.id,
+              fallbackCatalogItemId: null,
+              temperature: 0.2,
+              reasoningEffort: null,
+              maxInputTokens: 200_000,
+              maxOutputTokens: 4096,
+              fallbackTemperature: null,
+              fallbackReasoningEffort: null,
+              fallbackMaxInputTokens: null,
+              fallbackMaxOutputTokens: null,
+              version: 1,
+              updatedAt: now,
+            },
+            {
+              feature: "CHAT",
+              purpose: "TEXT",
+              primaryCatalogItemId: model.id,
+              fallbackCatalogItemId: null,
+              temperature: 0.2,
+              reasoningEffort: null,
+              maxInputTokens: 20_000,
+              maxOutputTokens: 1_200,
+              fallbackTemperature: null,
+              fallbackReasoningEffort: null,
+              fallbackMaxInputTokens: null,
+              fallbackMaxOutputTokens: null,
+              version: 1,
+              updatedAt: now,
+            },
+          ],
           models,
+          chatSettings: {
+            embeddingCatalogItemId: "model-text-embedding-3-small",
+            embeddingProvider: "OPENAI",
+            embeddingModel: "text-embedding-3-small",
+            embeddingDimensions: 1536,
+            maxImagesPerMessage: 5,
+            maxImageBytes: 10 * 1024 * 1024,
+            allowedImageMimeTypes: ["image/jpeg", "image/png", "image/webp"],
+            studentDailyMessageLimit: 20,
+            studentDailyImageLimit: 20,
+            version: 1,
+          },
         },
       });
     if (path.endsWith("/ocr-settings"))

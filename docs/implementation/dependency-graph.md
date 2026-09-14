@@ -105,6 +105,10 @@ M14 testing/hardening/deploy
 - `M9.32` phụ thuộc provider usage `M9.9-M9.12` và inventory các call path
   `M9.2-M9.7`, `M9.21-M9.31`; các pipeline AI mới phải truyền target context vào
   gateway chung trước call. Task không phụ thuộc live provider smoke test.
+- `M9.33` phụ thuộc durable jobs/BullMQ `M4.3`, Admin panel `M9.8` và các
+  pipeline lesson generation/figure hiện có. Socket.IO/Redis Pub/Sub chỉ báo
+  invalidation; REST snapshot và fallback polling giữ tính hội tụ, không phụ
+  thuộc notification realtime `M10.3` và không cần migration/outbox ở v1.
 - `M9.21` phụ thuộc Quiz figure `M9.3`, panel/action frame `M9.8`, route ảnh
   `M9.20`, R2 và TeX renderer; thêm một paid multimodal call chỉ khi admin bấm
   `Tinh chỉnh`, giữ current revision cho tới khi candidate pass toàn bộ gate.
@@ -129,6 +133,10 @@ M14 testing/hardening/deploy
   kiểm thử được, không tách UI sang `M9.8` hoặc một task chưa xác định.
 - `M9.6` AI chat chỉ nên hoàn thiện sau `M4.4`, `M5.2`, `M5.3`, `M9.1` và đi
   sau `M9.5` để nhận context từ `Chat thêm với AI`.
+- `M9.34` đi sau shared Chat runtime `M9.6` và dùng lại provider operations
+  `M9.9-M9.12` cùng target context `M9.32`. Admin chỉ thêm auth/selected-scope
+  adapter, session configuration và turn inspector; prompt/retrieval/streaming/
+  safety/provider/accounting phải là cùng implementation với Student Chat.
 - `M13.5` admin dashboard có thể dùng placeholder cho metric chưa có API, nhưng phải ghi rõ.
 - `M3.6` cần enrollment thật từ `M8.3` và worker foundation `M4.3`; không được kích hoạt clone trước khi job hoàn tất.
 - `M3.7` cần `M3.6`; `M7.8` cần `M3.6`, `M7.1`, `M7.5`; `M11.5` cần `M7.8`, `M11.1`, `M11.2`.

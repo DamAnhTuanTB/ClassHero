@@ -7,10 +7,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { StudentDetailMobileBrandBar } from "@/components/student/layout/student-detail-mobile-brand-bar";
 import { StudentCoursesHeader } from "@/components/student/courses/student-courses-header";
 import { StudentDataErrorState } from "@/components/student/student-data-error-state";
+import type { AiChatEntryContext } from "@/features/student/ai-chat/utils/ai-chat-link";
 import { usePracticeTabTransition } from "@/features/student/lessons/hooks/use-practice-tab-transition";
 import { useVideoPlaybackProgress } from "@/features/student/lessons/hooks/use-video-playback-progress";
 import { LessonNavigationControl } from "@/features/student/lessons/screens/student-lesson-screen/components/lesson-navigation-control";
-import { LessonSummaryPanel } from "@/features/student/lessons/screens/student-lesson-screen/components/lesson-summary-panel";
+import {
+  LessonSummaryPanel,
+  type LessonSummarySubTab,
+} from "@/features/student/lessons/screens/student-lesson-screen/components/lesson-summary-panel";
 import { LessonVideoPanel } from "@/features/student/lessons/screens/student-lesson-screen/components/lesson-video-panel";
 import type { CustomYoutubePlayerHandle } from "@/components/shared/custom-youtube-player";
 import { QuizCurtainTransition } from "@/features/student/lessons/screens/student-lesson-screen/components/quiz-curtain-transition";
@@ -121,8 +125,15 @@ export function StudentLessonScreen({
 }) {
   const [activeTab, setActiveTab] = useState<StudentLessonTab>(initialTab);
   const [learningSurface, setLearningSurface] = useState(initialLearningSurface);
+  const [isTestFullscreenOpen, setIsTestFullscreenOpen] = useState(
+    initialLearningSurface?.kind === "test-runner" ||
+      initialLearningSurface?.kind === "test-result",
+  );
   const [pendingTab, setPendingTab] = useState<StudentLessonTab | null>(null);
   const [hasVideoPlaybackStarted, setHasVideoPlaybackStarted] = useState(false);
+  const [activeSummarySubTab, setActiveSummarySubTab] =
+    useState<LessonSummarySubTab>("video");
+  const [videoChatPlaybackSeconds, setVideoChatPlaybackSeconds] = useState(0);
   const [videoPlaybackStore] = useState(createVideoPlaybackSecondStore);
   const [videoPlaybackWindow, setVideoPlaybackWindow] =
     useState<VideoPlaybackWindow | null>(null);
@@ -250,6 +261,7 @@ export function StudentLessonScreen({
   const handleVideoPlaybackTimeChange = useCallback(
     (seconds: number) => {
       videoPlaybackStore.setPlaybackTime(seconds);
+      setVideoChatPlaybackSeconds(Math.floor(Math.max(0, seconds)));
     },
     [videoPlaybackStore],
   );
@@ -309,6 +321,19 @@ export function StudentLessonScreen({
     testHistoryMaxScore,
   );
   const hasPassedCurrentLessonTest = bestTestScore >= lesson.completionMinScore;
+  const aiChatContext =
+    lesson.access.mode === "ENROLLMENT"
+      ? ({
+          scopeType: "COURSE",
+          learningPathId: lesson.learningPath.id,
+          surfaceLessonId: lesson.id,
+          videoPlaybackSeconds:
+            activeTab === "lesson" && activeSummarySubTab === "video"
+              ? videoChatPlaybackSeconds
+              : undefined,
+        } satisfies AiChatEntryContext)
+      : undefined;
+  const pageAiChatContext = isTestFullscreenOpen ? undefined : aiChatContext;
 
   return (
     <main
@@ -318,10 +343,14 @@ export function StudentLessonScreen({
       style={{ background: "var(--student-screen-bg)" }}
     >
       <div className="hidden lg:block">
-        <StudentCoursesHeader title={lesson.title} initialThemeMode={initialThemeMode} />
+        <StudentCoursesHeader
+          title={lesson.title}
+          initialThemeMode={initialThemeMode}
+          aiChatContext={pageAiChatContext}
+        />
       </div>
       <div className="mx-auto max-w-4xl">
-        <StudentDetailMobileBrandBar />
+        <StudentDetailMobileBrandBar aiChatContext={pageAiChatContext} />
 
         <section className="mt-1 px-1 pb-2 pt-2 sm:mt-4 sm:px-2 sm:py-5">
           <nav
@@ -456,6 +485,7 @@ export function StudentLessonScreen({
             <LessonSummaryPanel
               hasVideoPlaybackStarted={hasVideoPlaybackStarted}
               lesson={lesson}
+              onActiveSubTabChange={setActiveSummarySubTab}
               playbackStore={videoPlaybackStore}
               onVideoSeek={handleVideoSeek}
               videoPlaybackEndTimeInSeconds={videoPlaybackWindow?.endTimeInSeconds}
@@ -484,6 +514,7 @@ export function StudentLessonScreen({
               )
             ) : (
               <TestLearningPanel
+                aiChatContext={aiChatContext}
                 hasFlashcardContent={
                   flashcardsQuery.data
                     ? flashcardsQuery.data.some((set) => set.flashcards.length > 0)
@@ -501,6 +532,7 @@ export function StudentLessonScreen({
                 token={token}
                 onStartPrerequisite={practiceTabTransition.openPracticeTab}
                 onProgressChanged={refreshLearningProgress}
+                onFullscreenStateChange={setIsTestFullscreenOpen}
               />
             )
           ) : isFlashcardsPending || shouldShowFlashcardsLoading ? (

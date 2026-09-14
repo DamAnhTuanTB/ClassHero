@@ -6,7 +6,8 @@ import type {
 export type { ProviderUsageOperation } from "@learning-path/shared";
 
 export type ProviderCategory = "AI_MODEL" | "OCR_SERVICE";
-export type AiFeature = "SUMMARY" | "VIDEO_SUMMARY" | "QUIZ" | "FLASHCARD" | "TEST";
+export type AiFeature =
+  "SUMMARY" | "VIDEO_SUMMARY" | "QUIZ" | "FLASHCARD" | "TEST" | "CHAT";
 export type AiModelPurpose = "TEXT" | "IMAGE";
 export type UsageGranularity = "DAY" | "WEEK" | "MONTH";
 
@@ -66,14 +67,29 @@ export type AiFeatureConfiguration = {
   maxOutputTokens: number | null;
   fallbackTemperature: number | null;
   fallbackReasoningEffort: string | null;
+  fallbackMaxInputTokens: number | null;
   fallbackMaxOutputTokens: number | null;
   version: number;
   updatedAt: string;
 };
 
+export type AiChatRuntimeSettings = {
+  embeddingCatalogItemId: string | null;
+  embeddingProvider: "OPENAI";
+  embeddingModel: string;
+  embeddingDimensions: number;
+  maxImagesPerMessage: number;
+  maxImageBytes: number;
+  allowedImageMimeTypes: Array<"image/jpeg" | "image/png" | "image/webp">;
+  studentDailyMessageLimit: number;
+  studentDailyImageLimit: number;
+  version: number;
+};
+
 export type AiConfigurationsResponse = {
   configurations: AiFeatureConfiguration[];
   models: AiModelOption[];
+  chatSettings: AiChatRuntimeSettings;
 };
 
 export type ProviderBudget = {

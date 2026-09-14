@@ -138,7 +138,7 @@ export class QuizSolutionRefinementService {
     if (requestHash !== dto.requestHash) {
       throw badRequestException(
         "AI_INPUT_SNAPSHOT_STALE",
-        "Dữ liệu câu Quiz hoặc cấu hình AI đã thay đổi. Hãy cập nhật dữ liệu gửi AI.",
+        "Dữ liệu câu hỏi hoặc cấu hình AI đã thay đổi. Hãy cập nhật dữ liệu gửi AI.",
       );
     }
     const active = await this.prisma.backgroundJob.findFirst({

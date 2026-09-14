@@ -1,12 +1,16 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   useQuery,
   useMutation,
   useQueryClient,
   keepPreviousData,
 } from "@tanstack/react-query";
+import {
+  backgroundJobStatusChangedEventSchema,
+  realtimeSocketEvents,
+} from "@learning-path/shared";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import {
@@ -22,6 +26,7 @@ import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 import { getQueryRenderState } from "@/lib/query-render-state";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
+import { useAuthenticatedRealtime } from "@/components/common/realtime/authenticated-realtime-provider";
 
 export const enrollmentListQueryKeys = {
   all: ["admin", "course-enrollments"] as const,
@@ -47,6 +52,7 @@ function generateIdempotencyKey(): string {
 export function useEnrollmentListPanel(learningPathId: string) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { socket: realtimeSocket, status: realtimeStatus } = useAuthenticatedRealtime();
   const session = useAuthSessionStore((state) => state.session);
   const isAuthHydrated = useAuthSessionStore((state) => state.isHydrated);
   const token = session?.accessToken ?? "";
@@ -74,9 +80,37 @@ export function useEnrollmentListPanel(learningPathId: string) {
     refetchInterval: (data) => {
       const items = data?.state?.data?.items ?? [];
       const hasCloning = items.some((item) => item.personalizationStatus === "CLONING");
-      return hasCloning ? 4000 : false;
+      return hasCloning ? (realtimeStatus === "connected" ? 60_000 : 4_000) : false;
     },
+    refetchIntervalInBackground: false,
   });
+
+  useEffect(() => {
+    if (!realtimeSocket || realtimeStatus !== "connected") return;
+
+    const handleCloneJobStatus = (rawEvent: unknown) => {
+      const parsed = backgroundJobStatusChangedEventSchema.safeParse(rawEvent);
+      if (
+        !parsed.success ||
+        parsed.data.queue !== "PERSONAL_LEARNING_PATH_CLONE"
+      ) {
+        return;
+      }
+
+      void queryClient.invalidateQueries({ queryKey: enrollmentListQueryKeys.all });
+    };
+
+    realtimeSocket.on(
+      realtimeSocketEvents.backgroundJobStatusChanged,
+      handleCloneJobStatus,
+    );
+    return () => {
+      realtimeSocket.off(
+        realtimeSocketEvents.backgroundJobStatusChanged,
+        handleCloneJobStatus,
+      );
+    };
+  }, [queryClient, realtimeSocket, realtimeStatus]);
 
   const createCloneMutation = useMutation({
     mutationFn: ({

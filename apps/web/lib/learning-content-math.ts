@@ -3,6 +3,7 @@ import {
   normalizeLatexEnvironmentPairs,
   normalizeMathTextLatexSegments,
   normalizeMissingInlineMathClosers,
+  normalizeRepeatedLatexCommandBackslashes,
 } from "@learning-path/shared";
 
 export const LEARNING_CONTENT_KATEX_MACROS = {
@@ -41,9 +42,6 @@ const MISALIGNED_LEADING_INFERENCE_PATTERN =
   /(^|\\\\)\s*&\s*(\\(?:Longleftrightarrow|Longrightarrow|Longleftarrow|Leftrightarrow|Rightarrow|Leftarrow|impliedby|implies|iff))/gmu;
 const LOGICAL_ALIGNMENT_ENVIRONMENT_PATTERN =
   /\\begin\{(aligned|alignedat|split)\}([\s\S]*?)\\end\{\1\}/gu;
-const REPEATED_LATEX_COMMAND_BACKSLASH_PATTERN =
-  /\\{2,}(?=(?:angle|triangle|frac|dfrac|tfrac|sqrt|overline|underline|widehat|widetilde|hat|tilde|bar|vec|dot|ddot|overrightarrow|overleftarrow|cdot|times|left|right|mathrm|mathbf|mathit|mathsf|mathtt|mathbb|mathcal|operatorname|text|ce|pu|circ|widehat|perp|parallel|cong|neq|ne|le|leq|ge|geq|approx|equiv|infty|sum|prod|int|lim|sin|cos|tan|cot|log|ln)\b)/gu;
-
 /**
  * Keep fraction numerators and denominators readable at the shared learning-content
  * font size. Display-style fractions preserve the outer font-size while avoiding
@@ -76,9 +74,7 @@ function normalizeDecodedLearningContentLatex(value: string) {
  * backslash and only that extra slash is removed.
  */
 export function normalizeLearningContentLatexCommandEscapes(value: string) {
-  return value.replace(REPEATED_LATEX_COMMAND_BACKSLASH_PATTERN, (backslashes) =>
-    backslashes.length % 2 === 0 ? backslashes.slice(1) : backslashes,
-  );
+  return normalizeRepeatedLatexCommandBackslashes(value);
 }
 
 /**
@@ -87,18 +83,135 @@ export function normalizeLearningContentLatexCommandEscapes(value: string) {
  * Summary and every other surface rendered through MathpixMarkdownRenderer.
  */
 export function normalizeMathpixMarkdown(value: string) {
-  const repairedDisplayMathClosers = normalizeMissingInlineMathClosers(value).replace(
-    MISPLACED_DISPLAY_MATH_CLOSER_PATTERN,
-    "",
+  const repairedDisplayMathClosers = normalizeStandaloneDisplayMathBlocks(
+    normalizeMissingInlineMathClosers(value).replace(
+      MISPLACED_DISPLAY_MATH_CLOSER_PATTERN,
+      "",
+    ),
   );
 
-  return normalizeMathTextLatexSegments(repairedDisplayMathClosers, (latex) =>
-    normalizeLearningContentMathMarkdown(
-      normalizeLearningContentLatex(
-        trimMathDelimiterPadding(normalizeDecodedLearningContentLatex(latex)),
+  return normalizeMathpixLatexLists(
+    normalizeMathTextLatexSegments(repairedDisplayMathClosers, (latex) =>
+      normalizeLearningContentMathMarkdown(
+        normalizeLearningContentLatex(
+          trimMathDelimiterPadding(normalizeDecodedLearningContentLatex(latex)),
+        ),
       ),
     ),
   );
+}
+
+/**
+ * Mathpix Markdown treats a line containing only `=` as a Setext heading even
+ * when it appears between standalone `$$` delimiter lines. Provider responses
+ * commonly split long equations at that relation sign. Collapse only complete
+ * display-math blocks outside fenced code so Markdown cannot consume their
+ * inner lines before the math parser sees them.
+ */
+function normalizeStandaloneDisplayMathBlocks(value: string) {
+  const lines = value.split("\n");
+  const normalizedLines: string[] = [];
+  let codeFence: { marker: "`" | "~"; length: number } | null = null;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]!;
+    const fence = line.match(/^\s*(`{3,}|~{3,})/u)?.[1];
+    if (fence) {
+      const marker = fence[0] as "`" | "~";
+      if (!codeFence) {
+        codeFence = { marker, length: fence.length };
+      } else if (codeFence.marker === marker && fence.length >= codeFence.length) {
+        codeFence = null;
+      }
+      normalizedLines.push(line);
+      continue;
+    }
+    if (codeFence || !/^\s*\$\$\s*$/u.test(line)) {
+      normalizedLines.push(line);
+      continue;
+    }
+
+    let closingIndex = index + 1;
+    while (closingIndex < lines.length && !/^\s*\$\$\s*$/u.test(lines[closingIndex]!)) {
+      closingIndex += 1;
+    }
+    if (closingIndex >= lines.length) {
+      normalizedLines.push(line);
+      continue;
+    }
+
+    const body = lines
+      .slice(index + 1, closingIndex)
+      .map((bodyLine) => bodyLine.trim())
+      .filter(Boolean)
+      .join(" ");
+    if (!body) {
+      normalizedLines.push(line, lines[closingIndex]!);
+      index = closingIndex;
+      continue;
+    }
+    normalizedLines.push(`$$${body}$$`);
+    index = closingIndex;
+  }
+
+  return normalizedLines.join("\n");
+}
+
+/**
+ * Mathpix uses LaTeX list environments in MMD, while mathpix-markdown-it leaves
+ * those commands visible as plain text. Convert only line-level list commands
+ * outside fenced code to Markdown and keep item content, including math, intact.
+ */
+function normalizeMathpixLatexLists(value: string) {
+  const listStack: Array<"enumerate" | "itemize"> = [];
+  let codeFence: { marker: "`" | "~"; length: number } | null = null;
+
+  const normalizedLines = value.split("\n").map((line) => {
+    const fence = line.match(/^\s*(`{3,}|~{3,})/u)?.[1];
+    if (fence) {
+      const marker = fence[0] as "`" | "~";
+      if (!codeFence) {
+        codeFence = { marker, length: fence.length };
+      } else if (codeFence.marker === marker && fence.length >= codeFence.length) {
+        codeFence = null;
+      }
+      return line;
+    }
+    if (codeFence) return line;
+
+    const boundary = line.match(/^\s*\\(begin|end)\{(itemize|enumerate)\}\s*$/u);
+    if (boundary) {
+      const action = boundary[1];
+      const environment = boundary[2] as "enumerate" | "itemize";
+      if (action === "begin") {
+        listStack.push(environment);
+      } else if (listStack.at(-1) === environment) {
+        listStack.pop();
+      } else {
+        return line;
+      }
+      return "";
+    }
+
+    const item = line.match(/^\s*\\item(?:\[([^\]]*)\])?\s*(.*)$/u);
+    if (item && listStack.length > 0) {
+      const label = item[1]?.trim() ?? "";
+      const content = item[2] ?? "";
+      const indentation = "  ".repeat(Math.max(0, listStack.length - 1));
+      const marker = listStack.at(-1) === "enumerate" ? "1." : "-";
+      const visibleLabel = label && label !== "*" && label !== "-";
+      return `${indentation}${marker} ${
+        visibleLabel ? `**${label}** ` : ""
+      }${content}`.trimEnd();
+    }
+
+    if (listStack.length > 0 && line.trim()) {
+      return `${"  ".repeat(listStack.length)}${line.trimStart()}`;
+    }
+    return line;
+  });
+
+  return listStack.length === 0 ? normalizedLines.join("\n") : value;
 }
 
 function trimMathDelimiterPadding(value: string) {

@@ -156,6 +156,8 @@ Khi xong milestone này:
 - Admin dùng AI tạo quiz/flashcard/test.
 - Student bấm “Giải thích cho tôi” và nhận lời giải theo item.
 - Student chat với AI trong phạm vi buổi học hiện tại.
+- Admin mô phỏng đúng shared Student Chat runtime theo buổi học/một khóa/nhiều
+  khóa, cấu hình theo phiên và inspect input/usage/cost/latency từng lượt.
 - AI có cache/log/schema validation để kiểm soát chất lượng và chi phí.
 
 Milestone này phụ thuộc nhiều vào M4/M5 vì AI cần tài liệu đã xử lý và retrieval đúng lesson.

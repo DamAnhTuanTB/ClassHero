@@ -203,32 +203,94 @@ category/code, validator issues, duration và timestamps. Unique
 ```txt
 id uuid pk
 student_user_id uuid fk users.id
-lesson_id uuid fk lessons.id
+admin_user_id uuid? fk users.id
+mode AiChatSessionMode default STUDENT
+scope_type AiChatScopeType
+learning_path_id uuid? fk learning_paths.id
 title string?
 summary_text text?
+configuration_override_json jsonb?
+configuration_version int default 1
+last_message_at timestamp?
+deleted_at timestamp?
 created_at timestamp
 updated_at timestamp
 ```
 
 Constraint:
 
-- unique `(student_user_id, lesson_id)` cho MVP.
-
-ASSUMPTION: MVP dùng một chat session cho mỗi student + lesson để đơn giản.
+- `LIBRARY` bắt buộc `learning_path_id is null`.
+- `COURSE` bắt buộc `learning_path_id is not null`.
+- Không unique theo scope: một học sinh có thể tạo nhiều thread.
+- Index history theo `(student_user_id, deleted_at, last_message_at desc, id desc)`.
+- Từ `M9.34`, `mode=STUDENT` bắt buộc `student_user_id` có giá trị và
+  `admin_user_id is null`; `mode=ADMIN_SIMULATION` áp dụng XOR ngược lại. Admin
+  simulation dùng scope `LESSON | COURSE | COURSE_SET`, còn Student tiếp tục chỉ
+  dùng `LIBRARY | COURSE`.
+- `configuration_override_json` chỉ hợp lệ cho `ADMIN_SIMULATION`, validate bằng
+  schema versioned và không chứa API key/raw provider JSON. `configuration_version`
+  dùng optimistic update; thay đổi không rewrite turn trace cũ.
+- Index history Admin theo
+  `(admin_user_id, mode, deleted_at, last_message_at desc, id desc)`.
+- Lượt đầu lưu title mặc định từ câu hỏi trước khi stream. Call
+  `CHAT_TITLE_GENERATION` chỉ cập nhật row khi title vẫn bằng giá trị mặc định,
+  tránh ghi đè rename đồng thời; lỗi title không rollback session/message.
 
 ### 11.8. `ai_chat_messages`
+
+Ngoài role/content và generation link, message lưu `status`, `response_policy`,
+optional `surface_lesson_id`/target, server-resolved `context_json`, source path /
+lesson / chunk IDs và `error_code`. Policy là snapshot để audit rule hint-only,
+không phải content gate. Lời từ chối do AI sinh được lưu `COMPLETED` như mọi câu
+trả lời; `REFUSED` chỉ còn tương thích dữ liệu legacy.
 
 ```txt
 id uuid pk
 session_id uuid fk ai_chat_sessions.id
 role AiChatMessageRole
+status AiChatMessageStatus
+response_policy AiChatResponsePolicy
 content_json jsonb
-retrieved_chunk_ids uuid[]?
+surface_lesson_id uuid? fk lessons.id
+target_type string?
+target_id uuid?
+context_json jsonb?
+source_learning_path_ids uuid[]
+source_lesson_ids uuid[]
+retrieved_chunk_ids uuid[]
+error_code string?
 ai_generation_id uuid? fk ai_generations.id
+daily_quota_counted_at timestamp?
+created_at timestamp
+updated_at timestamp
+```
+
+### 11.9. `ai_chat_message_attachments`
+
+Liên kết một `FilePurpose.CHAT_IMAGE` private với đúng một message, có `sort_order`
+và unique `file_id`. Attachment không phải source document và không được nhập vào
+OCR artifact/document chunks.
+
+Upload chưa có attachment là staging file. Worker dọn file `CHAT_IMAGE` chưa
+gắn sau 24 giờ, dùng tombstone `FileStatus.DELETED` trước khi xóa object và
+retry tombstone nếu storage tạm lỗi. Ảnh chat không lưu OCR/visual hint và không
+trở thành course content; legacy metadata từ bản thử nghiệm cũ không còn consumer.
+
+```txt
+id uuid pk
+message_id uuid fk ai_chat_messages.id
+file_id uuid unique fk files.id
+sort_order int
+daily_quota_counted_at timestamp?
 created_at timestamp
 ```
 
-### 11.8. `conversation_summaries`
+Hai timestamp quota chỉ được ghi trong cùng transaction chuyển assistant
+Student sang `COMPLETED`: assistant ghi một lượt câu hỏi và tất cả attachment
+của user message tương ứng ghi số ảnh. Lượt Admin simulation, refusal, failure
+hoặc interruption đều để null.
+
+### 11.10. `conversation_summaries`
 
 ```txt
 id uuid pk
@@ -239,5 +301,121 @@ ai_generation_id uuid? fk ai_generations.id
 created_at timestamp
 updated_at timestamp
 ```
+
+### 11.11. `ai_chat_session_scope_items` (`M9.34`, Done 2026-09-13)
+
+Chỉ dùng cho session `ADMIN_SIMULATION` để biểu diễn scope chọn thủ công mà vẫn
+giữ foreign key; Student scope tiếp tục resolve theo enrollment hiện hành.
+
+```txt
+id uuid pk
+session_id uuid fk ai_chat_sessions.id
+learning_path_id uuid fk learning_paths.id
+lesson_id uuid? fk lessons.id
+sort_order int
+created_at timestamp
+```
+
+- Scope `LESSON` có đúng một row và `lesson_id` phải thuộc `learning_path_id` của
+  row đó; `COURSE` có đúng một row với `lesson_id is null`; `COURSE_SET` có ít
+  nhất hai learning path distinct và mọi `lesson_id is null`.
+- Unique `(session_id, learning_path_id, lesson_id)` và `(session_id, sort_order)`;
+  service transaction kiểm cardinality/cross-row rule trước khi tạo phiên.
+- Scope trở thành immutable ngay khi session có message đầu tiên. Xóa/ẩn resource
+  về sau không làm trace cũ đổi, nhưng lượt gửi mới phải fail thân thiện nếu scope
+  không còn khả dụng.
+
+### 11.12. `ai_chat_turn_traces` (`M9.34`, Done 2026-09-13)
+
+Trace bất biến của đúng một assistant turn trong phiên Admin simulation.
+
+```txt
+id uuid pk
+session_id uuid fk ai_chat_sessions.id
+user_message_id uuid unique fk ai_chat_messages.id
+assistant_message_id uuid unique fk ai_chat_messages.id
+ai_generation_id uuid unique fk ai_generations.id
+scope_snapshot_json jsonb
+default_configuration_version int
+session_configuration_version int
+configuration_override_snapshot_json jsonb?
+effective_configuration_json jsonb
+provider_request_snapshot_json jsonb
+created_at timestamp
+```
+
+- Shared Chat runtime tạo `ai_generation_id`/turn correlation trước mọi paid
+  call. Retrieval embedding và main response của turn đều truyền cùng generation
+  ID vào provider gateway để chi phí được aggregate chính xác từ
+  `provider_usage_events`.
+- Request snapshot giữ đúng thứ tự system/user/history/context đã gửi. Ảnh chỉ lưu
+  file ID/hash/detail và metadata cần audit, không lưu base64, signed URL, provider
+  file ID hoặc object key. Snapshot không chứa credential/header/secret.
+- Chỉ tạo full trace cho `ADMIN_SIMULATION`; Student dùng cùng runtime/correlation
+  nhưng không nhân bản raw prompt chỉ để phục vụ màn quản trị này.
+- Query inspector load trace theo `assistant_message_id`, kiểm session mode + admin
+  ownership và aggregate usage theo `ai_generation_id`; không scan toàn lịch sử.
+
+### 11.13. `ai_chat_runtime_settings`
+
+Singleton `singleton_key=default` giữ phần cấu hình Chat không thuộc route
+tạo text, tách hẳn khỏi `ai_feature_model_configs`.
+
+```txt
+id uuid pk
+singleton_key string unique
+embedding_catalog_item_id uuid? fk provider_catalog_items.id
+max_images_per_message int
+max_image_bytes bigint
+allowed_image_mime_types text[]
+student_daily_message_limit int
+student_daily_image_limit int
+version int
+updated_by_user_id uuid? fk users.id
+created_at timestamp
+updated_at timestamp
+```
+
+- Embedding catalog item phải là OpenAI `ACTIVE`, có capability `EMBEDDING`
+  và dimensions khớp vector space đã index; không được dùng là model
+  tạo câu trả lời.
+- MIME chỉ nhận tập con không rỗng của JPEG/PNG/WebP. Per-message image
+  limit `1..10`, dung lượng `64 KiB..20 MiB`, quota câu hỏi `1..1000`
+  và quota ảnh `0..1000`.
+- Update dùng optimistic `version` và ghi audit log riêng; Student/Admin cùng
+  resolve singleton này cho một turn snapshot.
+
+### 11.14. `video_summary_chunks`
+
+Lưu corpus Chat/RAG được tạo từ bản Video Summary persisted; không lưu hoặc chunk
+raw transcript.
+
+```txt
+id uuid pk
+video_summary_id uuid fk lesson_video_summaries.id on delete cascade
+lesson_id uuid fk lessons.id on delete cascade
+chunk_index int
+content text
+content_hash string
+summary_hash string
+token_count int
+start_seconds float?
+end_seconds float?
+embedding vector(1536)?
+embedding_provider AiProviderName?
+embedding_model string?
+embedding_dimensions int?
+metadata_json jsonb?
+created_at timestamp
+updated_at timestamp
+```
+
+- Unique `(video_summary_id, chunk_index)`; index theo summary, lesson/hash và
+  vector space; HNSW cosine chỉ áp dụng row có embedding.
+- Mỗi row chỉ biểu diễn một khối `knowledge` hoặc `example`, giữ timestamp video
+  nguồn. `end_seconds` là mốc bắt đầu lớn hơn kế tiếp để tìm khối bao phủ playback.
+- Khi nội dung summary đổi, service thay toàn bộ chunk trong cùng transaction và
+  enqueue embedding theo `summary_hash`. Retrieval Student chỉ nhận summary
+  `APPROVED`, không stale và chưa xóa.
 
 ---

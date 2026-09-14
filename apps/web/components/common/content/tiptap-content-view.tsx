@@ -34,11 +34,13 @@ export function TiptapContentView({
   className,
   content,
   contentAlignment = "authored",
+  contentMode = "full",
 }: {
   ariaLabel?: string;
   className?: string;
   content: TiptapTextDocument | null | undefined;
   contentAlignment?: "authored" | "left";
+  contentMode?: "full" | "text-preview";
 }) {
   if (!content?.content?.length) {
     return null;
@@ -50,6 +52,7 @@ export function TiptapContentView({
       className={cn(
         "tiptap-content-view min-w-0 leading-relaxed text-slate-700 dark:text-[var(--theme-text)]",
         contentAlignment === "left" && "tiptap-content-view--left-aligned text-left",
+        contentMode === "text-preview" && "tiptap-content-view--text-preview",
         className,
       )}
     >
@@ -57,6 +60,7 @@ export function TiptapContentView({
         <ContentNode
           key={`${node.type}-${index}`}
           contentAlignment={contentAlignment}
+          contentMode={contentMode}
           node={node}
         />
       ))}
@@ -66,18 +70,33 @@ export function TiptapContentView({
 
 function ContentNode({
   contentAlignment,
+  contentMode,
   node,
 }: {
   contentAlignment: "authored" | "left";
+  contentMode: "full" | "text-preview";
   node: TiptapJsonNode;
 }): ReactNode {
   const children = node.content?.map((child, index) => (
     <ContentNode
       key={`${child.type}-${index}`}
       contentAlignment={contentAlignment}
+      contentMode={contentMode}
       node={child}
     />
   ));
+
+  if (contentMode === "text-preview") {
+    if (node.type === "image" || node.type === "horizontalRule") return null;
+    if (
+      node.type === "table" ||
+      node.type === "tableRow" ||
+      node.type === "tableHeader" ||
+      node.type === "tableCell"
+    ) {
+      return <>{children}</>;
+    }
+  }
 
   if (node.type === "text") {
     return renderTextWithFallbackMath(node.text ?? "", node.marks);
@@ -135,7 +154,12 @@ function ContentNode({
       typeof node.attrs?.latex === "string"
         ? normalizeLatexCommandBackslashes(node.attrs.latex)
         : "";
-    return node.type === "blockMath" ? (
+    return node.type === "blockMath" && contentMode === "text-preview" ? (
+      <span
+        className="tiptap-content-preview-block-math"
+        dangerouslySetInnerHTML={{ __html: renderMath(latex, true) }}
+      />
+    ) : node.type === "blockMath" ? (
       <TiptapBlockMath latex={latex} />
     ) : (
       <span dangerouslySetInnerHTML={{ __html: renderMath(latex, false) }} />
@@ -335,7 +359,11 @@ function TiptapContentTable({
         <tbody>
           {node.content?.map((row, index) => (
             <Fragment key={`${row.type}-${index}`}>
-              <ContentNode contentAlignment={contentAlignment} node={row} />
+              <ContentNode
+                contentAlignment={contentAlignment}
+                contentMode="full"
+                node={row}
+              />
             </Fragment>
           ))}
         </tbody>
@@ -361,7 +389,11 @@ function TiptapContentTableCell({
   };
   const children = node.content?.map((child, index) => (
     <Fragment key={`${child.type}-${index}`}>
-      <ContentNode contentAlignment={contentAlignment} node={child} />
+      <ContentNode
+        contentAlignment={contentAlignment}
+        contentMode="full"
+        node={child}
+      />
     </Fragment>
   ));
   return tag === "th" ? <th {...cellProps}>{children}</th> : <td {...cellProps}>{children}</td>;

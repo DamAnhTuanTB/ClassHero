@@ -76,6 +76,11 @@ Nếu chỉ làm `/task-ui` mock data, dùng API docs để hiểu data shape, k
 | `M14.x`   | File API liên quan đến flow được test/harden/deploy                                                                                  |
 | `M15.x`   | `student-learning`, `ai-chat`, `learning-paths-lessons`, `jobs`, `provider-operations`, `quiz-flashcard-tests`, `conventions-errors-security`; admin analytics có thể tách file khi implement |
 
+`M9.34` thêm adapter ADMIN dưới `docs/api/ai-chat.md` cho session mô phỏng,
+configuration và per-turn trace. Adapter phải gọi cùng Chat runtime/SSE contract
+`M9.6`; default `CHAT/TEXT` tiếp tục dùng endpoint trong
+`docs/api/provider-operations.md`, không tạo API cấu hình mặc định thứ hai.
+
 ---
 
 ## 5. Khi sửa docs API

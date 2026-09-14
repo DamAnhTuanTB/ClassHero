@@ -7,11 +7,13 @@ Domain này phục vụ màn `/admin/ai-settings` và không lưu secret provide
 - `provider_catalog_items`: catalog model AI/dịch vụ OCR, capability, trạng thái và tên env credential để kiểm tra readiness.
 - `provider_price_versions` + `provider_price_rates`: bảng giá USD có thời điểm hiệu lực. Giá cũ không bị sửa để usage lịch sử giữ nguyên snapshot.
 - `ai_feature_model_configs`: model chính/dự phòng, temperature, max input token
-  và max output token cho từng cặp `(feature, purpose)`, trong đó `feature` là
-  `SUMMARY | QUIZ | FLASHCARD | TEST | VIDEO_SUMMARY`; bốn feature cũ có
-  `purpose = TEXT | IMAGE`, còn `VIDEO_SUMMARY` chỉ có `TEXT`; `version`
+  và max output token riêng cho cả route chính lẫn route dự phòng của từng cặp
+  `(feature, purpose)`, trong đó `feature` là
+  `SUMMARY | QUIZ | FLASHCARD | TEST | VIDEO_SUMMARY | CHAT`; bốn feature cũ có
+  `purpose = TEXT | IMAGE`, còn `VIDEO_SUMMARY` và `CHAT` chỉ có `TEXT`; `version`
   dùng optimistic concurrency độc lập cho từng cặp. Unique key là
-  `(feature, purpose)`, không còn unique riêng `feature`.
+  `(feature, purpose)`, không còn unique riêng `feature`. Màn `/admin/ai-chat`
+  và `/admin/ai-settings` cùng đọc/ghi một record `CHAT/TEXT`.
 - `provider_usage_events`: một record bất biến cho mỗi provider attempt hoặc OCR cache hit; liên kết được với `ai_generations`, `background_jobs`, `source_documents`; AI event mới lưu thêm `purpose=TEXT|IMAGE` để audit chi phí theo phase.
 - `provider_budget_policies`: ngân sách tháng `ALL`, `AI`, `OCR`; mặc định cảnh báo mềm, `hard_stop=false`.
 - `provider_budget_reservations` (`M9.12`): giữ chỗ chi phí trước paid call, có `idempotency_key` unique, period theo múi giờ kế toán, category, số tiền giữ/quyết toán, trạng thái `RESERVED/SETTLED/RELEASED/UNCERTAIN`, expiry/heartbeat và liên kết usage/job/generation/document.
@@ -55,8 +57,10 @@ Domain này phục vụ màn `/admin/ai-settings` và không lưu secret provide
   của provider; các cột token chuẩn hóa mới là nguồn tính phí và aggregate.
 - Index chính theo `created_at`, category/provider/model/feature/status để phục vụ dashboard.
 - Cấu hình và giá thay đổi phải ghi `audit_logs`; API không trả API key.
-- `ai_feature_model_configs.max_input_tokens` là nguồn chuẩn cho reservation AI;
-  admin quản lý cùng `max_output_tokens` theo từng feature + purpose. Catalog model và
+- `ai_feature_model_configs.max_input_tokens` và `fallback_max_input_tokens` là
+  nguồn chuẩn cho reservation AI của từng candidate; admin quản lý cùng giới hạn
+  output tương ứng theo từng feature + purpose. Cấu hình cũ chưa có giới hạn input
+  dự phòng kế thừa giới hạn input chính. Catalog model và
   price version không sở hữu cấu hình này; metadata
   `provider_price_rates.conditions_json.maxInputTokens` chỉ còn để đọc route
   snapshot/job cũ trong giai đoạn tương thích.
@@ -71,6 +75,11 @@ Domain này phục vụ màn `/admin/ai-settings` và không lưu secret provide
 - Migration `M9.7` seed `VIDEO_SUMMARY/TEXT` bằng bản sao cấu hình
   `SUMMARY/TEXT` hiện hành để flow có default an toàn ngay sau deploy. Sau đó hai
   route có version/cấu hình độc lập; không tạo `VIDEO_SUMMARY/IMAGE`.
+- `M9.6` seed `CHAT/TEXT` theo route text an toàn hiện hành. `M9.34` thêm
+  override theo phiên mô phỏng; override không tạo row global mới và không thay
+  default nếu admin chưa lưu qua endpoint provider operations. Cấu hình
+  embedding/image/quota của Chat nằm trong singleton
+  `ai_chat_runtime_settings`, không trộn vào row `CHAT/TEXT`.
 
 ### Reservation và tính nhất quán ngân sách (`M9.12`)
 

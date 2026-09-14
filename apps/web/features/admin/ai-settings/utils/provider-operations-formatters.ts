@@ -12,6 +12,7 @@ export const aiFeatureLabels: Record<AiFeature, string> = {
   QUIZ: "Sinh câu hỏi ôn tập",
   FLASHCARD: "Sinh thẻ ghi nhớ",
   TEST: "Sinh bài kiểm tra",
+  CHAT: "Chat với AI",
 };
 
 export const priceMetricLabels: Record<PriceRate["metric"], string> = {
@@ -48,6 +49,7 @@ const usageOperationLabels: Record<ProviderUsageOperation, string> = {
   TEST_GENERATION: "Tạo bài kiểm tra",
   EXPLANATION_GENERATION: "Tạo lời giải AI",
   CHAT_RESPONSE_GENERATION: "Trả lời chat AI",
+  CHAT_TITLE_GENERATION: "Đặt tên cuộc trò chuyện",
   EMBEDDING_GENERATION: "Tạo embedding",
   DOCUMENT_EXTRACTION: "Trích xuất tài liệu",
   DIAGRAM_GENERATION: "Tạo ảnh mới",

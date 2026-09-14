@@ -2261,6 +2261,7 @@ function ExerciseBlock({
       block={block}
       displayNumber={block.displayNumber}
       renderFigure={renderStemFigure}
+      showAiAuthoredBadge={showEditorialMetadata}
       showEditorialWarning={showEditorialMetadata}
       onVideoSeek={onVideoSeek}
       videoEndTimeSeconds={

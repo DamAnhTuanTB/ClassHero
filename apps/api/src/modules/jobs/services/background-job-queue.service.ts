@@ -1,4 +1,10 @@
-import { Inject, Injectable, Logger, OnModuleDestroy } from "@nestjs/common";
+import {
+  Inject,
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  Optional,
+} from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { BackgroundJobQueue, BackgroundJobStatus } from "@prisma/client";
 import { Queue, type JobsOptions } from "bullmq";
@@ -13,6 +19,7 @@ import {
 } from "#api/jobs/background-job-queues";
 import { getJobErrorMessage } from "#api/jobs/job-error";
 import { parseRedisConnection } from "#api/jobs/redis-connection";
+import { RealtimeEventPublisherService } from "#api/modules/realtime/services/realtime-event-publisher.service";
 
 type BullmqQueueClient = {
   add(
@@ -37,6 +44,9 @@ export class BackgroundJobQueueService implements OnModuleDestroy {
     configService: ConfigService<EnvConfig, true>,
     @Inject(PrismaService)
     private readonly prisma: PrismaService,
+    @Optional()
+    @Inject(RealtimeEventPublisherService)
+    private readonly realtimePublisher?: RealtimeEventPublisherService,
   ) {
     this.redisConnection = parseRedisConnection(
       configService.get("REDIS_URL", { infer: true }),
@@ -95,7 +105,7 @@ export class BackgroundJobQueueService implements OnModuleDestroy {
       );
       const bullmqJobId = String(bullmqJob.id ?? job.id);
 
-      await this.prisma.backgroundJob.update({
+      const updatedJob = await this.prisma.backgroundJob.update({
         where: {
           id: job.id,
         },
@@ -105,7 +115,9 @@ export class BackgroundJobQueueService implements OnModuleDestroy {
           errorMessage: null,
           maxAttempts: attempts,
         },
+        select: realtimeJobSelect,
       });
+      await this.realtimePublisher?.publishBackgroundJobStatus(updatedJob);
 
       return {
         jobId: job.id,
@@ -115,7 +127,7 @@ export class BackgroundJobQueueService implements OnModuleDestroy {
     } catch (error) {
       const message = getJobErrorMessage(error);
 
-      await this.prisma.backgroundJob.update({
+      const updatedJob = await this.prisma.backgroundJob.update({
         where: {
           id: job.id,
         },
@@ -124,7 +136,9 @@ export class BackgroundJobQueueService implements OnModuleDestroy {
           errorMessage: `Không enqueue được BullMQ job: ${message}`,
           finishedAt: new Date(),
         },
+        select: realtimeJobSelect,
       });
+      await this.realtimePublisher?.publishBackgroundJobStatus(updatedJob);
 
       this.logger.error(
         `Failed to enqueue background job ${job.id} on ${job.queue}: ${message}`,
@@ -184,3 +198,15 @@ export class BackgroundJobQueueService implements OnModuleDestroy {
     return Math.max(availableAt.getTime() - Date.now(), 0);
   }
 }
+
+const realtimeJobSelect = {
+  id: true,
+  lessonId: true,
+  ownerUserId: true,
+  queue: true,
+  status: true,
+  attempts: true,
+  resourceType: true,
+  resourceId: true,
+  updatedAt: true,
+} as const;

@@ -24,6 +24,7 @@ import { QuizAttemptScopeDto } from "#api/modules/quiz/dto/student-quiz-attempt.
 import { StudentLearningPrerequisitesService } from "#api/modules/student-learning/services/student-learning-prerequisites.service";
 import type { StudentTestAnswerDto } from "#api/modules/tests/dto/student-test-attempt.dto";
 import { calculateEffectivePoints } from "#api/modules/tests/utils/test-question-content";
+import { hasActiveStudentTestAttempt } from "#api/modules/tests/utils/test-attempt-activity";
 
 const studentTestQuestionSelect = {
   id: true,
@@ -95,6 +96,12 @@ export class StudentTestAttemptsService {
     @Inject(StudentLearningPrerequisitesService)
     private readonly prerequisitesService: StudentLearningPrerequisitesService,
   ) {}
+
+  async getActiveAttemptStatus(studentUserId: string) {
+    return {
+      isActive: await hasActiveStudentTestAttempt(this.prisma, studentUserId),
+    };
+  }
 
   async getLessonHistory(lessonId: string, studentUserId: string) {
     await this.studentLessonAccessService.assertCanRead(lessonId, studentUserId);
@@ -290,26 +297,36 @@ export class StudentTestAttemptsService {
       throw notFoundException("TEST_SET_NOT_FOUND", "Buổi học chưa có bộ đề được duyệt");
     }
 
-    const attempt = await this.prisma.testAttempt.create({
-      data: {
-        studentUserId,
-        lessonId,
-        testSetId: set.id,
-        totalCount: set.questions.length,
-        answers: {
-          create: set.questions.map((question) => ({
-            questionId: question.id,
-            answerJson: createPendingAnswerJson(),
-            isCorrect: false,
-          })),
+    const attempt = await this.prisma.$transaction(async (transaction) => {
+      await transaction.testAttempt.updateMany({
+        where: {
+          studentUserId,
+          status: AttemptStatus.IN_PROGRESS,
         },
-      },
-      select: {
-        id: true,
-        status: true,
-        startedAt: true,
-        totalCount: true,
-      },
+        data: { status: AttemptStatus.CANCELLED },
+      });
+
+      return transaction.testAttempt.create({
+        data: {
+          studentUserId,
+          lessonId,
+          testSetId: set.id,
+          totalCount: set.questions.length,
+          answers: {
+            create: set.questions.map((question) => ({
+              questionId: question.id,
+              answerJson: createPendingAnswerJson(),
+              isCorrect: false,
+            })),
+          },
+        },
+        select: {
+          id: true,
+          status: true,
+          startedAt: true,
+          totalCount: true,
+        },
+      });
     });
 
     return {
@@ -489,6 +506,29 @@ export class StudentTestAttemptsService {
       completionMinScore,
       passed: Number(result.score) >= completionMinScore,
     };
+  }
+
+  async cancelAttempt(attemptId: string, studentUserId: string) {
+    const cancelled = await this.prisma.testAttempt.updateMany({
+      where: {
+        id: attemptId,
+        studentUserId,
+        status: AttemptStatus.IN_PROGRESS,
+      },
+      data: { status: AttemptStatus.CANCELLED },
+    });
+    if (cancelled.count > 0) {
+      return { id: attemptId, status: AttemptStatus.CANCELLED };
+    }
+
+    const attempt = await this.prisma.testAttempt.findFirst({
+      where: { id: attemptId, studentUserId },
+      select: { id: true, status: true },
+    });
+    if (!attempt) {
+      throw notFoundException("TEST_ATTEMPT_NOT_FOUND", "Không tìm thấy lượt kiểm tra");
+    }
+    return attempt;
   }
 
   async reviewAttempt(

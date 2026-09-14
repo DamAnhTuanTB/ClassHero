@@ -230,7 +230,7 @@ export function AdminQuizFigureRefinementDialog({
                 </h3>
                 <div className="mt-3 overflow-hidden rounded-xl border border-[var(--theme-border)] bg-white p-3">
                   <Image
-                    alt={figure.currentRevision?.altText ?? "Ảnh Quiz hiện tại"}
+                    alt={figure.currentRevision?.altText ?? "Ảnh hiện tại"}
                     className="mx-auto max-h-80 w-auto object-contain"
                     height={800}
                     src={previewData.currentImageDataUrl}

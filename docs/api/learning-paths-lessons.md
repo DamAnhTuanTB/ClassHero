@@ -1309,7 +1309,7 @@ Client không gửi raw video URL, chapter hoặc transcript.
   schema riêng của Video Summary. `startTimeInSeconds`/`endTimeCutInSeconds`
   chỉ ảnh hưởng lesson player, không cắt/rebase source và không làm stale
   Video Summary.
-- Structured schema version 8 trả `title`, `objectives[]`, `sections[]` và các
+- Structured schema version 9 trả `title`, `objectives[]`, `sections[]` và các
   block tương thích `lesson_summary_blocks`: Knowledge có
   `title/content/startSeconds`; Example có
   `problem/solution/answer/startSeconds`; mỗi section cũng có `startSeconds`;
@@ -1586,15 +1586,22 @@ Body:
 
 `processingMode` optional:
 
-- Không gửi hoặc gửi `PROCESSING`: tài liệu bổ sung được đưa vào pipeline xử lý/chunking như context bổ sung của lesson.
-- Gửi `STORAGE_ONLY`: dùng cho tài liệu tham khảo trong modal tạo lesson; backend chỉ lưu file/document kèm lesson, set document `READY`, `chunkCount = 0`, không tạo OCR artifact, chunk, embedding hoặc `background_jobs`.
+- Không gửi hoặc gửi `PROCESSING`: tài liệu upload trực tiếp được đưa vào
+  pipeline OCR/chunking/embedding làm context của lesson. UI Admin hiện luôn
+  gửi giá trị này cho cả `PRIMARY_FROM_SOURCE`, `SUPPLEMENT` và `HOMEWORK`.
+- Gửi `STORAGE_ONLY`: backend chỉ lưu file/document kèm lesson, set document
+  `READY`, `chunkCount = 0`, không tạo OCR artifact, chunk, embedding hoặc
+  `background_jobs`. Đây là khả năng của API; UI Admin hiện không có control
+  chọn và không phát sinh request `STORAGE_ONLY`.
 
 Side effects:
 
 - Tạo `lesson_documents` trực tiếp cho lesson với kind được gửi lên. `PRIMARY_FROM_SOURCE` ở endpoint này luôn là file upload trực tiếp, không phải page-range mapping.
 - Tạo thêm `PRIMARY_FROM_SOURCE` không replace hoặc xóa các tài liệu nền tảng hiện có.
-- Tạo `background_jobs` queue `DOCUMENT_PROCESSING` khi `processingMode` là `PROCESSING`.
-- `M4.3` nối BullMQ thật để worker nhận job nếu PDF; `M4.4` dùng paid OCR-first cho tài liệu học chính/supplement khi OCR paid được bật.
+- Tạo `background_jobs` queue `DOCUMENT_PROCESSING` khi `processingMode` là
+  `PROCESSING` hoặc bị bỏ trống.
+- `M4.3` nối BullMQ thật để worker nhận job nếu PDF; `M4.4` dùng paid
+  OCR-first cho cả ba loại tài liệu upload trực tiếp khi OCR paid được bật.
 
 ### `GET /admin/lessons/:lessonId/documents`
 

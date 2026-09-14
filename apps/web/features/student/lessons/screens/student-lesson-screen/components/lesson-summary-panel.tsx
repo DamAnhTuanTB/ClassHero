@@ -20,19 +20,21 @@ import {
 } from "@/lib/video-player-time";
 import { SummaryBlockRenderer } from "./summary-block-renderer";
 
-type LessonSummarySubTab = "video" | "theory" | "exercises";
+export type LessonSummarySubTab = "video" | "theory" | "exercises";
 type VideoSummaryViewMode = "all" | "segment";
 type SummaryBlockData = ComponentProps<typeof SummaryBlockRenderer>["data"];
 
 export function LessonSummaryPanel({
   hasVideoPlaybackStarted,
   lesson,
+  onActiveSubTabChange,
   onVideoSeek,
   playbackStore,
   videoPlaybackEndTimeInSeconds,
 }: {
   hasVideoPlaybackStarted: boolean;
   lesson: StudentLesson;
+  onActiveSubTabChange?: (subTab: LessonSummarySubTab) => void;
   onVideoSeek: (seconds: number) => void;
   playbackStore: VideoPlaybackSecondStore;
   videoPlaybackEndTimeInSeconds?: number;
@@ -229,6 +231,11 @@ export function LessonSummaryPanel({
     }, 100);
   };
 
+  const selectActiveSubTab = (subTab: LessonSummarySubTab) => {
+    setActiveSubTab(subTab);
+    onActiveSubTabChange?.(subTab);
+  };
+
   return (
     <section className="rounded-[1.5rem] border border-sky-100 bg-white p-4 shadow-[0_20px_50px_-42px_rgb(2_132_199_/_60%)] dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface)] sm:p-5">
       <div className="flex items-center justify-between gap-3">
@@ -265,7 +272,7 @@ export function LessonSummaryPanel({
             activeNavigationTab={activeSubTab}
             onNavigationTabChange={(tabId) => {
               if (tabId === "video" || tabId === "theory" || tabId === "exercises") {
-                setActiveSubTab(tabId);
+                selectActiveSubTab(tabId);
               }
             }}
             sectionLabel={activeSubTab === "video" ? "Video" : "Lý thuyết"}
@@ -308,7 +315,7 @@ export function LessonSummaryPanel({
         <div className="flex w-full items-center gap-1 rounded-full border border-slate-200 bg-slate-100/80 p-1.5 dark:border-slate-700 dark:bg-slate-800/50">
           <button
             type="button"
-            onClick={() => setActiveSubTab("video")}
+            onClick={() => selectActiveSubTab("video")}
             className={cn(
               "flex-1 min-w-0 truncate rounded-full px-2 py-2 text-center text-[15px] font-bold transition-all sm:px-6 sm:py-2.5 sm:text-[17px]",
               activeSubTab === "video"
@@ -320,7 +327,7 @@ export function LessonSummaryPanel({
           </button>
           <button
             type="button"
-            onClick={() => setActiveSubTab("theory")}
+            onClick={() => selectActiveSubTab("theory")}
             className={cn(
               "flex-1 min-w-0 truncate rounded-full px-2 py-2 text-center text-[15px] font-bold transition-all sm:px-6 sm:py-2.5 sm:text-[17px]",
               activeSubTab === "theory"
@@ -332,7 +339,7 @@ export function LessonSummaryPanel({
           </button>
           <button
             type="button"
-            onClick={() => setActiveSubTab("exercises")}
+            onClick={() => selectActiveSubTab("exercises")}
             className={cn(
               "flex-1 min-w-0 truncate rounded-full px-2 py-2 text-center text-[15px] font-bold transition-all sm:px-6 sm:py-2.5 sm:text-[17px]",
               activeSubTab === "exercises"

@@ -295,7 +295,17 @@ export function AdminStemFigureCreateAiDialog({
     ? targetMode === "QUESTION"
       ? "Tạo hình cho đề bài"
       : "Tạo hình cho lời giải"
-    : "Tạo mới hình bằng AI";
+    : mode === "CURRENT_ONLY"
+      ? "Chỉnh sửa hình bằng AI"
+      : "Tạo mới hình bằng AI";
+  const submitLabel =
+    mode === "CURRENT_ONLY"
+      ? isCreating
+        ? "Đang chỉnh sửa"
+        : "Chỉnh sửa hình"
+      : isCreating
+        ? "Đang tạo"
+        : "Tạo mới";
 
   return createPortal(
     <div className="theme-dialog-overlay fixed inset-0 z-[80] flex items-center justify-center p-3 backdrop-blur-sm sm:p-6">
@@ -760,7 +770,7 @@ export function AdminStemFigureCreateAiDialog({
               ) : (
                 <Bot className="h-4 w-4" aria-hidden="true" />
               )}
-              Tạo mới
+              {submitLabel}
             </button>
           </div>
         </footer>

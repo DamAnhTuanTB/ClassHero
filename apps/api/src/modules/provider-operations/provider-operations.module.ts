@@ -5,6 +5,7 @@ import { AuthModule } from "#api/modules/auth/auth.module";
 import { AiModelRoutingService } from "#api/modules/provider-operations/services/ai-model-routing.service";
 import { ProviderOperationsAdminService } from "#api/modules/provider-operations/services/provider-operations-admin.service";
 import { ProviderUsageService } from "#api/modules/provider-operations/services/provider-usage.service";
+import { AiChatRuntimeSettingsService } from "#api/modules/provider-operations/services/ai-chat-runtime-settings.service";
 
 @Global()
 @Module({
@@ -12,9 +13,14 @@ import { ProviderUsageService } from "#api/modules/provider-operations/services/
   controllers: [AdminProviderOperationsController],
   providers: [
     AiModelRoutingService,
+    AiChatRuntimeSettingsService,
     ProviderUsageService,
     ProviderOperationsAdminService,
   ],
-  exports: [AiModelRoutingService, ProviderUsageService],
+  exports: [
+    AiModelRoutingService,
+    AiChatRuntimeSettingsService,
+    ProviderUsageService,
+  ],
 })
 export class ProviderOperationsModule {}

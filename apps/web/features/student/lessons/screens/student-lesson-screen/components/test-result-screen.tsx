@@ -15,6 +15,8 @@ import {
   XCircle,
 } from "lucide-react";
 import { ClassHeroLogo } from "@/components/common/brand/classhero-logo";
+import { StudentAiChatHeaderTrigger } from "@/features/student/ai-chat/components/student-ai-chat-header-trigger";
+import type { AiChatEntryContext } from "@/features/student/ai-chat/utils/ai-chat-link";
 import { useDocumentScrollLock } from "@/features/student/lessons/hooks/use-document-scroll-lock";
 import { AssessmentResultConfetti } from "@/features/student/lessons/screens/student-lesson-screen/components/assessment-result-confetti";
 import type { StudentTestResult } from "@/features/student/lessons/types/student-lesson-types";
@@ -23,6 +25,7 @@ import { formatDuration } from "@/features/student/lessons/utils/student-answer-
 import { cn } from "@/lib/utils";
 
 export function TestResultScreen({
+  aiChatContext,
   bestScore,
   onBack,
   onNextLesson,
@@ -33,6 +36,7 @@ export function TestResultScreen({
   result,
   shouldCelebrate,
 }: {
+  aiChatContext?: AiChatEntryContext;
   bestScore?: number | null;
   onBack: () => void;
   onReviewAll: () => void;
@@ -121,6 +125,12 @@ export function TestResultScreen({
             <ChevronLeft className="h-8 w-8" strokeWidth={2.8} aria-hidden="true" />
           </button>
           <ClassHeroLogo className="h-10 max-w-[9rem]" priority />
+          {aiChatContext ? (
+            <StudentAiChatHeaderTrigger
+              context={aiChatContext}
+              testId="student-ai-chat-trigger-test-result"
+            />
+          ) : null}
         </div>
       </header>
 

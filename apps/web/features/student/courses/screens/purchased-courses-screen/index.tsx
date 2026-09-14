@@ -15,6 +15,7 @@ import {
 import {
   buildTodayLearningGoals,
   getPurchasedCourses,
+  getVisibleCourseLessonCtaIds,
 } from "@/features/student/shared/utils/student-courses-utils";
 import type { StudentCoursesListResult } from "@/features/student/shared/types/student-course-api-results";
 import type { AppThemeMode } from "@/lib/theme-store";
@@ -36,6 +37,7 @@ export function PurchasedCoursesScreen({
   const prefetchCourseDetail = useStudentCourseDetailPrefetch();
   const courses = coursesQuery.data?.courses ?? [];
   const purchasedCourses = getPurchasedCourses(courses);
+  const preferredLessonIds = getVisibleCourseLessonCtaIds(purchasedCourses);
   const likelyNextCourseSlug = purchasedCourses[0]?.slug;
   const studentName = session?.user.fullName ?? initialStudentName ?? "bạn";
   const todayGoals = buildTodayLearningGoals(courses);
@@ -98,7 +100,11 @@ export function PurchasedCoursesScreen({
         className="mx-auto grid w-full min-w-0 max-w-[560px] gap-4 overflow-x-hidden md:max-w-[960px] lg:max-w-[900px]"
         style={{ background: screenBackground }}
       >
-        <StudentCoursesHeader title="Học tập" initialThemeMode={initialThemeMode} />
+        <StudentCoursesHeader
+          title="Học tập"
+          initialThemeMode={initialThemeMode}
+          aiChatContext={{ scopeType: "LIBRARY", preferredLessonIds }}
+        />
 
         <div className="grid min-w-0 gap-4 px-4 sm:px-6 lg:px-6">
           <StudentLearningGreetingPanel studentName={studentName} />

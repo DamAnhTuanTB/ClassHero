@@ -14,6 +14,7 @@ import type {
   QuizSubmitResult,
   ResumableQuizAttempt,
   StudentAnswer,
+  StudentActiveTestStatus,
   StudentFlashcardSet,
   StudentLesson,
   StudentTestAttempt,
@@ -229,6 +230,24 @@ export function startStudentTest(lessonId: string, token: string) {
   return apiRequest<StudentTestAttempt>(
     `/student/lessons/${encodeURIComponent(lessonId)}/test-attempts/start`,
     { method: "POST", token },
+  );
+}
+
+export function getStudentActiveTestStatus(token: string) {
+  return apiRequest<StudentActiveTestStatus>("/student/test-attempts/active-status", {
+    cache: "no-store",
+    token,
+  });
+}
+
+export function cancelStudentTest(
+  attemptId: string,
+  token: string,
+  options?: { keepalive?: boolean },
+) {
+  return apiRequest<{ id: string; status: string }>(
+    `/student/test-attempts/${encodeURIComponent(attemptId)}/cancel`,
+    { method: "POST", keepalive: options?.keepalive, token },
   );
 }
 

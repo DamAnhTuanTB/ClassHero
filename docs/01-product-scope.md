@@ -45,6 +45,9 @@ MVP tập trung vào việc giúp:
 - Có nhiều bộ quiz/flashcard/bài thi trong một buổi học.
 - Có kho bộ dự phòng do AI tạo.
 - Có AI tạo tóm tắt, quiz, flashcard, bài kiểm tra, lời giải chi tiết và chat theo buổi học.
+- Admin có màn `Chat với AI` để mô phỏng chính runtime Chat AI của học sinh theo
+  một buổi học, một khóa học hoặc một tập khóa học được chọn; từng lượt cho xem
+  input đã gửi provider, tham số hiệu lực, token, chi phí và thời gian phản hồi.
 - Khi admin sinh kiến thức, số bài tập vận dụng chuẩn và số bài ứng dụng thực tế
   được cấu hình độc lập, mặc định `2` cho mỗi nhóm. Đây là số lượng mục tiêu của
   Phase 1; nếu AI trả thiếu hoặc thừa, các bài hợp lệ vẫn được lưu và hiển thị.
@@ -271,6 +274,9 @@ Admin có quyền:
 - Tạo, sửa, xóa bài kiểm tra.
 - Dùng AI tạo câu hỏi bài kiểm tra.
 - Cấu hình model chính/dự phòng cho từng chức năng AI, xem bảng giá/usage AI và OCR, đặt ngân sách, chủ động bật hard-stop tuyệt đối và xem audit thay đổi; không xem hoặc sửa API key trên UI.
+- Mở màn `Chat với AI` từ sidebar Admin, tạo phiên mô phỏng theo một buổi học,
+  một khóa học hoặc nhiều khóa học; cấu hình riêng từng phiên, chỉnh cấu hình
+  mặc định `CHAT/TEXT` và kiểm tra chi tiết request/usage của từng câu trả lời.
 - Tạo hoặc cập nhật lời giải chi tiết cho từng câu bằng AI.
 - Xem và xử lý report lỗi.
 - Xem, sửa, duyệt hoặc ẩn nội dung AI chưa duyệt.
@@ -455,7 +461,9 @@ Phần mở rộng `M15` được triển khai sau luồng học sinh cốt lõi
 - Hệ thống lưu playback session, vị trí gần nhất và các khoảng video thực sự đã xem theo timeline sau khi cắt đầu/đuôi.
 - Tua tới cuối không được tính như đã xem toàn bộ.
 - Học sinh có thể tạo ghi chú theo timestamp, bấm để quay lại đoạn video, làm checkpoint trong video và xem chapter mastery.
-- `Hỏi đoạn này`/`Em chưa hiểu` dùng chapter, transcript lân cận và RAG của đúng lesson; không lấy context lesson khác.
+- Chat mở từ sub-tab `Video` ưu tiên khối kiến thức/ví dụ trong Video Summary bao
+  phủ mốc đang phát, đồng thời vẫn search toàn bộ Video Summary và RAG đúng
+  lesson. Raw transcript không phải nguồn Chat và không lấy context lesson khác.
 - Admin có thể sinh một bản tóm tắt toàn video từ transcript đã lưu và chapter
   tùy chọn; flow này không thay thế Summary kiến thức sinh từ PDF.
 - Tóm tắt chapter, flashcard từ video, semantic search và đề xuất ôn tập phải giữ liên kết timestamp nguồn.
@@ -626,17 +634,69 @@ Khi bấm:
 
 Lời giải là lời giải chi tiết chung, không cần giải thích riêng theo đáp án học sinh chọn sai.
 
-### 4.10. Chat AI trong buổi học
+### 4.10. Chat AI cho học sinh
 
-Mỗi buổi học có khung chat AI.
+Học sinh có một chat hub và một danh sách lịch sử chung. Mỗi cuộc trò chuyện có
+scope bất biến `LIBRARY` hoặc `COURSE`; scope chỉ quyết định dữ liệu RAG, không
+tách lịch sử thành nhiều danh sách.
 
-Input chỉ cho nhập text, gồm văn bản thường và ký hiệu Toán/Hóa/Lý. Không cho upload ảnh/file.
+- Mở từ màn Học tập: `LIBRARY`, gồm toàn bộ lesson thuộc các enrollment còn hiệu
+  lực mà học sinh đã mua.
+- Mở từ course detail hoặc lesson detail: `COURSE`, gồm toàn bộ lesson của đúng
+  khóa đã mua. Lesson hiện tại chỉ là tín hiệu ưu tiên retrieval.
+- Không bao giờ lấy context từ khóa chưa mua hoặc lesson trial.
+- Duy nhất khi Quiz attempt hoặc Flashcard study session còn `IN_PROGRESS`,
+  AI chỉ gợi ý và không tiết lộ đáp án. Mọi trạng thái khác, bao
+  gồm nội dung học thông thường và Quiz/Flashcard/Test đã nộp hoặc
+  đang xem lại, dùng `FULL_ANSWER`: AI được nêu đáp án đúng và giải
+  thích chi tiết. Trong chính Test runner, icon bị ẩn; ở tab/màn khác,
+  icon vẫn
+  hiện nhưng disabled với tooltip `Bạn không thể sử dụng tính năng này khi đang
+  làm bài thi!`. Backend khóa mọi API chat khi còn Test attempt thực sự đang
+  hiệu lực để không thể lách qua tab khác. Attempt đã quá thời lượng kèm grace
+  ngắn được tự chuyển `CANCELLED` và không được làm khóa nhầm Chat AI.
+- Với câu hỏi ngoài context, thiếu ảnh được nhắc tới hoặc ảnh không đủ chắc thuộc
+  scope, AI tự quyết định từ chối/hỏi lại theo prompt. Backend không tự viết câu
+  từ chối và không dùng heuristic/classifier để chặn hoặc thay nội dung model.
+  Response được stream theo delta thật; lời từ chối của AI là một response hoàn
+  tất bình thường.
+- Tin nhắn hỗ trợ text/LaTeX và tối đa 5 ảnh JPEG/PNG/WebP, mỗi ảnh tối đa 10 MB.
+  Ảnh là attachment private của chat, không được đưa vào OCR artifact nguồn.
+- Học sinh tạo nhiều cuộc trò chuyện, mở lại và tiếp tục thread cũ. Khi gửi câu
+  đầu, thread dùng chính câu đó làm tên mặc định ngay lập tức; AI đồng thời tạo
+  tên ngắn và cập nhật trên danh sách/header trong lúc phản hồi đầu đang stream.
+  Nếu call đặt tên lỗi, tên mặc định được giữ và câu trả lời không bị fail. Khi
+  gọi AI, chỉ gửi các message gần nhất và conversation summary nếu thread dài.
 
-AI chỉ trả lời dựa trên tài liệu của buổi học hiện tại. Nếu câu hỏi không liên quan đến buổi học, AI không trả lời và yêu cầu học sinh hỏi lại câu liên quan hơn.
+#### 4.10.1. Admin mô phỏng Chat AI
 
-Toàn bộ lịch sử chat AI của từng học sinh trong từng buổi học được lưu lại.
+Admin có một màn riêng `Chat với AI` để kiểm chứng hành vi của tính năng trước
+khi học sinh sử dụng thật.
 
-Khi gọi AI, hệ thống không cần gửi toàn bộ lịch sử. Chỉ gửi một số tin nhắn gần nhất và conversation summary nếu hội thoại dài.
+- Mỗi phiên mô phỏng chọn đúng một scope bất biến: một buổi học, một khóa học
+  hoặc một danh sách khóa học. Backend tự resolve tài liệu/chunk từ các ID đã
+  chọn; client không được gửi thẳng context tùy ý để chèn vào prompt.
+- Phiên mô phỏng thuộc admin đang đăng nhập, tách khỏi lịch sử học sinh, không
+  mạo danh học sinh và không tiêu hao quota theo ngày của học sinh. Mọi paid call
+  vẫn đi qua budget reservation và được tính vào usage AI chung.
+- Admin chat phải dùng cùng runtime core với Student Chat: cùng prompt builder,
+  retrieval, history/context cap, response policy, provider gateway, streaming,
+  LaTeX auto-repair, refusal, usage accounting và error mapping. Chỉ auth/scope
+  resolver, quyền sở hữu phiên và khả năng xem trace là adapter riêng; không tạo
+  prompt/service/provider flow song song cho admin.
+- `Thiết lập mặc định` trên màn này đọc và cập nhật đúng cấu hình `CHAT/TEXT`
+  đang dùng ở `/admin/ai-settings`; không có bản cấu hình mặc định thứ hai.
+- Mỗi phiên khởi tạo từ default hiện hành và có thể lưu override riêng gồm model,
+  fallback, `temperature` hoặc `reasoningEffort` theo capability, giới hạn input
+  và output. Không nhận raw provider JSON hoặc tham số model không hỗ trợ.
+- Admin có thể đổi cấu hình phiên giữa các câu chat. Giá trị mới chỉ áp dụng cho
+  lượt kế tiếp; từng lượt đã chạy giữ immutable snapshot của default, override
+  và effective request thực tế để lịch sử không đổi theo cấu hình mới.
+- Tại mỗi câu trả lời, admin xem được system/user input, lịch sử gần, context RAG
+  và ảnh thực sự được dùng, provider/model/tham số đã resolve, provider request
+  ID, token input/cache/output/reasoning, chi phí thực tế, tổng thời gian và thời
+  gian tới token đầu tiên khi provider có trả. Secret, credential, signed URL,
+  raw base64 và object key nội bộ luôn bị loại hoặc che trước khi lưu/hiển thị.
 
 ### 4.11. Report lỗi
 

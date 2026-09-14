@@ -330,6 +330,24 @@ export class AssessmentAdminService {
     if (sets.length === 0) return [];
 
     const setIds = sets.map((set) => set.id);
+    const questionTargets = await this.prisma.testQuestion.findMany({
+      where: { testSetId: { in: setIds } },
+      select: { id: true, testSetId: true },
+    });
+    const questionIds = questionTargets.map((question) => question.id);
+    const setIdByQuestionId = new Map(
+      questionTargets.map((question) => [question.id, question.testSetId]),
+    );
+    const generationTargetWhere: Prisma.AiGenerationWhereInput = {
+      type: AiGenerationType.TEST,
+      OR: [
+        { targetType: "TEST_SET", targetId: { in: setIds } },
+        {
+          targetType: "TEST_SOLUTION_REFINEMENT",
+          targetId: { in: questionIds },
+        },
+      ],
+    };
     const [pendingGroups, unpublishedGroups, aiGenerations, usageGroups] =
       await Promise.all([
         this.prisma.testQuestion.groupBy({
@@ -352,15 +370,12 @@ export class AssessmentAdminService {
           _count: { _all: true },
         }),
         this.prisma.aiGeneration.findMany({
-          where: {
-            type: AiGenerationType.TEST,
-            targetType: "TEST_SET",
-            targetId: { in: setIds },
-          },
+          where: generationTargetWhere,
           orderBy: { createdAt: "desc" },
           select: {
             id: true,
             targetId: true,
+            targetType: true,
             status: true,
             model: true,
             inputMetaJson: true,
@@ -373,11 +388,7 @@ export class AssessmentAdminService {
           by: ["aiGenerationId"],
           where: {
             aiGenerationId: { not: null },
-            aiGeneration: {
-              type: AiGenerationType.TEST,
-              targetType: "TEST_SET",
-              targetId: { in: setIds },
-            },
+            aiGeneration: generationTargetWhere,
           },
           _count: { _all: true },
           _sum: { costVnd: true },
@@ -415,14 +426,19 @@ export class AssessmentAdminService {
     >();
     for (const generation of aiGenerations) {
       if (!generation.targetId) continue;
+      const setId =
+        generation.targetType === "TEST_SET"
+          ? generation.targetId
+          : setIdByQuestionId.get(generation.targetId);
+      if (!setId) continue;
       const usage = usageByGenerationId.get(generation.id);
-      const current = generationsBySetId.get(generation.targetId) ?? [];
+      const current = generationsBySetId.get(setId) ?? [];
       current.push({
         ...generation,
         totalCostVnd: usage?.totalCostVnd ?? 0,
         usageEventCount: usage?.usageEventCount ?? 0,
       });
-      generationsBySetId.set(generation.targetId, current);
+      generationsBySetId.set(setId, current);
     }
     return sets.map((set) => ({
       ...set,

@@ -25,6 +25,9 @@ const CHEMISTRY_QUIZ_FIGURE_SPATIAL_LABEL_POLICY = [
   "- Trừ khi ảnh nguồn hoặc authority khóa một leader line hay quy ước khác, điểm, path hoặc cung tương thích gần bounding box nhãn nhất phải là đúng đối tượng sở hữu; sửa anchor hoặc vị trí khi liên thuộc chưa rõ và không dùng một offset tuyệt đối cho mọi hình.",
 ].join("\n");
 
+const CHEMISTRY_SOLUTION_FIGURE_CANVAS_CONTENT_POLICY =
+  "- Với hình lời giải, dùng solution để xác định cấu tạo, phản ứng, hiện tượng hoặc bố trí cần vẽ; không chép nguyên văn problem/solution, phép tính số mol-nồng độ, chuỗi biến đổi hay đáp số thành node độc lập hoặc một vùng chữ bên cạnh hình. Chỉ giữ công thức và nhãn ngắn gắn trực tiếp với chất, mũi tên phản ứng, dụng cụ, đồ thị hoặc bộ phận thật sự cần để đọc biểu diễn. Counterexample: công thức chất, điện tích, trạng thái, điều kiện trên mũi tên và phương trình phản ứng là chính đối tượng của sơ đồ vẫn hợp lệ; một dãy phương trình chỉ giải thích cách tính đáp án thì phải nằm ngoài canvas.";
+
 const CHEMISTRY_QUIZ_VISUAL_COMPLETENESS_POLICY = [
   "### THÀNH PHẦN TỐI THIỂU THEO HỌ HÌNH HÓA HỌC",
   "- Trước khi viết source, nhận diện đúng họ hình và luôn dựng đủ `móng hình` độc lập với việc problem/solution có gọi tên từng phần hay không: node-bond, ranh giới-marker-legend mẫu, node-mũi tên phản ứng, trục-mốc-marker-đường dóng hoặc cổng-ống liên tục tối thiểu. Móng chỉ dùng chất/dữ liệu/thiết bị đã có, không thêm kết luận Hóa học.",
@@ -97,6 +100,7 @@ function resolveSubjectName(
     prompt,
     CHEMISTRY_QUIZ_FIGURE_COMPILER_POLICY,
     CHEMISTRY_QUIZ_FIGURE_SPATIAL_LABEL_POLICY,
+    ...(mode === "SOLUTION" ? [CHEMISTRY_SOLUTION_FIGURE_CANVAS_CONTENT_POLICY] : []),
     CHEMISTRY_QUIZ_VISUAL_COMPLETENESS_POLICY,
     resolveChemistryQuizVisualCompletenessMode(mode),
     resolveChemistryQuizFinalSemanticCheck(mode),

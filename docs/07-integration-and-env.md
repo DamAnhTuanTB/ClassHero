@@ -22,8 +22,12 @@ Không hard-code secret trong source code. Không commit `.env` thật vào repo
 - Paid OCR local được phép bật để owner test vài cuốn đại diện. Mặc định
   `apps/api/.env.example` để `OCR_PAID_ENABLED=false`; khi test thật thì đổi
   `apps/api/.env` thành `true`, đặt Mathpix key và giữ artifact cache bật để tránh
-  gọi lại cùng file. Trước khi chạy forced OCR cả cuốn hoặc nhiều cuốn, phải báo
-  số trang và ước tính chi phí cho owner xác nhận.
+  gọi lại cùng file. Khi owner yêu cầu test live OCR, Codex lập matrix và
+  chọn các file/trang cần thiết để bao phủ những file type, page family,
+  language/options, cache miss/hit và output artifact chính trong phạm vi thay
+  đổi. Case tương đương có thể gộp; không thu hẹp các trường hợp chính
+  chỉ để chọn vài trang/file rẻ nhất. Codex ước tính chi phí cho bộ
+  coverage đó rồi chạy ngay mà không xin xác nhận chi phí lần hai.
 
 ### Production ban đầu
 
@@ -144,6 +148,12 @@ AI_GENERATION_TIMEOUT_MS=600000
 AI_MONTHLY_BUDGET_VND=1500000
 AI_STUDENT_CHAT_DAILY_LIMIT=20
 AI_STUDENT_GENERATE_DAILY_LIMIT=5
+AI_CHAT_MAX_CONTEXT_TOKENS=4000
+AI_CHAT_MAX_INPUT_TOKENS=20000
+AI_CHAT_MAX_OUTPUT_TOKENS=1200
+AI_CHAT_MAX_HISTORY_TOKENS=3000
+AI_CHAT_RECENT_MESSAGE_COUNT=10
+AI_CHAT_MAX_IMAGES_PER_MESSAGE=5
 
 # Searchable PDF equivalence + temporary Summary packet
 SEARCHABLE_PDF_VALIDATION_TTL_SECONDS=3600
@@ -182,10 +192,20 @@ ZALO_ZNS_TEMPLATE_TEST_RESULT=change-me
 # Socket.IO / CORS
 CORS_ORIGINS=http://localhost:3000
 SOCKET_IO_PATH=/socket.io
+REALTIME_JOB_EVENTS_ENABLED=true
+
+# Frontend public realtime config
+NEXT_PUBLIC_REALTIME_URL=http://localhost:4000
+NEXT_PUBLIC_SOCKET_IO_PATH=/socket.io
+NEXT_PUBLIC_REALTIME_JOB_EVENTS_ENABLED=true
 
 # File limits
 MAX_PDF_UPLOAD_MB=50
 MAX_IMAGE_UPLOAD_MB=10
+MAX_CHAT_IMAGE_UPLOAD_MB=10
+AI_CHAT_ORPHAN_IMAGE_TTL_HOURS=24
+AI_CHAT_ORPHAN_IMAGE_CLEANUP_INTERVAL_MINUTES=60
+AI_CHAT_ORPHAN_IMAGE_CLEANUP_BATCH_SIZE=100
 MAX_AVATAR_UPLOAD_MB=5
 
 # Sentry
@@ -194,6 +214,18 @@ SENTRY_DSN=
 # Logging
 LOG_LEVEL=debug
 ```
+
+`MAX_CHAT_IMAGE_UPLOAD_MB` không được lớn hơn 10 và
+`AI_CHAT_MAX_IMAGES_PER_MESSAGE` không được lớn hơn 5. Giữ biến riêng để thay đổi
+upload editor/note không vô tình nới giới hạn Chat AI.
+
+Ba biến `AI_CHAT_ORPHAN_IMAGE_*` điều khiển worker dọn upload chat chưa gắn
+message: TTL mặc định 24 giờ, quét mỗi 60 phút và tối đa 100 file/lần. Tombstone
+xóa storage lỗi sẽ được retry ở lần quét sau.
+
+Catalog provider phải có price version đang hiệu lực cho cả model trả lời Chat AI
+và `OPENAI_EMBEDDING_MODEL`; nếu thiếu giá embedding, semantic retrieval phải bỏ
+qua call trả phí và giữ keyword result thay vì gọi ngoài budget ledger.
 
 ASSUMPTION: Model names trong `.env.example` là placeholder để bắt đầu. Nếu provider/model thực tế khác, cập nhật env và `docs/06-ai-rag-spec.md`.
 
@@ -387,11 +419,25 @@ Dùng phụ cho:
 
 ### Paid provider cost guard
 
-- Với provider tính phí theo usage như Mathpix/OpenAI/Gemini, không chạy forced/full runtime test mặc định nếu cache hoặc sample test đã đủ kiểm code.
+- Với provider tính phí theo usage như Mathpix/OpenAI/Gemini, không chạy
+  forced/full runtime test mặc định khi owner chưa yêu cầu live test; dùng
+  cache/mock/local test để ổn định harness trước.
 - Với Mathpix PDF OCR, ước tính chi phí trước khi chạy bằng `số trang PDF × đơn giá/page` theo pricing hiện hành của tài khoản/provider. Ví dụ 265 trang ở mức khoảng `$0.005/page` tương đương khoảng `$1.325` trước các yếu tố billing khác.
-- Trước khi OCR thật cả cuốn hoặc nhiều cuốn, Codex phải báo owner phạm vi, số trang, ước tính chi phí và xin xác nhận rõ, kể cả khi đang test local.
-- Sau khi đã có artifact cache theo `content_hash + provider/options`, mọi lần verify code/derived artifacts phải ưu tiên cache-hit rerun, không gọi Mathpix lại.
-- Final/report sau khi test thật phải ghi rõ `forceMathpix` hay cache hit, số trang đã xử lý, artifact key và chi phí/usage ước tính nếu biết.
+- Chỉ gọi provider thật khi owner yêu cầu test live. Yêu cầu đó đã là
+  phê duyệt chi phí; Codex phải lập live acceptance matrix và chọn bộ case
+  cần thiết đủ bao phủ các trường hợp chính, rủi ro quan trọng của
+  contract bị ảnh hưởng. Không chọn phạm vi hay sample nhỏ nhất theo chi phí;
+  có thể gộp case tương đương khi giải thích được coverage. Codex ước tính
+  chi phí cho bộ coverage đó, chỉ tối ưu request/token/call trùng sau khi
+  coverage đã đủ và không xin xác nhận lần hai.
+- Forced/full run vẫn phải tuân budget guard. Nếu guard không đủ cho các
+  case cần thiết, dừng trước khi vượt giới hạn, báo các case chưa chạy
+  và không kết luận pass.
+- Sau khi đã có artifact cache theo `content_hash + provider/options`, verify code
+  hoặc derived artifact không đổi phải ưu tiên cache-hit rerun. Cache hit chỉ
+  là live evidence cho case cache/reuse; không thay thế case cần gọi Mathpix thật.
+- Final/report phải ghi matrix `Pass/Fail/Not run`, `forceMathpix` hay cache hit,
+  số request/trang đã xử lý, artifact key và chi phí/usage thực tế hoặc ước tính.
 
 ---
 
@@ -530,13 +576,22 @@ LuaLaTeX process rồi cùng chạm timeout.
 
 ## 10. Socket.IO
 
-Dùng cho realtime notification trong hệ thống.
+Dùng cho realtime notification và event đồng bộ trạng thái background job; không
+dùng event làm nguồn dữ liệu thay REST/database.
 
 Rules:
 
 - Client connect với access token.
 - Gateway authenticate socket.
 - User join room theo `user:{userId}`.
+- Chỉ Admin được subscribe room `lesson:{lessonId}` sau khi backend kiểm tra
+  lesson. Một web session dùng một socket; card/modal không tự mở connection.
+- API và worker publish event qua Redis Pub/Sub channel riêng; mọi API instance
+  subscribe để fan-out tới local Socket.IO rooms. Redis tạm lỗi không được làm
+  background job retry.
+- Client refetch snapshot ngay sau connect/subscribe, dedupe event và giữ polling
+  fallback. Có thể tắt nhanh hai phía bằng `REALTIME_JOB_EVENTS_ENABLED=false`
+  và `NEXT_PUBLIC_REALTIME_JOB_EVENTS_ENABLED=false`.
 - Khi có notification mới, emit vào room user.
 - Notification vẫn lưu DB trước.
 
@@ -567,6 +622,9 @@ CORS:
 
 - API chỉ cho phép origin front-end chính.
 - Dev cho `localhost:3000`.
+- Nginx route `SOCKET_IO_PATH` tới API phải giữ HTTP/1.1 và forward headers
+  `Upgrade`/`Connection`; timeout proxy phải dài hơn chu kỳ reconnect. Nếu web
+  và API khác origin, `NEXT_PUBLIC_REALTIME_URL` trỏ tới public HTTPS API origin.
 
 ---
 

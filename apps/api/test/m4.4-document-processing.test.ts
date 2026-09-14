@@ -109,6 +109,8 @@ describe("M4.4 document processing worker", () => {
             sourceDocumentId: "source-1",
             pageStart: 2,
             pageEnd: 3,
+            chunkingVersion: "semantic-overlap-v2",
+            overlapTokenCount: expect.any(Number),
             textSource: "paid_ocr",
             printedPageMappingSummary: expect.objectContaining({
               knownCount: 2,
@@ -165,6 +167,8 @@ describe("M4.4 document processing worker", () => {
           lessonId: "lesson-1",
           metadataJson: expect.objectContaining({
             textSource: "paid_ocr",
+            chunkingVersion: "semantic-overlap-v2",
+            overlapTokenCount: expect.any(Number),
             ocrArtifact: expect.objectContaining({
               artifactAuditKey: artifactKeys.artifactAuditJson,
               artifactKeys: expect.objectContaining({

@@ -19,6 +19,7 @@ import type { FlashcardFigureContext } from "#api/modules/flashcards/types/flash
 import type { AiFeatureRoute } from "#api/modules/provider-operations/types/provider-operations.types";
 import { buildWholeFeatureUsageTarget } from "#api/modules/provider-operations/utils/provider-usage-target";
 import {
+  FLASHCARD_SCHEMA_VERSION,
   flashcardGenerationJobInputSchema,
   generatedFlashcardOutputSchema,
 } from "#api/modules/flashcards/types/flashcard-generation.types";
@@ -29,7 +30,11 @@ import {
   toFlashcardTiptap,
   validateGeneratedFlashcards,
 } from "#api/modules/flashcards/utils/flashcard-generation-mapper";
-import { buildFlashcardStructuredInput } from "#api/modules/flashcards/utils/flashcard-generation-prompt";
+import {
+  buildFlashcardStructuredInput,
+  resolveFlashcardPromptVersion,
+} from "#api/modules/flashcards/utils/flashcard-generation-prompt";
+import { resolveAiStructuredTextFormat } from "#api/modules/ai/utils/ai-structured-output-format";
 
 @Injectable()
 export class FlashcardGenerationService {
@@ -99,6 +104,27 @@ export class FlashcardGenerationService {
       );
     }
     const sourceSnapshot = asRecord(draft.sourceSnapshotJson);
+    const subject = {
+      key: input.subjectKey,
+      name: input.subjectName,
+      slug: input.subjectSlug,
+    };
+    const currentFormat = resolveAiStructuredTextFormat(
+      generatedFlashcardOutputSchema,
+      "generated_flashcards",
+      "ref_v2",
+    );
+    if (
+      readNullableText(sourceSnapshot.promptVersion) !==
+        resolveFlashcardPromptVersion(subject) ||
+      draft.schemaName !== "generated_flashcards" ||
+      draft.schemaVersion !== FLASHCARD_SCHEMA_VERSION ||
+      draft.schemaHash !== hashAiValue(currentFormat.format.schema)
+    ) {
+      throw new UnrecoverableError(
+        "AI_INPUT_SNAPSHOT_STALE: Prompt hoặc schema Flashcard đã thay đổi sau khi preview.",
+      );
+    }
     const manifest = readFlashcardPacketManifest(draft.manifestJson);
     const existingCards = await this.prisma.flashcard.findMany({
       where: { lessonId: context.lessonId, deletedAt: null },
@@ -149,14 +175,14 @@ export class FlashcardGenerationService {
         .cleanupPacket(draft.packetObjectKey)
         .catch(() => undefined);
     }
-    validateGeneratedFlashcards({
+    const reviewWarnings = validateGeneratedFlashcards({
       output: output.data,
       requestedCount: input.cardCount,
       packetPageCount: draft.packetPageCount,
       difficulty: input.difficulty,
       difficultyCounts: input.difficultyCounts,
     });
-    return { action: "FLASHCARD", output };
+    return { action: "FLASHCARD", output, contextMetadata: { reviewWarnings } };
   }
 
   async persist(
@@ -217,7 +243,13 @@ export class FlashcardGenerationService {
           back: normalizeFlashcardLearnerText(card.back),
           solution: normalizeFlashcardLearnerText(card.solution),
         };
-        const reviewWarnings = collectFlashcardMathSyntaxWarnings(normalizedCard);
+        const semanticWarnings = readFlashcardReviewWarnings(
+          prepared.contextMetadata,
+        ).filter((warning) => warning.cardIndex === index);
+        const reviewWarnings = [
+          ...collectFlashcardMathSyntaxWarnings(normalizedCard),
+          ...semanticWarnings.map(({ cardIndex: _cardIndex, ...warning }) => warning),
+        ];
         const cardId = randomUUID();
         await tx.flashcard.create({
           data: {
@@ -271,6 +303,22 @@ export class FlashcardGenerationService {
           updatedById: context.ownerUserId,
         },
       });
+      const generationIssues = readFlashcardReviewWarnings(prepared.contextMetadata).map(
+        (warning) => ({
+          ...warning,
+          classification: "REVIEWABLE",
+          blocking: false,
+        }),
+      );
+      await tx.aiGeneration.update({
+        where: { id: context.aiGenerationId },
+        data: {
+          inputMetaJson: json({
+            ...asRecord(context.inputMeta),
+            generationIssues,
+          }),
+        },
+      });
       await tx.auditLog.create({
         data: {
           actorUserId: context.ownerUserId,
@@ -291,6 +339,7 @@ export class FlashcardGenerationService {
         result: {
           reviewStatus: ReviewStatus.NEEDS_REVIEW,
           itemCount: output.cards.length,
+          generationIssues,
         },
       };
     });
@@ -372,6 +421,10 @@ function readRequiredText(value: unknown, field: string) {
   return value;
 }
 
+function readNullableText(value: unknown) {
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
 function readFlashcardPacketManifest(value: unknown) {
   const record = asRecord(value);
   if (record.version !== 1 || !Array.isArray(record.pages)) {
@@ -425,23 +478,47 @@ function resolveSourcePages(
   requestDraftId: string,
   pages: ReturnType<typeof draftManifestPages>,
 ) {
-  return pageNumbers.map((packetPageNumber) => {
+  return pageNumbers.flatMap((packetPageNumber) => {
     const page = pages.find(
       (candidate) => candidate.packetPageNumber === packetPageNumber,
     );
     if (!page) {
-      throw new UnrecoverableError(
-        `AI_OUTPUT_SOURCE_INVALID: Trang packet ${packetPageNumber} không tồn tại.`,
-      );
+      return [];
     }
-    return {
-      requestDraftId,
-      packetPageNumber,
-      sourcePdfPageNumber: page.sourcePdfPageNumber,
-      printedPageLabel: page.printedPageLabel,
-      documentTitle: page.documentTitle,
-      lessonDocumentId: page.lessonDocumentId,
-      sourceDocumentId: page.sourceDocumentId,
-    };
+    return [
+      {
+        requestDraftId,
+        packetPageNumber,
+        sourcePdfPageNumber: page.sourcePdfPageNumber,
+        printedPageLabel: page.printedPageLabel,
+        documentTitle: page.documentTitle,
+        lessonDocumentId: page.lessonDocumentId,
+        sourceDocumentId: page.sourceDocumentId,
+      },
+    ];
   });
+}
+
+function readFlashcardReviewWarnings(value: unknown) {
+  const warnings = asRecord(value).reviewWarnings;
+  if (!Array.isArray(warnings)) return [];
+  return warnings.filter(
+    (
+      warning,
+    ): warning is {
+      code: string;
+      message: string;
+      severity: "WARNING";
+      paths: string[];
+      cardIndex?: number;
+    } => {
+      const record = asRecord(warning);
+      return (
+        typeof record.code === "string" &&
+        typeof record.message === "string" &&
+        record.severity === "WARNING" &&
+        Array.isArray(record.paths)
+      );
+    },
+  );
 }

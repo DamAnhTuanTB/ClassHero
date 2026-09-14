@@ -17,6 +17,16 @@ test("student chuyển giữa toàn bộ và từng phần của Video Summary",
   });
 
   await page.goto(`/student/lessons/${lessonId}`);
+  await expect(page.getByRole("link", { name: "Chat với AI" })).toHaveAttribute(
+    "href",
+    "/student/ai-chat?scope=COURSE&learningPathId=path-m7&surfaceLessonId=lesson-m7&videoPlaybackSeconds=0",
+  );
+  await page.getByRole("button", { name: "Lý thuyết", exact: true }).click();
+  await expect(page.getByRole("link", { name: "Chat với AI" })).toHaveAttribute(
+    "href",
+    "/student/ai-chat?scope=COURSE&learningPathId=path-m7&surfaceLessonId=lesson-m7",
+  );
+  await page.getByRole("button", { name: "Video", exact: true }).click();
   await expect(page.getByRole("button", { name: "Tất cả" })).toHaveAttribute(
     "aria-pressed",
     "true",
@@ -436,6 +446,175 @@ test("completed test offers review and a new test attempt", async ({ page }) => 
   await expect(page.getByTestId("test-runner-screen")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Câu 1" })).toBeVisible();
   await expectNoFrameworkOverlay(page);
+});
+
+test("AI chat is hidden while taking a test and available after submission", async ({
+  page,
+}) => {
+  await setupStudentLearningApiMock(page, {
+    testCompleted: true,
+    testPasses: true,
+    testReady: true,
+  });
+  await page.goto(`/student/lessons/${lessonId}?tab=test`);
+
+  await page.getByRole("button", { name: "Xem lại bài thi" }).click();
+  const resultScreen = page.getByTestId("test-result-screen");
+  await expect(resultScreen).toBeVisible();
+  await expect(
+    resultScreen.getByTestId("student-ai-chat-trigger-test-result"),
+  ).toHaveAttribute(
+    "href",
+    "/student/ai-chat?scope=COURSE&learningPathId=path-m7&surfaceLessonId=lesson-m7",
+  );
+
+  await resultScreen.getByRole("button", { name: "Xem lại tất cả" }).click();
+  const reviewScreen = page.getByTestId("test-review-screen");
+  await expect(reviewScreen).toBeVisible();
+  await expect(
+    reviewScreen.getByTestId("student-ai-chat-trigger-review"),
+  ).toHaveAttribute(
+    "href",
+    "/student/ai-chat?scope=COURSE&learningPathId=path-m7&surfaceLessonId=lesson-m7&targetType=TEST_QUESTION&targetId=test-question-m7",
+  );
+
+  await reviewScreen.getByRole("button", { name: "Quay lại kết quả Bài thi" }).click();
+  await resultScreen.getByRole("button", { name: "Làm lại bài thi mới" }).click();
+  await expect(page.getByTestId("test-runner-screen")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Chat với AI" })).toHaveCount(0);
+
+  const cancelRequest = page.waitForRequest(
+    (request) =>
+      request.method() === "POST" &&
+      request.url().endsWith("/student/test-attempts/test-attempt-m7/cancel"),
+  );
+  await page.getByRole("button", { name: "Quay lại màn Bài thi" }).click();
+  await page.getByRole("button", { name: "Vẫn thoát" }).click();
+  await cancelRequest;
+  await expect(page.getByTestId("test-runner-screen")).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Chat với AI" })).toBeVisible();
+});
+
+test("Quiz runner Chat link carries the active attempt and current question", async ({
+  page,
+}) => {
+  await setupStudentLearningApiMock(page, {
+    testReady: false,
+    testPasses: false,
+  });
+  await page.goto(`/student/lessons/${lessonId}?tab=quiz`);
+
+  await page.getByRole("button", { name: "Bắt đầu", exact: true }).click();
+
+  await expect(page.getByTestId("student-ai-chat-trigger-quiz-runner")).toHaveAttribute(
+    "href",
+    "/student/ai-chat?scope=COURSE&learningPathId=path-m7&surfaceLessonId=lesson-m7&activityType=QUIZ_ATTEMPT&activityId=quiz-attempt-m7&targetType=QUIZ_QUESTION&targetId=quiz-question-m7",
+  );
+
+  const checkedProgressRequest = page.waitForRequest(
+    (request) =>
+      request.method() === "PATCH" &&
+      request.url().endsWith("/student/quiz-attempts/quiz-attempt-m7/progress") &&
+      request.postDataJSON()?.answer?.isChecked === true,
+  );
+  await page.getByRole("button", { name: /B.*4/ }).click();
+  await page.getByRole("button", { name: "Kiểm tra đáp án" }).click();
+  await checkedProgressRequest;
+  await page.getByRole("button", { name: "Hoàn thành Quiz" }).click();
+  await page.getByRole("button", { name: "Xem lại tất cả" }).click();
+
+  await expect(
+    page.getByTestId("quiz-review-screen").getByTestId("student-ai-chat-trigger-review"),
+  ).toHaveAttribute(
+    "href",
+    "/student/ai-chat?scope=COURSE&learningPathId=path-m7&surfaceLessonId=lesson-m7&targetType=QUIZ_QUESTION&targetId=quiz-question-m7",
+  );
+});
+
+test("Flashcard runner Chat link carries the active session and current card", async ({
+  page,
+}) => {
+  await setupStudentLearningApiMock(page, {
+    testReady: false,
+    testPasses: false,
+  });
+  await page.goto(`/student/lessons/${lessonId}?tab=flashcard`);
+
+  await page.getByRole("button", { name: "Bắt đầu", exact: true }).click();
+
+  await expect(
+    page.getByTestId("student-ai-chat-trigger-flashcard-runner"),
+  ).toHaveAttribute(
+    "href",
+    "/student/ai-chat?scope=COURSE&learningPathId=path-m7&surfaceLessonId=lesson-m7&activityType=FLASHCARD_STUDY_SESSION&activityId=flashcard-session-m7-1&targetType=FLASHCARD&targetId=flashcard-m7",
+  );
+});
+
+test("Flashcard review Chat link does not carry an active runner context", async ({
+  page,
+}) => {
+  await setupStudentLearningApiMock(page, {
+    flashcardCardCount: 3,
+    flashcardCompleted: true,
+    testReady: false,
+    testPasses: false,
+  });
+  await page.goto(`/student/lessons/${lessonId}?tab=flashcard`);
+  await page.getByRole("button", { name: "Mở cài đặt Flashcard" }).click();
+  await page.getByRole("menuitem", { name: "Các bộ Flashcard đã học" }).click();
+  await page
+    .getByRole("dialog", { name: "Các bộ Flashcard đã học" })
+    .getByRole("button", { name: "Xem lại" })
+    .click();
+
+  await expect(
+    page.getByTestId("student-ai-chat-trigger-flashcard-review"),
+  ).toHaveAttribute(
+    "href",
+    "/student/ai-chat?scope=COURSE&learningPathId=path-m7&surfaceLessonId=lesson-m7&targetType=FLASHCARD&targetId=flashcard-m7",
+  );
+});
+
+test("AI chat trigger is disabled with a custom tooltip when a test is active in another tab", async ({
+  page,
+}, testInfo) => {
+  const api = await setupStudentLearningApiMock(page, {
+    testPasses: false,
+    testReady: false,
+  });
+  await page.goto(`/student/lessons/${lessonId}`);
+
+  const disabledTrigger = page.locator(
+    '[data-testid="student-ai-chat-trigger"]:visible, [data-testid="student-ai-chat-trigger-mobile"]:visible',
+  );
+
+  await expect(disabledTrigger).toHaveAttribute("href", /\/student\/ai-chat/u);
+  const testRunnerTab = await page.context().newPage();
+  await testRunnerTab.goto("about:blank");
+  await testRunnerTab.bringToFront();
+  api.setTestAttemptActive(true);
+  await page.bringToFront();
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+
+  await expect(disabledTrigger).toBeDisabled();
+  await expect(page.getByRole("link", { name: "Chat với AI" })).toHaveCount(0);
+  if (testInfo.project.name === "chromium-desktop") {
+    await disabledTrigger.hover();
+  } else {
+    await disabledTrigger.focus();
+  }
+  await expect(
+    page.getByRole("tooltip", {
+      name: "Bạn không thể sử dụng tính năng này khi đang làm bài thi!",
+    }),
+  ).toBeVisible();
+  await expect(page.locator("[data-immediate-tooltip]")).toHaveText(
+    "Bạn không thể sử dụng tính năng này khi đang làm bài thi!",
+  );
+  await page.screenshot({
+    path: testInfo.outputPath("student-ai-chat-disabled-tooltip.png"),
+  });
+  await testRunnerTab.close();
 });
 
 test("empty Quiz, Flashcard, and Test disable start actions", async ({ page }) => {
@@ -3371,6 +3550,7 @@ async function seedStudentSession(page: Page) {
 async function setupStudentLearningApiMock(
   page: Page,
   options: {
+    activeTestInAnotherTab?: boolean;
     alternateQuizStatusDelayMs?: number;
     flashcardCardCount?: number;
     flashcardCompleted?: boolean;
@@ -3438,6 +3618,7 @@ async function setupStudentLearningApiMock(
   let latestQuizAttempt: QuizAttemptSummaryPayload | null = null;
   let testCompleted = options.testCompleted ?? false;
   let testSubmitted = testCompleted;
+  let testAttemptActive = options.activeTestInAnotherTab ?? false;
   let flashcardSessionCount = 0;
   const flashcardSessions: Array<{
     id: string;
@@ -3666,6 +3847,11 @@ async function setupStudentLearningApiMock(
           options.testQuestionCount,
           options.omitTestSet,
         ),
+      });
+    }
+    if (method === "GET" && pathname === "/student/test-attempts/active-status") {
+      return fulfillJson(route, 200, {
+        data: { isActive: testAttemptActive },
       });
     }
     if (
@@ -3967,7 +4153,17 @@ async function setupStudentLearningApiMock(
       method === "POST" &&
       pathname === `/student/lessons/${lessonId}/test-attempts/start`
     ) {
+      testAttemptActive = true;
       return fulfillJson(route, 200, { data: testAttemptPayload() });
+    }
+    if (
+      method === "POST" &&
+      pathname === "/student/test-attempts/test-attempt-m7/cancel"
+    ) {
+      testAttemptActive = false;
+      return fulfillJson(route, 200, {
+        data: { id: "test-attempt-m7", status: "CANCELLED" },
+      });
     }
     if (method === "GET" && pathname === `/student/lessons/${lessonId}/test-history`) {
       const historyItems = testSubmitted
@@ -4026,6 +4222,7 @@ async function setupStudentLearningApiMock(
       method === "POST" &&
       pathname === "/student/test-attempts/test-attempt-m7/submit"
     ) {
+      testAttemptActive = false;
       testSubmitted = true;
       testCompleted ||= Boolean(options.testPasses);
       return fulfillJson(route, 200, {
@@ -4058,6 +4255,12 @@ async function setupStudentLearningApiMock(
       error: { code: "NOT_FOUND", message: `No mock for ${method} ${pathname}` },
     });
   });
+
+  return {
+    setTestAttemptActive(isActive: boolean) {
+      testAttemptActive = isActive;
+    },
+  };
 }
 
 function quizFeedbackPayload() {

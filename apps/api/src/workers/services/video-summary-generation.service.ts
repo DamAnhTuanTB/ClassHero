@@ -10,7 +10,6 @@ import type {
 import { AiProviderCallService } from "#api/modules/ai/services/ai-provider-call.service";
 import {
   alignVideoSummaryOutputToChapters,
-  buildVideoSummaryProviderOutputSchema,
   hasValidVideoSummaryCueStartTimes,
   hasMatchingVideoSummaryChapters,
   collectVideoSummaryOutputWarnings,
@@ -18,21 +17,26 @@ import {
   videoSummarySectionsToChapters,
   videoSummaryOutputSchema,
 } from "#api/modules/learning-paths/utils/video-summary-output";
+import { hashAiValue } from "#api/modules/ai/utils/ai-hash";
+import { buildVideoSummaryProviderContract } from "#api/modules/learning-paths/utils/video-summary-provider-contract";
 import { buildWholeFeatureUsageTarget } from "#api/modules/provider-operations/utils/provider-usage-target";
 import {
   buildVideoSummarySource,
   serializeVideoSummarySourceText,
 } from "#api/modules/learning-paths/utils/video-summary-source";
-import {
-  buildVideoSummaryStructuredRequestPolicy,
-  VIDEO_SUMMARY_PROMPT_VERSION,
-} from "#api/modules/learning-paths/utils/video-summary-prompt";
+import { buildVideoSummaryStructuredRequestPolicy } from "#api/modules/learning-paths/utils/video-summary-prompt";
 import { z } from "zod";
+import { VideoSummaryIndexService } from "#api/modules/learning-paths/services/video-summary-index.service";
+import { EmbeddingJobEnqueuer } from "#api/workers/services/embedding-job-enqueuer.service";
 
 const inputSchema = z.object({
   requestDraftId: z.string().uuid(),
   requestHash: z.string().length(64),
   sourceHash: z.string().length(64),
+  schemaName: z.string().min(1),
+  schemaVersion: z.string().min(1),
+  schemaHash: z.string().length(64),
+  promptVersion: z.string().min(1),
 });
 @Injectable()
 export class VideoSummaryGenerationService {
@@ -41,6 +45,10 @@ export class VideoSummaryGenerationService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(AiProviderCallService) private readonly provider: AiProviderCallService,
+    @Inject(VideoSummaryIndexService)
+    private readonly videoSummaryIndex: VideoSummaryIndexService,
+    @Inject(EmbeddingJobEnqueuer)
+    private readonly embeddingEnqueuer: EmbeddingJobEnqueuer,
   ) {}
   async generate(
     context: AiGenerationExecutionContext,
@@ -52,23 +60,52 @@ export class VideoSummaryGenerationService {
       throw new UnrecoverableError(
         "AI_INPUT_SNAPSHOT_STALE: Dữ liệu job tóm tắt video không hợp lệ.",
       );
-    const draft = await this.prisma.lessonVideoSummaryRequestDraft.findFirst({
-      where: {
-        id: input.data.requestDraftId,
-        lessonId: context.lessonId,
-        requestHash: input.data.requestHash,
-      },
-    });
-    const lesson = await this.prisma.lesson.findFirst({
-      where: { id: context.lessonId, deletedAt: null },
-      select: { videoUrl: true, customVideoSettings: true },
-    });
+    const [draft, lesson, aiGeneration] = await Promise.all([
+      this.prisma.lessonVideoSummaryRequestDraft.findFirst({
+        where: {
+          id: input.data.requestDraftId,
+          lessonId: context.lessonId,
+          requestHash: input.data.requestHash,
+        },
+      }),
+      this.prisma.lesson.findFirst({
+        where: { id: context.lessonId, deletedAt: null },
+        select: { videoUrl: true, customVideoSettings: true },
+      }),
+      this.prisma.aiGeneration.findFirst({
+        where: {
+          id: context.aiGenerationId,
+          backgroundJobId: context.backgroundJobId,
+          type: AiGenerationType.VIDEO_SUMMARY,
+        },
+        select: { promptVersion: true, schemaVersion: true },
+      }),
+    ]);
     const source = lesson && buildVideoSummarySource(lesson);
     if (!draft || !source || source.hashes.source !== input.data.sourceHash)
       throw new UnrecoverableError(
         "AI_SOURCE_CONTEXT_STALE: Video hoặc transcript đã thay đổi sau khi tạo job.",
       );
-    const providerOutputSchema = buildVideoSummaryProviderOutputSchema(source.chapters);
+    const contract = buildVideoSummaryProviderContract(source.chapters);
+    const draftPromptVersion = readPromptVersion(draft.modelConfigJson);
+    if (
+      !aiGeneration ||
+      aiGeneration.promptVersion !== contract.promptVersion ||
+      aiGeneration.schemaVersion !== contract.schemaVersion ||
+      input.data.schemaName !== contract.schemaName ||
+      input.data.schemaVersion !== contract.schemaVersion ||
+      input.data.schemaHash !== contract.schemaHash ||
+      input.data.promptVersion !== contract.promptVersion ||
+      draft.schemaName !== contract.schemaName ||
+      draft.schemaVersion !== contract.schemaVersion ||
+      draft.schemaHash !== contract.schemaHash ||
+      hashAiValue(draft.schemaJson) !== contract.schemaHash ||
+      draftPromptVersion !== contract.promptVersion
+    ) {
+      throw new UnrecoverableError(
+        "AI_INPUT_SNAPSHOT_STALE: Contract AI của bản xem trước hoặc job tóm tắt video đã thay đổi.",
+      );
+    }
     const output = await this.provider.generateStructured(
       {
         feature: AiGenerationType.VIDEO_SUMMARY,
@@ -86,9 +123,9 @@ export class VideoSummaryGenerationService {
       },
       {
         ...buildVideoSummaryStructuredRequestPolicy(),
-        outputName: draft.schemaName,
-        promptVersion: VIDEO_SUMMARY_PROMPT_VERSION,
-        schemaVersion: draft.schemaVersion,
+        outputName: contract.schemaName,
+        promptVersion: contract.promptVersion,
+        schemaVersion: contract.schemaVersion,
         systemPrompt: draft.systemInstructions,
         userPrompt: draft.userPrompt,
         inputTextItems: [
@@ -99,9 +136,9 @@ export class VideoSummaryGenerationService {
         ],
         maxTokens: context.providerRouteSnapshot?.maxOutputTokens ?? undefined,
       },
-      providerOutputSchema,
+      contract.outputSchema,
     );
-    const providerParsedOutput = providerOutputSchema.safeParse(output.data);
+    const providerParsedOutput = contract.outputSchema.safeParse(output.data);
     if (!providerParsedOutput.success) {
       throw new UnrecoverableError(
         "VIDEO_SUMMARY_OUTPUT_INVALID: Kết quả AI không đúng cấu trúc chapter.",
@@ -241,9 +278,22 @@ export class VideoSummaryGenerationService {
           deletedAt: null,
         },
       });
-      return { summary, generatedChapters };
+      const index = await this.videoSummaryIndex.syncInTransaction(tx, {
+        videoSummaryId: summary.id,
+        lessonId,
+        contentJson: summary.contentJson,
+      });
+      return { summary, generatedChapters, index };
     });
-    const { summary, generatedChapters } = persistence;
+    const { summary, generatedChapters, index } = persistence;
+    if (index.chunkCount > 0) {
+      await this.embeddingEnqueuer.enqueueVideoSummaryEmbeddingJob({
+        lessonId,
+        videoSummaryId: index.videoSummaryId,
+        summaryHash: index.summaryHash,
+        ownerUserId: context.ownerUserId ?? undefined,
+      });
+    }
     return {
       resourceType: "LESSON_VIDEO_SUMMARY",
       resourceId: summary.id,
@@ -261,6 +311,11 @@ function omitRoute(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return value;
   const { routeSnapshot: _routeSnapshot, ...rest } = value as Record<string, unknown>;
   return rest;
+}
+function readPromptVersion(value: Prisma.JsonValue) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const promptVersion = (value as Record<string, unknown>).promptVersion;
+  return typeof promptVersion === "string" ? promptVersion : null;
 }
 function readHashes(value: unknown) {
   const hashes =

@@ -17,13 +17,27 @@ Tất cả endpoint dưới đây yêu cầu Bearer token role `ADMIN`, prefix `
 | `GET`     | `/admin/provider-operations/usage/events`               | Event list phân trang và filter                          |
 | `GET`     | `/admin/provider-operations/audit-history`              | Lịch sử đổi model/giá/budget/accounting                  |
 
-`GET/PUT /ai-configurations` trả/nhận chín cấu hình: đủ tám cặp của
+`GET/PUT /ai-configurations` trả/nhận mười cấu hình: đủ tám cặp của
 `feature = SUMMARY | QUIZ | FLASHCARD | TEST` với `purpose = TEXT | IMAGE`, cộng
-`VIDEO_SUMMARY/TEXT`; không nhận `VIDEO_SUMMARY/IMAGE`. Mỗi item có model chính/dự phòng, temperature hoặc
-reasoning effort, `maxInputTokens`, `maxOutputTokens`, `version`; optimistic
-conflict được kiểm tra theo đúng cặp. Hai giới hạn token là số nguyên dương;
-thiếu một giới hạn thì budget guard fail-closed. Catalog create/update và
-price-version API không nhận hai field này.
+`VIDEO_SUMMARY/TEXT` và `CHAT/TEXT`; không nhận `VIDEO_SUMMARY/IMAGE` hoặc
+`CHAT/IMAGE`. Mỗi item có model chính/dự phòng, temperature hoặc
+reasoning effort, `maxInputTokens`, `maxOutputTokens`,
+`fallbackMaxInputTokens`, `fallbackMaxOutputTokens`, `version`; optimistic
+conflict được kiểm tra theo đúng cặp. Các giới hạn token là số nguyên dương;
+thiếu giới hạn cần thiết của candidate đang gọi thì budget guard fail-closed.
+Catalog create/update và price-version API không nhận các field này.
+
+Response còn trả `chatSettings` tách khỏi mảng `CHAT/TEXT`: model embedding
+OpenAI + dimensions của vector space, số ảnh tối đa mỗi câu hỏi, dung lượng
+mỗi ảnh, MIME allowlist, số câu hỏi AI thành công/ngày và số ảnh
+thuộc các câu hỏi đó/ngày. `PUT` nhận `chatSettings.expectedVersion`
+riêng; model embedding không được xuất hiện trong select model tạo câu
+trả lời và phải tương thích dimensions của document vector space.
+
+`M9.34` hiển thị và cập nhật `CHAT/TEXT` cùng `chatSettings` ngay trong tab `Thiết lập mặc định` của
+`/admin/ai-chat`, nhưng vẫn gọi đúng endpoint và optimistic version ở trên. Đây
+không phải cấu hình thứ hai. Override của một phiên mô phỏng được lưu cùng phiên
+qua API Admin Chat, không ghi đè `ai_feature_model_configs`.
 
 ## Concurrency và validation
 
@@ -51,7 +65,7 @@ price-version API không nhận hai field này.
   không dùng một nhãn hình minh họa chung. Event cũ có thể trả `null`.
 - Mỗi AI item trả thêm `targetContext` có schema versioned và `targetLabel` ngắn.
   `operation` mô tả hành động, `targetLabel` mô tả đích cụ thể, ví dụ `Ví dụ 2 ·
-  Hình lời giải`, `Quiz · Câu 4 · Hình đề`, `Flashcard · Thẻ 2 · Hình lời giải`
+Hình lời giải`, `Quiz · Câu 4 · Hình đề`, `Flashcard · Thẻ 2 · Hình lời giải`
   hoặc `Quiz · Cả bộ`. API không trả raw UUID trong label; event cũ không xác
   định chắc chắn trả `targetContext=null`, `targetLabel="Chưa xác định"`.
 - Target context phải được truyền vào provider gateway trước attempt cho mọi

@@ -71,7 +71,7 @@ function PromptMarkdownPreview({ content }: { content: string }) {
 
 function PromptMarkdownContent({ content }: { content: string }) {
   return (
-    <div className="mmd-content whitespace-pre-wrap break-words [&_code]:whitespace-pre-wrap [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-[var(--theme-surface-soft)] [&_pre]:p-3">
+    <div className="mmd-content whitespace-normal break-words [&_blockquote]:whitespace-pre-wrap [&_li]:whitespace-pre-wrap [&_p]:whitespace-pre-wrap [&_code]:whitespace-pre-wrap [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-[var(--theme-surface-soft)] [&_pre]:p-3">
       <ReactMarkdown
         rehypePlugins={[rehypeKatex]}
         remarkPlugins={[remarkGfm, remarkMath]}

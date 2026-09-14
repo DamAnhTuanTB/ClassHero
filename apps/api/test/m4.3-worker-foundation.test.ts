@@ -80,6 +80,7 @@ describe("M4.3 BullMQ worker foundation", () => {
         status: BackgroundJobStatus.QUEUED,
         errorMessage: null,
       }),
+      select: expect.any(Object),
     });
   });
 
@@ -107,6 +108,7 @@ describe("M4.3 BullMQ worker foundation", () => {
         status: BackgroundJobStatus.FAILED,
         errorMessage: "Không enqueue được BullMQ job: Redis unavailable",
       }),
+      select: expect.any(Object),
     });
   });
 

@@ -1,4 +1,11 @@
-import { BookOpen, Bot, FileText, Layers3, Shapes } from "lucide-react";
+import {
+  BookOpen,
+  Bot,
+  FileText,
+  Layers3,
+  MessageCircleMore,
+  Shapes,
+} from "lucide-react";
 import type { AdminCoursesSidebarItem } from "@/components/admin/courses/admin-courses-sidebar";
 
 export type AdminNavigationKey =
@@ -6,6 +13,7 @@ export type AdminNavigationKey =
   | "domains"
   | "lessons"
   | "documents"
+  | "ai-chat"
   | "ai-settings";
 
 export function getAdminNavigationItems(
@@ -33,6 +41,12 @@ export function getAdminNavigationItems(
       label: "Tài liệu",
       icon: FileText,
       active: activeItem === "documents",
+    },
+    {
+      label: "Chat với AI",
+      icon: MessageCircleMore,
+      active: activeItem === "ai-chat",
+      href: "/admin/ai-chat",
     },
     {
       label: "Cài đặt AI",

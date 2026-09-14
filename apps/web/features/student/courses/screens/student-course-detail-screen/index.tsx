@@ -235,11 +235,37 @@ export function StudentCourseDetailScreen({
       style={{ background: "var(--student-screen-bg)" }}
     >
       <div className="hidden lg:block">
-        <StudentCoursesHeader title={course.title} initialThemeMode={initialThemeMode} />
+        <StudentCoursesHeader
+          title={course.title}
+          initialThemeMode={initialThemeMode}
+          aiChatContext={
+            isLockedCourse
+              ? undefined
+              : {
+                  scopeType: "COURSE",
+                  learningPathId: course.id,
+                  preferredLessonIds: shouldShowLearningProgress
+                    ? [detail.continueLessonId]
+                    : undefined,
+                }
+          }
+        />
       </div>
       <div className="mx-auto grid max-w-3xl gap-4 lg:gap-6">
         <div className="min-w-0 space-y-4">
-          <StudentCourseMobileBrandBar />
+          <StudentCourseMobileBrandBar
+            aiChatContext={
+              isLockedCourse
+                ? undefined
+                : {
+                    scopeType: "COURSE",
+                    learningPathId: course.id,
+                    preferredLessonIds: shouldShowLearningProgress
+                      ? [detail.continueLessonId]
+                      : undefined,
+                  }
+            }
+          />
 
           <section className="overflow-hidden rounded-[1.35rem] bg-white p-4 dark:bg-[var(--theme-surface)] lg:p-5">
             <StudentCourseDetailHeroArt

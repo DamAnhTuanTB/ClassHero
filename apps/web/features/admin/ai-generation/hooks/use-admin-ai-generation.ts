@@ -44,6 +44,7 @@ import type {
 import type { LessonSummaryPhaseOneLayoutOperation } from "@/features/admin/ai-generation/utils/lesson-summary-phase-one-preview";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 import { getUsageEvents } from "@/features/admin/ai-settings/api/provider-operations-api";
+import { useAuthenticatedRealtime } from "@/components/common/realtime/authenticated-realtime-provider";
 
 export const adminAiGenerationQueryKeys = {
   panel: (lessonId: string) =>
@@ -61,6 +62,7 @@ export function useAdminAiGenerationPanel(
   options?: { pollUsage?: boolean },
 ) {
   const session = useAuthSessionStore((state) => state.session);
+  const { status: realtimeStatus } = useAuthenticatedRealtime();
   return useQuery({
     queryKey: adminAiGenerationQueryKeys.panel(lessonId),
     queryFn: () => getAdminAiGenerationPanel(lessonId, session?.accessToken ?? ""),
@@ -70,14 +72,18 @@ export function useAdminAiGenerationPanel(
     refetchInterval: (query) => {
       const data = query.state.data;
       if (!data) return false;
-      if (options?.pollUsage) return 1_500;
+      if (options?.pollUsage) return realtimeStatus === "connected" ? 60_000 : 2_000;
       if (
         data.videoSummaryJob &&
         ["QUEUED", "RUNNING"].includes(data.videoSummaryJob.status)
       ) {
-        return 1_500;
+        return realtimeStatus === "connected" ? 60_000 : 3_000;
       }
-      return data.documents.some((doc) => doc.status === "PROCESSING") ? 5_000 : false;
+      return data.documents.some((doc) => doc.status === "PROCESSING")
+        ? realtimeStatus === "connected"
+          ? 60_000
+          : 5_000
+        : false;
     },
     refetchIntervalInBackground: false,
   });
@@ -89,6 +95,7 @@ export function useAdminAiGenerationUsageEvents(
   enabled: boolean,
 ) {
   const session = useAuthSessionStore((state) => state.session);
+  const { status: realtimeStatus } = useAuthenticatedRealtime();
   return useQuery({
     queryKey: adminAiGenerationQueryKeys.usageEvents(aiGenerationId ?? "idle", page),
     queryFn: () =>
@@ -98,13 +105,18 @@ export function useAdminAiGenerationUsageEvents(
       }),
     enabled: enabled && Boolean(aiGenerationId && session?.accessToken),
     staleTime: 2_000,
-    refetchInterval: enabled ? 2_000 : false,
+    refetchInterval: enabled
+      ? realtimeStatus === "connected"
+        ? 60_000
+        : 3_000
+      : false,
     refetchIntervalInBackground: false,
   });
 }
 
 export function useAdminStemFigures(lessonId: string) {
   const session = useAuthSessionStore((state) => state.session);
+  const { status: realtimeStatus } = useAuthenticatedRealtime();
   return useQuery({
     queryKey: adminAiGenerationQueryKeys.stemFigures(lessonId),
     queryFn: () => getAdminStemFigures(lessonId, session?.accessToken ?? ""),
@@ -115,7 +127,9 @@ export function useAdminStemFigures(lessonId: string) {
       query.state.data?.some((figure) =>
         ["QUEUED", "RENDERING", "REPAIRING"].includes(figure.status),
       )
-        ? 1_500
+        ? realtimeStatus === "connected"
+          ? 60_000
+          : 3_000
         : false,
     refetchIntervalInBackground: false,
   });
@@ -285,6 +299,7 @@ export function useApplyAdminStemFigureDraft(lessonId: string) {
 
 export function useAdminAiJob(jobId: string | null, enabled: boolean) {
   const session = useAuthSessionStore((state) => state.session);
+  const { status: realtimeStatus } = useAuthenticatedRealtime();
   return useQuery({
     queryKey: adminAiGenerationQueryKeys.job(jobId ?? "idle"),
     queryFn: () => getAdminAiJob(jobId ?? "", session?.accessToken ?? ""),
@@ -292,7 +307,11 @@ export function useAdminAiJob(jobId: string | null, enabled: boolean) {
     refetchOnWindowFocus: false,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      return status === "QUEUED" || status === "RUNNING" ? 1_500 : false;
+      return status === "QUEUED" || status === "RUNNING"
+        ? realtimeStatus === "connected"
+          ? 60_000
+          : 3_000
+        : false;
     },
     staleTime: 0,
   });

@@ -321,12 +321,15 @@ describe("subject-owned AI system prompt architecture", () => {
         expect(prompt).toContain("quan hệ logic giữa các dòng");
         expect(prompt).toContain("mỗi display chỉ có một dấu `=`");
         expect(prompt).toContain("Counterexample hợp lệ");
-        expect(prompt).toContain("đối chiếu từng cặp dòng kề nhau");
         for (const rule of subjectSpecificRules[subject.key]) {
           expect(prompt).toContain(rule);
         }
       }
 
+      expect(quiz).toContain(
+        "Trong cùng lượt viết chuỗi biến đổi, từng cặp dòng kề nhau",
+      );
+      expect(summary).toContain("đối chiếu từng cặp dòng kề nhau");
       expect(summary).toContain("Với `SOURCE_EXACT`");
 
       for (const figurePrompt of [
@@ -348,13 +351,24 @@ describe("subject-owned AI system prompt architecture", () => {
       expect(quiz).not.toContain("Rà mọi field hiển thị trước khi trả JSON");
       expect(quiz).not.toContain("tự rà mọi field có LaTeX");
       expect(quiz).toContain("KIỂM CHỨNG");
-      expect(quiz).toContain("kiểm tra độc lập");
+      expect(quiz.match(/LƯỢT TỰ GIẢI VÀ KIỂM CHỨNG THEO TỪNG CÂU/gu)).toHaveLength(1);
+      expect(quiz).not.toContain("LƯỢT KIỂM TRA NHẤT QUÁN CUỐI CHO CẢ BỘ");
+      expect(quiz).toContain("đúng lượt cục bộ của candidate này");
+      expect(quiz).toContain("cấm audit hoặc tự giải lại toàn bộ bộ câu");
+      expect(quiz).toContain("không dựng một lời giải thứ hai");
+      expect(quiz).not.toContain("kiểm tra độc lập");
+      expect(quiz).not.toContain("Trước khi trả JSON, chỉ với mỗi câu đã được chọn");
+      expect(quiz).not.toMatch(/(?:Trước|trước) khi trả (?:JSON|output|kết quả JSON)/u);
+      expect(quiz).not.toMatch(/trước khi trả kết quả JSON, phải rà soát mọi trường/iu);
+      expect(quiz).not.toMatch(
+        /Trước khi trả output, (?:phải )?(?:đối chiếu từng cặp dòng|rà từng ký hiệu|rà mọi `solution`)/u,
+      );
 
-      expect(summary).toContain("Chỉ tự kiểm chứng tính đúng chuyên môn");
-      expect(summary).toContain("tính đúng chuyên môn");
-      expect(summary).toContain("độ khớp PDF/provenance");
-      expect(summary).toContain("Không chạy thêm vòng audit taxonomy/JSON shape");
-      expect(summary).toContain("không lặp checklist");
+      expect(summary).toContain("Đọc PDF một lần để lập inventory");
+      expect(summary).toContain("tính đúng");
+      expect(summary).toContain("căn cứ nguồn/provenance");
+      expect(summary).toContain("không chạy audit hay rescan toàn bộ output");
+      expect(summary).toContain("kiểm tra cục bộ");
       expect(summary).not.toContain("âm thầm kiểm tra taxonomy");
     }
   });
@@ -377,12 +391,13 @@ describe("subject-owned AI system prompt architecture", () => {
         expect(prompt).toContain("giới thiệu đúng một lần trước lần dùng đầu tiên");
         expect(prompt).toContain("Gọi $q$ là ...");
         expect(prompt).toContain("Counterexample hợp lệ");
-        expect(prompt).toContain("rà từng ký hiệu ở lần xuất hiện đầu tiên");
         for (const rule of subjectSpecificRules[subject.key]) {
           expect(prompt).toContain(rule);
         }
       }
 
+      expect(quiz).toContain("Trong cùng lượt viết field chứa ký hiệu");
+      expect(summary).toContain("Trong local pass của block, mọi ký hiệu mới");
       expect(summary).toContain("Với `SOURCE_EXACT`");
 
       for (const figurePrompt of [
@@ -433,12 +448,13 @@ describe("subject-owned AI system prompt architecture", () => {
           expect(prompt).toContain("mọi nhãn đã gắn phải được viện dẫn ít nhất một lần");
           expect(prompt).toContain("không đặt hai kết luận mang nhãn cùng dòng");
           expect(prompt).toContain("Nếu mạch là $A\\Rightarrow B$");
-          expect(prompt).toContain("bỏ mọi nhãn không có tham chiếu về sau");
           expect(prompt).toContain("Từ căn cứ thứ hai, suy ra $Q=k$. (1)");
           expect(prompt).toContain("Theo định lý, suy ra $Q=R$.");
           expect(prompt).toContain("Từ (1), suy ra $R=k$.");
           expect(prompt).toMatch(/Q=R\$.+`\n\n\s+`Từ \(1\)/u);
         }
+        expect(quiz).toContain("Trong cùng lượt viết mạch suy luận");
+        expect(summary).toContain("chỉ giữ nhãn có tham chiếu về sau");
         expect(summary).toContain("Với `SOURCE_EXACT`");
       } else {
         expect(quiz).not.toContain("MẠCH SUY LUẬN VÀ NHÃN KẾT LUẬN");

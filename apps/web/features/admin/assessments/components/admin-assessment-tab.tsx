@@ -954,7 +954,7 @@ function QuizSetPanel({
                 aria-haspopup="dialog"
                 onClick={() => setIsGenerationHistoryOpen(true)}
                 className="-m-1 inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-md p-1 text-sm font-extrabold text-[var(--theme-text-muted)] transition-colors hover:bg-[var(--theme-surface-soft)] hover:text-[var(--theme-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-primary)]"
-                title={`Xem toàn bộ lịch sử sinh và chi phí của bộ ${isTest ? "Test" : "Quiz"}`}
+                title={`Xem toàn bộ lịch sử dùng AI và chi phí của bộ ${isTest ? "Test" : "Quiz"}`}
               >
                 <Coins className="size-4" aria-hidden="true" />
                 Tổng chi phí: {formatQuizGenerationCost(activeSet as AdminQuizSet)}
@@ -1469,7 +1469,9 @@ function QuizSetPanel({
                           selectedQuizQuestion.id,
                           questionReviewJson,
                         );
-                        toast.success("Đã lưu JSON câu Quiz");
+                        toast.success(
+                          `Đã lưu JSON câu ${assessmentKind === "test" ? "Test" : "Quiz"}`,
+                        );
                       } catch (error) {
                         toast.error(
                           getUserFacingErrorMessage(
@@ -1497,7 +1499,7 @@ function QuizSetPanel({
                       onEdit={(event) => {
                         if (isProtectedQuizGenerationJsonEdit(event)) {
                           toast.error(
-                            "Hình của câu Quiz được sửa bằng công cụ quản lý hình riêng.",
+                            `Hình của câu ${assessmentKind === "test" ? "Test" : "Quiz"} được sửa bằng công cụ quản lý hình riêng.`,
                           );
                           return false;
                         }
@@ -1508,7 +1510,7 @@ function QuizSetPanel({
                       onAdd={(event) => {
                         if (isProtectedQuizGenerationJsonEdit(event)) {
                           toast.error(
-                            "Hình của câu Quiz được sửa bằng công cụ quản lý hình riêng.",
+                            `Hình của câu ${assessmentKind === "test" ? "Test" : "Quiz"} được sửa bằng công cụ quản lý hình riêng.`,
                           );
                           return false;
                         }
@@ -1569,6 +1571,7 @@ function QuizSetPanel({
         ) : null}
       </section>
       <AdminQuizGenerationHistoryDialog
+        assessmentKind={assessmentKind}
         isOpen={isGenerationHistoryOpen}
         onClose={() => setIsGenerationHistoryOpen(false)}
         quizSet={activeSet as AdminQuizSet}

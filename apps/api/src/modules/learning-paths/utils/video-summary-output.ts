@@ -1,18 +1,19 @@
 import {
   hasMalformedMathText,
-  LEARNER_MATH_TEXT_SYNTAX_DESCRIPTION,
   normalizeLearnerMathTextSyntax,
   normalizeThreePointAngleNotation,
 } from "@learning-path/shared";
 import { z } from "zod";
 
 import {
-  LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION,
-  LESSON_SUMMARY_PROVIDER_SOLUTION_DESCRIPTION,
-  LESSON_SUMMARY_SEMANTIC_LAYOUT_DESCRIPTION,
-  LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION,
-} from "#api/modules/ai/types/lesson-summary.types";
-import { normalizeVideoSummaryChapterTitle } from "#api/modules/learning-paths/utils/video-summary-source";
+  VIDEO_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION,
+  VIDEO_SUMMARY_SEMANTIC_LAYOUT_INSTRUCTION,
+  VIDEO_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION,
+} from "#api/modules/learning-paths/utils/video-summary-prompt";
+import {
+  normalizeVideoSummaryChapterTitle,
+  VIDEO_SUMMARY_CHAPTER_BOUNDARY_TOLERANCE_SECONDS,
+} from "#api/modules/learning-paths/utils/video-summary-source";
 
 const nonEmptyText = (maxLength: number) => z.string().trim().min(1).max(maxLength);
 
@@ -47,24 +48,23 @@ const videoKnowledgeBlockSchema = z
     title: nonEmptyText(240),
     startSeconds: z.number().min(0),
     content: nonEmptyText(6_000).describe(
-      `Chỉ trình bày lý thuyết, khái niệm, công thức, quy tắc hoặc phương pháp thực sự có trong video; không chứa ví dụ/bài tập. Bảo toàn ký hiệu, hệ điều kiện, dấu ngoặc nhóm, bullet và dấu câu dẫn; không văn xuôi hóa công thức. ${LESSON_SUMMARY_SEMANTIC_LAYOUT_DESCRIPTION} ${LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION}`,
+      "Chỉ trình bày lý thuyết, khái niệm, công thức, quy tắc hoặc phương pháp thực sự có trong video; không chứa ví dụ/bài tập. Bảo toàn ký hiệu, hệ điều kiện, dấu ngoặc nhóm, bullet và dấu câu dẫn; không văn xuôi hóa công thức.",
     ),
   })
   .strict();
 
-const videoExampleTextRules = `${LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION} ${LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION}`;
+const VIDEO_SUMMARY_SOLUTION_FIELD_DESCRIPTION =
+  "Chỉ chứa thân lời giải; không chứa tiêu đề do UI sở hữu, không lặp lại answer hoặc dữ liệu cấu trúc đã được tách sang field riêng. Lời giải phải đầy đủ theo phong cách sách giáo khoa: không làm tắt, không bỏ bước biến đổi hoặc suy luận cần thiết để người học theo dõi. Tuân theo cách lập luận của hồ sơ môn học trong system prompt, giữ đúng thứ tự suy luận và không biến toàn bộ lời giải thành checklist rời rạc. Bảo toàn ký hiệu tương đương và hệ ngoặc nhóm có ý nghĩa.";
 const videoExampleBlockSchema = z
   .object({
     type: z.literal("example"),
     startSeconds: z.number().min(0),
     problem: nonEmptyText(4_000).describe(
-      `Đề bài hoặc tình huống đầy đủ dữ kiện và yêu cầu đúng như nội dung video. ${videoExampleTextRules}`,
+      "Đề bài hoặc tình huống đầy đủ dữ kiện và yêu cầu đúng như nội dung video.",
     ),
-    solution: nonEmptyText(10_000).describe(
-      `${LESSON_SUMMARY_PROVIDER_SOLUTION_DESCRIPTION} ${videoExampleTextRules}`,
-    ),
+    solution: nonEmptyText(10_000).describe(VIDEO_SUMMARY_SOLUTION_FIELD_DESCRIPTION),
     answer: nonEmptyText(3_000).describe(
-      `Đáp án hoặc kết luận cuối của ví dụ; không lặp lại toàn bộ lời giải. ${videoExampleTextRules}`,
+      "Đáp án hoặc kết luận cuối của ví dụ; không lặp lại toàn bộ lời giải.",
     ),
   })
   .strict();
@@ -109,7 +109,7 @@ export function buildVideoSummaryProviderOutputSchema(
     })
     .strict()
     .describe(
-      `Tóm tắt video và mọi nội dung học sinh nhìn thấy. Khi source có chapter, objectives và sections phải có đúng số phần tương ứng; metadata section phải khớp chapter cùng vị trí. Chỉ khi source không có chapter, model mới tự chia section. ${LEARNER_MATH_TEXT_SYNTAX_DESCRIPTION}`,
+      `Tóm tắt video và mọi nội dung học sinh nhìn thấy. Khi source có chapter, objectives và sections phải có đúng số phần tương ứng; metadata section phải khớp chapter cùng vị trí. Chỉ khi source không có chapter, model mới tự chia section. Mọi field learner-facing phải tuân thủ system prompt. ${VIDEO_SUMMARY_SEMANTIC_LAYOUT_INSTRUCTION} ${VIDEO_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION} ${VIDEO_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION}`,
     );
 }
 
@@ -144,7 +144,11 @@ export const videoSummaryOutputSchema = videoSummaryProviderOutputSchema.superRe
       previousSectionStartSeconds = section.startSeconds;
 
       const firstTimedBlock = section.blocks[0];
-      if (firstTimedBlock && section.startSeconds > firstTimedBlock.startSeconds) {
+      if (
+        firstTimedBlock &&
+        section.startSeconds - firstTimedBlock.startSeconds >
+          VIDEO_SUMMARY_CHAPTER_BOUNDARY_TOLERANCE_SECONDS
+      ) {
         context.addIssue({
           code: "custom",
           path: ["sections", index, "startSeconds"],
@@ -190,10 +194,12 @@ export function alignVideoSummaryOutputToChapters(
       order: index + 1,
       displayHeading: chapters[index]!.title,
       startSeconds: chapters[index]!.time,
-      blocks: blocks.filter(
-        (block) =>
-          block.startSeconds >= chapters[index]!.time &&
-          (!chapters[index + 1] || block.startSeconds < chapters[index + 1]!.time),
+      blocks: blocks.filter((block) =>
+        isVideoSummaryBlockInChapter(
+          block.startSeconds,
+          chapters[index]!,
+          chapters[index + 1],
+        ),
       ),
     })),
   };
@@ -222,13 +228,23 @@ export function hasMatchingVideoSummaryChapters(
       section.order === index + 1 &&
       section.displayHeading === chapter.title &&
       Math.abs(section.startSeconds - chapter.time) <= tolerance &&
-      section.blocks.every(
-        (block) =>
-          block.startSeconds >= chapter.time - tolerance &&
-          (!nextChapter || block.startSeconds < nextChapter.time),
+      section.blocks.every((block) =>
+        isVideoSummaryBlockInChapter(block.startSeconds, chapter, nextChapter),
       )
     );
   });
+}
+
+function isVideoSummaryBlockInChapter(
+  startSeconds: number,
+  chapter: VideoSummaryChapter,
+  nextChapter: VideoSummaryChapter | undefined,
+) {
+  const lowerBound = chapter.time - VIDEO_SUMMARY_CHAPTER_BOUNDARY_TOLERANCE_SECONDS;
+  const upperBound = nextChapter
+    ? nextChapter.time - VIDEO_SUMMARY_CHAPTER_BOUNDARY_TOLERANCE_SECONDS
+    : Number.POSITIVE_INFINITY;
+  return startSeconds >= lowerBound && startSeconds < upperBound;
 }
 
 export function collectVideoSummaryOutputWarnings(

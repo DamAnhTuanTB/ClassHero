@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger, Optional } from "@nestjs/common";
 import {
   AiProviderName,
   BackgroundJobQueue,
@@ -14,6 +14,7 @@ import type {
 import { getJobErrorMessage } from "#api/jobs/job-error";
 import { toJobJson } from "#api/jobs/job-json";
 import { AiService } from "#api/modules/ai/services/ai.service";
+import { RealtimeJobSnapshotPublisherService } from "#api/modules/realtime/services/realtime-job-snapshot-publisher.service";
 import { EmbeddingJobEnqueuer } from "#api/workers/services/embedding-job-enqueuer.service";
 import { PersonalLearningPathClonerService } from "#api/workers/services/personal-learning-path-cloner.service";
 
@@ -45,6 +46,9 @@ export class PersonalLearningPathCloneProcessor {
     @Inject(AiService) private readonly aiService: AiService,
     @Inject(EmbeddingJobEnqueuer)
     private readonly embeddingEnqueuer: EmbeddingJobEnqueuer,
+    @Optional()
+    @Inject(RealtimeJobSnapshotPublisherService)
+    private readonly realtimeJobs?: RealtimeJobSnapshotPublisherService,
   ) {}
 
   async process(
@@ -97,6 +101,7 @@ export class PersonalLearningPathCloneProcessor {
       },
       select: workerJobSelect,
     });
+    await this.realtimeJobs?.publishById(runningJob.id);
 
     try {
       const clone = await this.cloner.cloneForEnrollment({
@@ -133,6 +138,7 @@ export class PersonalLearningPathCloneProcessor {
           finishedAt: new Date(),
         },
       });
+      await this.realtimeJobs?.publishById(runningJob.id);
 
       return result;
     } catch (error) {
@@ -148,6 +154,7 @@ export class PersonalLearningPathCloneProcessor {
           finishedAt: hasRetryLeft ? null : new Date(),
         },
       });
+      await this.realtimeJobs?.publishById(runningJob.id);
       this.logger.warn(
         `Personal clone job ${runningJob.id} attempt ${attempt}/${maxAttempts} failed: ${message}`,
       );

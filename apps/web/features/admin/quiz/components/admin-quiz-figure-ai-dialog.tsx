@@ -44,7 +44,7 @@ const MODE_OPTIONS: Array<{ value: AiMode; label: string; description: string }>
   {
     value: "REGENERATE",
     label: "Tạo mới lại",
-    description: "Tạo lại từ nội dung và kế hoạch hình của câu Quiz hiện tại.",
+    description: "Tạo lại từ nội dung và kế hoạch hình của câu hỏi hiện tại.",
   },
   {
     value: "EDIT_CURRENT",
@@ -244,6 +244,7 @@ export function AdminQuizFigureAiDialog({
     userPrompt: userPromptOverride?.trim() || null,
   };
   const isDataStale = previewInputKey !== createPreviewInputKey(currentInput);
+  const assessmentLabel = assessmentKind === "test" ? "Test" : "Quiz";
   const displayedSystemPrompt = systemPromptOverride ?? previewData?.systemPrompt ?? "";
   const displayedUserPrompt = userPromptOverride ?? previewData?.userPrompt ?? "";
   const displayedProviderInput = previewData
@@ -290,8 +291,10 @@ export function AdminQuizFigureAiDialog({
       }
       toast.success(
         mode === "EDIT_CURRENT"
-          ? "Đã bắt đầu chỉnh sửa hình Quiz hiện tại bằng AI."
-          : `Đã bắt đầu ${targetMode ? targetModeLabel(targetMode).toLowerCase() : "tạo mới lại hình Quiz"} bằng AI.`,
+          ? `Đã bắt đầu chỉnh sửa hình ${assessmentLabel} hiện tại bằng AI.`
+          : targetMode
+            ? `Đã bắt đầu tạo hình cho ${targetMode === "QUESTION" ? "đề bài" : "lời giải"} bằng AI.`
+            : `Đã bắt đầu tạo mới lại hình ${assessmentLabel} bằng AI.`,
       );
       onClose();
     } catch (error) {
@@ -340,7 +343,7 @@ export function AdminQuizFigureAiDialog({
                   providedFigure?.currentRevision?.caption ??
                   (targetMode
                     ? targetModeDescription(targetMode)
-                    : "Tạo một phiên bản hình mới cho câu Quiz")
+                    : "Tạo một phiên bản hình mới cho câu hỏi")
                 }
               />
             </p>

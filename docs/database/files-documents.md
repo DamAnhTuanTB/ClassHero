@@ -221,7 +221,13 @@ Rules:
 - `PRIMARY_FROM_SOURCE` là **Tài liệu nền tảng** của lesson. Tài liệu này có thể đến từ source document + page range hoặc từ file upload trực tiếp; một lesson có thể có nhiều bản ghi active cùng kind này.
 - `SUPPLEMENT` là tài liệu bổ sung upload trực tiếp cho lesson, ví dụ phiếu bài tập riêng, đáp án, ảnh công thức hoặc tài liệu tham khảo.
 - `HOMEWORK` là tài liệu bài tập về nhà upload trực tiếp cho lesson.
-- `SUPPLEMENT` có thể là tài liệu cần xử lý hoặc storage-only. Storage-only dùng cho tài liệu tham khảo thêm trong modal tạo lesson: lưu file/document, `status = READY`, `chunk_count = 0`, không có `processing_job_id`, và `metadata_json.processingMode = "storage_only"`.
+- `processingMode` độc lập với ba giá trị `kind`. UI Admin hiện luôn gửi
+  `PROCESSING` cho file upload trực tiếp thuộc `PRIMARY_FROM_SOURCE`, `SUPPLEMENT`
+  hoặc `HOMEWORK`, nên các file này có processing job và được OCR/chunk/embed.
+  Backend vẫn nhận `STORAGE_ONLY` khi API client gửi tường minh; khi đó chỉ lưu
+  file/document với `status = READY`, `chunk_count = 0`, không có
+  `processing_job_id`, và `metadata_json.processingMode = "storage_only"`. UI Admin
+  chưa expose chế độ này.
 - Mỗi lesson có thể có nhiều tài liệu nền tảng dạng source document + page range và nhiều tài liệu nền tảng dạng file upload trực tiếp.
 - `page_range_id` liên kết chính xác một lesson document với một khối trích xuất; không suy ra bằng cặp `(lesson_id, source_document_id)` vì cùng source có thể có nhiều range.
 - `source_document_id`/`page_range_id`/metadata phân biệt tài liệu nền tảng từ khối trích xuất với file nền tảng upload; không tạo thêm document kind.
@@ -258,6 +264,9 @@ Index/constraint:
 Rules:
 
 - Lưu `lesson_id` trực tiếp để retrieval luôn filter theo lesson.
+- `metadata_json` lưu `chunkingVersion`, `overlapTokenCount` và page range
+  thực tế của chunk để audit/tái lập profile chunking; chunk overlap qua
+  trang kế tiếp phải mở rộng `chunkPageStart/chunkPageEnd` tương ứng.
 - Retrieval phải filter theo `lesson_id`, `embedding_provider`, `embedding_model`, `embedding_dimensions`.
 - Retrieval chỉ dùng chunk thuộc `lesson_documents` active (`replaced_at IS NULL`) và `status = READY`.
 - Không fallback sang vector space khác nếu provider/model/dimension không khớp.

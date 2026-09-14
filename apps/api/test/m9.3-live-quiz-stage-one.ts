@@ -124,7 +124,6 @@ async function main() {
       questionCount: 1,
       questionTypes: [QuestionType.TEXT_INPUT],
       difficulty: Difficulty.MEDIUM,
-      includeSourceCoverageAudit: true,
     });
     const routeSnapshot = {
       feature: AiGenerationType.QUIZ,
@@ -170,7 +169,6 @@ async function main() {
     );
     const validation = validateQuizOutput({
       questions: normalizedQuestions,
-      sourceCoverageAudit: result.data.sourceCoverageAudit,
       requestedCount: 1,
       requestedTypes: [QuestionType.TEXT_INPUT],
       requestedDifficulty: Difficulty.MEDIUM,

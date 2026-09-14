@@ -23,6 +23,7 @@ import {
 } from "#api/jobs/background-job-queues";
 import { parseRedisConnection } from "#api/jobs/redis-connection";
 import { EmbeddingProcessor } from "#api/workers/processors/embedding.processor";
+import { RealtimeJobSnapshotPublisherService } from "#api/modules/realtime/services/realtime-job-snapshot-publisher.service";
 
 const REMOVE_ON_COMPLETE_SECONDS = 7 * 24 * 60 * 60;
 const REMOVE_ON_FAIL_SECONDS = 30 * 24 * 60 * 60;
@@ -38,6 +39,8 @@ export class EmbeddingWorkerService implements OnModuleInit, OnModuleDestroy {
     private readonly configService: ConfigService<EnvConfig, true>,
     @Inject(EmbeddingProcessor)
     private readonly processor: EmbeddingProcessor,
+    @Inject(RealtimeJobSnapshotPublisherService)
+    private readonly realtimeJobs: RealtimeJobSnapshotPublisherService,
   ) {}
 
   onModuleInit() {
@@ -68,10 +71,12 @@ export class EmbeddingWorkerService implements OnModuleInit, OnModuleDestroy {
 
     this.worker.on("failed", (job, err) => {
       this.logger.error(`Embedding job ${job?.id ?? "unknown"} failed: ${err.message}`);
+      if (job) void this.realtimeJobs.publishById(job.data.backgroundJobId);
     });
 
     this.worker.on("completed", (job) => {
       this.logger.log(`Embedding job ${job.id} completed`);
+      void this.realtimeJobs.publishById(job.data.backgroundJobId);
     });
 
     this.logger.log(

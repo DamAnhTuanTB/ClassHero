@@ -300,7 +300,11 @@ Fallback:
 
 - Admin vẫn có thể upload tài liệu lẻ trực tiếp cho từng buổi học nếu tài liệu không nằm trong một source PDF dài.
 - Sau khi đã gán trang từ source PDF dài, admin vẫn có thể upload thêm tài liệu bổ sung cho một vài buổi học, ví dụ phiếu bài tập riêng, file đáp án, ảnh công thức hoặc tài liệu tham khảo. Các tài liệu bổ sung này gắn trực tiếp vào `lesson_id` và được xử lý/chunk như nguồn context bổ sung của chính buổi học đó.
-- Riêng tài liệu tham khảo thêm ngay trong modal tạo buổi học là storage-only: vẫn lưu file và `lesson_documents` để xem/tải lại theo lesson, nhưng không tạo OCR artifact, chunk hoặc embedding.
+- Mọi file được thêm từ ba nhóm `Tài liệu nền tảng`, `Tài liệu bổ sung`
+  và `Bài tập về nhà` trong modal tạo/sửa buổi học hoặc tab `Tài liệu`
+  hiện đều gửi `processingMode=PROCESSING`, chạy OCR, chunk và embedding để
+  trở thành context của lesson. UI Admin chưa expose `STORAGE_ONLY`; chế độ này
+  chỉ có hiệu lực khi client/API khác chủ động gửi giá trị đó.
 
 Acceptance Criteria:
 
@@ -798,6 +802,70 @@ Acceptance Criteria:
 
 ---
 
+## 7.2. Admin mô phỏng Chat với AI
+
+Actor: Admin.
+
+Các bước:
+
+1. Admin mở item `Chat với AI` trên sidebar và chọn tab `Mô phỏng`.
+2. Admin tạo một phiên, chọn đúng một loại phạm vi: một buổi học, một khóa học
+   hoặc nhiều khóa học. Phạm vi bị khóa sau câu đầu tiên; muốn đổi phạm vi thì
+   tạo phiên mới để lịch sử và request trace không bị nhập nhằng.
+3. Khi chọn một buổi học, Admin có thể không chọn context để chat bình thường,
+   hoặc chọn một trong các tab `Tóm tắt video`, `Sinh kiến thức`, `Quiz`,
+   `Flashcard`, `Test`. Với Quiz/Flashcard/Test, Admin chọn bộ và item cụ thể rồi
+   chọn đúng trạng thái Student: Quiz/Flashcard là `HINT_ONLY | FULL_ANSWER`, Test
+   là `BLOCKED | FULL_ANSWER`. Context chỉ áp dụng lượt kế tiếp và có thể đổi giữa
+   các lượt; scope lesson vẫn khóa. Với `Tóm tắt video`, Admin nhập mốc phát hiện
+   tại; backend dùng đúng cơ chế ưu tiên khối Video Summary và search toàn bản
+   giống Student ở sub-tab `Video`.
+4. Phiên lấy cấu hình từ default `CHAT/TEXT`. Admin có thể bật override riêng,
+   chọn model chính/dự phòng, `temperature` hoặc `reasoningEffort` theo capability
+   và giới hạn input/output. Admin được sửa cấu hình phiên giữa các câu; thay đổi
+   chỉ có hiệu lực từ câu kế tiếp.
+5. Admin gửi câu hỏi bằng cùng composer và cùng khả năng text/LaTeX/ảnh của Chat
+   AI học sinh. Backend dùng adapter ADMIN để resolve scope, sau đó bàn giao cho
+   đúng shared Chat runtime của học sinh để retrieval, dựng prompt, gọi provider,
+   stream, kiểm policy và lưu kết quả.
+6. Trong lúc trả lời, UI nhận SSE
+   `started/delta/title_updated/completed/failed` thật. Lượt đầu hiện tên mặc định
+   từ câu hỏi ngay ở `started`, rồi thay bằng tên AI khi `title_updated` đến song
+   song với stream nội dung.
+7. Admin bấm `Xem input & chi phí` tại câu trả lời để xem exact sanitized input:
+   system/user prompt, history, RAG context, ảnh tham chiếu và effective parameter;
+   đồng thời xem provider/model/request ID, token, cache, chi phí, tổng latency và
+   time-to-first-token nếu có.
+8. Admin chuyển sang tab `Thiết lập mặc định` để sửa đúng cấu hình `CHAT/TEXT`
+   dùng chung với `/admin/ai-settings`; optimistic version/audit vẫn áp dụng.
+
+Acceptance Criteria:
+
+- Không có prompt builder, retrieval service, provider call, streaming handler,
+  auto-repair hoặc usage calculator riêng cho Admin; focused architecture test
+  khóa cả Student và Admin vào cùng shared Chat runtime entrypoint.
+- Danh sách context chỉ chứa content Student được xem; mapping trạng thái
+  Quiz/Flashcard/Test dùng cùng resolver với Student. Test `IN_PROGRESS` không tạo
+  message/generation, không retrieval và không gọi provider.
+- Phiên/trace của Admin không xuất hiện trong lịch sử Student, không tiêu quota
+  Student và không giả lập enrollment; paid usage vẫn tính vào budget chung.
+- Mỗi lượt có immutable snapshot của scope, default version, session override và
+  effective request. Đổi config phiên/default không làm thay dữ liệu lượt cũ.
+- Chi phí của một câu là tổng mọi provider attempt thuộc đúng turn, gồm main
+  response và preprocessing trả phí nếu có; không cộng nhầm lượt của câu khác.
+- Trace không trả secret, API key, authorization header, signed URL, raw base64,
+  object key hoặc dữ liệu ngoài đúng scope admin đã chọn.
+- Loading/empty/error/failed/streaming/reconnect và lời từ chối do AI trả như nội
+  dung `COMPLETED` đều kiểm thử được trên UI.
+- Sau deterministic test, chạy runtime SSE trên mobile/desktop và paid live smoke
+  OpenAI với scope một buổi học, tối đa 3 câu trả lời chính và trần tổng
+  `10.000 VND`. Owner đã phê duyệt trước targeted smoke này ngày 2026-09-13;
+  không cần hỏi lại nếu preflight theo price catalog hiện hành chứng minh không
+  vượt trần. Nếu không ước lượng được hoặc có thể vượt trần thì không gọi. Một
+  forced/full matrix lớn hơn vẫn phải báo phạm vi/ước tính và chờ xác nhận riêng.
+
+---
+
 ## 8. Student/Parent thanh toán mua lộ trình
 
 Actor: Student hoặc Parent.
@@ -933,9 +1001,12 @@ Các bước:
 5. Trong sub-tab `Video`, Student chọn `Tất cả` để xem toàn bộ Video Summary hoặc
    `Từng phần` để chỉ xem khối kiến thức/ví dụ có khoảng thời gian chứa thời điểm
    video đang phát; bấm badge thời gian sẽ tua và phát video từ đúng mốc đó.
-6. Context AI gồm timestamp hiện tại, chapter, một cửa sổ transcript lân cận và retrieval của đúng lesson; thiếu transcript thì fallback rõ ràng.
+6. Khi mở Chat ở sub-tab `Video`, client gửi timestamp hiện tại. Backend ưu tiên
+   khối kiến thức/ví dụ của Video Summary bao phủ mốc đó và vẫn hybrid-search
+   toàn bộ Video Summary cùng retrieval đúng lesson. Không search raw transcript.
 7. Hệ thống cập nhật watched intervals/mastery và đề xuất chapter/đoạn nên ôn lại bằng nhiều tín hiệu.
-8. Student có thể tìm theo ý nghĩa trong transcript, bấm kết quả để phát từ đúng timestamp, hoặc bỏ qua recommendation.
+8. Student có thể tìm theo ý nghĩa trong Video Summary, bấm kết quả để phát từ
+   đúng timestamp, hoặc bỏ qua recommendation.
 
 Acceptance Criteria:
 
@@ -1111,7 +1182,9 @@ Các bước:
    Nếu Student bấm Back, UI mở modal cảnh báo lượt hiện tại sẽ bị hủy và phải
    làm bài thi mới; chọn ở lại phải giữ nguyên câu và đáp án đang làm.
    Nếu Student F5/reload/đóng trang, browser mở cảnh báo rời trang; nếu vẫn tiếp
-   tục thì runner hiện tại bị hủy, không resume lượt cũ.
+   tục thì frontend gọi cancel dạng keepalive, runner hiện tại bị hủy và không
+   resume lượt cũ. Backend đồng thời tự đối soát deadline để dọn attempt hết hạn
+   nếu request cancel không tới được.
 5. Student nộp bài.
 6. Backend chấm bài.
 7. Backend tính điểm thang 10.
@@ -1131,6 +1204,11 @@ Acceptance Criteria:
   cảnh báo hệ thống của browser.
 - Lượt Bài thi đang làm không khôi phục sau Back đã xác nhận hoặc reload; Student
   phải bắt đầu một lượt mới.
+- Trong Test runner không có icon Chat AI. Nếu mở một tab/màn học khác khi attempt
+  còn hiệu lực, icon Chat AI ở đó disabled và dùng tooltip custom
+  `Bạn không thể sử dụng tính năng này khi đang làm bài thi!`; backend vẫn chặn
+  trực tiếp mọi API Chat AI. Attempt hết `durationSeconds` cộng grace ngắn phải
+  tự thành `CANCELLED`, không tiếp tục khóa Chat AI.
 - Khi quay lại tab Bài thi và status đã có `latestSubmittedAttempt`, CTA chính đổi từ
   `Bắt đầu bài thi` thành `Làm bài thi mới`, đồng thời hiển thị
   `Xem lại bài thi`. Action xem lại tải attempt đã hoàn thành gần nhất/tốt nhất
@@ -1198,20 +1276,40 @@ Các bước:
 
 1. Student đang xem lời giải.
 2. Student bấm “Chat thêm với AI”.
-3. UI chuyển sang khung chat AI của buổi học.
-4. UI truyền context gồm target item và lời giải đã lưu.
+3. UI chuyển sang chat hub chung với scope `COURSE` của khóa đang học.
+4. UI truyền đúng target item đang hiển thị và lời giải đã lưu; backend đặt target
+   này làm ngữ cảnh chính, tự resolve toàn bộ lesson trong đúng khóa đã mua, còn
+   lesson hiện tại là retrieval boost. Màn review Quiz/Flashcard/Test cũng truyền
+   target hiện tại dù không có active runner.
 5. Student nhập câu hỏi tiếp.
-6. Backend retrieval tài liệu trong cùng lesson.
-7. AI trả lời trong phạm vi bài học.
-8. Backend lưu message.
+6. Backend lưu câu đầu làm title mặc định, retrieval quyền-first và bắt đầu stream.
+7. Sau provider event đầu tiên, call đặt tên chạy song song; UI thay title khi
+   nhận `title_updated` trong lúc nội dung vẫn đang stream.
+8. AI tự trả lời/từ chối trong phạm vi khóa; backend lưu message hoàn tất.
+
+Từ trang chi tiết khóa học, lesson có CTA `Vào học`/`Học tiếp` được gửi làm lesson
+ưu tiên nhưng scope vẫn là toàn khóa. Từ trang danh sách Học tập, client gửi lesson
+có CTA học thực sự đang hiển thị của từng khóa làm tập ưu tiên trong scope
+`LIBRARY`; khóa đã hoàn thành, đang bảo trì hoặc không có lesson tiếp tục không
+đóng góp ID ưu tiên. Backend lọc lại theo enrollment, ánh xạ lesson catalog sang
+lesson của lộ trình cá nhân theo lineage khi cần và không dùng tập này như hard
+boundary.
 
 Acceptance Criteria:
 
-- Chat session gắn với student và lesson.
-- AI không trả lời ngoài phạm vi lesson.
-- Không cho upload file/ảnh trong chat.
+- Chat session gắn với student và scope COURSE bất biến; nằm trong một history
+  chung với các thread LIBRARY.
+- Không retrieval khóa chưa mua. AI tự quyết định refusal theo context được cấp;
+  backend không heuristic/classifier để chặn/thay nội dung.
+- Cho upload tối đa 5 ảnh JPEG/PNG/WebP, 10 MB/ảnh theo contract private upload.
 - Chat vẫn mở trực tiếp từ lesson khi không đi qua lời giải; context badge chỉ
   hiện khi được bàn giao từ `M9.5`.
+- Trong runner Quiz/Flashcard, item chưa mở đáp án chỉ nhận gợi ý. Item đã
+  `Kiểm tra`/`Bỏ qua` hoặc `Đã thuộc`/`Chưa thuộc` được giải đầy đủ cho đúng item
+  đó; hỏi sang item khác chưa mở trong cùng set phải quay về gợi ý.
+- Nếu Student chọn một hội thoại cũ sau khi mở Chat AI từ runner, UI vẫn
+  giữ `activityId` và target hiện tại cho tin nhắn mới; chuyển thread không được
+  trở thành cách lách `HINT_ONLY`.
 
 ---
 

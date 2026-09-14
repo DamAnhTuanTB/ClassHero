@@ -136,6 +136,19 @@
   text-align: left !important;
 }
 
+.tiptap-content-preview-block-math {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  padding-block: 0.125rem;
+  overscroll-behavior-inline: contain;
+}
+
+.tiptap-content-preview-block-math > .katex-display {
+  margin: 0;
+  overflow: visible;
+}
+
 .tiptap-formula-scrollbar {
   display: block;
   width: 100%;

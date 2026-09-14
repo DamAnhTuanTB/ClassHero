@@ -143,9 +143,11 @@ Thứ tự này ưu tiên nền tảng trước tính năng sau. Nếu `.codex/p
 | 52.18  | `M9.30`  | Admin authoring/tinh chỉnh hình Flashcard độc lập                                              |
 | 52.19  | `M9.31`  | Student Flashcard delivery và hardening pipeline AI                                            |
 | 52.20  | `M9.32`  | Ghi nhận đích đến cụ thể cho mọi lượt gọi AI và hiển thị ngắn trong thống kê — Done 2026-09-09 |
+| 52.21  | `M9.33`  | Realtime đồng bộ trạng thái job ở Admin lesson detail — Done 2026-09-11                        |
 | 53     | `M9.4`   | Student request-new reserve-first UI + API                                                     |
 | 54     | `M9.5`   | AI explanation cache inline UI + API                                                           |
-| 55     | `M9.6`   | Chat AI trong lesson bằng RAG                                                                  |
+| 55     | `M9.6`   | Chat AI đa ngữ cảnh COURSE/LIBRARY bằng RAG — Done 2026-09-13                                 |
+| 55.1   | `M9.34`  | Admin mô phỏng shared Chat AI theo lesson/course/course set và inspect từng lượt — Done 2026-09-13 |
 | 56     | `M9.7`   | Admin tạo bản tóm tắt toàn video bằng AI — Done 2026-09-10                                     |
 | 57     | `M15.4`  | Contextual AI `Hỏi đoạn này` và `Em chưa hiểu`                                                 |
 | 58     | `M15.5`  | AI chapter summary và flashcard từ video                                                       |
@@ -299,12 +301,21 @@ Ghi chú:
   tinh chỉnh, chỉnh sửa, sửa lỗi và lượt thất bại; UI chỉ hiện nhãn ngắn, còn ID
   kỹ thuật nằm trong dialog chi tiết. Các pipeline bổ sung sau đó phải tuân cùng
   contract thay vì tự tạo nhãn riêng.
+- `M9.33` phụ thuộc durable job/BullMQ `M4.3`, Admin generation panel `M9.8` và
+  các pipeline `M9.2-M9.3`, `M9.7`, `M9.28-M9.31`; dùng Socket.IO + Redis
+  Pub/Sub làm invalidation signal, còn REST/database vẫn authoritative. Task
+  không phụ thuộc `M10.3` notification và không thêm database migration/outbox.
 - `M9.4` phụ thuộc `M9.2`, `M9.3`, `M6.2-M6.4`, `M7.1-M7.4` theo loại nội dung và phải
   nối luôn các action request-new hiện có trên UI học sinh.
 - `M9.5` phụ thuộc `M9.1`, `M5.3`, `M6.2-M6.4`, `M7.2-M7.4` và phải có inline
   explanation UI trong cùng task.
 - `M9.6` phụ thuộc `M5.4`, `M9.1`, `M7.1`; triển khai sau `M9.5` để nhận context
   từ action `Chat thêm với AI`.
+- `M9.34` phụ thuộc shared Student Chat runtime `M9.6`, provider routing/usage/
+  budget `M9.9-M9.12`, target context `M9.32` và admin shell. Task phải adapter
+  hóa Student/Admin vào cùng runtime core; chỉ khác auth/scope/session trace.
+  Default trên màn mới dùng đúng `CHAT/TEXT` hiện có, còn session override được
+  snapshot cho từng lượt. Thực hiện sau khi core `M9.6` qua deterministic gate.
 - `M9.7` phụ thuộc `M3.8`, `M4.3`, `M9.1`, `M9.9-M9.12`, `M9.20`, `M9.32`;
   là pipeline Video Summary admin độc lập và đã Done 2026-09-10.
 - `M9.9` phụ thuộc `M9.1` và nền Prisma/job; tạo catalog/price/usage, snapshot routing, OpenAI/Gemini fallback và cost calculator.

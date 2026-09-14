@@ -17,12 +17,15 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
+import type { AiChatEntryContext } from "@/features/student/ai-chat/utils/ai-chat-link";
 import {
+  cancelStudentTest,
   getTestHistory,
   reviewStudentTest,
   startStudentTest,
   submitStudentTest,
 } from "@/features/student/lessons/api/student-lessons-api";
+import { studentActiveTestStatusQueryKey } from "@/features/student/ai-chat/hooks/use-ai-chat-availability";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 import { useStudentLearningTransition } from "@/components/student/learning-transition/student-learning-transition-provider";
 import { QuizCurtainTransition } from "@/features/student/lessons/screens/student-lesson-screen/components/quiz-curtain-transition";
@@ -70,15 +73,18 @@ function clearTestSurfaceUrl() {
 }
 
 export function TestLearningPanel({
+  aiChatContext,
   hasFlashcardContent,
   hasQuizContent,
   initialSurface,
   lesson,
   onProgressChanged,
+  onFullscreenStateChange,
   onStartPrerequisite,
   status,
   token,
 }: {
+  aiChatContext?: AiChatEntryContext;
   hasFlashcardContent: boolean;
   hasQuizContent: boolean;
   initialSurface?: Extract<
@@ -87,6 +93,7 @@ export function TestLearningPanel({
   > | null;
   lesson: StudentLesson;
   onProgressChanged: () => Promise<void>;
+  onFullscreenStateChange?: (isOpen: boolean) => void;
   onStartPrerequisite: (tab: PracticeTabTarget) => Promise<void>;
   status: StudentTestStatus | undefined;
   token: string;
@@ -98,6 +105,10 @@ export function TestLearningPanel({
   const historyQueryKey = useMemo(
     () => ["student", "lesson", lesson.id, "test-history", userId ?? "guest"] as const,
     [lesson.id, userId],
+  );
+  const activeTestStatusQueryKey = useMemo(
+    () => studentActiveTestStatusQueryKey(userId),
+    [userId],
   );
   const historyQuery = useQuery({
     queryKey: historyQueryKey,
@@ -135,6 +146,37 @@ export function TestLearningPanel({
     useState<QuizTransitionVariant>("book");
   const lastTransitionVariantRef = useRef<QuizTransitionVariant | null>(null);
   const shouldReduceMotion = Boolean(useReducedMotion());
+  const isFullscreenSurfaceOpen = Boolean(
+    isRestoringSurface || attempt || result || review,
+  );
+
+  useEffect(() => {
+    onFullscreenStateChange?.(isFullscreenSurfaceOpen);
+  }, [isFullscreenSurfaceOpen, onFullscreenStateChange]);
+
+  useEffect(
+    () => () => {
+      onFullscreenStateChange?.(false);
+    },
+    [onFullscreenStateChange],
+  );
+
+  useEffect(() => {
+    if (!attempt) return;
+
+    const attemptId = attempt.id;
+    const cancelActiveAttempt = () => {
+      void cancelStudentTest(attemptId, token, { keepalive: true })
+        .then(() => queryClient.invalidateQueries({ queryKey: activeTestStatusQueryKey }))
+        .catch(() => undefined);
+    };
+
+    window.addEventListener("pagehide", cancelActiveAttempt);
+    return () => {
+      window.removeEventListener("pagehide", cancelActiveAttempt);
+      cancelActiveAttempt();
+    };
+  }, [activeTestStatusQueryKey, attempt, queryClient, token]);
 
   const allAnswersComplete = useMemo(
     () =>
@@ -184,6 +226,7 @@ export function TestLearningPanel({
         setAttempt(null);
         await Promise.all([
           queryClient.refetchQueries({ queryKey: historyQueryKey }),
+          queryClient.invalidateQueries({ queryKey: activeTestStatusQueryKey }),
           onProgressChanged(),
         ]);
         return true;
@@ -198,6 +241,7 @@ export function TestLearningPanel({
     },
     [
       answers,
+      activeTestStatusQueryKey,
       attempt,
       historyQueryKey,
       onProgressChanged,
@@ -299,6 +343,7 @@ export function TestLearningPanel({
 
       await waitForTestCurtain(shouldReduceMotion ? 0 : quizTransitionTimings.holdMs);
       const nextAttempt = prepareResult.value;
+      await queryClient.invalidateQueries({ queryKey: activeTestStatusQueryKey });
       setAttempt(nextAttempt);
       setAnswers({});
       setCurrentIndex(0);
@@ -399,6 +444,7 @@ export function TestLearningPanel({
       <QuizReviewScreen
         accent="emerald"
         activityLabel="Bài thi"
+        aiChatContext={aiChatContext}
         backLabel="Quay lại kết quả Bài thi"
         currentIndex={reviewIndex}
         displayScope={review.scope}
@@ -410,6 +456,7 @@ export function TestLearningPanel({
             ? "Xem lại các câu trả lời sai"
             : "Xem lại tất cả câu trả lời"
         }
+        targetType="TEST_QUESTION"
         testId="test-review-screen"
       />,
     );
@@ -428,6 +475,7 @@ export function TestLearningPanel({
 
     return renderWithCurtain(
       <TestResultScreen
+        aiChatContext={aiChatContext}
         result={result}
         bestScore={currentBestScore}
         pendingAction={pendingAction}
@@ -469,10 +517,16 @@ export function TestLearningPanel({
           setAnswers((current) => ({ ...current, [question.id]: nextAnswer }))
         }
         onBack={() => {
+          const attemptId = attempt.id;
           setAttempt(null);
           setAnswers({});
           setCurrentIndex(0);
           setRemainingSeconds(0);
+          void cancelStudentTest(attemptId, token, { keepalive: true })
+            .then(() =>
+              queryClient.invalidateQueries({ queryKey: activeTestStatusQueryKey }),
+            )
+            .catch(() => undefined);
         }}
         onNext={() =>
           setCurrentIndex((index) => Math.min(attempt.questions.length - 1, index + 1))
@@ -714,6 +768,7 @@ export function TestLearningPanel({
         <QuizReviewScreen
           accent="emerald"
           activityLabel="Bài thi"
+          aiChatContext={aiChatContext}
           backLabel="Quay lại lịch sử Bài thi"
           currentIndex={reviewIndex}
           displayScope={review.scope}
@@ -722,6 +777,7 @@ export function TestLearningPanel({
           review={review}
           reviewTitle={historyReviewTitle ?? undefined}
           stackedOverDialog
+          targetType="TEST_QUESTION"
           testId="test-history-review-screen"
         />
       ) : null}

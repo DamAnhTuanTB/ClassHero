@@ -148,6 +148,7 @@ describe("M9.3 Quiz figure admin actions", () => {
       quizFigure: {
         findFirst: vi.fn().mockResolvedValue({
           id: figureId,
+          aiGenerationId: null,
           role: "QUESTION",
           planJson: {
             version: 1,
@@ -162,6 +163,14 @@ describe("M9.3 Quiz figure admin actions", () => {
           },
         }),
         update: vi.fn().mockResolvedValue({}),
+      },
+      quizQuestion: {
+        findFirst: vi.fn().mockResolvedValue({
+          sourceMetadataJson: {
+            aiGenerationId: "generation-1",
+            generationQuestionIndex: 0,
+          },
+        }),
       },
       quizFigureRevision: {
         findFirst: vi.fn().mockResolvedValue({ sourceVersion: 2 }),
@@ -204,6 +213,10 @@ describe("M9.3 Quiz figure admin actions", () => {
       adminInstructions: "  Đặt nhãn thoáng hơn.  ",
     });
     expect(result).toEqual({ jobId: "job-1", status: "QUEUED" });
+    expect(prisma.quizFigure.update).toHaveBeenCalledWith({
+      where: { id: figureId },
+      data: { aiGenerationId: "generation-1" },
+    });
     expect(jobs.enqueue).toHaveBeenCalledWith(
       figureId,
       actorUserId,

@@ -42,6 +42,12 @@ export class StudentTestAttemptsController {
     return this.studentTestAttemptsService.startAttempt(lessonId, user.id);
   }
 
+  @Get("test-attempts/active-status")
+  @ApiOperation({ summary: "Check whether the student has an active test attempt" })
+  activeStatus(@CurrentUser() user: AuthenticatedUser) {
+    return this.studentTestAttemptsService.getActiveAttemptStatus(user.id);
+  }
+
   @Post("test-attempts/:attemptId/submit")
   @ApiOperation({ summary: "Grade and persist one test attempt" })
   submit(
@@ -54,6 +60,12 @@ export class StudentTestAttemptsController {
       user.id,
       body.answers,
     );
+  }
+
+  @Post("test-attempts/:attemptId/cancel")
+  @ApiOperation({ summary: "Cancel an in-progress test attempt" })
+  cancel(@Param("attemptId") attemptId: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.studentTestAttemptsService.cancelAttempt(attemptId, user.id);
   }
 
   @Get("test-attempts/:attemptId/review")

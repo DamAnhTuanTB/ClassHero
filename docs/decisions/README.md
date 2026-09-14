@@ -74,3 +74,5 @@ Hệ quả tốt/xấu/cần lưu ý.
 | `ADR-0026-flashcard-solution-figure-only.md`      | Superseded in part | Flashcard chỉ tạo SOLUTION; prompt/schema/builder chuyển sang core chung                                     |
 | `ADR-0027-shared-solution-figure-core.md`         | Accepted           | Summary, Quiz và Flashcard dùng chung prompt/schema/builder tạo hình lời giải theo môn                       |
 | `ADR-0028-shared-question-figure-core.md`         | Accepted           | Summary và Quiz dùng chung prompt/schema/builder problem-only cho hình đề không có ảnh nguồn                 |
+| `ADR-0029-test-admin-timed-quiz-mode.md`          | Accepted           | Test Admin dùng shared Quiz/Assessment core và chỉ thêm duration ở set editor                               |
+| `ADR-0030-realtime-job-status-invalidation.md`    | Accepted           | Job status realtime là invalidation signal qua Redis Pub/Sub; REST/DB vẫn authoritative                     |

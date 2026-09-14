@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger, Optional } from "@nestjs/common";
 import {
   BackgroundJobQueue,
   BackgroundJobStatus,
@@ -13,6 +13,7 @@ import { Job, UnrecoverableError } from "bullmq";
 
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import { ObjectStorageService } from "#api/modules/files/services/object-storage.service";
+import { RealtimeJobSnapshotPublisherService } from "#api/modules/realtime/services/realtime-job-snapshot-publisher.service";
 import type {
   BackgroundJobBullmqData,
   BackgroundJobBullmqResult,
@@ -97,6 +98,9 @@ export class StemFigureRenderingProcessor {
     private readonly artifacts: StemFigureArtifactService,
     @Inject(ObjectStorageService)
     private readonly storage: ObjectStorageService,
+    @Optional()
+    @Inject(RealtimeJobSnapshotPublisherService)
+    private readonly realtimeJobs?: RealtimeJobSnapshotPublisherService,
   ) {}
 
   async process(
@@ -168,6 +172,7 @@ export class StemFigureRenderingProcessor {
         finishedAt: null,
       },
     });
+    await this.realtimeJobs?.publishById(durableJob.id);
 
     try {
       revision = await this.preparePaidSourceIfNeeded({

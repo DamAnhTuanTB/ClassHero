@@ -60,10 +60,13 @@ export function collectFlashcardMathSyntaxWarnings(input: {
   back: string;
   solution: string;
 }) {
-  const malformedPaths = Object.entries(input)
-    .filter((entry): entry is [keyof typeof input, string] =>
-      hasMalformedMathText(normalizeFlashcardLearnerText(entry[1])),
-    )
+  const learnerTextEntries = [
+    ["front", input.front],
+    ["back", input.back],
+    ["solution", input.solution],
+  ] as const;
+  const malformedPaths = learnerTextEntries
+    .filter(([, value]) => hasMalformedMathText(normalizeFlashcardLearnerText(value)))
     .map(([path]) => path);
   return malformedPaths.length === 0
     ? []
@@ -85,8 +88,17 @@ export function validateGeneratedFlashcards(input: {
   difficulty: Difficulty;
   difficultyCounts: { easy: number; medium: number; hard: number } | null;
 }) {
+  const warnings: Array<{
+    code: string;
+    message: string;
+    severity: "WARNING";
+    paths: string[];
+    cardIndex?: number;
+  }> = [];
+  const warn = (code: string, message: string, paths: string[], cardIndex?: number) =>
+    warnings.push({ code, message, severity: "WARNING", paths, cardIndex });
   if (input.output.cards.length !== input.requestedCount) {
-    throw new Error("AI_OUTPUT_COUNT_MISMATCH: Số thẻ không khớp yêu cầu.");
+    warn("AI_OUTPUT_COUNT_MISMATCH", "Số thẻ không khớp yêu cầu.", ["cards"]);
   }
   const normalizedFronts = new Set<string>();
   for (const [index, card] of input.output.cards.entries()) {
@@ -97,40 +109,71 @@ export function validateGeneratedFlashcards(input: {
         (pageNumber) => pageNumber > input.packetPageCount,
       )
     ) {
-      throw new Error(
-        `AI_OUTPUT_SOURCE_INVALID: Thẻ ${index + 1} dẫn trang packet PDF không hợp lệ.`,
+      warn(
+        "AI_OUTPUT_SOURCE_INVALID",
+        `Thẻ ${index + 1} dẫn trang packet PDF không hợp lệ.`,
+        ["sourcePacketPageNumbers"],
+        index,
       );
     }
     const front = normalize(card.front);
     const back = normalize(card.back);
     const solution = normalize(card.solution);
     if (front === back) {
-      throw new Error(
-        `AI_OUTPUT_FLASHCARD_PAIR_INVALID: Mặt trước và mặt sau thẻ ${index + 1} bị trùng.`,
+      warn(
+        "AI_OUTPUT_FLASHCARD_PAIR_INVALID",
+        `Mặt trước và mặt sau thẻ ${index + 1} bị trùng.`,
+        ["front", "back"],
+        index,
+      );
+    }
+    if (referencesExternalFigure(card.front)) {
+      warn(
+        "AI_OUTPUT_FLASHCARD_FRONT_CONTEXT_INVALID",
+        `Mặt trước thẻ ${index + 1} tham chiếu hình nguồn thay vì tự đủ bằng text.`,
+        ["front"],
+        index,
+      );
+    }
+    if (!isTheoryRecallFront(card.front)) {
+      warn(
+        "AI_OUTPUT_FLASHCARD_THEORY_ONLY",
+        `Mặt trước thẻ ${index + 1} có dấu hiệu yêu cầu giải bài thay vì kiểm tra lý thuyết.`,
+        ["front"],
+        index,
       );
     }
     if (!isClearQuestion(card.front)) {
-      throw new Error(
-        `AI_OUTPUT_FLASHCARD_FRONT_INVALID: Mặt trước thẻ ${index + 1} chưa phải một câu hỏi rõ ràng.`,
+      warn(
+        "AI_OUTPUT_FLASHCARD_FRONT_INVALID",
+        `Mặt trước thẻ ${index + 1} chưa phải một câu hỏi rõ ràng.`,
+        ["front"],
+        index,
       );
     }
     if (normalizedFronts.has(front)) {
-      throw new Error(
-        `AI_OUTPUT_FLASHCARD_DUPLICATE: Mặt trước thẻ ${index + 1} bị trùng với thẻ khác trong cùng lượt sinh.`,
+      warn(
+        "AI_OUTPUT_FLASHCARD_DUPLICATE",
+        `Mặt trước thẻ ${index + 1} bị trùng với thẻ khác trong cùng lượt sinh.`,
+        ["front"],
+        index,
       );
     }
     normalizedFronts.add(front);
     if (solution === back) {
-      throw new Error(
-        `AI_OUTPUT_FLASHCARD_SOLUTION_INVALID: Lời giải thẻ ${index + 1} chỉ lặp lại mặt sau.`,
+      warn(
+        "AI_OUTPUT_FLASHCARD_SOLUTION_INVALID",
+        `Phần giải thích thẻ ${index + 1} chỉ lặp lại mặt sau.`,
+        ["solution"],
+        index,
       );
     }
   }
   if (input.difficulty !== "MIXED") {
     if (input.output.cards.some((card) => card.difficulty !== input.difficulty)) {
-      throw new Error(
-        "AI_OUTPUT_DIFFICULTY_MISMATCH: Độ khó của thẻ không khớp yêu cầu.",
-      );
+      warn("AI_OUTPUT_DIFFICULTY_MISMATCH", "Độ khó của một số thẻ không khớp yêu cầu.", [
+        "difficulty",
+      ]);
     }
   } else if (input.difficultyCounts) {
     const actual = input.output.cards.reduce(
@@ -147,21 +190,49 @@ export function validateGeneratedFlashcards(input: {
       actual.medium !== input.difficultyCounts.medium ||
       actual.hard !== input.difficultyCounts.hard
     ) {
-      throw new Error(
-        "AI_OUTPUT_DIFFICULTY_COUNTS_MISMATCH: Phân bổ độ khó của Flashcard không khớp yêu cầu.",
+      warn(
+        "AI_OUTPUT_DIFFICULTY_COUNTS_MISMATCH",
+        "Phân bổ độ khó của Flashcard không khớp yêu cầu.",
+        ["cards", "difficulty"],
       );
     }
   }
-  return input.output.cards;
+  return warnings;
 }
 
 function isClearQuestion(value: string) {
   const text = value.trim();
   return (
     text.endsWith("?") ||
-    /^(hãy|nêu|trình bày|giải thích|phát biểu|định nghĩa|cho biết|thế nào|vì sao|khi nào|điều kiện nào|công thức nào)\b/iu.test(
+    /^(hãy|nêu|trình bày|giải thích|cho biết|thế nào|vì sao|khi nào|điều kiện nào|công thức nào|phân biệt|liệt kê)\b/iu.test(
       text,
     )
+  );
+}
+
+function isTheoryRecallFront(value: string) {
+  const text = value.trim();
+  const textWithoutObjectCounts = text.replace(
+    /\b\d+\s+(?:góc|cạnh|đỉnh|điểm|đường|tia|đoạn|cung|mặt|trục|nghiệm|phần|bước|đại lượng|chất|nguyên tử|phân tử|ion|vật|lực)\b/giu,
+    "",
+  );
+  return !(
+    /(?:^|[.;,:]\s+)(?:(?:em\s+)?hãy\s+)?(?:giải(?!\s+thích\b)|chứng minh|dựng|vẽ|biện luận|rút gọn|lập\s+(?:phương trình|hệ)|cân bằng\s+(?:phương trình|phản ứng)|thực hiện\s+phép\s+tính)\b/iu.test(
+      text,
+    ) ||
+    /(?:^|[.;,:]\s+)(?:(?:em\s+)?hãy\s+)?(?:tính\s+(?:giá trị|số đo|độ dài|chu vi|diện tích|thể tích|khối lượng|số mol|nồng độ|vận tốc|gia tốc|công suất|điện trở|cường độ|hiệu điện thế|tọa độ|xác suất|tỉ số|phần trăm)|tìm\s+(?:giá trị|nghiệm|số đo|độ dài|tọa độ)|xác định\s+(?:giá trị|nghiệm|số đo|độ dài|tọa độ))(?=\s|$|[.,;:?!])/iu.test(
+      text,
+    ) ||
+    (/\d/u.test(textWithoutObjectCounts) &&
+      /\b(?:giá trị|nghiệm|kết quả|số đo|độ dài|chu vi|diện tích|thể tích|khối lượng|số mol|nồng độ|vận tốc|gia tốc|công suất|điện trở|cường độ|hiệu điện thế|đại lượng)\b[\s\S]{0,160}\b(?:là|bằng)\s+bao nhiêu\?/iu.test(
+        text,
+      ))
+  );
+}
+
+function referencesExternalFigure(value: string) {
+  return /\b(?:(?<!cấu\s)hình|figure|sơ đồ|biểu đồ|đồ thị)\s*(?:(?:số\s*)?\d+(?:[.:]\d+|[a-z])?|(?:bên|phía|ở)\s*(?:trên|dưới|bên|này|đây)|(?:này|đây))\b/iu.test(
+    value,
   );
 }
 

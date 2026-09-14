@@ -3,18 +3,21 @@
 import { Bell, Moon, Sun } from "lucide-react";
 import Link from "next/link";
 import { ClassHeroLogo } from "@/components/common/brand/classhero-logo";
-import { MessengerIcon } from "@/components/student/courses/messenger-icon";
 import { useAutoHidingStudentHeader } from "@/components/student/layout/use-auto-hiding-student-header";
+import { StudentAiChatHeaderTrigger } from "@/features/student/ai-chat/components/student-ai-chat-header-trigger";
 import { useThemeStore, type AppThemeMode } from "@/lib/theme-store";
+import type { AiChatEntryContext } from "@/features/student/ai-chat/utils/ai-chat-link";
 
 const HEADER_ICON_STROKE_WIDTH = 1.75;
 
 export function StudentCoursesHeader({
   title,
   initialThemeMode = "light",
+  aiChatContext,
 }: {
   title: string;
   initialThemeMode?: AppThemeMode;
+  aiChatContext?: AiChatEntryContext;
 }) {
   const headerRef = useAutoHidingStudentHeader();
   const storeIsDarkTheme = useThemeStore((state) => state.isDarkTheme);
@@ -85,22 +88,13 @@ export function StudentCoursesHeader({
               />
             )}
           </button>
-          <Link
-            href="/student/ai-chat"
-            aria-label="Chat AI"
-            className="flex h-10 w-10 items-center justify-center rounded-full text-blue-600 transition hover:text-blue-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100 dark:text-[var(--theme-primary)] sm:h-11 sm:w-11"
-          >
-            <span className="relative flex h-7 w-7 items-center justify-center">
-              <MessengerIcon
-                className="h-7 w-7"
-                strokeWidth={HEADER_ICON_STROKE_WIDTH}
-                aria-hidden="true"
-              />
-              <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-5 items-center justify-center rounded-full bg-blue-600 px-1 text-[9px] font-extrabold leading-none tracking-normal text-white shadow-sm ring-2 ring-[var(--theme-surface)] dark:bg-[var(--theme-primary)] dark:text-[var(--theme-primary-foreground)]">
-                AI
-              </span>
-            </span>
-          </Link>
+          {aiChatContext ? (
+            <StudentAiChatHeaderTrigger
+              className="ml-0 h-10 w-10 sm:h-11 sm:w-11"
+              context={aiChatContext}
+              testId="student-ai-chat-trigger"
+            />
+          ) : null}
         </div>
       </header>
     </>

@@ -16,6 +16,7 @@ describe("M4.5 private document previews", () => {
         createSignedGetUrl: async (objectKey: string) =>
           `http://localhost:9100/private-bucket/${objectKey}?signed=true`,
       } as never,
+      {} as never,
     );
 
     await expect(
@@ -34,6 +35,7 @@ describe("M4.5 private document previews", () => {
       {
         createSignedGetUrl: async () => "https://signed.example/file.pdf",
       } as never,
+      {} as never,
     );
 
     await expect(

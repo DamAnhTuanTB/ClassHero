@@ -34,6 +34,8 @@ import { SearchablePdfEquivalenceService } from "#api/modules/learning-paths/ser
 import { StudentLessonAccessService } from "#api/modules/learning-paths/services/student-lesson-access.service";
 import { YoutubeTranscriptService } from "#api/modules/learning-paths/services/youtube-transcript.service";
 import { OcrArtifactCacheService } from "#api/workers/services/ocr-artifact-cache.service";
+import { EmbeddingJobEnqueuer } from "#api/workers/services/embedding-job-enqueuer.service";
+import { VideoSummaryIndexService } from "#api/modules/learning-paths/services/video-summary-index.service";
 
 @Module({
   imports: [AuthModule, FilesModule, JobsModule, JwtModule.register({})],
@@ -65,6 +67,8 @@ import { OcrArtifactCacheService } from "#api/workers/services/ocr-artifact-cach
     SearchablePdfEquivalenceService,
     StudentLessonAccessService,
     YoutubeTranscriptService,
+    VideoSummaryIndexService,
+    EmbeddingJobEnqueuer,
     JwtAuthGuard,
     OptionalJwtAuthGuard,
     RolesGuard,

@@ -291,11 +291,9 @@ async function main() {
           targetId: true,
           status: true,
           errorMessage: true,
-          outputJson: true,
         },
       });
-      const { outputJson, ...aiGenerationSummary } = aiGeneration;
-      const sourceCoverageAudit = readSourceCoverageAudit(outputJson);
+      const aiGenerationSummary = aiGeneration;
       if (mainJob.status !== BackgroundJobStatus.SUCCEEDED) {
         const usage = await summarizeUsage(prisma, aiGeneration.id);
         totalCostVnd += usage.costVnd;
@@ -304,7 +302,6 @@ async function main() {
           phaseOneUpperBoundVnd,
           mainJob,
           aiGeneration: aiGenerationSummary,
-          sourceCoverageAudit,
           usage,
         });
         continue;
@@ -346,7 +343,6 @@ async function main() {
         phaseOneUpperBoundVnd,
         mainJob,
         aiGeneration: aiGenerationSummary,
-        sourceCoverageAudit,
         contract: summarizeContract(
           questions,
           figures,
@@ -387,14 +383,6 @@ function readPositiveNumberEnv(name: string, fallback: number) {
     throw new Error(`${name} must be a positive number.`);
   }
   return parsed;
-}
-
-function readSourceCoverageAudit(outputJson: unknown) {
-  if (!outputJson || typeof outputJson !== "object" || Array.isArray(outputJson)) {
-    return null;
-  }
-  const audit = (outputJson as Record<string, unknown>).sourceCoverageAudit;
-  return audit && typeof audit === "object" && !Array.isArray(audit) ? audit : null;
 }
 
 async function waitForMainJob(prisma: PrismaService, jobId: string) {

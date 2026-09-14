@@ -24,6 +24,7 @@ import type {
   AiStructuredOutput,
   AiTextInput,
   AiTextOutput,
+  AiTextStreamEvent,
   AiTokenUsage,
 } from "#api/modules/ai/types/ai-text.types";
 import type { AiOpenAiConfig } from "#api/modules/ai/utils/ai-config.helper";
@@ -38,12 +39,9 @@ import {
   parseAiStructuredOutput,
 } from "#api/modules/ai/utils/ai-output-validation";
 import {
-  supportsOpenAiReasoningEffort,
-  supportsOpenAiTemperature,
-} from "#api/modules/ai/utils/ai-openai-model-capabilities";
-import {
   buildOpenAiResponseInput,
   buildOpenAiStructuredResponseRequest,
+  buildOpenAiTextResponseRequest,
   type OpenAiPreparedInputFile,
 } from "#api/modules/ai/utils/openai-response-request";
 
@@ -132,20 +130,12 @@ export class OpenAiProvider implements AiProvider {
     const preparedInput = await this.prepareResponseInput(input);
     try {
       const response = await this.client.responses.create(
-        {
+        buildOpenAiTextResponseRequest({
+          request: input,
           model: modelToUse,
-          instructions: input.systemPrompt,
-          input: preparedInput.input,
-          ...(input.temperature === undefined || !supportsOpenAiTemperature(modelToUse)
-            ? {}
-            : { temperature: input.temperature }),
-          ...(input.reasoningEffort && supportsOpenAiReasoningEffort(modelToUse)
-            ? { reasoning: { effort: input.reasoningEffort } }
-            : {}),
-          ...(input.maxTokens === undefined
-            ? {}
-            : { max_output_tokens: input.maxTokens }),
-        },
+          contractVersion: "ai-text-v1",
+          responseInput: preparedInput.input,
+        }),
         this.generationRequestOptions,
       );
       const text = response.output_text.trim();
@@ -163,6 +153,73 @@ export class OpenAiProvider implements AiProvider {
         providerRequestId: response.id,
         latencyMs: Date.now() - startedAt,
         inputFileOperations: preparedInput.operations,
+      };
+    } finally {
+      await preparedInput.cleanup();
+    }
+  }
+
+  async *streamText(input: AiTextInput): AsyncGenerator<AiTextStreamEvent> {
+    const startedAt = Date.now();
+    const modelToUse = input.model ?? this.config.chatModel;
+    const preparedInput = await this.prepareResponseInput(input);
+    let fullText = "";
+    let timeToFirstTokenMs: number | undefined;
+    let completedResponse:
+      | Extract<
+          import("openai/resources/responses/responses").ResponseStreamEvent,
+          { type: "response.completed" }
+        >["response"]
+      | null = null;
+
+    try {
+      const stream = await this.client.responses.create(
+        {
+          ...buildOpenAiTextResponseRequest({
+            request: input,
+            model: modelToUse,
+            contractVersion: "ai-text-stream-v1",
+            responseInput: preparedInput.input,
+          }),
+          stream: true,
+        },
+        this.generationRequestOptions,
+      );
+
+      for await (const event of stream) {
+        if (event.type === "response.output_text.delta" && event.delta) {
+          timeToFirstTokenMs ??= Date.now() - startedAt;
+          fullText += event.delta;
+          yield { type: "delta", delta: event.delta };
+        } else if (event.type === "response.completed") {
+          completedResponse = event.response;
+        } else if (
+          event.type === "response.failed" ||
+          event.type === "response.incomplete" ||
+          event.type === "error"
+        ) {
+          throw new Error(`OpenAI stream ended with ${event.type}.`);
+        }
+      }
+
+      const text = fullText.trim();
+      if (!text || !completedResponse) {
+        throw new Error("OpenAI returned an incomplete or empty text stream.");
+      }
+
+      yield {
+        type: "completed",
+        output: {
+          text,
+          provider: this.name,
+          model: completedResponse.model ?? modelToUse,
+          usage: toTokenUsage(completedResponse.usage),
+          providerUsageRaw: completedResponse.usage,
+          providerRequestId: completedResponse.id,
+          latencyMs: Date.now() - startedAt,
+          timeToFirstTokenMs,
+          inputFileOperations: preparedInput.operations,
+        },
       };
     } finally {
       await preparedInput.cleanup();

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { LessonType, Prisma, PublishStatus } from "@prisma/client";
+import { ContentSource, LessonType, Prisma, PublishStatus } from "@prisma/client";
 import { tiptapTextDocumentSchema } from "@learning-path/shared";
 import { throwBadRequest } from "#api/common/errors/api-exception";
 import { PrismaService } from "#api/common/prisma/prisma.service";
@@ -26,6 +26,7 @@ import { SourceDocumentsService } from "#api/modules/learning-paths/services/sou
 import { LearningPathStructureService } from "#api/modules/learning-paths/services/learning-path-structure.service";
 import type { LessonDocumentRecord } from "#api/modules/learning-paths/types/document.types";
 import type { RequestContext } from "#api/modules/learning-paths/types/lesson.types";
+import { buildVideoSummarySource } from "#api/modules/learning-paths/utils/video-summary-source";
 
 @Injectable()
 export class LessonsService {
@@ -374,6 +375,29 @@ export class LessonsService {
                 ipAddress: context.ipAddress,
                 userAgent: context.userAgent,
               },
+            });
+          }
+        } else if (customVideoSettingsUpdate !== undefined) {
+          const beforeVideoSummarySource = buildVideoSummarySource({
+            videoUrl: before.videoUrl,
+            customVideoSettings: before.customVideoSettings,
+          });
+          const updatedVideoSummarySource = buildVideoSummarySource({
+            videoUrl: updated.videoUrl,
+            customVideoSettings: updated.customVideoSettings,
+          });
+          if (
+            beforeVideoSummarySource?.hashes.source !==
+            updatedVideoSummarySource?.hashes.source
+          ) {
+            await tx.lessonVideoSummary.updateMany({
+              where: {
+                lessonId,
+                source: ContentSource.AI,
+                staleAt: null,
+                deletedAt: null,
+              },
+              data: { staleAt: new Date() },
             });
           }
         }

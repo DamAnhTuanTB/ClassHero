@@ -6,12 +6,13 @@ import { Difficulty, QuestionType } from "@prisma/client";
 import { z } from "zod";
 
 export const QUIZ_PROMPT_VERSIONS = {
-  MATH: "quiz-math-v89-semantic-review-only",
-  PHYSICS: "quiz-physics-v84-semantic-review-only",
-  CHEMISTRY: "quiz-chemistry-v84-semantic-review-only",
-  GENERAL: "quiz-general-v84-semantic-review-only",
+  MATH: "quiz-math-v91-local-candidate-quality-gate",
+  PHYSICS: "quiz-physics-v86-local-candidate-quality-gate",
+  CHEMISTRY: "quiz-chemistry-v86-local-candidate-quality-gate",
+  GENERAL: "quiz-general-v86-local-candidate-quality-gate",
 } as const;
-export const QUIZ_SCHEMA_VERSION = "quiz-pdf-figure-schema-v39-math-syntax-contract";
+export const QUIZ_SCHEMA_VERSION = "quiz-pdf-figure-schema-v41-no-self-audit";
+export const QUIZ_OUTPUT_NAME = "generated_quiz";
 export const QUIZ_MAX_OUTPUT_TOKENS = 12_000;
 export const QUIZ_MIN_OUTPUT_TOKENS = 1_000;
 export const QUIZ_MAX_CONFIGURED_OUTPUT_TOKENS = 32_000;
@@ -46,12 +47,12 @@ export function resolveQuizOutputTokenFloor(input: {
 }
 
 export const QUIZ_EQUALITY_CHAIN_LAYOUT_POLICY = [
-  "QUY TẮC CỨNG VỀ CHUỖI DẤU BẰNG: trước khi trả kết quả JSON, phải rà soát mọi trường hiển thị có nội dung toán học, đặc biệt là `problem`, `solution`, `statementSolutions[].solution`, `hint`, `options[].text` và `statements[].text`.",
+  "QUY TẮC CỨNG VỀ CHUỖI DẤU BẰNG: khi viết từng field hiển thị có nội dung toán học, áp dụng quy tắc này ngay tại field đó, đặc biệt với `problem`, `solution`, `statementSolutions[].solution`, `hint`, `options[].text` và `statements[].text`.",
   "Bất kỳ chuỗi tính hoặc biến đổi duy nhất nào có từ hai dấu `=` cấp ngoài cùng trở lên đều bắt buộc được xuất thành một khối display `$$...$$` dùng `aligned`/`split`, bất kể chuỗi ngắn, vừa một dòng, không tràn ngang hoặc ban đầu có thể viết inline. Tuyệt đối không đặt chuỗi đó trong `$...$` và không giữ toàn bộ chuỗi trên một dòng.",
   "Trong `aligned`/`split`, mỗi dòng chỉ chứa một dấu `=` cấp ngoài cùng và một bước biến đổi tương ứng. Dòng đầu có dạng `A &= B`, các dòng sau có dạng `&= C`.",
   "Ví dụ tổng quát SAI: `$A=B=C$`. Ví dụ tổng quát SAI: `$$A=B=C.$$` Ví dụ tổng quát ĐÚNG: `$$\\begin{aligned}A&=B\\\\&=C.\\end{aligned}$$`.",
   "Không áp dụng quy tắc tách chuỗi cho các phương trình độc lập, hệ phương trình, phép gán nhiều đại lượng hoặc dấu `=` nằm trong cấu trúc lồng nhau.",
-  "Nếu phát hiện chuỗi vi phạm khi tự kiểm tra, phải chuyển chuỗi inline hoặc display một dòng đó thành display nhiều dòng trước khi trả kết quả.",
+  "Ngay trong lượt viết field, chuỗi inline hoặc display một dòng vi phạm phải được chuyển thành display nhiều dòng.",
 ].join(" ");
 
 export const QUIZ_LOGICAL_DERIVATION_POLICY = [
@@ -193,13 +194,15 @@ const multiStatementQuizExplanationContentShape = {
     ),
 };
 
+const quizIsGeometryFieldSchema = z
+  .boolean()
+  .describe("Đặt true nếu đây là câu Hình học; ngược lại đặt false.");
+
 function createMathQuizExplanationSchema<T extends z.ZodRawShape>(contentShape: T) {
   return z
     .object({
       ...contentShape,
-      isGeometry: z
-        .boolean()
-        .describe("Đặt true nếu đây là câu Hình học; ngược lại đặt false."),
+      isGeometry: quizIsGeometryFieldSchema,
     })
     .strict();
 }
@@ -444,62 +447,7 @@ export interface GeneratedQuizSchemaConfiguration {
   questionCount?: number;
   questionTypes?: readonly QuestionType[];
   difficulty?: Difficulty;
-  includeSourceCoverageAudit?: boolean;
 }
-
-export const generatedQuizSourceCoverageAuditSchema = z
-  .object({
-    sourceHasAssessableRealWorldApplication: z
-      .boolean()
-      .describe(
-        "True khi PDF có họ bài thực tế bắt buộc dùng trọng tâm lesson; false nếu chỉ cần kiến thức đã học trước đó. Không đặt false chỉ để né việc tạo bối cảnh mới.",
-      ),
-    sourceApplicationFamily: z
-      .string()
-      .trim()
-      .min(1)
-      .max(500)
-      .nullable()
-      .describe(
-        "Mô tả ngắn họ bài thực tế, trọng tâm lesson bắt buộc và vai trò mô hình hóa, không chép đề; null nếu không có.",
-      ),
-    realWorldQuestions: z
-      .array(
-        z
-          .object({
-            questionNumber: z
-              .number()
-              .int()
-              .min(1)
-              .max(50)
-              .describe(
-                "Số thứ tự 1-based của câu ứng dụng thực tế mới trong questions.",
-              ),
-            newContext: z
-              .string()
-              .trim()
-              .min(1)
-              .max(500)
-              .describe(
-                "Bối cảnh thực tế mới của câu, không lặp bối cảnh đặc thù trong nguồn.",
-              ),
-            modelingRole: z
-              .string()
-              .trim()
-              .min(1)
-              .max(500)
-              .describe(
-                "Nêu ngắn vai trò mô hình hóa của thông tin thực tế và vì sao phải dùng trọng tâm lesson.",
-              ),
-          })
-          .strict(),
-      )
-      .max(50)
-      .describe(
-        "Các câu thực tế mới; có ít nhất một phần tử khi nguồn có họ bài phù hợp, ngược lại phải rỗng.",
-      ),
-  })
-  .strict();
 
 export function getGeneratedQuizOutputSchema(
   configuration: GeneratedQuizSchemaConfiguration,
@@ -548,53 +496,7 @@ export function getGeneratedQuizOutputSchema(
       ? questions.min(1).max(50)
       : questions.length(configuration.questionCount);
   const description = LEARNER_MATH_TEXT_SYNTAX_DESCRIPTION;
-  if (!configuration.includeSourceCoverageAudit) {
-    return z.object({ questions: resolvedQuestions }).strict().describe(description);
-  }
-  return z
-    .object({
-      sourceCoverageAudit: generatedQuizSourceCoverageAuditSchema,
-      questions: resolvedQuestions,
-    })
-    .strict()
-    .superRefine((output, context) => {
-      const audit = output.sourceCoverageAudit;
-      if (audit.sourceHasAssessableRealWorldApplication) {
-        if (!audit.sourceApplicationFamily || audit.realWorldQuestions.length === 0) {
-          context.addIssue({
-            code: "custom",
-            path: ["sourceCoverageAudit"],
-            message:
-              "Nguồn có họ bài ứng dụng thực tế thì phải mô tả họ bài và chỉ ra ít nhất một câu ứng dụng mới.",
-          });
-        }
-      } else if (
-        audit.sourceApplicationFamily !== null ||
-        audit.realWorldQuestions.length > 0
-      ) {
-        context.addIssue({
-          code: "custom",
-          path: ["sourceCoverageAudit"],
-          message:
-            "Nguồn không có họ bài ứng dụng thực tế thì sourceApplicationFamily phải null và realWorldQuestions phải rỗng.",
-        });
-      }
-      const seen = new Set<number>();
-      for (const [index, item] of audit.realWorldQuestions.entries()) {
-        if (
-          item.questionNumber > output.questions.length ||
-          seen.has(item.questionNumber)
-        ) {
-          context.addIssue({
-            code: "custom",
-            path: ["sourceCoverageAudit", "realWorldQuestions", index, "questionNumber"],
-            message: "Số thứ tự câu thực tế phải tồn tại và không được lặp.",
-          });
-        }
-        seen.add(item.questionNumber);
-      }
-    })
-    .describe(description);
+  return z.object({ questions: resolvedQuestions }).strict().describe(description);
 }
 
 const sourceSnapshotSchema = z
@@ -627,6 +529,13 @@ export const quizGenerationJobInputSchema = sourceSnapshotSchema
     // jobs through the legacy handler.
     assessmentKind: z.enum(["QUIZ", "TEST"]).default("QUIZ"),
     pipelineVersion: z.literal("ASSESSMENT_QUIZ_V1").default("ASSESSMENT_QUIZ_V1"),
+    promptVersion: z.string().trim().min(1).optional(),
+    schemaName: z.string().trim().min(1).optional(),
+    schemaVersion: z.string().trim().min(1).optional(),
+    schemaHash: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional(),
     targetQuizSetId: z.uuid().nullable().default(null),
     targetTestSetId: z.uuid().nullable().optional(),
     durationSeconds: z.number().int().min(60).max(14_400).optional(),
@@ -670,9 +579,6 @@ export type GeneratedQuizQuestion =
   | z.infer<typeof _generatedNonMathQuizQuestionSchema>
   | z.infer<typeof _generatedMathQuizQuestionSchema>;
 export type GeneratedQuizStatementSolution = z.infer<typeof quizStatementSolutionSchema>;
-export type GeneratedQuizSourceCoverageAudit = z.infer<
-  typeof generatedQuizSourceCoverageAuditSchema
->;
 export type QuizGenerationJobInput = z.infer<typeof quizGenerationJobInputSchema>;
 export type QuizExplanationBlock = z.infer<typeof quizExplanationBlockSchema>;
 

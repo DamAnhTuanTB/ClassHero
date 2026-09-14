@@ -43,6 +43,7 @@ import type { AiFeatureRoute } from "#api/modules/provider-operations/types/prov
 import type { QuizSubjectSnapshot } from "#api/modules/quiz/types/quiz-generation.types";
 import { serializeQuizRichText } from "#api/modules/quiz/utils/quiz-generation-output";
 import { resolveQuizSubject } from "#api/modules/quiz/utils/quiz-subject";
+import { readQuizGenerationQuestionReference } from "#api/modules/quiz/utils/quiz-generation-output";
 import { FilesService } from "#api/modules/files/services/files.service";
 import {
   quizFigureTargetCreateData,
@@ -212,11 +213,15 @@ export class QuizFiguresService {
     const plan = buildQuestionFigureAuthoringPlan(context, dto.targetMode);
     const role = targetRole(dto.targetMode);
     const targetFigure = context.targetFigure;
+    const sourceGenerationId = readQuizGenerationQuestionReference(
+      context.question.sourceMetadataJson,
+    )?.aiGenerationId;
     const figure = targetFigure
       ? await this.prisma.quizFigure.update({
           where: { id: targetFigure.id },
           data: {
             deletedAt: null,
+            ...(sourceGenerationId ? { aiGenerationId: sourceGenerationId } : {}),
             ...(targetFigure.planJson == null ? { planJson: plan } : {}),
           },
           select: { id: true },
@@ -226,6 +231,7 @@ export class QuizFiguresService {
             lessonId: context.question.lessonId,
             ...quizFigureTargetCreateData(target),
             role,
+            ...(sourceGenerationId ? { aiGenerationId: sourceGenerationId } : {}),
             planJson: plan,
             subjectKey: context.subject.key,
             subjectName: context.subject.name,
@@ -249,7 +255,7 @@ export class QuizFiguresService {
         sourceVersion: (latest?.sourceVersion ?? 0) + 1,
         altText:
           targetFigure?.currentRevision?.altText ??
-          defaultAuthoringAltText(dto.targetMode, context.problem),
+          defaultAuthoringAltText(dto.targetMode, context.problem, target.kind),
         caption: targetFigure?.currentRevision?.caption ?? null,
         createdById: actorUserId,
       },
@@ -331,6 +337,7 @@ export class QuizFiguresService {
     target: QuizFigureTarget = { kind: "QUIZ", questionId },
   ) {
     const figure = await this.requireFigure(target, figureId);
+    await this.ensureSourceGenerationLink(target, figure.id, figure.aiGenerationId);
     this.assertBaseRevision(figure.currentRevisionId, dto.baseRevisionId);
     const plan = readPlan(figure.planJson);
     this.assertPlanRole(figure.role, plan);
@@ -356,7 +363,8 @@ export class QuizFiguresService {
         origin: "ADMIN_REGENERATE",
         status: "QUEUED",
         sourceVersion: (latest?.sourceVersion ?? 0) + 1,
-        altText: figure.currentRevision?.altText ?? defaultAltText(figure.role),
+        altText:
+          figure.currentRevision?.altText ?? defaultAltText(figure.role, target.kind),
         caption: figure.currentRevision?.caption ?? null,
         createdById: actorUserId,
       },
@@ -471,6 +479,7 @@ export class QuizFiguresService {
     target: QuizFigureTarget = { kind: "QUIZ", questionId },
   ) {
     const figure = await this.requireFigure(target, figureId);
+    await this.ensureSourceGenerationLink(target, figure.id, figure.aiGenerationId);
     this.assertBaseRevision(figure.currentRevisionId, dto.baseRevisionId);
     const current = figure.currentRevision;
     if (
@@ -700,6 +709,7 @@ export class QuizFiguresService {
       where: { id: figureId, ...quizFigureTargetWhere(target), deletedAt: null },
       select: {
         id: true,
+        aiGenerationId: true,
         role: true,
         status: true,
         planJson: true,
@@ -732,6 +742,32 @@ export class QuizFiguresService {
       );
     }
     return figure;
+  }
+
+  private async ensureSourceGenerationLink(
+    target: QuizFigureTarget,
+    figureId: string,
+    currentGenerationId: string | null,
+  ) {
+    if (currentGenerationId !== null) return;
+    const question =
+      target.kind === "QUIZ"
+        ? await this.prisma.quizQuestion.findFirst({
+            where: { id: target.questionId, deletedAt: null },
+            select: { sourceMetadataJson: true },
+          })
+        : await this.prisma.testQuestion.findFirst({
+            where: { id: target.questionId, deletedAt: null },
+            select: { sourceMetadataJson: true },
+          });
+    const sourceGenerationId = readQuizGenerationQuestionReference(
+      question?.sourceMetadataJson,
+    )?.aiGenerationId;
+    if (!sourceGenerationId) return;
+    await this.prisma.quizFigure.update({
+      where: { id: figureId },
+      data: { aiGenerationId: sourceGenerationId },
+    });
   }
 
   private findQuestion(target: QuizFigureTarget) {
@@ -1088,10 +1124,11 @@ export function readQuizFigurePendingAiTargetMode(inputMeta: unknown) {
   return "SOLUTION" as const;
 }
 
-function defaultAltText(role: QuizFigureRole) {
+function defaultAltText(role: QuizFigureRole, assessmentKind: QuizFigureTarget["kind"]) {
+  const assessmentLabel = assessmentKind === "TEST" ? "Test" : "Quiz";
   return role === QuizFigureRole.QUESTION
-    ? "Hình minh họa đề Quiz"
-    : "Hình lời giải Quiz";
+    ? `Hình minh họa đề ${assessmentLabel}`
+    : `Hình lời giải ${assessmentLabel}`;
 }
 
 function targetRole(targetMode: QuizFigureAiTargetMode) {
@@ -1127,9 +1164,16 @@ function readQuestionSolution(sourceMetadata: unknown, explanationJson: unknown)
   return serializeQuizRichText(explanationJson);
 }
 
-function defaultAuthoringAltText(targetMode: QuizFigureAiTargetMode, problem: string) {
+function defaultAuthoringAltText(
+  targetMode: QuizFigureAiTargetMode,
+  problem: string,
+  assessmentKind: QuizFigureTarget["kind"],
+) {
   const excerpt = problem.replaceAll(/\s+/gu, " ").trim().slice(0, 160);
+  const assessmentLabel = assessmentKind === "TEST" ? "Test" : "Quiz";
   const label =
-    targetMode === "QUESTION" ? "Hình minh họa đề Quiz" : "Hình lời giải Quiz";
+    targetMode === "QUESTION"
+      ? `Hình minh họa đề ${assessmentLabel}`
+      : `Hình lời giải ${assessmentLabel}`;
   return excerpt ? `${label}: ${excerpt}` : label;
 }

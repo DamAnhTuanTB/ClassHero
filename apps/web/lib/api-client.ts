@@ -50,7 +50,7 @@ export class ApiRequestError extends Error {
   }
 }
 
-function getApiBaseUrl() {
+export function getApiBaseUrl() {
   let baseUrl = process.env.NEXT_PUBLIC_API_URL ?? defaultApiBaseUrl;
   if (
     typeof window !== "undefined" &&

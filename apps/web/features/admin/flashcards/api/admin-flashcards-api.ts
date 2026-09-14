@@ -47,6 +47,7 @@ export interface AdminFlashcard {
   sourceMetadataJson: {
     aiGenerationId?: string;
     requiresSolutionFigure?: boolean;
+    reviewWarnings?: Array<{ code: string; message: string; severity: "WARNING" }>;
     [key: string]: unknown;
   } | null;
   sortOrder: number;

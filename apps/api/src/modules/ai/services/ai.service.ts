@@ -28,6 +28,7 @@ import type {
   AiOutputSchema,
   AiTextInput,
   AiTextOutput,
+  AiTextStreamEvent,
 } from "#api/modules/ai/types/ai-text.types";
 import { getEmbeddingConfig } from "#api/modules/ai/utils/ai-config.helper";
 import {
@@ -80,10 +81,12 @@ export class AiService {
    * Shorthand cho getEmbeddingProvider().createEmbedding().
    * Model và dimensions lấy từ config nếu không được override trong input.
    */
-  async createEmbedding(input: AiEmbeddingInput): Promise<AiEmbeddingOutput> {
+  async createEmbedding(
+    input: AiEmbeddingInput,
+    embeddingConfig = this.getEmbeddingConfig(),
+  ): Promise<AiEmbeddingOutput> {
     assertEmbeddingInput(input);
 
-    const embeddingConfig = this.getEmbeddingConfig();
     if (input.model !== undefined && input.model !== embeddingConfig.model) {
       throw new Error(
         `Embedding model override "${input.model}" does not match configured vector space "${embeddingConfig.model}".`,
@@ -138,6 +141,13 @@ export class AiService {
   ): Promise<AiTextOutput> {
     const provider = this.getProvider(providerName);
     return provider.generateText(input);
+  }
+
+  streamText(
+    input: AiTextInput,
+    providerName: AiProviderName = AiProviderName.OPENAI,
+  ): AsyncGenerator<AiTextStreamEvent> {
+    return this.getProvider(providerName).streamText(input);
   }
 
   /**

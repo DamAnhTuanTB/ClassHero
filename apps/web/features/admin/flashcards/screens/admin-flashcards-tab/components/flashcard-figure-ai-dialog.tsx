@@ -226,8 +226,8 @@ export function FlashcardFigureAiDialog({
                       Tạo mới lại
                     </span>
                     <span className="mt-1 block text-xs leading-5 text-[var(--theme-text-muted)]">
-                      Dựng một hình lời giải hoàn chỉnh mới từ câu hỏi và solution hiện
-                      tại.
+                      Dựng một hình lời giải hoàn chỉnh mới từ câu hỏi và lời giải
+                      hiện tại.
                     </span>
                   </span>
                 </span>
@@ -288,8 +288,8 @@ export function FlashcardFigureAiDialog({
                 </p>
               )}
               <p className="mt-2 text-xs font-semibold leading-5 text-[var(--theme-text-muted)]">
-                Request SOLUTION dùng solution làm nguồn ưu tiên và front làm bối cảnh;
-                không gửi mặt sau.
+                Yêu cầu tạo hình lời giải dùng lời giải làm nguồn ưu tiên và mặt
+                trước làm bối cảnh; không gửi mặt sau.
               </p>
             </div>
           </fieldset>

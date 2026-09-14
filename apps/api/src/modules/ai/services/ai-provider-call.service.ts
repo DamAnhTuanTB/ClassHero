@@ -15,9 +15,15 @@ import { createHash } from "node:crypto";
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import { AiService } from "#api/modules/ai/services/ai.service";
 import type {
+  AiEmbeddingInput,
+  AiEmbeddingOutput,
+} from "#api/modules/ai/types/ai-embedding.types";
+import type {
   AiOutputSchema,
   AiStructuredInput,
   AiStructuredOutput,
+  AiTextInput,
+  AiTextStreamEvent,
 } from "#api/modules/ai/types/ai-text.types";
 import { isAiProviderOutputError } from "#api/modules/ai/utils/ai-output-validation";
 import { buildAiUserPrompt } from "#api/modules/ai/utils/ai-prompt";
@@ -99,7 +105,7 @@ export type ResolvedAiStructuredRequestPreview = ResolvedAiStructuredRequestTrac
   };
 };
 
-type RoutedAiCallContext = {
+export type RoutedAiCallContext = {
   feature: AiGenerationType;
   aiGenerationId?: string | null;
   backgroundJobId?: string | null;
@@ -111,6 +117,8 @@ type RoutedAiCallContext = {
   idempotencyKey?: string;
   /** Disable provider failover for flows whose retry contract permits compiler repair only. */
   allowProviderFallback?: boolean;
+  /** Per-call output cap for an auxiliary call whose output limit differs from its route. */
+  maxOutputTokensOverride?: number;
   onResolvedRequest?: (trace: ResolvedAiStructuredRequestTrace) => Promise<void>;
 };
 
@@ -124,6 +132,10 @@ export class AiProviderCallService {
     private readonly usage: ProviderUsageService,
     @Inject(PrismaService) private readonly prisma: PrismaService,
   ) {}
+
+  getEmbeddingConfig() {
+    return this.aiService.getEmbeddingConfig();
+  }
 
   async previewStructuredRequest<TOutput>(
     context: Pick<RoutedAiCallContext, "feature" | "routeSnapshot"> & {
@@ -248,16 +260,20 @@ export class AiProviderCallService {
     let lastError: unknown;
     for (let index = 0; index < candidates.length; index += 1) {
       const candidate = candidates[index]!;
-      const maxInputTokens = route.maxInputTokens ?? candidate.maxInputTokens;
-      const maxOutputTokens = route.maxOutputTokens ?? input.maxTokens;
-      const reasoningEffort = toAiReasoningEffort(route.reasoningEffort);
+      const isFallback = route.candidates.indexOf(candidate) > 0;
+      const maxInputTokens = resolveCandidateMaxInputTokens(
+        route,
+        candidate,
+        isFallback,
+      );
+      const controls = resolveCandidateControls(route, candidate, isFallback, input);
       const requestFingerprint = fingerprintRequest(input);
       const resolvedInput = {
         ...input,
         model: candidate.model,
-        temperature: route.temperature ?? input.temperature,
-        reasoningEffort: reasoningEffort ?? input.reasoningEffort,
-        maxTokens: maxOutputTokens,
+        temperature: controls.temperature,
+        reasoningEffort: controls.reasoningEffort,
+        maxTokens: controls.maxOutputTokens,
       } satisfies AiStructuredInput;
       await context.onResolvedRequest?.(
         buildResolvedRequestTrace({
@@ -303,7 +319,7 @@ export class AiProviderCallService {
               input: resolvedInput,
               promptTokens: maxInputTokens ?? 0,
             }),
-            completionTokens: maxOutputTokens ?? 0,
+            completionTokens: controls.maxOutputTokens ?? 0,
           },
           rates: candidate.rates,
           requiredMetrics: [
@@ -313,7 +329,7 @@ export class AiProviderCallService {
           estimateUnavailableReason:
             maxInputTokens == null || maxInputTokens <= 0
               ? "Chưa có giới hạn token đầu vào trong Thiết lập mặc định nên yêu cầu AI đã được dừng để bảo vệ ngân sách."
-              : maxOutputTokens == null || maxOutputTokens <= 0
+              : controls.maxOutputTokens == null || controls.maxOutputTokens <= 0
                 ? "Chưa có giới hạn token đầu ra trong Thiết lập mặc định nên yêu cầu AI đã được dừng để bảo vệ ngân sách."
                 : undefined,
         },
@@ -372,6 +388,222 @@ export class AiProviderCallService {
     throw lastError instanceof Error ? lastError : new Error("AI provider call failed.");
   }
 
+  async *streamText(
+    context: RoutedAiCallContext,
+    input: AiTextInput,
+  ): AsyncGenerator<AiTextStreamEvent> {
+    const route = context.routeSnapshot ?? (await this.routing.resolve(context.feature));
+    const availableCandidates = route.candidates.filter(
+      (candidate) => candidate.available,
+    );
+    const candidates =
+      context.allowProviderFallback === false
+        ? availableCandidates.slice(0, 1)
+        : availableCandidates;
+    if (candidates.length === 0) {
+      throw new Error(
+        `No configured credential is available for AI feature ${context.feature}.`,
+      );
+    }
+
+    let lastError: unknown;
+    for (let index = 0; index < candidates.length; index += 1) {
+      const candidate = candidates[index]!;
+      const isFallback = route.candidates.indexOf(candidate) > 0;
+      const maxInputTokens = resolveCandidateMaxInputTokens(
+        route,
+        candidate,
+        isFallback,
+      );
+      const controls = resolveCandidateControls(
+        route,
+        candidate,
+        isFallback,
+        input,
+        context.maxOutputTokensOverride,
+      );
+      const resolvedInput = {
+        ...input,
+        model: candidate.model,
+        temperature: controls.temperature,
+        reasoningEffort: controls.reasoningEffort,
+        maxTokens: controls.maxOutputTokens,
+      } satisfies AiTextInput;
+      const estimatedPromptTokens = estimateTextInputTokens(resolvedInput);
+      if (maxInputTokens && estimatedPromptTokens > maxInputTokens) {
+        throw new Error(
+          `AI text input estimate ${estimatedPromptTokens} exceeds route limit ${maxInputTokens}.`,
+        );
+      }
+
+      const usageEvent = await this.usage.reserveAndStart(
+        {
+          category: candidate.category,
+          provider: candidate.provider,
+          catalogItemId: candidate.catalogItemId,
+          priceVersionId: candidate.priceVersionId,
+          aiGenerationId: context.aiGenerationId,
+          backgroundJobId: context.backgroundJobId,
+          feature: context.feature,
+          purpose: route.purpose ?? null,
+          operation: context.operation ?? defaultContentOperation(context.feature),
+          targetContext: context.targetContext,
+          reasoningEffort: resolvedInput.reasoningEffort ?? null,
+          attempt: context.attempt,
+        },
+        {
+          idempotencyKey: [
+            context.idempotencyKey ??
+              [
+                "ai-stream",
+                context.backgroundJobId ??
+                  context.aiGenerationId ??
+                  fingerprintRequest(input),
+                context.attempt ?? 1,
+                context.callSequence ?? 1,
+              ].join(":"),
+            index,
+            candidate.catalogItemId ?? candidate.model,
+          ].join(":"),
+          usageUpperBound: {
+            promptTokens: maxInputTokens ?? estimatedPromptTokens,
+            completionTokens: controls.maxOutputTokens ?? 0,
+          },
+          rates: candidate.rates,
+          requiredMetrics: [
+            ProviderUsageMetric.INPUT_TOKEN,
+            ProviderUsageMetric.OUTPUT_TOKEN,
+          ],
+          estimateUnavailableReason:
+            !maxInputTokens || maxInputTokens <= 0
+              ? "Chưa có giới hạn token đầu vào cho Chat AI."
+              : !controls.maxOutputTokens || controls.maxOutputTokens <= 0
+                ? "Chưa có giới hạn token đầu ra cho Chat AI."
+                : undefined,
+        },
+      );
+      let usageSettled = false;
+      let emittedDelta = false;
+
+      try {
+        for await (const event of this.aiService.streamText(
+          resolvedInput,
+          candidate.provider,
+        )) {
+          if (event.type === "delta") emittedDelta = true;
+          if (event.type === "completed") {
+            const usage = event.output.usage;
+            const recorded = await this.usage.succeed(usageEvent.id, {
+              promptTokens: usage?.promptTokens,
+              cachedInputTokens: usage?.cachedInputTokens,
+              cacheWriteInputTokens: usage?.cacheWriteInputTokens,
+              completionTokens: usage?.completionTokens,
+              totalTokens: usage?.totalTokens,
+              providerRequestId: event.output.providerRequestId,
+              latencyMs: event.output.latencyMs,
+              rawUsage: {
+                providerUsage: event.output.providerUsageRaw ?? null,
+                fileOperations: event.output.inputFileOperations ?? [],
+                ...(event.output.timeToFirstTokenMs === undefined
+                  ? {}
+                  : { timeToFirstTokenMs: event.output.timeToFirstTokenMs }),
+              },
+              rates: candidate.rates,
+            });
+            usageSettled = true;
+            if (context.aiGenerationId) {
+              await this.updateAiGenerationCost(context.aiGenerationId, recorded.costVnd);
+            }
+          }
+          yield event;
+        }
+        if (!usageSettled) {
+          throw new Error("AI text stream was interrupted before completion.");
+        }
+        return;
+      } catch (error) {
+        if (!usageSettled) {
+          await this.usage.fail(usageEvent.id, error, { rates: candidate.rates });
+          usageSettled = true;
+        }
+        lastError = error;
+        const hasFallback = index < candidates.length - 1;
+        if (emittedDelta || !hasFallback || !isTransientProviderError(error)) {
+          throw error;
+        }
+      } finally {
+        if (!usageSettled) {
+          await this.usage.fail(
+            usageEvent.id,
+            new Error("AI text stream was interrupted before completion."),
+            { rates: candidate.rates },
+          );
+        }
+      }
+    }
+    throw lastError instanceof Error ? lastError : new Error("AI provider call failed.");
+  }
+
+  async createEmbedding(
+    context: RoutedAiCallContext,
+    input: AiEmbeddingInput,
+    configuredSpace = this.aiService.getEmbeddingConfig(),
+  ): Promise<AiEmbeddingOutput> {
+    const candidate = await this.routing.resolveCandidateByModel(configuredSpace.model);
+    if (
+      !candidate?.available ||
+      candidate.provider !== configuredSpace.provider ||
+      configuredSpace.provider !== AiProviderName.OPENAI
+    ) {
+      throw new Error(
+        `No configured OpenAI credential or active catalog price is available for embedding model ${configuredSpace.model}.`,
+      );
+    }
+
+    const estimatedPromptTokens = Math.max(
+      1,
+      Math.ceil(input.texts.reduce((total, value) => total + value.length, 0) / 4),
+    );
+    const usageEvent = await this.usage.reserveAndStart(
+      {
+        category: candidate.category,
+        provider: candidate.provider,
+        catalogItemId: candidate.catalogItemId,
+        priceVersionId: candidate.priceVersionId,
+        aiGenerationId: context.aiGenerationId,
+        backgroundJobId: context.backgroundJobId,
+        feature: context.feature,
+        operation: context.operation ?? "EMBEDDING_GENERATION",
+        targetContext: context.targetContext,
+        attempt: context.attempt,
+      },
+      {
+        idempotencyKey:
+          context.idempotencyKey ??
+          `ai-embedding:${context.aiGenerationId ?? fingerprintEmbeddingRequest(input)}`,
+        usageUpperBound: { promptTokens: estimatedPromptTokens },
+        rates: candidate.rates,
+        requiredMetrics: [ProviderUsageMetric.INPUT_TOKEN],
+      },
+    );
+
+    try {
+      const output = await this.aiService.createEmbedding(input, configuredSpace);
+      const recorded = await this.usage.succeed(usageEvent.id, {
+        promptTokens: output.usage?.promptTokens,
+        totalTokens: output.usage?.totalTokens,
+        rates: candidate.rates,
+      });
+      if (context.aiGenerationId) {
+        await this.updateAiGenerationCost(context.aiGenerationId, recorded.costVnd);
+      }
+      return output;
+    } catch (error) {
+      await this.usage.fail(usageEvent.id, error, { rates: candidate.rates });
+      throw error;
+    }
+  }
+
   private async updateAiGenerationCost(aiGenerationId: string, fallbackCostVnd: number) {
     const aggregate = this.prisma.providerUsageEvent?.aggregate
       ? await this.prisma.providerUsageEvent.aggregate({
@@ -396,6 +628,56 @@ export class AiProviderCallService {
   }
 }
 
+function resolveCandidateControls(
+  route: AiFeatureRoute,
+  candidate: AiFeatureRoute["candidates"][number],
+  isFallback: boolean,
+  input: AiTextInput,
+  maxOutputTokensOverride?: number,
+) {
+  const configuredTemperature = isFallback
+    ? route.fallbackTemperature
+    : route.temperature;
+  const configuredReasoningEffort = isFallback
+    ? route.fallbackReasoningEffort
+    : route.reasoningEffort;
+  const aiConfiguration = readAiConfiguration(candidate.capabilitiesJson);
+  return {
+    temperature:
+      aiConfiguration === "REASONING_EFFORT"
+        ? undefined
+        : (configuredTemperature ?? input.temperature),
+    reasoningEffort:
+      aiConfiguration === "TEMPERATURE"
+        ? undefined
+        : (toAiReasoningEffort(configuredReasoningEffort ?? null) ??
+          input.reasoningEffort),
+    maxOutputTokens:
+      maxOutputTokensOverride ??
+      (isFallback ? route.fallbackMaxOutputTokens : route.maxOutputTokens) ??
+      route.maxOutputTokens ??
+      input.maxTokens,
+  };
+}
+
+function resolveCandidateMaxInputTokens(
+  route: AiFeatureRoute,
+  candidate: AiFeatureRoute["candidates"][number],
+  isFallback: boolean,
+) {
+  return isFallback
+    ? (route.fallbackMaxInputTokens ?? route.maxInputTokens ?? candidate.maxInputTokens)
+    : (route.maxInputTokens ?? candidate.maxInputTokens);
+}
+
+function readAiConfiguration(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const configuration = (value as Record<string, unknown>).aiConfiguration;
+  return configuration === "TEMPERATURE" || configuration === "REASONING_EFFORT"
+    ? configuration
+    : null;
+}
+
 function buildInputUsageUpperBound(input: {
   candidate: AiFeatureRoute["candidates"][number];
   input: AiStructuredInput;
@@ -413,6 +695,20 @@ function buildInputUsageUpperBound(input: {
 
 function estimateImageInputTokens(detail: string | null) {
   return detail === "low" ? 250 : 1_000;
+}
+
+function estimateTextInputTokens(input: AiTextInput) {
+  const text = [
+    input.systemPrompt,
+    input.userPrompt,
+    ...(input.inputTextItems ?? []).map((item) => item.text),
+    ...(input.contextChunks ?? []).map((chunk) => chunk.content),
+  ].join("\n");
+  const imageTokens = (input.inputImages ?? []).reduce(
+    (total, image) => total + estimateImageInputTokens(image.detail ?? null),
+    0,
+  );
+  return Math.max(1, Math.ceil(text.length / 4)) + imageTokens;
 }
 
 function buildResolvedRequestTrace<TOutput>(input: {
@@ -523,7 +819,7 @@ function hashValue(value: string) {
   return createHash("sha256").update(value).digest("hex");
 }
 
-function fingerprintRequest(input: AiStructuredInput) {
+function fingerprintRequest(input: AiTextInput) {
   const digestValue = (value: string | undefined) =>
     value ? createHash("sha256").update(value).digest("hex") : null;
   return createHash("sha256")
@@ -548,6 +844,10 @@ function fingerprintRequest(input: AiStructuredInput) {
     )
     .digest("hex")
     .slice(0, 20);
+}
+
+function fingerprintEmbeddingRequest(input: AiEmbeddingInput) {
+  return createHash("sha256").update(JSON.stringify(input)).digest("hex").slice(0, 20);
 }
 
 function toAiReasoningEffort(value: string | null): AiReasoningEffort | undefined {

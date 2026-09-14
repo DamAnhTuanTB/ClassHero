@@ -110,6 +110,7 @@ export const quizSolutionRefinementJobInputSchema = z
       TEST_SOLUTION_REFINEMENT_TARGET_TYPE,
     ]),
     assessmentKind: z.enum(["QUIZ", "TEST"]).optional(),
+    pipelineVersion: z.literal("ASSESSMENT_QUIZ_V1").optional(),
     targetQuestionId: z.string().uuid().optional(),
     mode: z.enum(QUIZ_SOLUTION_REFINEMENT_MODES),
     includeCurrentSolutionAsRejected: z.boolean(),

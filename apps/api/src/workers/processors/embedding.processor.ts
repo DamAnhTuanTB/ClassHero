@@ -3,16 +3,16 @@
  *
  * Flow (docs/06-ai-rag-spec.md §3.4):
  * 1. Load backgroundJob → validate queue = EMBEDDING
- * 2. Lấy lessonDocumentId từ inputMeta
- * 3. Load document_chunks chưa có embedding (embedding IS NULL)
+ * 2. Resolve nguồn lesson document hoặc persisted video summary
+ * 3. Load source chunks chưa có embedding (embedding IS NULL)
  * 4. Batch gọi AiService.createEmbedding() (50 texts/batch)
  * 5. Lưu vector bằng raw SQL (Prisma Unsupported type)
- * 6. Cập nhật lesson_documents embedding metadata
+ * 6. Cập nhật lesson_documents embedding metadata khi nguồn là tài liệu
  * 7. Log ai_generations record
  * 8. Update backgroundJob status = SUCCEEDED
  */
 
-import { Inject, Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger, Optional } from "@nestjs/common";
 import {
   AiGenerationStatus,
   AiGenerationType,
@@ -31,6 +31,7 @@ import type {
 import { getJobErrorMessage } from "#api/jobs/job-error";
 import { toJobJson } from "#api/jobs/job-json";
 import { AiService } from "#api/modules/ai/services/ai.service";
+import { RealtimeJobSnapshotPublisherService } from "#api/modules/realtime/services/realtime-job-snapshot-publisher.service";
 import { assertEmbeddingOutput } from "#api/modules/ai/utils/embedding-validation";
 import { stripLatexForEmbedding } from "#api/workers/utils/strip-latex";
 
@@ -80,6 +81,9 @@ export class EmbeddingProcessor {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(AiService) private readonly aiService: AiService,
+    @Optional()
+    @Inject(RealtimeJobSnapshotPublisherService)
+    private readonly realtimeJobs?: RealtimeJobSnapshotPublisherService,
   ) {}
 
   async process(
@@ -126,6 +130,7 @@ export class EmbeddingProcessor {
         finishedAt: null,
       },
     });
+    await this.realtimeJobs?.publishById(backgroundJob.id);
 
     let aiGenerationId: string | null = null;
     try {
@@ -178,9 +183,11 @@ export class EmbeddingProcessor {
     record: EmbeddingJobRecord,
   ): Promise<EmbeddingExecution> {
     const lessonDocumentId = this.readLessonDocumentId(record);
+    const summaryHash = this.readSummaryHash(record);
+    const isVideoSummary = record.resourceType === "video_summary";
     const lessonId = record.lessonId;
 
-    if (!lessonDocumentId) {
+    if (!isVideoSummary && !lessonDocumentId) {
       throw new UnrecoverableError(
         `EMBEDDING job ${record.id} missing lessonDocumentId in inputMeta`,
       );
@@ -192,31 +199,62 @@ export class EmbeddingProcessor {
       );
     }
 
+    if (isVideoSummary && !summaryHash) {
+      throw new UnrecoverableError(
+        `EMBEDDING job ${record.id} missing summaryHash in inputMeta`,
+      );
+    }
+
+    if (isVideoSummary && !record.resourceId) {
+      throw new UnrecoverableError(
+        `EMBEDDING job ${record.id} missing video summary resourceId`,
+      );
+    }
+
     if (
-      record.resourceType !== "lesson_document" ||
-      record.resourceId !== lessonDocumentId
+      !isVideoSummary &&
+      (record.resourceType !== "lesson_document" ||
+        record.resourceId !== lessonDocumentId)
     ) {
       throw new UnrecoverableError(
         `EMBEDDING job ${record.id} has inconsistent lesson document metadata`,
       );
     }
 
-    const lessonDocument = await this.prisma.lessonDocument.findFirst({
-      where: {
-        id: lessonDocumentId,
-        lessonId,
-        replacedAt: null,
-      },
-      select: {
-        id: true,
-        chunkCount: true,
-      },
-    });
+    const lessonDocument = isVideoSummary
+      ? null
+      : await this.prisma.lessonDocument.findFirst({
+          where: {
+            id: lessonDocumentId,
+            lessonId,
+            replacedAt: null,
+          },
+          select: {
+            id: true,
+            chunkCount: true,
+          },
+        });
 
-    if (!lessonDocument) {
+    if (!isVideoSummary && !lessonDocument) {
       throw new UnrecoverableError(
         `Active lesson document ${lessonDocumentId} was not found in lesson ${lessonId}`,
       );
+    }
+
+    if (isVideoSummary) {
+      const summaryExists = await this.prisma.lessonVideoSummary.findFirst({
+        where: {
+          id: record.resourceId!,
+          lessonId,
+          deletedAt: null,
+        },
+        select: { id: true },
+      });
+      if (!summaryExists) {
+        throw new UnrecoverableError(
+          `Video summary ${record.resourceId} was not found in lesson ${lessonId}`,
+        );
+      }
     }
 
     // Check AI provider availability
@@ -229,40 +267,47 @@ export class EmbeddingProcessor {
     const embeddingConfig = this.aiService.getEmbeddingConfig();
     const startedAt = new Date();
 
-    await this.prisma.lessonDocument.update({
-      where: { id: lessonDocumentId },
-      data: {
-        status: DocumentStatus.PROCESSING,
-        extractError: null,
-      },
-    });
+    if (lessonDocumentId && !isVideoSummary) {
+      await this.prisma.lessonDocument.update({
+        where: { id: lessonDocumentId },
+        data: {
+          status: DocumentStatus.PROCESSING,
+          extractError: null,
+        },
+      });
+    }
 
     // Load chunks chưa có embedding hoặc thuộc vector space cũ.
     const chunks = await this.loadChunksNeedingEmbedding({
       lessonDocumentId,
       lessonId,
+      videoSummaryId: record.resourceId ?? undefined,
+      summaryHash,
+      sourceType: isVideoSummary ? "VIDEO_SUMMARY" : "LESSON_DOCUMENT",
       model: embeddingConfig.model,
       dimensions: embeddingConfig.dimensions,
     });
 
     if (chunks.length === 0) {
       this.logger.log(
-        `[EMBEDDING] No chunks without embedding for document=${lessonDocumentId}`,
+        `[EMBEDDING] No chunks without embedding for ${isVideoSummary ? `video summary=${record.resourceId}` : `document=${lessonDocumentId}`}`,
       );
 
-      await this.prisma.lessonDocument.update({
-        where: { id: lessonDocumentId },
-        data: {
-          status: DocumentStatus.READY,
-          extractError: null,
-          embeddingProvider:
-            lessonDocument.chunkCount > 0 ? AiProviderName.OPENAI : null,
-          embeddingModel:
-            lessonDocument.chunkCount > 0 ? embeddingConfig.model : null,
-          embeddingDimensions:
-            lessonDocument.chunkCount > 0 ? embeddingConfig.dimensions : null,
-        },
-      });
+      if (lessonDocumentId && lessonDocument) {
+        await this.prisma.lessonDocument.update({
+          where: { id: lessonDocumentId },
+          data: {
+            status: DocumentStatus.READY,
+            extractError: null,
+            embeddingProvider:
+              lessonDocument.chunkCount > 0 ? AiProviderName.OPENAI : null,
+            embeddingModel:
+              lessonDocument.chunkCount > 0 ? embeddingConfig.model : null,
+            embeddingDimensions:
+              lessonDocument.chunkCount > 0 ? embeddingConfig.dimensions : null,
+          },
+        });
+      }
 
       const latencyMs = Date.now() - startedAt.getTime();
       return {
@@ -287,7 +332,7 @@ export class EmbeddingProcessor {
     }
 
     this.logger.log(
-      `[EMBEDDING] Starting: ${chunks.length} chunks for document=${lessonDocumentId}, lesson=${lessonId}`,
+      `[EMBEDDING] Starting: ${chunks.length} chunks for ${isVideoSummary ? `video summary=${record.resourceId}` : `document=${lessonDocumentId}`}, lesson=${lessonId}`,
     );
 
     let totalPromptTokens = 0;
@@ -319,6 +364,8 @@ export class EmbeddingProcessor {
 
       // Save vectors via raw SQL
       await this.saveEmbeddingBatch(batch, result.vectors, {
+        sourceType: isVideoSummary ? "VIDEO_SUMMARY" : "LESSON_DOCUMENT",
+        summaryHash,
         provider: AiProviderName.OPENAI,
         model: result.model,
         dimensions: result.dimensions,
@@ -333,19 +380,21 @@ export class EmbeddingProcessor {
     const latencyMs = finishedAt.getTime() - startedAt.getTime();
 
     // Update lesson_documents embedding metadata
-    await this.prisma.lessonDocument.update({
-      where: { id: lessonDocumentId },
-      data: {
-        status: DocumentStatus.READY,
-        extractError: null,
-        embeddingProvider: AiProviderName.OPENAI,
-        embeddingModel: embeddingConfig.model,
-        embeddingDimensions: embeddingConfig.dimensions,
-      },
-    });
+    if (lessonDocumentId && !isVideoSummary) {
+      await this.prisma.lessonDocument.update({
+        where: { id: lessonDocumentId },
+        data: {
+          status: DocumentStatus.READY,
+          extractError: null,
+          embeddingProvider: AiProviderName.OPENAI,
+          embeddingModel: embeddingConfig.model,
+          embeddingDimensions: embeddingConfig.dimensions,
+        },
+      });
+    }
 
     this.logger.log(
-      `[EMBEDDING] Completed: ${embeddedCount} chunks embedded for document=${lessonDocumentId}, ` +
+      `[EMBEDDING] Completed: ${embeddedCount} chunks embedded for ${isVideoSummary ? `video summary=${record.resourceId}` : `document=${lessonDocumentId}`}, ` +
         `tokens=${totalTokens}, latency=${latencyMs}ms`,
     );
 
@@ -415,10 +464,16 @@ export class EmbeddingProcessor {
         type: AiGenerationType.EMBEDDING,
         backgroundJobId: record.id,
         lessonId: record.lessonId,
-        targetType: "LESSON_DOCUMENT",
+        targetType:
+          record.resourceType === "video_summary"
+            ? "VIDEO_SUMMARY"
+            : "LESSON_DOCUMENT",
         targetId: record.resourceId,
         inputMetaJson: {
           lessonDocumentId: this.readLessonDocumentId(record) ?? null,
+          videoSummaryId:
+            record.resourceType === "video_summary" ? record.resourceId : null,
+          summaryHash: this.readSummaryHash(record) ?? null,
           dimensions: embeddingConfig.dimensions,
         },
         ...data,
@@ -428,11 +483,33 @@ export class EmbeddingProcessor {
   }
 
   private async loadChunksNeedingEmbedding(params: {
-    lessonDocumentId: string;
+    lessonDocumentId?: string;
     lessonId: string;
+    videoSummaryId?: string;
+    summaryHash?: string;
+    sourceType: "LESSON_DOCUMENT" | "VIDEO_SUMMARY";
     model: string;
     dimensions: number;
   }): Promise<ChunkToEmbed[]> {
+    if (params.sourceType === "VIDEO_SUMMARY") {
+      if (!params.videoSummaryId || !params.summaryHash) return [];
+      return this.prisma.$queryRaw<ChunkToEmbed[]>`
+        SELECT id, content, chunk_index AS "chunkIndex"
+        FROM video_summary_chunks
+        WHERE video_summary_id = ${params.videoSummaryId}::uuid
+          AND lesson_id = ${params.lessonId}::uuid
+          AND summary_hash = ${params.summaryHash}
+          AND (
+            embedding IS NULL
+            OR embedding_provider IS DISTINCT FROM ${AiProviderName.OPENAI}::"AiProviderName"
+            OR embedding_model IS DISTINCT FROM ${params.model}
+            OR embedding_dimensions IS DISTINCT FROM ${params.dimensions}
+          )
+        ORDER BY chunk_index ASC
+      `;
+    }
+
+    if (!params.lessonDocumentId) return [];
     const chunks = await this.prisma.$queryRaw<ChunkToEmbed[]>`
       SELECT id, content, chunk_index AS "chunkIndex"
       FROM document_chunks
@@ -454,6 +531,8 @@ export class EmbeddingProcessor {
     chunks: ChunkToEmbed[],
     vectors: number[][],
     meta: {
+      sourceType: "LESSON_DOCUMENT" | "VIDEO_SUMMARY";
+      summaryHash?: string;
       provider: AiProviderName;
       model: string;
       dimensions: number;
@@ -478,14 +557,25 @@ export class EmbeddingProcessor {
       }
 
       const vectorString = `[${vector.join(",")}]`;
-      const updatedRows = await this.prisma.$executeRaw`
-        UPDATE document_chunks
-        SET embedding = ${vectorString}::vector,
-            embedding_provider = ${meta.provider}::"AiProviderName",
-            embedding_model = ${meta.model},
-            embedding_dimensions = ${meta.dimensions}
-        WHERE id = ${chunk.id}::uuid
-      `;
+      const updatedRows =
+        meta.sourceType === "VIDEO_SUMMARY"
+          ? await this.prisma.$executeRaw`
+              UPDATE video_summary_chunks
+              SET embedding = ${vectorString}::vector,
+                  embedding_provider = ${meta.provider}::"AiProviderName",
+                  embedding_model = ${meta.model},
+                  embedding_dimensions = ${meta.dimensions}
+              WHERE id = ${chunk.id}::uuid
+                AND summary_hash = ${meta.summaryHash}
+            `
+          : await this.prisma.$executeRaw`
+              UPDATE document_chunks
+              SET embedding = ${vectorString}::vector,
+                  embedding_provider = ${meta.provider}::"AiProviderName",
+                  embedding_model = ${meta.model},
+                  embedding_dimensions = ${meta.dimensions}
+              WHERE id = ${chunk.id}::uuid
+            `;
 
       if (updatedRows !== 1) {
         throw new Error(
@@ -518,6 +608,19 @@ export class EmbeddingProcessor {
     return typeof lessonDocumentId === "string"
       ? lessonDocumentId
       : undefined;
+  }
+
+  private readSummaryHash(record: EmbeddingJobRecord): string | undefined {
+    if (
+      !record.inputMeta ||
+      typeof record.inputMeta !== "object" ||
+      Array.isArray(record.inputMeta)
+    ) {
+      return undefined;
+    }
+
+    const summaryHash = record.inputMeta.summaryHash;
+    return typeof summaryHash === "string" ? summaryHash : undefined;
   }
 
   private resolveMaxAttempts(

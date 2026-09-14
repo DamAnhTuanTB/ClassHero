@@ -54,6 +54,10 @@ export function SourceDocumentPagesDialog({
   const [searchPrintedPage, setSearchPrintedPage] = useState("");
   const debouncedSearchPrintedPage = useDebouncedValue(searchPrintedPage);
   const [visibleCount, setVisibleCount] = useState(10);
+  const [pdfPreviewWidth, setPdfPreviewWidth] = useState(320);
+  const [pendingFocusPageId, setPendingFocusPageId] = useState<string | null>(null);
+  const hasFocusedInitialWarning = useRef(false);
+  const printedPageInputRefs = useRef(new Map<string, HTMLInputElement>());
   const pdfAccessUrlQuery = useAdminFileAccessUrl(
     sourceDocument?.file.id ?? null,
     isOpen && viewMode === "pages" && showPdfPreview,
@@ -94,7 +98,88 @@ export function SourceDocumentPagesDialog({
     setVisibleCount(10);
   }, [filterMode, debouncedSearchPrintedPage, viewMode, isOpen]);
 
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const updatePdfPreviewWidth = () => {
+      const preferredWidth = window.innerWidth >= 1024 ? 400 : 320;
+      setPdfPreviewWidth(Math.min(preferredWidth, Math.max(160, window.innerWidth - 64)));
+    };
+
+    updatePdfPreviewWidth();
+    window.addEventListener("resize", updatePdfPreviewWidth);
+
+    return () => window.removeEventListener("resize", updatePdfPreviewWidth);
+  }, [isOpen]);
+
   const paginatedPages = filteredPages.slice(0, visibleCount);
+  const confirmationPageIds = filteredPages
+    .filter((page) => Boolean(getPrintedPageView(page).warning))
+    .map((page) => page.id);
+
+  const registerPrintedPageInput = useCallback(
+    (pageId: string, input: HTMLInputElement | null) => {
+      if (input) {
+        printedPageInputRefs.current.set(pageId, input);
+      } else {
+        printedPageInputRefs.current.delete(pageId);
+      }
+    },
+    [],
+  );
+
+  const handlePrintedPageConfirmed = useCallback(
+    (pageId: string) => {
+      const currentIndex = confirmationPageIds.indexOf(pageId);
+      const nextPageId = confirmationPageIds[currentIndex + 1];
+
+      if (!nextPageId) {
+        return;
+      }
+
+      const nextPageIndex = filteredPages.findIndex((page) => page.id === nextPageId);
+      setVisibleCount((current) => Math.max(current, nextPageIndex + 1));
+      setPendingFocusPageId(nextPageId);
+    },
+    [confirmationPageIds, filteredPages],
+  );
+
+  useEffect(() => {
+    if (!isOpen) {
+      hasFocusedInitialWarning.current = false;
+      setPendingFocusPageId(null);
+      return;
+    }
+
+    if (
+      viewMode === "pages" &&
+      confirmationPageIds[0] &&
+      !hasFocusedInitialWarning.current
+    ) {
+      hasFocusedInitialWarning.current = true;
+      setPendingFocusPageId(confirmationPageIds[0]);
+    }
+  }, [confirmationPageIds, isOpen, viewMode]);
+
+  useEffect(() => {
+    if (!pendingFocusPageId) {
+      return;
+    }
+
+    const input = printedPageInputRefs.current.get(pendingFocusPageId);
+    if (!input) {
+      return;
+    }
+
+    const animationFrame = window.requestAnimationFrame(() => {
+      input.focus();
+      setPendingFocusPageId(null);
+    });
+
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, [paginatedPages, pendingFocusPageId]);
 
   const observer = useRef<IntersectionObserver | null>(null);
   const lastElementRef = useCallback((node: HTMLDivElement | null) => {
@@ -117,7 +202,7 @@ export function SourceDocumentPagesDialog({
       ariaLabel="Xem trang tài liệu"
       isOpen={isOpen}
       onClose={onClose}
-      panelClassName="h-[90dvh] w-[95vw] max-w-6xl"
+      panelClassName="h-[90dvh] w-[95vw] max-w-[90rem]"
     >
       <div className="theme-dialog-header flex flex-col sm:flex-row min-h-16 shrink-0 sm:items-center gap-4 p-4 pr-14 sm:p-5 sm:pr-20">
         <div className="flex items-center gap-3 min-w-0">
@@ -264,6 +349,9 @@ export function SourceDocumentPagesDialog({
                   key={page.id}
                   page={page}
                   pdfUrl={showPdfPreview ? pdfUrl : null}
+                  pdfPreviewWidth={pdfPreviewWidth}
+                  onPrintedPageConfirmed={handlePrintedPageConfirmed}
+                  registerPrintedPageInput={registerPrintedPageInput}
                 />
               ))}
             </div>
@@ -284,9 +372,15 @@ export function SourceDocumentPagesDialog({
 function PageDetailRow({
   page,
   pdfUrl,
+  pdfPreviewWidth,
+  onPrintedPageConfirmed,
+  registerPrintedPageInput,
 }: {
   page: AdminSourceDocumentPageApi;
   pdfUrl: string | null;
+  pdfPreviewWidth: number;
+  onPrintedPageConfirmed: (pageId: string) => void;
+  registerPrintedPageInput: (pageId: string, input: HTMLInputElement | null) => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -356,7 +450,11 @@ function PageDetailRow({
             <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             Cần xác nhận số trang in — {printedPage.warning}
           </div>
-          <PrintedPageConfirmForm page={page} />
+          <PrintedPageConfirmForm
+            page={page}
+            onConfirmed={onPrintedPageConfirmed}
+            registerInput={registerPrintedPageInput}
+          />
         </div>
       ) : null}
 
@@ -380,7 +478,11 @@ function PageDetailRow({
               onClick={() => setIsPreviewOpen(true)}
               aria-label="Phóng to trang PDF"
             >
-              <PdfPagePreview pageNumber={page.pageNumber} pdfUrl={pdfUrl} width={320} />
+              <PdfPagePreview
+                pageNumber={page.pageNumber}
+                pdfUrl={pdfUrl}
+                width={pdfPreviewWidth}
+              />
             </button>
             <EditorDialogShell
               ariaLabel={`Trang PDF ${page.pageNumber}`}
@@ -477,7 +579,15 @@ function SummaryPill({
   );
 }
 
-function PrintedPageConfirmForm({ page }: { page: AdminSourceDocumentPageApi }) {
+function PrintedPageConfirmForm({
+  page,
+  onConfirmed,
+  registerInput,
+}: {
+  page: AdminSourceDocumentPageApi;
+  onConfirmed: (pageId: string) => void;
+  registerInput: (pageId: string, input: HTMLInputElement | null) => void;
+}) {
   const queryClient = useQueryClient();
   const token = useAuthSessionStore((state) => state.session?.accessToken ?? "");
   const printedPage = getPrintedPageView(page);
@@ -509,9 +619,10 @@ function PrintedPageConfirmForm({ page }: { page: AdminSourceDocumentPageApi }) 
       );
 
       toast.success("Đã xác nhận trang in");
+      onConfirmed(page.id);
 
       // Mutate the pages list
-      queryClient.invalidateQueries({
+      void queryClient.invalidateQueries({
         queryKey: adminCourseDocumentQueryKeys.all, // invalidate all to refresh documents and pages
       });
     } catch {
@@ -524,6 +635,7 @@ function PrintedPageConfirmForm({ page }: { page: AdminSourceDocumentPageApi }) 
   return (
     <form onSubmit={handleSubmit} className="flex flex-wrap items-center gap-2 mt-1">
       <input
+        ref={(input) => registerInput(page.id, input)}
         type="text"
         placeholder="Nhập nhãn hoặc số trang in (VD: 4, iv)"
         value={labelInput}

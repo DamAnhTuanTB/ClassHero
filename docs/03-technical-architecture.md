@@ -441,12 +441,19 @@ trong tmpfs và bị xóa sau lượt render.
 
 ---
 
-## 10. Realtime notification architecture
+## 10. Realtime architecture
 
 - Stack: Socket.IO + NestJS WebSocket Gateway.
-- Notification luôn lưu DB.
-- Nếu user online, backend gửi event realtime.
-- Nếu user offline, khi user mở nút thông báo thì load danh sách mới nhất từ DB.
+- Một authenticated socket dùng chung theo web session; user room là
+  `user:{userId}`, còn lesson room chỉ cho Admin subscribe sau backend RBAC.
+- API/worker phát event cross-process qua Redis Pub/Sub của ứng dụng; mọi API
+  instance subscribe rồi emit vào local Socket.IO rooms. Event là invalidation
+  signal at-most-once, không thay database/REST làm source of truth.
+- Job-status event versioned chỉ mang ID, scope, queue, status, attempt và
+  timestamp tối thiểu. Client refetch snapshot khi subscribe/reconnect, dedupe
+  `eventId` và giữ slow polling fallback để tự hội tụ khi mất event/Redis.
+- Notification luôn lưu DB trước khi emit. Nếu user offline, khi mở nút thông báo
+  thì load danh sách mới nhất từ DB.
 - Email/Zalo là delivery channel bổ sung.
 
 Không làm chat realtime giữa người dùng trong MVP.

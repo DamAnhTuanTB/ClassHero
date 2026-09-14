@@ -3,6 +3,10 @@ import { hashAiValue } from "#api/modules/ai/utils/ai-hash";
 type RecordValue = Record<string, unknown>;
 const LEADING_CHAPTER_NUMBER_PATTERN = /^\s*\d+\s*(?:[.)](?!\d)|[-–—:])\s*/u;
 
+// YouTube chapter markers have whole-second precision while transcript cues can
+// start fractionally earlier. Treat that final second as the next chapter's edge.
+export const VIDEO_SUMMARY_CHAPTER_BOUNDARY_TOLERANCE_SECONDS = 1;
+
 export type VideoSummarySource = {
   videoUrl: string;
   transcript: Array<{ time: number; endTime?: number; text: string }>;

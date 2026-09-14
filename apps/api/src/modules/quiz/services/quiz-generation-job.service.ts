@@ -24,10 +24,7 @@ import { AiGenerationJobService } from "#api/modules/ai/services/ai-generation-j
 import { hashAiValue } from "#api/modules/ai/utils/ai-hash";
 import { supportsOpenAiExplicitPromptCaching } from "#api/modules/ai/utils/ai-prompt-cache";
 import { buildAiUserPrompt } from "#api/modules/ai/utils/ai-prompt";
-import {
-  estimateAiStructuredInputTokens,
-  resolveAiStructuredTextFormat,
-} from "#api/modules/ai/utils/ai-structured-output-format";
+import { estimateAiStructuredInputTokens } from "#api/modules/ai/utils/ai-structured-output-format";
 import {
   buildOpenAiResponseInput,
   buildOpenAiStructuredResponseRequest,
@@ -46,17 +43,15 @@ import {
   QuizGenerationContextService,
 } from "#api/modules/quiz/services/quiz-generation-context.service";
 import {
-  getGeneratedQuizOutputSchema,
   QUIZ_MAX_CONFIGURED_OUTPUT_TOKENS,
-  QUIZ_SCHEMA_VERSION,
   quizSubjectKeySchema,
   resolveQuizOutputTokenFloor,
   type QuizGenerationJobInput,
 } from "#api/modules/quiz/types/quiz-generation.types";
 import {
   buildExistingQuizQuestionReferences,
+  buildQuizProviderContract,
   buildQuizStructuredInput,
-  resolveQuizPromptVersion,
 } from "#api/modules/quiz/utils/quiz-generation-prompt";
 
 const ALL_QUESTION_TYPES = Object.values(QuestionType);
@@ -175,6 +170,27 @@ export class QuizGenerationJobService {
         "Cấu hình sinh Quiz hiện tại không còn khớp bản xem trước.",
       );
     }
+    const subjectKey = quizSubjectKeySchema.parse(
+      readRequiredString(sourceSnapshot.subjectKey, "subjectKey"),
+    );
+    const providerContract = buildQuizProviderContract({
+      ...configuration,
+      subjectKey,
+      targetGrade: readNullableNumber(sourceSnapshot.targetGrade),
+    });
+    const modelConfig = readJsonRecord(draft.modelConfigJson);
+    if (
+      readNullableString(modelConfig.promptVersion) !== providerContract.promptVersion ||
+      draft.schemaName !== providerContract.schemaName ||
+      draft.schemaVersion !== providerContract.schemaVersion ||
+      draft.schemaHash !== providerContract.schemaHash ||
+      hashAiValue(draft.schemaJson) !== providerContract.schemaHash
+    ) {
+      throw badRequestException(
+        "AI_INPUT_CONTRACT_STALE",
+        "Prompt hoặc schema Quiz đã thay đổi; hãy cập nhật dữ liệu gửi AI.",
+      );
+    }
     const targetSetId =
       target?.id ??
       (await this.ensureAssessmentTargetSet(
@@ -183,19 +199,12 @@ export class QuizGenerationJobService {
         isTest ? snapshotTargetTestSetId : snapshotTargetQuizSetId,
         isTest,
       ));
-    const route = readJsonRecord(
-      readJsonRecord(draft.modelConfigJson).routeSnapshot,
-    ) as unknown as AiFeatureRoute;
-    const imageRouteRecord = readJsonRecord(
-      readJsonRecord(draft.modelConfigJson).imageRouteSnapshot,
-    );
+    const route = readJsonRecord(modelConfig.routeSnapshot) as unknown as AiFeatureRoute;
+    const imageRouteRecord = readJsonRecord(modelConfig.imageRouteSnapshot);
     const imageRouteSnapshot =
       Object.keys(imageRouteRecord).length > 0
         ? (imageRouteRecord as unknown as AiFeatureRoute)
         : route;
-    const subjectKey = quizSubjectKeySchema.parse(
-      readRequiredString(sourceSnapshot.subjectKey, "subjectKey"),
-    );
     const inputMeta = {
       requestDraftId: draft.id,
       requestHash: draft.requestHash,
@@ -212,6 +221,10 @@ export class QuizGenerationJobService {
       targetTestSetId: isTest ? targetSetId : undefined,
       assessmentKind: isTest ? "TEST" : "QUIZ",
       pipelineVersion: "ASSESSMENT_QUIZ_V1" as const,
+      promptVersion: providerContract.promptVersion,
+      schemaName: providerContract.schemaName,
+      schemaVersion: providerContract.schemaVersion,
+      schemaHash: providerContract.schemaHash,
       imageRouteSnapshot,
     };
     const job = await this.jobs.createAndEnqueue({
@@ -220,8 +233,8 @@ export class QuizGenerationJobService {
       lessonId,
       targetType: isTest ? "TEST_SET" : "QUIZ_SET",
       targetId: targetSetId,
-      promptVersion: resolveQuizPromptVersion(subjectKey),
-      schemaVersion: QUIZ_SCHEMA_VERSION,
+      promptVersion: providerContract.promptVersion,
+      schemaVersion: providerContract.schemaVersion,
       inputFingerprint: { lessonId, ...inputMeta },
       inputMeta,
       routeSnapshot: route,
@@ -309,18 +322,8 @@ export class QuizGenerationJobService {
       existingQuestionReferences: buildExistingQuizQuestionReferences(existingQuestions),
     });
     const inputPrompt = buildAiUserPrompt(request);
-    const structuredTextFormatResolution = resolveAiStructuredTextFormat(
-      getGeneratedQuizOutputSchema({
-        subjectKey: source.subject.key,
-        targetGrade: source.targetGrade,
-        questionCount: jobConfiguration.questionCount,
-        questionTypes: jobConfiguration.questionTypes,
-        difficulty: jobConfiguration.difficulty,
-        includeSourceCoverageAudit: !jobConfiguration.systemInstructions,
-      }),
-      request.outputName,
-      request.schemaReferenceStrategy,
-    );
+    const providerContract = buildQuizProviderContract(jobConfiguration);
+    const { structuredTextFormatResolution } = providerContract;
     const structuredTextFormat = structuredTextFormatResolution.format;
     const candidate =
       route.candidates.find((item) => item.available) ?? route.candidates[0] ?? null;
@@ -349,14 +352,15 @@ export class QuizGenerationJobService {
       ),
     );
     const schemaJson = structuredTextFormat.schema;
-    const schemaHash = hashAiValue(schemaJson);
     const requestHash = hashAiValue({
       packetHash: source.packet.packetHash,
       manifestHash: source.packet.manifestHash,
       systemPrompt: request.systemPrompt,
       userPrompt: request.userPrompt,
-      schemaVersion: QUIZ_SCHEMA_VERSION,
-      schemaHash,
+      promptVersion: providerContract.promptVersion,
+      schemaName: providerContract.schemaName,
+      schemaVersion: providerContract.schemaVersion,
+      schemaHash: providerContract.schemaHash,
       model: candidate?.model ?? null,
       temperature,
       reasoningEffort,
@@ -383,9 +387,9 @@ export class QuizGenerationJobService {
         packetPageCount: source.packet.manifest.pageCount,
         systemInstructions: request.systemPrompt,
         userPrompt: request.userPrompt,
-        schemaName: request.outputName,
-        schemaVersion: QUIZ_SCHEMA_VERSION,
-        schemaHash,
+        schemaName: providerContract.schemaName,
+        schemaVersion: providerContract.schemaVersion,
+        schemaHash: providerContract.schemaHash,
         schemaJson: schemaJson as unknown as Prisma.InputJsonValue,
         manifestJson: source.packet.manifest as unknown as Prisma.InputJsonValue,
         sourceSnapshotJson: {
@@ -403,6 +407,7 @@ export class QuizGenerationJobService {
           generationConfiguration: configuration,
         } as Prisma.InputJsonValue,
         modelConfigJson: {
+          promptVersion: providerContract.promptVersion,
           resolvedProvider: candidate?.provider ?? null,
           resolvedModel: candidate?.model ?? null,
           temperature,
@@ -437,8 +442,8 @@ export class QuizGenerationJobService {
       requestDraftId: draft.id,
       requestHash,
       expiresAt,
-      promptVersion: request.promptVersion,
-      schemaVersion: QUIZ_SCHEMA_VERSION,
+      promptVersion: providerContract.promptVersion,
+      schemaVersion: providerContract.schemaVersion,
       systemPrompt: request.systemPrompt,
       userPrompt: request.userPrompt,
       inputPrompt,

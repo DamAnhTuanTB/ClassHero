@@ -18,6 +18,8 @@ import {
 } from "lucide-react";
 import { ClassHeroLogo } from "@/components/common/brand/classhero-logo";
 import { TiptapContentView } from "@/components/common/content/tiptap-content-view";
+import { StudentAiChatHeaderTrigger } from "@/features/student/ai-chat/components/student-ai-chat-header-trigger";
+import type { AiChatEntryContext } from "@/features/student/ai-chat/utils/ai-chat-link";
 import { useDocumentScrollLock } from "@/features/student/lessons/hooks/use-document-scroll-lock";
 import { QuizExitConfirmDialog } from "@/features/student/lessons/screens/student-lesson-screen/components/quiz-exit-confirm-dialog";
 import type { StudentFlashcard } from "@/features/student/lessons/types/student-lesson-types";
@@ -67,6 +69,7 @@ export function FlashcardRunnerLoadingScreen() {
 }
 
 export function FlashcardRunnerScreen({
+  aiChatContext,
   card,
   currentIndex,
   isBackVisible,
@@ -91,6 +94,7 @@ export function FlashcardRunnerScreen({
   stackedOverDialog = false,
   totalCount,
 }: {
+  aiChatContext: AiChatEntryContext;
   card: StudentFlashcard;
   currentIndex: number;
   isBackVisible: boolean;
@@ -361,6 +365,14 @@ export function FlashcardRunnerScreen({
             <ChevronLeft className="h-8 w-8" strokeWidth={2.8} aria-hidden="true" />
           </button>
           <ClassHeroLogo className="h-10 max-w-[9rem]" priority />
+          <StudentAiChatHeaderTrigger
+            context={aiChatContext}
+            testId={
+              reviewMode
+                ? "student-ai-chat-trigger-flashcard-review"
+                : "student-ai-chat-trigger-flashcard-runner"
+            }
+          />
         </div>
       </header>
 

@@ -22,6 +22,7 @@ import type {
   AiOutputSchema,
   AiTextInput,
   AiTextOutput,
+  AiTextStreamEvent,
 } from "#api/modules/ai/types/ai-text.types";
 
 export const AI_PROVIDER_REGISTRY = Symbol("AI_PROVIDER_REGISTRY");
@@ -35,6 +36,9 @@ export interface AiProvider {
 
   /** Tạo text completion và trả metadata usage/provider. */
   generateText(input: AiTextInput): Promise<AiTextOutput>;
+
+  /** Stream real provider deltas. The final event contains authoritative usage. */
+  streamText(input: AiTextInput): AsyncGenerator<AiTextStreamEvent>;
 
   /**
    * Tạo structured output. `schema` ràng buộc request gửi provider;

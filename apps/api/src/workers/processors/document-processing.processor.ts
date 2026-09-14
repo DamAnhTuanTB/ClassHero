@@ -14,10 +14,7 @@ import type {
   BackgroundJobBullmqData,
   BackgroundJobBullmqResult,
 } from "#api/jobs/background-job-queues";
-import {
-  normalizeJobError,
-  type JobErrorDetails,
-} from "#api/jobs/job-error";
+import { normalizeJobError, type JobErrorDetails } from "#api/jobs/job-error";
 import { toJobJson } from "#api/jobs/job-json";
 import type { EnvConfig } from "#api/config/env.validation";
 import { extractChunkPdfPageRange } from "#api/modules/ai/utils/chunk-page-range";
@@ -54,9 +51,10 @@ import {
   computeTextHash,
   scorePageQualityWithConfidence,
 } from "#api/workers/utils/quality-score";
-import { chunkText } from "#api/workers/utils/chunking";
+import { chunkText, DOCUMENT_CHUNKING_PROFILE } from "#api/workers/utils/chunking";
 import { ProviderUsageService } from "#api/modules/provider-operations/services/provider-usage.service";
 import { isProviderBudgetError } from "#api/modules/provider-operations/utils/provider-budget-error";
+import { RealtimeJobSnapshotPublisherService } from "#api/modules/realtime/services/realtime-job-snapshot-publisher.service";
 
 const PAID_OCR_TEXT_SOURCE = "paid_ocr";
 
@@ -148,6 +146,9 @@ export class DocumentProcessingProcessor {
     @Optional()
     @Inject(ProviderUsageService)
     private readonly providerUsage?: ProviderUsageService,
+    @Optional()
+    @Inject(RealtimeJobSnapshotPublisherService)
+    private readonly realtimeJobs?: RealtimeJobSnapshotPublisherService,
   ) {}
 
   async process(
@@ -196,6 +197,7 @@ export class DocumentProcessingProcessor {
       },
       select: workerJobSelect,
     });
+    await this.realtimeJobs?.publishById(runningJob.id);
 
     try {
       const action = getJobAction(runningJob.inputMeta);
@@ -571,6 +573,7 @@ export class DocumentProcessingProcessor {
         lessonId,
         pageRange.pageStart,
         pageRange.pageEnd,
+        DOCUMENT_CHUNKING_PROFILE.version,
         fullText,
       ].join(":"),
     );
@@ -631,6 +634,7 @@ export class DocumentProcessingProcessor {
             pageEnd: pageRange.pageEnd,
           },
           chunking: {
+            ...DOCUMENT_CHUNKING_PROFILE,
             chunkCount: chunks.length,
             contentHash,
             pageStart: pageRange.pageStart,
@@ -817,6 +821,7 @@ export class DocumentProcessingProcessor {
           pageCount: ocr.pageCount,
           printedPageMappingSummary: this.buildPrintedPageMappingSummary(ocr.pages),
           chunking: {
+            ...DOCUMENT_CHUNKING_PROFILE,
             chunkCount: chunks.length,
             contentHash: ocr.contentHash,
             pageStart: 1,
@@ -1718,9 +1723,24 @@ export class DocumentProcessingProcessor {
       return;
     }
 
+    let previousChunkPageEnd: number | null = null;
     await this.prisma.documentChunk.createMany({
       data: chunks.map((chunk) => {
-        const chunkPageRange = extractChunkPdfPageRange(chunk.content);
+        const explicitPageRange = extractChunkPdfPageRange(chunk.content);
+        const chunkPageRange = explicitPageRange
+          ? {
+              pageStart:
+                chunk.overlapTokenCount > 0 && previousChunkPageEnd !== null
+                  ? Math.min(previousChunkPageEnd, explicitPageRange.pageStart)
+                  : explicitPageRange.pageStart,
+              pageEnd: explicitPageRange.pageEnd,
+            }
+          : previousChunkPageEnd !== null
+            ? { pageStart: previousChunkPageEnd, pageEnd: previousChunkPageEnd }
+            : null;
+        if (explicitPageRange) {
+          previousChunkPageEnd = explicitPageRange.pageEnd;
+        }
 
         return {
           documentId,
@@ -1740,6 +1760,8 @@ export class DocumentProcessingProcessor {
             chunkIndex: chunk.chunkIndex,
             chunkContentHash: chunk.contentHash,
             tokenCount: chunk.tokenCount,
+            overlapTokenCount: chunk.overlapTokenCount,
+            chunkingVersion: DOCUMENT_CHUNKING_PROFILE.version,
             embeddingStatus: "pending",
           }),
         };

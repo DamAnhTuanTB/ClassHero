@@ -16,6 +16,7 @@ import type {
 import { getBullmqQueueName } from "#api/jobs/background-job-queues";
 import type { BackgroundJobQueueService } from "#api/modules/jobs/services/background-job-queue.service";
 import type { AiService } from "#api/modules/ai/services/ai.service";
+import type { RealtimeJobSnapshotPublisherService } from "#api/modules/realtime/services/realtime-job-snapshot-publisher.service";
 import { PersonalLearningPathsService } from "#api/modules/learning-paths/services/personal-learning-paths.service";
 import { PersonalLearningPathCloneProcessor } from "#api/workers/processors/personal-learning-path-clone.processor";
 import type { EmbeddingJobEnqueuer } from "#api/workers/services/embedding-job-enqueuer.service";
@@ -156,11 +157,15 @@ describe("M3.6 personal learning-path clone foundation", () => {
     const embeddingEnqueuer = {
       enqueueEmbeddingJob: vi.fn(async () => ({ jobId: "embedding-job-1" })),
     } as unknown as EmbeddingJobEnqueuer;
+    const realtimeJobs = {
+      publishById: vi.fn(async () => undefined),
+    } as unknown as RealtimeJobSnapshotPublisherService;
     const processor = new PersonalLearningPathCloneProcessor(
       prisma,
       cloner,
       aiService,
       embeddingEnqueuer,
+      realtimeJobs,
     );
 
     const result = await processor.process(createBullmqJob());
@@ -189,6 +194,9 @@ describe("M3.6 personal learning-path clone foundation", () => {
         errorMessage: null,
       }),
     });
+    expect(realtimeJobs.publishById).toHaveBeenCalledTimes(2);
+    expect(realtimeJobs.publishById).toHaveBeenNthCalledWith(1, durableJob.id);
+    expect(realtimeJobs.publishById).toHaveBeenNthCalledWith(2, durableJob.id);
   });
 
   it("marks the durable job failed without activating an enrollment on final error", async () => {
@@ -230,6 +238,9 @@ describe("M3.6 personal learning-path clone foundation", () => {
       {
         enqueueEmbeddingJob: vi.fn(),
       } as unknown as EmbeddingJobEnqueuer,
+      {
+        publishById: vi.fn(async () => undefined),
+      } as unknown as RealtimeJobSnapshotPublisherService,
     );
 
     await expect(processor.process(createBullmqJob({ attempts: 1 }))).rejects.toThrow(

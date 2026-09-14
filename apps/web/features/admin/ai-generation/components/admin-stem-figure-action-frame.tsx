@@ -309,7 +309,11 @@ export function AdminStemFigureActionFrame({
           onCreate={async (input) => {
             try {
               await createNewMutation.mutateAsync(input);
-              toast.success("Đã bắt đầu tạo hình mới bằng AI.");
+              toast.success(
+                input.referenceImageMode === "CURRENT_ONLY"
+                  ? "Đã bắt đầu chỉnh sửa hình bằng AI."
+                  : "Đã bắt đầu tạo hình mới bằng AI.",
+              );
               setShowCreateAi(false);
             } catch (error) {
               toast.error(

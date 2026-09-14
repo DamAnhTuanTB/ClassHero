@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 const migrationPath = resolve(
   process.cwd(),
-  "prisma/migrations/20260910120000_allow_video_summary_usage_operation/migration.sql",
+  "prisma/migrations/20260913210000_allow_ai_chat_title_usage_operation/migration.sql",
 );
 
 describe("M9.29 provider usage operation constraint", () => {

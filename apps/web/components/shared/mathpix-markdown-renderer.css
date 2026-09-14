@@ -106,6 +106,17 @@
 }
 
 /*
+ * A Markdown marker such as `1.` is generated as `li::marker`, so it sits
+ * outside a leading `<strong>` title. Match the marker weight to that title
+ * without making ordinary numbered steps bold.
+ */
+.mmd-content ol > li:has(> strong:first-child)::marker,
+.mmd-content ol > li:has(> div:first-child > strong:first-child)::marker,
+.mmd-content ol > li:has(> p:first-child > strong:first-child)::marker {
+  font-weight: 800;
+}
+
+/*
  * Mathpix wraps loose-list paragraphs in a block element. Keep the first
  * paragraph inline with the marker so Safari/WebKit does not place the marker
  * on an empty line before the list-item content.

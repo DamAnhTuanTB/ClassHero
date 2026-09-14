@@ -4,7 +4,6 @@ import {
   getGeneratedQuizStatementSolutions,
   QUIZ_SUBQUESTION_IDS,
   type GeneratedQuizQuestion,
-  type GeneratedQuizSourceCoverageAudit,
 } from "#api/modules/quiz/types/quiz-generation.types";
 
 export type GenerationRecoveryIssue = {
@@ -18,42 +17,12 @@ export type GenerationRecoveryIssue = {
 
 export function validateQuizOutput(input: {
   questions: GeneratedQuizQuestion[];
-  sourceCoverageAudit?: GeneratedQuizSourceCoverageAudit;
   requestedCount: number;
   requestedTypes: QuestionType[];
   requestedDifficulty: Difficulty;
   difficultyCounts: { easy: number; medium: number; hard: number } | null;
 }) {
   const issues: GenerationRecoveryIssue[] = [];
-  if (input.sourceCoverageAudit) {
-    const audit = input.sourceCoverageAudit;
-    const questionNumbers = audit.realWorldQuestions.map((item) => item.questionNumber);
-    if (
-      audit.sourceHasAssessableRealWorldApplication &&
-      (!audit.sourceApplicationFamily || questionNumbers.length === 0)
-    ) {
-      issues.push({
-        classification: "REVIEWABLE",
-        code: "REAL_WORLD_SOURCE_COVERAGE_MISSING",
-        message:
-          "Nguồn có họ bài ứng dụng thực tế nhưng output chưa chỉ ra câu ứng dụng mới tương ứng.",
-        blocking: true,
-      });
-    }
-    if (
-      questionNumbers.some(
-        (questionNumber) => questionNumber < 1 || questionNumber > input.questions.length,
-      ) ||
-      new Set(questionNumbers).size !== questionNumbers.length
-    ) {
-      issues.push({
-        classification: "REVIEWABLE",
-        code: "REAL_WORLD_QUESTION_REFERENCE_INVALID",
-        message: "Audit ứng dụng thực tế tham chiếu câu không tồn tại hoặc bị lặp.",
-        blocking: true,
-      });
-    }
-  }
   input.questions.forEach((question, questionIndex) => {
     if (!input.requestedTypes.includes(question.questionType)) {
       issues.push({

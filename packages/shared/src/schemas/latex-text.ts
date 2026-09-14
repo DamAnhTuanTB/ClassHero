@@ -39,6 +39,10 @@ const ARGUMENT_LATEX_COMMANDS = [
 ] as const;
 
 const SYMBOL_LATEX_COMMANDS = [
+  "angle",
+  "triangle",
+  "left",
+  "right",
   "circ",
   "pi",
   "theta",
@@ -90,6 +94,8 @@ const SYMBOL_LATEX_COMMANDS = [
   "cot",
   "log",
   "ln",
+  "quad",
+  "qquad",
 ] as const;
 
 const COMMAND_PREFIX_PATTERN = String.raw`(^|[\s^_=+\-*/<>()\[\],;&:])`;
@@ -117,6 +123,11 @@ const RECOGNIZED_LATEX_COMMAND_PATTERN_SOURCE = [
 ]
   .sort((left, right) => right.length - left.length)
   .join("|");
+
+const REPEATED_LATEX_COMMAND_BACKSLASH_PATTERN = new RegExp(
+  `\\\\{2,}(?=(?:${RECOGNIZED_LATEX_COMMAND_PATTERN_SOURCE})(?:\\b|\\s*\\{))`,
+  "gu",
+);
 
 const DECODED_LATEX_ESCAPE_REPLACEMENTS = [
   [`${String.fromCharCode(9)}riangle`, String.raw`\triangle`],
@@ -157,7 +168,9 @@ export const LEARNER_MATH_TEXT_SYNTAX_DESCRIPTION =
  * idempotent.
  */
 export function normalizeLatexCommandBackslashes(latex: string) {
-  const decodedLatex = normalizeDecodedLatexControlCharacters(latex);
+  const decodedLatex = normalizeRepeatedLatexCommandBackslashes(
+    normalizeDecodedLatexControlCharacters(latex),
+  );
   const withTextCommands = decodedLatex.replace(
     TEXT_LATEX_COMMAND_PATTERN,
     (_match, prefix: string, command: string) => `${prefix}\\${command}`,
@@ -179,6 +192,17 @@ export function normalizeLatexCommandBackslashes(latex: string) {
 
   normalized += normalizeUnprotectedLatex(withTextCommands.slice(cursor));
   return normalized;
+}
+
+/**
+ * Removes only a duplicated command escape while preserving valid LaTeX row
+ * separators immediately before a command. Odd runs already represent one or
+ * more `\\\\` row separators followed by the command's own backslash.
+ */
+export function normalizeRepeatedLatexCommandBackslashes(latex: string) {
+  return latex.replace(REPEATED_LATEX_COMMAND_BACKSLASH_PATTERN, (backslashes) =>
+    backslashes.length % 2 === 0 ? backslashes.slice(1) : backslashes,
+  );
 }
 
 /**
@@ -670,9 +694,10 @@ function findHighConfidenceInlineMathCloser(content: string) {
     const prefixEnd = trimEndIndex(content, punctuationIndex);
     const mathPrefix = content.slice(0, prefixEnd);
     const proseSuffix = content.slice(punctuationIndex + 1).trim();
+    const proseLead = proseSuffix.split(/(?:\r?\n|\$|\\\(|\\\[)/u, 1)[0]?.trim() ?? "";
     if (
       looksLikeCompleteMathPrefix(mathPrefix) &&
-      looksLikeOrdinaryProseSuffix(proseSuffix)
+      looksLikeOrdinaryProseSuffix(proseLead)
     ) {
       return prefixEnd;
     }

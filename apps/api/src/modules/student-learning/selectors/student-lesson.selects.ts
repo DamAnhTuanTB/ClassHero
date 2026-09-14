@@ -1,4 +1,12 @@
-import { DocumentStatus, Prisma, ReviewStatus } from "@prisma/client";
+import { DocumentStatus, Prisma } from "@prisma/client";
+import {
+  studentVisibleFlashcardSetWhere,
+  studentVisibleFlashcardWhere,
+  studentVisibleQuizQuestionWhere,
+  studentVisibleQuizSetWhere,
+  studentVisibleTestQuestionWhere,
+  studentVisibleTestSetWhere,
+} from "#api/modules/student-learning/selectors/student-visible-learning-content.where";
 
 export const studentLessonFileSelect = {
   id: true,
@@ -47,23 +55,6 @@ export const studentLessonSummarySelect = {
     },
   },
 } satisfies Prisma.LessonSummarySelect;
-
-const approvedQuizQuestionWhere = {
-  deletedAt: null,
-  reviewStatus: ReviewStatus.APPROVED,
-  publishedAt: { not: null },
-} satisfies Prisma.QuizQuestionWhereInput;
-
-const approvedFlashcardWhere = {
-  deletedAt: null,
-  reviewStatus: ReviewStatus.APPROVED,
-} satisfies Prisma.FlashcardWhereInput;
-
-const approvedTestQuestionWhere = {
-  deletedAt: null,
-  reviewStatus: ReviewStatus.APPROVED,
-  publishedAt: { not: null },
-} satisfies Prisma.TestQuestionWhereInput;
 
 export const studentLessonContentSelect = {
   id: true,
@@ -157,11 +148,7 @@ export const studentLessonContentSelect = {
     },
   },
   quizSets: {
-    where: {
-      deletedAt: null,
-      isReserve: false,
-      reviewStatus: ReviewStatus.APPROVED,
-    },
+    where: studentVisibleQuizSetWhere,
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     select: {
       id: true,
@@ -171,18 +158,14 @@ export const studentLessonContentSelect = {
       _count: {
         select: {
           questions: {
-            where: approvedQuizQuestionWhere,
+            where: studentVisibleQuizQuestionWhere,
           },
         },
       },
     },
   },
   flashcardSets: {
-    where: {
-      deletedAt: null,
-      isReserve: false,
-      reviewStatus: ReviewStatus.APPROVED,
-    },
+    where: studentVisibleFlashcardSetWhere,
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     select: {
       id: true,
@@ -193,18 +176,14 @@ export const studentLessonContentSelect = {
       _count: {
         select: {
           flashcards: {
-            where: approvedFlashcardWhere,
+            where: studentVisibleFlashcardWhere,
           },
         },
       },
     },
   },
   testSets: {
-    where: {
-      deletedAt: null,
-      isReserve: false,
-      reviewStatus: ReviewStatus.APPROVED,
-    },
+    where: studentVisibleTestSetWhere,
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     select: {
       id: true,
@@ -217,7 +196,7 @@ export const studentLessonContentSelect = {
       _count: {
         select: {
           questions: {
-            where: approvedTestQuestionWhere,
+            where: studentVisibleTestQuestionWhere,
           },
         },
       },
@@ -232,7 +211,7 @@ export const studentQuizSetSelect = {
   source: true,
   sortOrder: true,
   questions: {
-    where: approvedQuizQuestionWhere,
+    where: studentVisibleQuizQuestionWhere,
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }, { id: "asc" }],
     select: {
       id: true,
@@ -258,7 +237,7 @@ export const studentTestSetSelect = {
   _count: {
     select: {
       questions: {
-        where: approvedTestQuestionWhere,
+        where: studentVisibleTestQuestionWhere,
       },
     },
   },

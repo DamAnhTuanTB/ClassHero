@@ -33,6 +33,8 @@ export class StoredFileCleanupService {
         id: { in: uniqueFileIds },
         stemFigureDeliveries: { none: {} },
         quizFigureDeliveries: { none: {} },
+        flashcardFigureDeliveries: { none: {} },
+        aiChatMessageAttachments: { none: {} },
       },
       select: { id: true },
     });
@@ -60,6 +62,8 @@ export class StoredFileCleanupService {
         deletedAt: { not: null },
         stemFigureDeliveries: { none: {} },
         quizFigureDeliveries: { none: {} },
+        flashcardFigureDeliveries: { none: {} },
+        aiChatMessageAttachments: { none: {} },
       },
       select: { id: true, objectKey: true },
     });
@@ -74,6 +78,8 @@ export class StoredFileCleanupService {
               status: FileStatus.DELETED,
               stemFigureDeliveries: { none: {} },
               quizFigureDeliveries: { none: {} },
+              flashcardFigureDeliveries: { none: {} },
+              aiChatMessageAttachments: { none: {} },
             },
           });
           return deleted.count === 1;

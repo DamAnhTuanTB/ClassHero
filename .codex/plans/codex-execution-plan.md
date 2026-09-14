@@ -1,6 +1,6 @@
 # Codex Execution Pointer
 
-Last updated: 2026-09-10
+Last updated: 2026-09-13
 
 File này chỉ ghi hướng thực thi đang hoạt động. Nó không lặp roadmap, dependency
 graph, milestone contract, lịch sử triển khai hoặc log kiểm tra.
@@ -20,6 +20,10 @@ graph, milestone contract, lịch sử triển khai hoặc log kiểm tra.
 - Dependency chính: `M9.7`, `M6.5`, `M7.1`; không phụ thuộc tracking `M15.1`.
 - Hoàn tất feedback/check còn lại của `M15.10` trước khi chọn subtask mới; không
   dùng snapshot lịch sử M0/M9 cũ để thay roadmap hiện hành.
+- `M9.6` đã qua deterministic, paid Luna single-pass image và realtime UI gate
+  ngày 2026-09-13. `M9.34` — Admin mô phỏng Chat với AI — đã hoàn tất full-stack ngày
+  2026-09-13 trên cùng shared Student Chat runtime, gồm responsive UI, trace usage/
+  cost/latency, RBAC runtime và paid OpenAI smoke 1 response / 147 VND.
 
 ## Cách cập nhật
 

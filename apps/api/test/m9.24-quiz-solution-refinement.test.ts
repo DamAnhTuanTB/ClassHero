@@ -168,6 +168,9 @@ describe("M9.24 Quiz solution AI actions", () => {
   it("snapshots mode, content hash and optional question figure in the durable job", () => {
     const parsed = quizSolutionRefinementJobInputSchema.parse({
       operation: "QUIZ_SOLUTION_REFINEMENT",
+      assessmentKind: "QUIZ",
+      pipelineVersion: "ASSESSMENT_QUIZ_V1",
+      targetQuestionId: "11111111-1111-4111-8111-111111111111",
       mode: "REGENERATE",
       includeCurrentSolutionAsRejected: false,
       questionId: "11111111-1111-4111-8111-111111111111",
@@ -186,6 +189,7 @@ describe("M9.24 Quiz solution AI actions", () => {
       questionSnapshot: commonInput().question,
     });
     expect(parsed.mode).toBe("REGENERATE");
+    expect(parsed.pipelineVersion).toBe("ASSESSMENT_QUIZ_V1");
     expect(parsed.questionFigure?.objectKey).toBe("quiz/question.svg");
   });
 });

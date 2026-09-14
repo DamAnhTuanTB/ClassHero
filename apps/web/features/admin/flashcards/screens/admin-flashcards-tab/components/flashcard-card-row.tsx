@@ -12,6 +12,7 @@ import {
   PlayCircle,
   Sparkles,
   Trash2,
+  TriangleAlert,
   Undo2,
 } from "lucide-react";
 import { AdminFigureCandidateProgress } from "@/components/admin/admin-figure-candidate-progress";
@@ -68,6 +69,7 @@ export function FlashcardCardRow({
     requiresSolutionFigure: card.sourceMetadataJson?.requiresSolutionFigure === true,
     sourcePacketPageNumbers: card.sourceMetadataJson?.sourcePacketPageNumbers ?? [],
   };
+  const reviewWarnings = card.sourceMetadataJson?.reviewWarnings ?? [];
 
   return (
     <div className="space-y-2">
@@ -107,6 +109,22 @@ export function FlashcardCardRow({
         role="tabpanel"
         className="overflow-hidden rounded-xl border border-[var(--theme-border)] bg-white shadow-sm dark:bg-slate-950"
       >
+        {reviewWarnings.length > 0 ? (
+          <div
+            role="alert"
+            className="flex gap-2 border-b border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200 sm:px-5"
+          >
+            <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            <div>
+              <strong>AI tạo nội dung cần kiểm tra:</strong>
+              <ul className="mt-1 list-disc pl-5">
+                {reviewWarnings.map((warning) => (
+                  <li key={`${warning.code}:${warning.message}`}>{warning.message}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        ) : null}
         <div className="space-y-3 border-b border-[var(--theme-border)] p-4 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex min-w-0 flex-wrap items-center gap-2">

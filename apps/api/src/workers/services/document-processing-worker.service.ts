@@ -16,6 +16,7 @@ import {
 } from "#api/jobs/background-job-queues";
 import { parseRedisConnection } from "#api/jobs/redis-connection";
 import { DocumentProcessingProcessor } from "#api/workers/processors/document-processing.processor";
+import { RealtimeJobSnapshotPublisherService } from "#api/modules/realtime/services/realtime-job-snapshot-publisher.service";
 
 const REMOVE_ON_COMPLETE_SECONDS = 7 * 24 * 60 * 60;
 const REMOVE_ON_FAIL_SECONDS = 30 * 24 * 60 * 60;
@@ -31,6 +32,8 @@ export class DocumentProcessingWorkerService implements OnModuleInit, OnModuleDe
     private readonly configService: ConfigService<EnvConfig, true>,
     @Inject(DocumentProcessingProcessor)
     private readonly processor: DocumentProcessingProcessor,
+    @Inject(RealtimeJobSnapshotPublisherService)
+    private readonly realtimeJobs: RealtimeJobSnapshotPublisherService,
   ) {}
 
   onModuleInit() {
@@ -64,9 +67,11 @@ export class DocumentProcessingWorkerService implements OnModuleInit, OnModuleDe
     });
     this.worker.on("completed", (job) => {
       this.logger.debug(`Completed BullMQ job ${job.id ?? "unknown"}`);
+      void this.realtimeJobs.publishById(job.data.backgroundJobId);
     });
     this.worker.on("failed", (job, error) => {
       this.logger.warn(`BullMQ job ${job?.id ?? "unknown"} failed: ${error.message}`);
+      if (job) void this.realtimeJobs.publishById(job.data.backgroundJobId);
     });
     this.worker.on("error", (error) => {
       this.logger.error(`Worker error: ${error.message}`);

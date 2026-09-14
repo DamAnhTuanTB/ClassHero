@@ -22,6 +22,7 @@ import type {
   AdminAssessmentQuestionUpdatePayload,
   AdminAssessmentSet,
 } from "@/features/admin/assessments/types/admin-assessment.types";
+import { useAuthenticatedRealtime } from "@/components/common/realtime/authenticated-realtime-provider";
 
 export const adminAssessmentQueryKeys = {
   all: ["admin", "assessment"] as const,
@@ -145,6 +146,7 @@ export function useAdminAssessmentQuestions(
   initialData?: AdminAssessmentQuestion[],
 ) {
   const session = useAuthSessionStore((state) => state.session);
+  const { status: realtimeStatus } = useAuthenticatedRealtime();
   return useQuery({
     ...getAdminAssessmentQuestionsQueryOptions({
       accessToken: session?.accessToken ?? "",
@@ -159,7 +161,9 @@ export function useAdminAssessmentQuestions(
       hasActiveAdminFigure(
         query.state.data?.flatMap((question) => question.figures) ?? [],
       )
-        ? 2_000
+        ? realtimeStatus === "connected"
+          ? 60_000
+          : 3_000
         : false,
     refetchIntervalInBackground: false,
   });

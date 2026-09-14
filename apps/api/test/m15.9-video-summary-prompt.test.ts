@@ -73,7 +73,7 @@ describe("M15.9 video summary prompts", () => {
       ...policy,
       outputName: "video_summary_output",
       promptVersion: VIDEO_SUMMARY_PROMPT_VERSION,
-      schemaVersion: "8",
+      schemaVersion: "9",
       systemPrompt: "STABLE VIDEO SUMMARY CONTRACT",
       userPrompt,
       inputTextItems: [{ id: "source_packet_manifest", text: sourceText }],
@@ -164,6 +164,9 @@ describe("M15.9 video summary prompts", () => {
     );
     expect(prompts.systemPrompt).toContain(
       "`section.startSeconds` phải giữ chính xác time của chapter tương ứng",
+    );
+    expect(prompts.systemPrompt).toContain(
+      "cue bắt đầu không quá 1 giây trước mốc chapter kế tiếp",
     );
     expect(prompts.systemPrompt).toContain("phụ thuộc vào hình");
     expect(prompts.systemPrompt).toContain("Khẳng định a) đúng.");
@@ -551,6 +554,42 @@ describe("M15.9 video summary prompts", () => {
 
     aligned.sections[0]!.blocks[0]!.startSeconds = 60;
     expect(hasMatchingVideoSummaryChapters(aligned, chapters)).toBe(false);
+  });
+
+  it("assigns a fractional cue within one second before a chapter marker to that chapter", () => {
+    const output = twoSectionOutput();
+    const chapters = [
+      { time: 0, title: "Phần trước" },
+      { time: 926, title: "Hệ hai phương trình" },
+    ];
+    output.sections[0]!.startSeconds = 0;
+    output.sections[1]!.startSeconds = 926;
+    output.sections[1]!.blocks[0]!.startSeconds = 925.64;
+
+    const parsed = videoSummaryOutputSchema.safeParse(output);
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+
+    const misassigned = structuredClone(parsed.data);
+    misassigned.sections[0]!.blocks.push(...misassigned.sections[1]!.blocks);
+    misassigned.sections[1]!.blocks = [];
+    expect(hasMatchingVideoSummaryChapters(misassigned, chapters)).toBe(false);
+
+    const aligned = alignVideoSummaryOutputToChapters(parsed.data, chapters);
+    expect(aligned.sections[0]!.blocks.map((block) => block.startSeconds)).toEqual([
+      12, 44,
+    ]);
+    expect(aligned.sections[1]!.blocks.map((block) => block.startSeconds)).toEqual([
+      925.64,
+    ]);
+    expect(hasMatchingVideoSummaryChapters(aligned, chapters)).toBe(true);
+    expect(hasValidVideoSummaryCueStartTimes(aligned, [12, 44, 925.64], chapters)).toBe(
+      true,
+    );
+
+    const outsideTolerance = structuredClone(output);
+    outsideTolerance.sections[1]!.blocks[0]!.startSeconds = 924.99;
+    expect(videoSummaryOutputSchema.safeParse(outsideTolerance).success).toBe(false);
   });
 
   it("maps AI-created sections back to video chapters when source has none", () => {

@@ -36,6 +36,8 @@ export interface AiTextInput {
   /** Model runtime resolved by provider-operations; embedding does not use this field. */
   model?: string;
   metadata?: Record<string, unknown>;
+  /** Provider-neutral stable-prefix cache policy for text or structured requests. */
+  promptCache?: AiPromptCacheConfiguration;
 }
 
 export interface AiInputFile {
@@ -74,6 +76,7 @@ export interface AiProviderOutputMetadata {
   providerUsageRaw?: unknown;
   providerRequestId?: string;
   latencyMs?: number;
+  timeToFirstTokenMs?: number;
   inputFileOperations?: Array<{
     providerFileId: string;
     uploadLatencyMs: number;
@@ -84,6 +87,10 @@ export interface AiProviderOutputMetadata {
 export interface AiTextOutput extends AiProviderOutputMetadata {
   text: string;
 }
+
+export type AiTextStreamEvent =
+  | { type: "delta"; delta: string }
+  | { type: "completed"; output: AiTextOutput };
 
 export type AiStructuredSchemaReferenceStrategy = "inline" | "ref" | "ref_v2" | "auto";
 
@@ -107,8 +114,6 @@ export interface AiStructuredInput extends AiTextInput {
    * `auto` safely chooses the smallest serializer and falls back to inline.
    */
   schemaReferenceStrategy?: AiStructuredSchemaReferenceStrategy;
-  /** Provider-neutral cache routing policy. It never changes prompt/context content. */
-  promptCache?: AiPromptCacheConfiguration;
 }
 
 export type AiOutputSchema<TOutput> = ZodType<TOutput>;

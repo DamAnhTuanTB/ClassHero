@@ -17,6 +17,7 @@ import {
 } from "#api/jobs/background-job-queues";
 import { parseRedisConnection } from "#api/jobs/redis-connection";
 import { QuizFigureRenderingProcessor } from "#api/workers/processors/quiz-figure-rendering.processor";
+import { RealtimeJobSnapshotPublisherService } from "#api/modules/realtime/services/realtime-job-snapshot-publisher.service";
 
 @Injectable()
 export class QuizFigureRenderingWorkerService
@@ -31,6 +32,8 @@ export class QuizFigureRenderingWorkerService
     private readonly config: ConfigService<EnvConfig, true>,
     @Inject(QuizFigureRenderingProcessor)
     private readonly processor: QuizFigureRenderingProcessor,
+    @Inject(RealtimeJobSnapshotPublisherService)
+    private readonly realtimeJobs: RealtimeJobSnapshotPublisherService,
   ) {}
 
   onModuleInit() {
@@ -49,10 +52,14 @@ export class QuizFigureRenderingWorkerService
         removeOnFail: { age: 30 * 24 * 60 * 60, count: 5_000 },
       },
     );
+    this.worker.on("completed", (job) => {
+      void this.realtimeJobs.publishById(job.data.backgroundJobId);
+    });
     this.worker.on("failed", (job, error) => {
       this.logger.error(
         `Quiz figure render job ${job?.id ?? "unknown"} failed: ${error.message}`,
       );
+      if (job) void this.realtimeJobs.publishById(job.data.backgroundJobId);
     });
     this.logger.log(
       `Quiz figure worker started on queue="${queueName}" concurrency=${concurrency}.`,

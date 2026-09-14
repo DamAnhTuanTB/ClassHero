@@ -71,6 +71,7 @@ export function AdminQuizFigureActionFrame({
   const [showDelete, setShowDelete] = useState(false);
   const [showRefinement, setShowRefinement] = useState(false);
   const revision = figure.currentRevision;
+  const assessmentLabel = assessmentKind === "test" ? "Test" : "Quiz";
   const canRefine = Boolean(
     figure.status === "SUCCEEDED" &&
     revision?.sourceKind === "AI_TEX" &&
@@ -96,10 +97,12 @@ export function AdminQuizFigureActionFrame({
   async function remove() {
     try {
       await mutations.deleteFigure.mutateAsync({ questionId, figure });
-      toast.success("Đã xóa hình khỏi câu Quiz.");
+      toast.success(`Đã xóa hình khỏi câu ${assessmentLabel}.`);
       setShowDelete(false);
     } catch (error) {
-      toast.error(getUserFacingErrorMessage(error, "Chưa xóa được hình Quiz."));
+      toast.error(
+        getUserFacingErrorMessage(error, `Chưa xóa được hình ${assessmentLabel}.`),
+      );
     }
   }
 
@@ -126,9 +129,9 @@ export function AdminQuizFigureActionFrame({
               </ImmediateTooltip>
             ) : null}
             {revision ? (
-              <ImmediateTooltip content="Chỉnh sửa caption">
+              <ImmediateTooltip content="Chỉnh sửa chú thích">
                 <button
-                  aria-label="Chỉnh sửa caption"
+                  aria-label="Chỉnh sửa chú thích"
                   className="theme-button-primary-subtle grid h-9 w-9 place-items-center rounded-lg shadow-sm"
                   onClick={() => setShowCaption(true)}
                   type="button"
@@ -219,11 +222,11 @@ export function AdminQuizFigureActionFrame({
         />
       ) : null}
       <DeleteConfirmDialog
-        description="Bạn muốn xóa hình này khỏi câu Quiz. Nếu xóa hình đề, hình lời giải phụ thuộc cũng sẽ bị xóa."
+        description={`Bạn muốn xóa hình này khỏi câu ${assessmentLabel}. Nếu xóa hình đề, hình lời giải phụ thuộc cũng sẽ bị xóa.`}
         isConfirming={mutations.deleteFigure.isPending}
         isOpen={showDelete}
         itemName={revision?.caption ?? roleLabel(figure.role)}
-        title="Xóa hình Quiz"
+        title={`Xóa hình ${assessmentLabel}`}
         onCancel={() => setShowDelete(false)}
         onConfirm={remove}
       />

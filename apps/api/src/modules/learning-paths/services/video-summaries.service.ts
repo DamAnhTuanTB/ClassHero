@@ -10,7 +10,6 @@ import { throwBadRequest, throwNotFound } from "#api/common/errors/api-exception
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import { AiGenerationJobService } from "#api/modules/ai/services/ai-generation-job.service";
 import { AiProviderCallService } from "#api/modules/ai/services/ai-provider-call.service";
-import { buildAiStructuredTextFormat } from "#api/modules/ai/utils/ai-structured-output-format";
 import { hashAiValue } from "#api/modules/ai/utils/ai-hash";
 import { GenerateVideoSummaryDto } from "#api/modules/learning-paths/dto/generate-video-summary.dto";
 import { UpsertVideoSummaryDto } from "#api/modules/learning-paths/dto/upsert-video-summary.dto";
@@ -24,20 +23,22 @@ import {
   buildVideoSummaryPrompts,
   buildVideoSummaryStructuredRequestPolicy,
   resolveVideoSummarySubject,
-  VIDEO_SUMMARY_PROMPT_VERSION,
   type VideoSummarySubject,
 } from "#api/modules/learning-paths/utils/video-summary-prompt";
 import {
-  buildVideoSummaryProviderOutputSchema,
   hasVideoSummaryBlock,
   normalizeVideoSummaryDocument,
   VIDEO_SUMMARY_DOCUMENT_VERSION,
 } from "#api/modules/learning-paths/utils/video-summary-output";
+import {
+  buildVideoSummaryProviderContract,
+  VIDEO_SUMMARY_SCHEMA_NAME,
+  VIDEO_SUMMARY_SCHEMA_VERSION,
+} from "#api/modules/learning-paths/utils/video-summary-provider-contract";
 import { AiModelRoutingService } from "#api/modules/provider-operations/services/ai-model-routing.service";
 import type { AiFeatureRoute } from "#api/modules/provider-operations/types/provider-operations.types";
-
-const schemaName = "video_summary_output";
-const schemaVersion = "8";
+import { VideoSummaryIndexService } from "#api/modules/learning-paths/services/video-summary-index.service";
+import { EmbeddingJobEnqueuer } from "#api/workers/services/embedding-job-enqueuer.service";
 
 @Injectable()
 export class VideoSummariesService {
@@ -46,6 +47,10 @@ export class VideoSummariesService {
     @Inject(AiGenerationJobService) private readonly jobs: AiGenerationJobService,
     @Inject(AiModelRoutingService) private readonly routing: AiModelRoutingService,
     @Inject(AiProviderCallService) private readonly provider: AiProviderCallService,
+    @Inject(VideoSummaryIndexService)
+    private readonly videoSummaryIndex: VideoSummaryIndexService,
+    @Inject(EmbeddingJobEnqueuer)
+    private readonly embeddingEnqueuer: EmbeddingJobEnqueuer,
   ) {}
 
   async getForAdmin(lessonId: string) {
@@ -81,12 +86,11 @@ export class VideoSummariesService {
     const route = await this.resolveRoute(dto);
     const config = normalize(dto);
     const input = buildInput(source, config);
-    const outputSchema = buildVideoSummaryProviderOutputSchema(source.source.chapters);
-    const format = buildAiStructuredTextFormat(outputSchema, schemaName);
+    const contract = buildVideoSummaryProviderContract(source.source.chapters);
     const preview = await this.provider.previewStructuredRequest(
       { feature: AiGenerationType.VIDEO_SUMMARY, routeSnapshot: route },
       input,
-      outputSchema,
+      contract.outputSchema,
     );
     const snapshot = {
       lessonTitle: source.lesson.title,
@@ -100,7 +104,7 @@ export class VideoSummariesService {
       snapshot,
       input,
       route: routeFingerprint(route),
-      schemaHash: hashAiValue(format.schema),
+      schemaHash: contract.schemaHash,
     });
     await this.prisma.lessonVideoSummaryRequestDraft.deleteMany({
       where: { lessonId, createdById: actorUserId, consumedAt: null },
@@ -113,11 +117,14 @@ export class VideoSummariesService {
         sourceSnapshotJson: snapshot as Prisma.InputJsonValue,
         systemInstructions: input.systemPrompt,
         userPrompt: input.userPrompt,
-        schemaName,
-        schemaVersion,
-        schemaHash: hashAiValue(format.schema),
-        schemaJson: format.schema as Prisma.InputJsonValue,
-        modelConfigJson: { routeSnapshot: route } as Prisma.InputJsonValue,
+        schemaName: contract.schemaName,
+        schemaVersion: contract.schemaVersion,
+        schemaHash: contract.schemaHash,
+        schemaJson: contract.schemaJson as Prisma.InputJsonValue,
+        modelConfigJson: {
+          routeSnapshot: route,
+          promptVersion: contract.promptVersion,
+        } as Prisma.InputJsonValue,
         costEstimateJson: preview.estimatedCost as Prisma.InputJsonValue,
         expiresAt: new Date(Date.now() + 30 * 60_000),
       },
@@ -134,7 +141,11 @@ export class VideoSummariesService {
         language: source.source.language,
         hashes: source.source.hashes,
       },
-      schema: { name: schemaName, version: schemaVersion, json: format.schema },
+      schema: {
+        name: contract.schemaName,
+        version: contract.schemaVersion,
+        json: contract.schemaJson,
+      },
       model: preview,
       estimatedCost: preview.estimatedCost,
     };
@@ -168,8 +179,23 @@ export class VideoSummariesService {
         "AI_INPUT_SNAPSHOT_STALE",
         "Video, transcript hoặc mốc thời gian đã thay đổi; hãy xem trước lại.",
       );
-    const route = (draft.modelConfigJson as { routeSnapshot?: AiFeatureRoute })
-      .routeSnapshot;
+    const contract = buildVideoSummaryProviderContract(current.source.chapters);
+    const modelConfig = draft.modelConfigJson as {
+      routeSnapshot?: AiFeatureRoute;
+      promptVersion?: string;
+    };
+    if (
+      draft.schemaName !== contract.schemaName ||
+      draft.schemaVersion !== contract.schemaVersion ||
+      draft.schemaHash !== contract.schemaHash ||
+      hashAiValue(draft.schemaJson) !== contract.schemaHash ||
+      modelConfig.promptVersion !== contract.promptVersion
+    )
+      throwBadRequest(
+        "AI_INPUT_SNAPSHOT_STALE",
+        "Contract AI của bản xem trước đã thay đổi; hãy xem trước lại.",
+      );
+    const route = modelConfig.routeSnapshot;
     if (!route)
       throwBadRequest(
         "AI_INPUT_SNAPSHOT_STALE",
@@ -181,8 +207,8 @@ export class VideoSummariesService {
       lessonId,
       targetType: "LESSON_VIDEO_SUMMARY",
       targetId: lessonId,
-      promptVersion: VIDEO_SUMMARY_PROMPT_VERSION,
-      schemaVersion,
+      promptVersion: contract.promptVersion,
+      schemaVersion: contract.schemaVersion,
       inputFingerprint: {
         lessonId,
         requestHash: draft.requestHash,
@@ -192,6 +218,10 @@ export class VideoSummariesService {
         requestDraftId: draft.id,
         requestHash: draft.requestHash,
         sourceHash: current.source.hashes.source,
+        schemaName: contract.schemaName,
+        schemaVersion: contract.schemaVersion,
+        schemaHash: contract.schemaHash,
+        promptVersion: contract.promptVersion,
         temperature: route.temperature,
         reasoningEffort: route.reasoningEffort,
         maxOutputTokens: route.maxOutputTokens,
@@ -232,42 +262,58 @@ export class VideoSummariesService {
             staleAt: null,
           }
         : {};
-    const before = await this.prisma.lessonVideoSummary.findUnique({
-      where: { lessonId },
-    });
-    const summary = await this.prisma.lessonVideoSummary.upsert({
-      where: { lessonId },
-      create: {
+    const persistence = await this.prisma.$transaction(async (transaction) => {
+      const before = await transaction.lessonVideoSummary.findUnique({
+        where: { lessonId },
+      });
+      const summary = await transaction.lessonVideoSummary.upsert({
+        where: { lessonId },
+        create: {
+          lessonId,
+          contentJson: dto.contentJson as Prisma.InputJsonValue,
+          source: dto.source,
+          reviewStatus: dto.reviewStatus,
+          ...approvedSourceBaseline,
+          createdById: actorUserId,
+          updatedById: actorUserId,
+        },
+        update: {
+          contentJson: dto.contentJson as Prisma.InputJsonValue,
+          source: dto.source,
+          reviewStatus: dto.reviewStatus,
+          ...approvedSourceBaseline,
+          updatedById: actorUserId,
+          deletedAt: null,
+        },
+      });
+      const index = await this.videoSummaryIndex.syncInTransaction(transaction, {
+        videoSummaryId: summary.id,
         lessonId,
-        contentJson: dto.contentJson as Prisma.InputJsonValue,
-        source: dto.source,
-        reviewStatus: dto.reviewStatus,
-        ...approvedSourceBaseline,
-        createdById: actorUserId,
-        updatedById: actorUserId,
-      },
-      update: {
-        contentJson: dto.contentJson as Prisma.InputJsonValue,
-        source: dto.source,
-        reviewStatus: dto.reviewStatus,
-        ...approvedSourceBaseline,
-        updatedById: actorUserId,
-        deletedAt: null,
-      },
+        contentJson: summary.contentJson,
+      });
+      await transaction.auditLog.create({
+        data: {
+          actorUserId,
+          action: "LESSON_VIDEO_SUMMARY_UPSERTED",
+          entityType: "LessonVideoSummary",
+          entityId: summary.id,
+          before: before ? (before as unknown as Prisma.InputJsonValue) : undefined,
+          after: summary as unknown as Prisma.InputJsonValue,
+          ipAddress: context.ipAddress,
+          userAgent: context.userAgent,
+        },
+      });
+      return { summary, index };
     });
-    await this.prisma.auditLog.create({
-      data: {
-        actorUserId,
-        action: "LESSON_VIDEO_SUMMARY_UPSERTED",
-        entityType: "LessonVideoSummary",
-        entityId: summary.id,
-        before: before ? (before as unknown as Prisma.InputJsonValue) : undefined,
-        after: summary as unknown as Prisma.InputJsonValue,
-        ipAddress: context.ipAddress,
-        userAgent: context.userAgent,
-      },
-    });
-    return serialize(summary);
+    if (persistence.index.chunkCount > 0) {
+      await this.embeddingEnqueuer.enqueueVideoSummaryEmbeddingJob({
+        lessonId,
+        videoSummaryId: persistence.index.videoSummaryId,
+        summaryHash: persistence.index.summaryHash,
+        ownerUserId: actorUserId,
+      });
+    }
+    return serialize(persistence.summary);
   }
   async deleteForAdmin(
     lessonId: string,
@@ -415,9 +461,9 @@ function buildInput(
   });
   return {
     ...buildVideoSummaryStructuredRequestPolicy(),
-    outputName: schemaName,
+    outputName: VIDEO_SUMMARY_SCHEMA_NAME,
     promptVersion: prompts.promptVersion,
-    schemaVersion,
+    schemaVersion: VIDEO_SUMMARY_SCHEMA_VERSION,
     systemPrompt: prompts.systemPrompt,
     userPrompt: prompts.userPrompt,
     inputTextItems: [{ id: "source_packet_manifest" as const, text: sourceText }],

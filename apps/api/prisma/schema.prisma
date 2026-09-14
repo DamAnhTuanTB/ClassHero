@@ -110,6 +110,7 @@ enum FilePurpose {
   EDITOR_IMAGE
   QUESTION_IMAGE
   NOTE_IMAGE
+  CHAT_IMAGE
   AI_DIAGRAM
 }
 
@@ -249,6 +250,32 @@ enum AiChatMessageRole {
   USER
   ASSISTANT
   SYSTEM
+}
+
+enum AiChatScopeType {
+  LIBRARY
+  COURSE
+  LESSON
+  COURSE_SET
+}
+
+enum AiChatSessionMode {
+  STUDENT
+  ADMIN_SIMULATION
+}
+
+enum AiChatMessageStatus {
+  GENERATING
+  COMPLETED
+  REFUSED
+  FAILED
+  INTERRUPTED
+}
+
+enum AiChatResponsePolicy {
+  HINT_ONLY
+  FULL_ANSWER
+  BLOCKED
 }
 
 enum FavoriteTargetType {
@@ -572,6 +599,8 @@ model User {
   reportActions                   ReportAction[]            @relation("ReportActionAdmin")
   aiGenerationsCreated            AiGeneration[]            @relation("AiGenerationCreatedBy")
   aiChatSessions                  AiChatSession[]           @relation("AiChatSessionStudent")
+  adminAiChatSessions             AiChatSession[]           @relation("AiChatSessionAdmin")
+  updatedAiChatRuntimeSettings    AiChatRuntimeSetting[]    @relation("AiChatRuntimeSettingUpdatedBy")
   xpEvents                        XpEvent[]                 @relation("XpEventStudent")
   createdNewsItems                NewsItem[]                @relation("NewsItemCreatedBy")
   updatedNewsItems                NewsItem[]                @relation("NewsItemUpdatedBy")
@@ -675,6 +704,7 @@ model File {
   quizFigureDeliveries      QuizFigureRevision[]      @relation("QuizFigureRevisionDeliveryFile")
   flashcardFigureDeliveries FlashcardFigureRevision[] @relation("FlashcardFigureRevisionDeliveryFile")
   newsItemCovers            NewsItem[]                @relation("NewsItemCoverFile")
+  aiChatMessageAttachments  AiChatMessageAttachment[]
   publicUrl                 String?                   @map("public_url")
   checksum                  String?
   metadataJson              Json?                     @map("metadata_json")
@@ -765,6 +795,8 @@ model LearningPath {
   enrollments          Enrollment[]                 @relation("EnrollmentPurchasedLearningPath")
   deliveredEnrollments Enrollment[]                 @relation("EnrollmentDeliveryLearningPath")
   payments             Payment[]
+  aiChatSessions       AiChatSession[]
+  aiChatScopeItems     AiChatSessionScopeItem[]
 
   @@index([kind, status])
   @@index([sourceLearningPathId])
@@ -879,6 +911,7 @@ model Lesson {
   documents                 LessonDocument[]
   documentPageRanges        LessonDocumentPageRange[]
   documentChunks            DocumentChunk[]
+  videoSummaryChunks        VideoSummaryChunk[]
   summary                   LessonSummary?
   videoSummary              LessonVideoSummary?
   progressEntries           LessonProgress[]
@@ -907,7 +940,8 @@ model Lesson {
   quizRequestDrafts         QuizGenerationRequestDraft[]
   flashcardRequestDrafts    FlashcardGenerationRequestDraft[]
   quizFigures               QuizFigure[]
-  aiChatSessions            AiChatSession[]
+  aiChatSurfaceMessages     AiChatMessage[]                   @relation("AiChatMessageSurfaceLesson")
+  aiChatScopeItems          AiChatSessionScopeItem[]
   xpEvents                  XpEvent[]
 
   @@unique([chapterId, orderIndex])
@@ -1243,6 +1277,35 @@ model DocumentChunk {
   @@map("document_chunks")
 }
 
+model VideoSummaryChunk {
+  id                  String                       @id @default(uuid()) @db.Uuid
+  videoSummaryId      String                       @map("video_summary_id") @db.Uuid
+  videoSummary        LessonVideoSummary           @relation(fields: [videoSummaryId], references: [id], onDelete: Cascade)
+  lessonId            String                       @map("lesson_id") @db.Uuid
+  lesson              Lesson                       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  chunkIndex          Int                          @map("chunk_index")
+  content             String                       @db.Text
+  contentHash         String                       @map("content_hash")
+  summaryHash         String                       @map("summary_hash")
+  tokenCount          Int                          @map("token_count")
+  startSeconds        Float?                       @map("start_seconds")
+  endSeconds          Float?                       @map("end_seconds")
+  embedding           Unsupported("vector(1536)")?
+  embeddingProvider   AiProviderName?              @map("embedding_provider")
+  embeddingModel      String?                      @map("embedding_model")
+  embeddingDimensions Int?                         @map("embedding_dimensions")
+  metadataJson        Json?                        @map("metadata_json")
+  createdAt           DateTime                     @default(now()) @map("created_at")
+  updatedAt           DateTime                     @updatedAt @map("updated_at")
+
+  @@unique([videoSummaryId, chunkIndex])
+  @@index([videoSummaryId])
+  @@index([lessonId])
+  @@index([lessonId, summaryHash])
+  @@index([lessonId, embeddingProvider, embeddingModel, embeddingDimensions])
+  @@map("video_summary_chunks")
+}
+
 model LessonSummary {
   id             String        @id @default(uuid()) @db.Uuid
   lessonId       String        @unique @map("lesson_id") @db.Uuid
@@ -1313,6 +1376,7 @@ model LessonVideoSummary {
   createdAt                DateTime      @default(now()) @map("created_at")
   updatedAt                DateTime      @updatedAt @map("updated_at")
   deletedAt                DateTime?     @map("deleted_at")
+  chunks                   VideoSummaryChunk[]
 
   @@index([aiGenerationId])
   @@map("lesson_video_summaries")
@@ -2299,6 +2363,7 @@ model AiGeneration {
   testSets                   TestSet[]                   @relation("TestSetAiGeneration")
   explanations               AiExplanation[]
   chatMessages               AiChatMessage[]
+  aiChatTurnTrace            AiChatTurnTrace?
   summaries                  ConversationSummary[]
   providerUsageEvents        ProviderUsageEvent[]        @relation("ProviderUsageAiGeneration")
   providerBudgetReservations ProviderBudgetReservation[] @relation("ProviderBudgetReservationAiGeneration")
@@ -2329,6 +2394,7 @@ model ProviderCatalogItem {
   priceVersions          ProviderPriceVersion[]
   primaryConfigurations  AiFeatureModelConfig[]  @relation("AiFeaturePrimaryCatalogItem")
   fallbackConfigurations AiFeatureModelConfig[]  @relation("AiFeatureFallbackCatalogItem")
+  chatRuntimeSettings    AiChatRuntimeSetting[]  @relation("AiChatEmbeddingCatalogItem")
   usageEvents            ProviderUsageEvent[]
 
   @@unique([category, provider, externalKey])
@@ -2388,6 +2454,7 @@ model AiFeatureModelConfig {
 
   fallbackTemperature     Decimal? @map("fallback_temperature") @db.Decimal(4, 3)
   fallbackReasoningEffort String?  @map("fallback_reasoning_effort")
+  fallbackMaxInputTokens  Int?     @map("fallback_max_input_tokens")
   fallbackMaxOutputTokens Int?     @map("fallback_max_output_tokens")
 
   version         Int      @default(1)
@@ -2399,6 +2466,27 @@ model AiFeatureModelConfig {
   @@index([primaryCatalogItemId])
   @@index([fallbackCatalogItemId])
   @@map("ai_feature_model_configs")
+}
+
+model AiChatRuntimeSetting {
+  id                       String               @id @default(uuid()) @db.Uuid
+  singletonKey             String               @unique @default("default") @map("singleton_key")
+  embeddingCatalogItemId   String?              @map("embedding_catalog_item_id") @db.Uuid
+  embeddingCatalogItem     ProviderCatalogItem? @relation("AiChatEmbeddingCatalogItem", fields: [embeddingCatalogItemId], references: [id], onDelete: SetNull)
+  maxImagesPerMessage      Int                  @default(5) @map("max_images_per_message")
+  maxImageBytes            BigInt               @default(10485760) @map("max_image_bytes")
+  allowedImageMimeTypes    String[]             @default(["image/jpeg", "image/png", "image/webp"]) @map("allowed_image_mime_types")
+  studentDailyMessageLimit Int                  @default(20) @map("student_daily_message_limit")
+  studentDailyImageLimit   Int                  @default(20) @map("student_daily_image_limit")
+  version                  Int                  @default(1)
+  updatedByUserId          String?              @map("updated_by_user_id") @db.Uuid
+  updatedByUser            User?                @relation("AiChatRuntimeSettingUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  createdAt                DateTime             @default(now()) @map("created_at")
+  updatedAt                DateTime             @updatedAt @map("updated_at")
+
+  @@index([embeddingCatalogItemId])
+  @@index([updatedByUserId])
+  @@map("ai_chat_runtime_settings")
 }
 
 model ProviderUsageEvent {
@@ -2549,37 +2637,124 @@ model AiExplanation {
 }
 
 model AiChatSession {
-  id            String                @id @default(uuid()) @db.Uuid
-  studentUserId String                @map("student_user_id") @db.Uuid
-  studentUser   User                  @relation("AiChatSessionStudent", fields: [studentUserId], references: [id], onDelete: Cascade)
-  lessonId      String                @map("lesson_id") @db.Uuid
-  lesson        Lesson                @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  title         String?
-  summaryText   String?               @map("summary_text") @db.Text
-  createdAt     DateTime              @default(now()) @map("created_at")
-  updatedAt     DateTime              @updatedAt @map("updated_at")
-  messages      AiChatMessage[]
-  summaries     ConversationSummary[]
+  id                        String                   @id @default(uuid()) @db.Uuid
+  mode                      AiChatSessionMode        @default(STUDENT)
+  studentUserId             String?                  @map("student_user_id") @db.Uuid
+  studentUser               User?                    @relation("AiChatSessionStudent", fields: [studentUserId], references: [id], onDelete: Cascade)
+  adminUserId               String?                  @map("admin_user_id") @db.Uuid
+  adminUser                 User?                    @relation("AiChatSessionAdmin", fields: [adminUserId], references: [id], onDelete: Cascade)
+  scopeType                 AiChatScopeType          @map("scope_type")
+  learningPathId            String?                  @map("learning_path_id") @db.Uuid
+  learningPath              LearningPath?            @relation(fields: [learningPathId], references: [id], onDelete: Restrict)
+  title                     String?
+  summaryText               String?                  @map("summary_text") @db.Text
+  configurationOverrideJson Json?                    @map("configuration_override_json")
+  configurationVersion      Int                      @default(1) @map("configuration_version")
+  lastMessageAt             DateTime?                @map("last_message_at")
+  deletedAt                 DateTime?                @map("deleted_at")
+  createdAt                 DateTime                 @default(now()) @map("created_at")
+  updatedAt                 DateTime                 @updatedAt @map("updated_at")
+  messages                  AiChatMessage[]
+  summaries                 ConversationSummary[]
+  scopeItems                AiChatSessionScopeItem[]
+  turnTraces                AiChatTurnTrace[]
 
-  @@unique([studentUserId, lessonId])
-  @@index([lessonId])
+  @@index([studentUserId, deletedAt, lastMessageAt(sort: Desc), id(sort: Desc)])
+  @@index([adminUserId, deletedAt, lastMessageAt(sort: Desc), id(sort: Desc)])
+  @@index([studentUserId, scopeType, learningPathId, deletedAt])
+  @@index([adminUserId, scopeType, deletedAt])
+  @@index([learningPathId])
   @@map("ai_chat_sessions")
 }
 
-model AiChatMessage {
-  id                String            @id @default(uuid()) @db.Uuid
-  sessionId         String            @map("session_id") @db.Uuid
-  session           AiChatSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  role              AiChatMessageRole
-  contentJson       Json              @map("content_json")
-  retrievedChunkIds String[]          @default([]) @map("retrieved_chunk_ids") @db.Uuid
-  aiGenerationId    String?           @map("ai_generation_id") @db.Uuid
-  aiGeneration      AiGeneration?     @relation(fields: [aiGenerationId], references: [id], onDelete: SetNull)
-  createdAt         DateTime          @default(now()) @map("created_at")
+model AiChatSessionScopeItem {
+  id             String        @id @default(uuid()) @db.Uuid
+  sessionId      String        @map("session_id") @db.Uuid
+  session        AiChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  learningPathId String        @map("learning_path_id") @db.Uuid
+  learningPath   LearningPath  @relation(fields: [learningPathId], references: [id], onDelete: Restrict)
+  lessonId       String?       @map("lesson_id") @db.Uuid
+  lesson         Lesson?       @relation(fields: [lessonId], references: [id], onDelete: Restrict)
+  sortOrder      Int           @default(0) @map("sort_order")
+  createdAt      DateTime      @default(now()) @map("created_at")
 
-  @@index([sessionId, createdAt])
+  @@unique([sessionId, learningPathId, lessonId])
+  @@index([sessionId, sortOrder, id])
+  @@index([learningPathId])
+  @@index([lessonId])
+  @@map("ai_chat_session_scope_items")
+}
+
+model AiChatMessage {
+  id                    String                    @id @default(uuid()) @db.Uuid
+  sessionId             String                    @map("session_id") @db.Uuid
+  session               AiChatSession             @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role                  AiChatMessageRole
+  status                AiChatMessageStatus       @default(COMPLETED)
+  responsePolicy        AiChatResponsePolicy      @default(FULL_ANSWER) @map("response_policy")
+  contentJson           Json                      @map("content_json")
+  surfaceLessonId       String?                   @map("surface_lesson_id") @db.Uuid
+  surfaceLesson         Lesson?                   @relation("AiChatMessageSurfaceLesson", fields: [surfaceLessonId], references: [id], onDelete: SetNull)
+  targetType            String?                   @map("target_type")
+  targetId              String?                   @map("target_id") @db.Uuid
+  contextJson           Json?                     @map("context_json")
+  sourceLearningPathIds String[]                  @default([]) @map("source_learning_path_ids") @db.Uuid
+  sourceLessonIds       String[]                  @default([]) @map("source_lesson_ids") @db.Uuid
+  retrievedChunkIds     String[]                  @default([]) @map("retrieved_chunk_ids") @db.Uuid
+  errorCode             String?                   @map("error_code")
+  aiGenerationId        String?                   @map("ai_generation_id") @db.Uuid
+  aiGeneration          AiGeneration?             @relation(fields: [aiGenerationId], references: [id], onDelete: SetNull)
+  dailyQuotaCountedAt   DateTime?                 @map("daily_quota_counted_at")
+  createdAt             DateTime                  @default(now()) @map("created_at")
+  updatedAt             DateTime                  @updatedAt @map("updated_at")
+  attachments           AiChatMessageAttachment[]
+  turnTraceAsUser       AiChatTurnTrace?          @relation("AiChatTurnTraceUserMessage")
+  turnTraceAsAssistant  AiChatTurnTrace?          @relation("AiChatTurnTraceAssistantMessage")
+
+  @@index([sessionId, createdAt, id])
+  @@index([surfaceLessonId])
   @@index([aiGenerationId])
+  @@index([dailyQuotaCountedAt])
   @@map("ai_chat_messages")
+}
+
+model AiChatTurnTrace {
+  id                                String        @id @default(uuid()) @db.Uuid
+  sessionId                         String        @map("session_id") @db.Uuid
+  session                           AiChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  userMessageId                     String        @unique @map("user_message_id") @db.Uuid
+  userMessage                       AiChatMessage @relation("AiChatTurnTraceUserMessage", fields: [userMessageId], references: [id], onDelete: Cascade)
+  assistantMessageId                String        @unique @map("assistant_message_id") @db.Uuid
+  assistantMessage                  AiChatMessage @relation("AiChatTurnTraceAssistantMessage", fields: [assistantMessageId], references: [id], onDelete: Cascade)
+  aiGenerationId                    String        @unique @map("ai_generation_id") @db.Uuid
+  aiGeneration                      AiGeneration  @relation(fields: [aiGenerationId], references: [id], onDelete: Cascade)
+  scopeSnapshotJson                 Json          @map("scope_snapshot_json")
+  defaultConfigurationVersion       Int           @map("default_configuration_version")
+  sessionConfigurationVersion       Int           @map("session_configuration_version")
+  configurationOverrideSnapshotJson Json?         @map("configuration_override_snapshot_json")
+  effectiveConfigurationJson        Json          @map("effective_configuration_json")
+  providerRequestSnapshotJson       Json?         @map("provider_request_snapshot_json")
+  createdAt                         DateTime      @default(now()) @map("created_at")
+  updatedAt                         DateTime      @updatedAt @map("updated_at")
+
+  @@index([sessionId, createdAt, id])
+  @@map("ai_chat_turn_traces")
+}
+
+model AiChatMessageAttachment {
+  id                  String        @id @default(uuid()) @db.Uuid
+  messageId           String        @map("message_id") @db.Uuid
+  message             AiChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  fileId              String        @unique @map("file_id") @db.Uuid
+  file                File          @relation(fields: [fileId], references: [id], onDelete: Restrict)
+  sortOrder           Int           @default(0) @map("sort_order")
+  dailyQuotaCountedAt DateTime?     @map("daily_quota_counted_at")
+  createdAt           DateTime      @default(now()) @map("created_at")
+
+  @@unique([messageId, fileId])
+  @@index([messageId, sortOrder])
+  @@index([dailyQuotaCountedAt])
+  @@map("ai_chat_message_attachments")
 }
 
 model ConversationSummary {

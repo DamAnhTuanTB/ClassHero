@@ -17,6 +17,7 @@ import {
 } from "#api/jobs/background-job-queues";
 import { parseRedisConnection } from "#api/jobs/redis-connection";
 import { StemFigureRenderingProcessor } from "#api/workers/processors/stem-figure-rendering.processor";
+import { RealtimeJobSnapshotPublisherService } from "#api/modules/realtime/services/realtime-job-snapshot-publisher.service";
 
 @Injectable()
 export class StemFigureRenderingWorkerService implements OnModuleInit, OnModuleDestroy {
@@ -29,6 +30,8 @@ export class StemFigureRenderingWorkerService implements OnModuleInit, OnModuleD
     private readonly config: ConfigService<EnvConfig, true>,
     @Inject(StemFigureRenderingProcessor)
     private readonly processor: StemFigureRenderingProcessor,
+    @Inject(RealtimeJobSnapshotPublisherService)
+    private readonly realtimeJobs: RealtimeJobSnapshotPublisherService,
   ) {}
 
   onModuleInit() {
@@ -49,6 +52,7 @@ export class StemFigureRenderingWorkerService implements OnModuleInit, OnModuleD
     );
     this.worker.on("completed", (job) => {
       this.logger.log(`STEM figure render job ${job.id} completed.`);
+      void this.realtimeJobs.publishById(job.data.backgroundJobId);
     });
     this.worker.on("failed", (job, error) => {
       const maxAttempts = Math.max(
@@ -59,6 +63,7 @@ export class StemFigureRenderingWorkerService implements OnModuleInit, OnModuleD
       const message = `STEM figure render job ${job?.id ?? "unknown"} attempt ${job?.attemptsMade ?? 1}/${maxAttempts} ${retrying ? "will retry" : "failed"}: ${error.message}`;
       if (retrying) this.logger.warn(message);
       else this.logger.error(message);
+      if (job) void this.realtimeJobs.publishById(job.data.backgroundJobId);
     });
     this.worker.on("error", (error) => {
       this.logger.error(`STEM figure worker error: ${error.message}`);

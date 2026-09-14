@@ -22,7 +22,6 @@ import type {
 import type { AiOutputSchema } from "#api/modules/ai/types/ai-text.types";
 import { hashAiValue } from "#api/modules/ai/utils/ai-hash";
 import { parseAiStructuredOutput } from "#api/modules/ai/utils/ai-output-validation";
-import { buildAiStructuredTextFormat } from "#api/modules/ai/utils/ai-structured-output-format";
 import { QuizFigureJobService } from "#api/modules/quiz-figures/services/quiz-figure-job.service";
 import { QuizFigureArtifactService } from "#api/modules/quiz-figures/services/quiz-figure-artifact.service";
 import { buildQuizFigureRefinementImageDataUrl } from "#api/modules/quiz-figures/utils/quiz-figure-refinement-image";
@@ -36,7 +35,6 @@ import {
   buildWholeFeatureUsageTarget,
 } from "#api/modules/provider-operations/utils/provider-usage-target";
 import {
-  generatedQuizSourceCoverageAuditSchema,
   getGeneratedQuizOutputSchema,
   quizGenerationJobInputSchema,
   type GeneratedQuizQuestion,
@@ -77,7 +75,10 @@ import {
   normalizeGeneratedQuizQuestionContent,
   normalizeQuizConclusionParagraph,
 } from "#api/modules/quiz/utils/quiz-generation-content-normalizer";
-import { buildQuizStructuredInput } from "#api/modules/quiz/utils/quiz-generation-prompt";
+import {
+  buildQuizProviderContract,
+  buildQuizStructuredInput,
+} from "#api/modules/quiz/utils/quiz-generation-prompt";
 import {
   type GenerationRecoveryIssue,
   validateQuizOutput,
@@ -111,9 +112,15 @@ export class QuizGenerationService {
       );
     }
     const input = parseJobInput(quizGenerationJobInputSchema, context.inputMeta, "quiz");
-    const draft = await this.prisma.quizGenerationRequestDraft.findFirst({
-      where: { id: input.requestDraftId, lessonId: context.lessonId },
-    });
+    const [draft, aiGeneration] = await Promise.all([
+      this.prisma.quizGenerationRequestDraft.findFirst({
+        where: { id: input.requestDraftId, lessonId: context.lessonId },
+      }),
+      this.prisma.aiGeneration.findFirst({
+        where: { id: context.aiGenerationId },
+        select: { promptVersion: true, schemaVersion: true },
+      }),
+    ]);
     if (
       !draft ||
       draft.requestHash !== input.requestHash ||
@@ -122,6 +129,26 @@ export class QuizGenerationService {
     ) {
       throw new UnrecoverableError(
         "AI_INPUT_SNAPSHOT_STALE: Không tìm thấy request draft Quiz bất biến khớp với job.",
+      );
+    }
+    const providerContract = buildQuizProviderContract(input);
+    const draftPromptVersion = asRecord(draft.modelConfigJson).promptVersion;
+    if (
+      !aiGeneration ||
+      input.promptVersion !== providerContract.promptVersion ||
+      input.schemaName !== providerContract.schemaName ||
+      input.schemaVersion !== providerContract.schemaVersion ||
+      input.schemaHash !== providerContract.schemaHash ||
+      aiGeneration.promptVersion !== providerContract.promptVersion ||
+      aiGeneration.schemaVersion !== providerContract.schemaVersion ||
+      draftPromptVersion !== providerContract.promptVersion ||
+      draft.schemaName !== providerContract.schemaName ||
+      draft.schemaVersion !== providerContract.schemaVersion ||
+      draft.schemaHash !== providerContract.schemaHash ||
+      hashAiValue(draft.schemaJson) !== providerContract.schemaHash
+    ) {
+      throw new UnrecoverableError(
+        "AI_INPUT_CONTRACT_STALE: Prompt hoặc schema Quiz đã thay đổi sau khi preview.",
       );
     }
     const currentSourceHash = await this.generationContext.computeCurrentSourceHash(
@@ -162,26 +189,16 @@ export class QuizGenerationService {
         userPrompt: draft.userPrompt,
       },
     });
-    const providerSchema = getGeneratedQuizOutputSchema({
-      subjectKey: input.subjectKey,
-      targetGrade: input.targetGrade,
-      questionCount: input.questionCount,
-      questionTypes: input.questionTypes,
-      difficulty: input.difficulty,
-      includeSourceCoverageAudit: !input.systemInstructions,
-    });
-    const schemaHash = hashAiValue(
-      buildAiStructuredTextFormat(
-        providerSchema,
-        request.outputName,
-        request.schemaReferenceStrategy,
-      ).schema,
-    );
-    if (schemaHash !== draft.schemaHash) {
+    if (
+      request.outputName !== providerContract.schemaName ||
+      request.promptVersion !== providerContract.promptVersion ||
+      request.schemaVersion !== providerContract.schemaVersion
+    ) {
       throw new UnrecoverableError(
-        "AI_INPUT_SCHEMA_STALE: Output schema Quiz đã thay đổi sau khi preview.",
+        "AI_INPUT_CONTRACT_STALE: Provider request Quiz không khớp contract hiện tại.",
       );
     }
+    const providerSchema = providerContract.providerSchema;
     let output;
     try {
       output = this.providerCall
@@ -199,13 +216,8 @@ export class QuizGenerationService {
     const normalizedQuestions = output.data.questions.map(
       normalizeGeneratedQuizQuestionContent,
     );
-    const sourceCoverageAudit =
-      "sourceCoverageAudit" in output.data
-        ? generatedQuizSourceCoverageAuditSchema.parse(output.data.sourceCoverageAudit)
-        : undefined;
     const validation = validateQuizOutput({
       questions: normalizedQuestions,
-      sourceCoverageAudit,
       requestedCount: input.questionCount,
       requestedTypes: input.questionTypes,
       requestedDifficulty: input.difficulty,
@@ -241,7 +253,6 @@ export class QuizGenerationService {
         questionCount: input.questionCount,
         questionTypes: input.questionTypes,
         difficulty: input.difficulty,
-        includeSourceCoverageAudit: !input.systemInstructions,
       }),
       prepared.output.data,
     );

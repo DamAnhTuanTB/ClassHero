@@ -13,6 +13,7 @@ import {
   ArrowLeft,
   Layers3,
   Pencil,
+  MessageCircleMore,
 } from "lucide-react";
 import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
 import { AdminDataErrorState } from "@/components/admin/admin-data-error-state";
@@ -53,6 +54,7 @@ import type {
   AdminAiGenerationDialogRequest,
   AdminAiGenerationType,
 } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
+import { useAdminLessonRealtimeSync } from "@/features/admin/lessons/hooks/use-admin-lesson-realtime-sync";
 
 const LessonDetailEditorDialog = dynamic(() =>
   import("@/features/admin/lessons/components/lesson-detail-editor-dialog").then(
@@ -103,6 +105,7 @@ const adminNavItems: AdminCoursesSidebarItem[] = [
   { label: "Khóa học", icon: Layers3, active: true },
   { label: "Buổi học", icon: BookOpen, active: false },
   { label: "Tài liệu", icon: FileText, active: false },
+  { label: "Chat với AI", icon: MessageCircleMore, active: false, href: "/admin/ai-chat" },
   { label: "Cài đặt AI", icon: Bot, active: false, href: "/admin/ai-settings" },
 ];
 
@@ -121,6 +124,7 @@ export function AdminLessonDetailManager({
     isPrerequisitePending: !isAuthHydrated && initialLesson === undefined,
   });
   useAdminLessonContentPrefetch(lessonId, Boolean(lesson));
+  useAdminLessonRealtimeSync(lessonId);
   const [activeTab, setActiveTab] = useState<LessonContentTabKey>("documents");
   const [preferredSetIds, setPreferredSetIds] = useState<
     Partial<Record<"QUIZ" | "FLASHCARD" | "TEST", string>>

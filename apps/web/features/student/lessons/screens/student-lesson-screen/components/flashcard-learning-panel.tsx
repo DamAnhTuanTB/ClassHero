@@ -13,6 +13,7 @@ import {
   updateFlashcardProgress,
 } from "@/features/student/lessons/api/student-lessons-api";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
+import type { AiChatEntryContext } from "@/features/student/ai-chat/utils/ai-chat-link";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { FlashcardResultScreen } from "@/features/student/lessons/screens/student-lesson-screen/components/flashcard-result-screen";
 import { FlashcardRunnerScreen } from "@/features/student/lessons/screens/student-lesson-screen/components/flashcard-runner-screen";
@@ -251,6 +252,11 @@ export function FlashcardLearningPanel({
     (card) => favoriteOverrides[card.id] ?? card.isFavorite,
   ).length;
   const currentCard = sessionCards[currentIndex];
+  const baseAiChatContext = {
+    scopeType: "COURSE",
+    learningPathId: lesson.learningPath.id,
+    surfaceLessonId: lesson.id,
+  } satisfies AiChatEntryContext;
   const sessionReviewStatuses = sessionCards.map((card) =>
     sessionReviewedIds.has(card.id)
       ? (knownOverrides[card.id] ?? card.progress?.isKnown ?? null)
@@ -707,6 +713,19 @@ export function FlashcardLearningPanel({
     const isFavorite = favoriteOverrides[currentCard.id] ?? currentCard.isFavorite;
     return renderWithCurtain(
       <FlashcardRunnerScreen
+        aiChatContext={{
+          ...baseAiChatContext,
+          ...(studySessionId
+            ? {
+                activeActivity: {
+                  activityType: "FLASHCARD_STUDY_SESSION" as const,
+                  activityId: studySessionId,
+                  targetType: "FLASHCARD" as const,
+                  targetId: currentCard.id,
+                },
+              }
+            : {}),
+        }}
         card={currentCard}
         currentIndex={currentIndex}
         isBackVisible={isBackVisible}
@@ -844,6 +863,13 @@ export function FlashcardLearningPanel({
       </section>
       {screen === "RUNNER" && currentCard && historyReviewTitle !== null ? (
         <FlashcardRunnerScreen
+          aiChatContext={{
+            ...baseAiChatContext,
+            target: {
+              targetType: "FLASHCARD",
+              targetId: currentCard.id,
+            },
+          }}
           card={currentCard}
           currentIndex={currentIndex}
           isBackVisible={isBackVisible}

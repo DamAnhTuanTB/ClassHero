@@ -125,6 +125,76 @@ backend chấm/lưu authoritative.
 - Notification list/bell.
 - AI chat/generate/job status.
 
+Chat AI `M9.6` dùng SSE trực tiếp cho delta text, không dùng Socket.IO. Retrieval
+embed query một lần rồi giới hạn top context theo `AI_CHAT_MAX_CONTEXT_TOKENS`;
+Student Chat lấy tối đa 16 chunks ở scope `COURSE` và 24 chunks ở scope
+`LIBRARY`, nhưng token cap vẫn là điểm dừng bắt buộc;
+Admin `COURSE_SET` mô phỏng multi-course dùng cùng cap 24 chunks;
+SQL phải filter tập learning path đã resolve quyền trước khi rank. History dùng
+cursor và index `(student_user_id, deleted_at, last_message_at desc, id desc)`;
+không tải toàn bộ messages/thread. Client upload tối đa 3 ảnh song song, vẫn giữ
+đúng thứ tự trong message; toàn message không quá 5 file và mỗi file không vượt
+10 MB để tránh memory spike ở browser/API. `AI_CHAT_MAX_INPUT_TOKENS`
+giới hạn toàn request sau khi cộng system prompt, history, RAG và image token;
+không dùng context cap làm input cap vì sẽ chặn nhầm request hợp lệ có ảnh.
+History lấy tối đa số message gần nhất đã cấu hình và tiếp tục cắt theo
+`AI_CHAT_MAX_HISTORY_TOKENS` trước khi ghép prompt.
+
+Đường critical path của chat phải chạy song song các việc độc lập: keyword SQL
+với query embedding, và sau khi resolve target thì history, retrieval cùng ảnh
+lượt trước. Không giảm RAG/access/policy gate để đổi lấy tốc độ. System prefix
+ổn định dùng OpenAI prompt cache khi model hỗ trợ; scope/question/history/context
+luôn ở phần dynamic và không được đưa vào cache key.
+
+Prompt `student-ai-chat-v8-preferred-lessons` là `NEW_STABLE_PREFIX_WARMUP`:
+stable system prefix giữ contract không giải tắt/công thức gốc/chất lượng
+hint và profile chuyên môn tách biệt `MATH`, `PHYSICS`, `CHEMISTRY`, `GENERAL`,
+đồng thời chia System/User prompt thành các heading rõ ràng, bỏ heading con dư
+ở profile đơn môn và giới hạn chữ đậm theo ngữ nghĩa. Prefix/cache key của
+`student-ai-chat-v6-sectioned-prompts` không tái sử dụng cho bản này.
+`HINT_ONLY`, `FULL_CURRENT_TARGET`, `FULL_SCOPE` và từng tập subject
+resolve thành stable prefix/cache key riêng; các input động cùng policy + subject
+vẫn dùng chung key sau warm-up. Không đổi namespace, breakpoint, retention
+hoặc thứ tự request.
+
+Lượt có ảnh không chạy vision/OCR preprocessing bằng AI. Ảnh gốc chỉ xuất hiện
+trong một call `CHAT_RESPONSE_GENERATION`; hybrid retrieval vẫn có đúng một query
+embedding từ text. Manifest môn/khóa/bài được dựng cục bộ từ scope đã authorize
+và chạy song song với retrieval. Cách này bỏ một round trip provider khỏi critical
+path; theo dõi `imageResponseMode=SINGLE_PASS`, số mục manifest và cờ rút gọn
+trong `ai_generations.input_meta_json`, không lưu raw image/data URL vào log.
+
+Với `HINT_ONLY`, backend giảm dữ liệu đầu vào bằng cách không gửi đáp án/mặt sau/
+saved solution và dùng system prompt riêng. Không có output classifier, answer-
+leak validator hoặc fallback nội dung cục bộ; response của model đi thẳng qua
+stream/persistence sau auto-repair kỹ thuật LaTeX/layout. Theo dõi tỷ lệ vi phạm
+bằng eval thay vì đánh đổi false positive ở runtime.
+
+Lượt đầu của thread dùng câu hỏi làm optimistic title ở client tức thì;
+`started.title` xác nhận title backend mà không nằm trên critical path. Call đặt tên
+`CHAT_TITLE_GENERATION` (`ai-chat-title-v3`, reasoning `low`, tối đa 128 output
+token) chỉ khởi chạy
+sau provider event trả lời đầu tiên và chạy song song với các delta còn lại, nên
+không làm tăng TTFT. `title_updated` được phát trước `completed` nếu call thành
+công; lỗi title giữ fallback, không fail câu trả lời. Prompt title có namespace
+cache riêng `ai-chat-title` và stable prefix riêng, không làm lạnh cache response
+`student-ai-chat-v8-preferred-lessons`.
+
+Chat ghi `timeToFirstTokenMs` từ provider stream vào `raw_usage_json`, đồng thời
+client live test đo thời gian tới delta/refusal đầu tiên. Budget vận hành ban đầu:
+
+- event nội dung đầu tiên: p50 không quá 2,5 giây, p95 không quá 6 giây;
+- hoàn tất câu text thông thường: p95 không quá 10 giây;
+- câu vision/nhiều ảnh: theo dõi riêng, p95 không quá 15 giây;
+- output mặc định phải trực tiếp và vừa đủ; `AI_CHAT_MAX_OUTPUT_TOKENS=1200` là
+  safety cap, không phải mục tiêu để model dùng hết.
+
+Nếu vượt budget, ưu tiên kiểm tra lần lượt retrieval/embedding, TTFT provider,
+độ dài context/history, kích thước ảnh sau normalize, cache hit và output token;
+không bỏ authorization/scope input filtering hoặc LaTeX validation để giảm vài
+mili-giây. Content policy được cải thiện ở prompt/model/eval, không thêm heuristic
+chặn output trên critical path.
+
 ---
 
 ## 5. Database performance
@@ -262,13 +332,21 @@ Performance và cost rules:
   và attempt kind `AI_REFINEMENT`; không log raw source, data URL hoặc object key.
   `adminInstructions` tùy chọn phải nằm trong dynamic user input sau stable
   prefix, được trim và bỏ khỏi request khi rỗng; preview và execute phải dùng
-  cùng giá trị. Stable refinement prompt dùng Toán v34, Lý v24, Hóa/General v23;
-  output schema `quiz-figure-refinement-schema-v3-independent-solution` giữ
-  nguyên. Thay đổi thuộc loại
+  cùng giá trị. Stable refinement prompt dùng Toán QUESTION v40/SOLUTION v41,
+  Lý QUESTION v26/SOLUTION v27 và Hóa/General QUESTION v25/SOLUTION v26;
+  output schema hiện là `quiz-figure-refinement-schema-v4-visual-only`; schema
+  mô tả canvas chỉ chứa hình và nhãn trực tiếp, không chép lời giải/phép tính.
+  Thay đổi thuộc loại
   `NEW_STABLE_PREFIX_WARMUP`: cache cũ không được tái sử dụng và cần warmup lại
-  prefix mới; schema/order/breakpoint không đổi và không có invalidation dữ liệu
-  runtime ngoài version key. Sau warm-up, dynamic problem/source vẫn nằm sau
+  prefix mới; thứ tự request/breakpoint không đổi và không có invalidation dữ
+  liệu runtime ngoài version key. Sau warm-up, dynamic problem/source vẫn nằm sau
   breakpoint nên request cùng subject × mode tiếp tục dùng chung cache key.
+- Contract hình lời giải `solution-figure-<subject>-v2-visual-only` với schema
+  `solution-figure-schema-v2-visual-only` và refinement solution version mới là
+  `NEW_STABLE_PREFIX_WARMUP`: prompt/schema bytes đổi nên không tái sử dụng cache
+  key cũ. Dữ liệu `problem`, `solution`, source và ảnh candidate vẫn đứng sau
+  breakpoint; sau warm-up, các request cùng subject × mode tiếp tục dùng chung
+  stable prefix. Không đổi namespace, breakpoint, retention hoặc thứ tự request.
 - Invariant cùng độ dài render cho một đơn vị ngữ nghĩa trên hai trục Descartes
   chỉ đổi stable prompt Toán của các mode semantic Quiz/StemFigure, không đổi
   schema, tool, thứ tự request hay breakpoint. Đây là `NEW_STABLE_PREFIX_WARMUP`:
@@ -338,7 +416,18 @@ Provider operations rules:
 Rules:
 
 - API tạo job nên trả `202 Accepted` hoặc response có `jobId` khi xử lý lâu.
-- UI phải poll/refetch hoặc nhận realtime status nếu flow cần.
+- UI phải nhận realtime status nếu flow cần phản hồi nhanh, đồng thời giữ
+  REST/refetch làm snapshot authoritative và polling fallback có giới hạn.
+- Với Admin lesson detail `M9.33`, một socket dùng chung nhận event job versioned;
+  connected chỉ reconcile job/figure/document mỗi 60 giây, usage mỗi 15 giây.
+  Disconnected fallback về 3 giây cho job/figure và 5 giây cho document; terminal
+  event debounce ngắn rồi invalidate đúng resource. Reconnect/subscribe phải
+  refetch snapshot để bù Pub/Sub at-most-once.
+- Admin enrollment clone nhận event `PERSONAL_LEARNING_PATH_CLONE` qua user room;
+  connected reconcile mỗi 60 giây, disconnected fallback polling mỗi 4 giây.
+- Theo dõi `realtime_connection_count`, connect/auth/subscribe failure,
+  event publish/receive latency, reconnect count và fallback-poll request rate;
+  cảnh báo khi fallback tăng kéo dài hoặc subscriber Redis mất kết nối.
 - Job phải idempotent khi có thể.
 - Job status phải đủ để UI hiển thị pending/success/error/retry.
 - Không để worker lỗi âm thầm; lỗi phải lưu log/status phù hợp.
@@ -389,6 +478,10 @@ AI là phần dễ tạo độ trễ và chi phí cao, nên Codex phải:
   điều khiển, delimiter/môi trường LaTeX và chuẩn hóa đoạn kết luận an toàn
   thuộc normalizer/backend. Không lặp các vòng rà cơ học này trong system prompt
   hoặc schema description vì chúng tăng input/reasoning mà không tăng coverage.
+- Không đặt acceptance theo giả định một model chi phí thấp như Luna phải đúng
+  100% ở từng lượt. Theo dõi quality theo rubric và tần suất lỗi trên nhiều mẫu;
+  phân biệt lỗi contract lặp lại với biến thiên nhỏ của một output đơn lẻ trước
+  khi tăng prompt, thêm retry hoặc kết luận regression.
 - Có fallback/error state thân thiện khi provider chậm/lỗi.
 - Ghi log usage/duration khi module AI log đã có; mỗi provider attempt snapshot
   cả Reasoning Effort đã resolve và mã tác vụ theo mục đích nghiệp vụ để so sánh
@@ -416,13 +509,13 @@ AI là phần dễ tạo độ trễ và chi phí cao, nên Codex phải:
 - Quy ước góc ba điểm `\widehat{ABC}` và contract cú pháp toán cơ học đổi stable
   prompt/schema của Summary, Video Summary, Quiz, Flashcard, Test cùng nhánh
   solution refinement/regeneration. Summary hiện dùng
-  `lesson-summary-math-v45-math-syntax-contract`, Video Summary dùng
-  `video-summary-v10-bidirectional-chapter-contract`,
-  `flashcard_math_v8_angle_notation` và `lesson-content-math-v14-angle-notation`.
+  `lesson-summary-math-v46-local-quality-pass`, Video Summary dùng
+  `video-summary-v12-schema-root-dedup`,
+  `flashcard_math_v14-quiz-style-solutions` và `lesson-content-math-v14-angle-notation`.
   Schema tương ứng phải bump để không tái sử dụng contract cũ; Video Summary dùng
-  schema `8`, Quiz dùng `quiz-pdf-figure-schema-v39-math-syntax-contract`,
-  Flashcard dùng `flashcard_v7_math_syntax_contract`, Test dùng
-  `lesson-content-subject-schema-v7-math-syntax-contract`. Refinement/regeneration
+  schema `9`, Quiz/Test dùng chung
+  `quiz-pdf-figure-schema-v41-no-self-audit`, Flashcard dùng
+  `flashcard_v13-quiz-style-solutions`. Refinement/regeneration
   dùng prompt `v6`/`v3` (candidate bị loại `v4`) và schema `v4`/`v2`. Đây là
   `NEW_STABLE_PREFIX_WARMUP`: prefix/key cũ không được tái sử dụng cho version
   mới; sau warm-up, dữ liệu lesson/PDF động vẫn nằm sau breakpoint nên các
@@ -506,11 +599,38 @@ AI là phần dễ tạo độ trễ và chi phí cao, nên Codex phải:
   chuyển sang terminal phải refetch một lần để chốt số tiền. Modal chi tiết usage
   chỉ polling khi đang mở, query theo `aiGenerationId`, phân trang và dùng aggregate
   server-side thay vì tải toàn bộ event về client để cộng.
-- Khi test runtime với provider trả phí, ưu tiên cache/sample trước; forced/full run phải có ước tính usage/chi phí và xác nhận rõ của owner trước khi chạy.
+- Khi owner yêu cầu test live với provider trả phí, yêu cầu đó đã là phê duyệt chi
+  phí. Codex lập live acceptance matrix và chọn bộ case cần thiết đủ bao
+  phủ các trường hợp chính, rủi ro quan trọng của contract bị ảnh hưởng.
+  Không cần chạy mọi tổ hợp; có thể gộp case tương đương khi nêu rõ
+  lý do coverage. Không chọn cache/sample hay phạm vi nhỏ nhất theo chi phí
+  để loại case chính. Codex ước tính usage/chi phí cho bộ coverage, chỉ tối
+  ưu sau khi coverage đã đủ và không xin xác nhận lần hai. Forced/full run
+  vẫn tuân budget guard; nếu guard chặn case cần thiết, báo `Not run` và
+  không kết luận pass.
 - Video Summary không cắt transcript im lặng. Preflight so input estimate với
   limit route/model, trả lỗi thân thiện trước reservation/provider call nếu vượt;
   log source cue/chapter count, input/output token, latency, schema failure và
   stale-source rejection nhưng không log raw transcript/prompt/output.
+- Admin Chat simulation `M9.34` phải giữ đúng performance envelope của Student
+  Chat vì chạy chung runtime. Session/message list dùng cursor pagination; không
+  tải toàn lịch sử hoặc toàn request trace khi mở màn.
+- Tổng chi phí phiên do backend aggregate trực tiếp trên provider usage của các
+  response/title generation thuộc session, không cộng từ page message đang tải ở
+  client. Message list lấy cost/TTFT/response latency bằng relation select trong
+  cùng query path và SSE `completed` trả cùng shape; không gọi trace riêng theo
+  từng card và không tạo N+1 request.
+- Inspector từng lượt lazy-load theo `assistantMessageId`; query dùng unique
+  turn trace + `aiGenerationId` để aggregate usage, không N+1 theo message và
+  không scan event của các turn khác. Trace không nhúng binary/base64 hoặc signed
+  URL; image preview được resolve có quyền khi admin thực sự mở phần ảnh.
+- Thay đổi cấu hình phiên/default không restart stream đang chạy. UI snapshot
+  effective config trước send, khóa đúng action gửi của phiên đó và refetch config
+  sau optimistic conflict; các phiên khác vẫn tương tác độc lập.
+- Đo riêng `time_to_first_token_ms`, total provider latency, end-to-end turn
+  duration, số chunk/history/image đưa vào request, token/cost aggregate và trạng
+  thái reconnect/refusal/failure. Không ghi raw prompt/context vào application log;
+  exact sanitized trace chỉ nằm trong bảng Admin simulation có RBAC.
 
 ---
 
@@ -524,6 +644,9 @@ Khi hạ tầng logging/monitoring được triển khai, cần có:
 - Job duration, retry count, failed reason.
 - AI provider latency, request ID, response status, incomplete/refusal reason và
   token/usage kể cả khi structured output không dùng được.
+- Với Admin Chat simulation, thêm metric theo turn cho time-to-first-token,
+  end-to-end duration, effective model/config version và số provider attempt;
+  dashboard/log chỉ giữ ID/hash/size, còn exact input đọc qua inspector RBAC.
 - Payment webhook verify/idempotency logs.
 - Basic health check cho API/worker/Redis.
 

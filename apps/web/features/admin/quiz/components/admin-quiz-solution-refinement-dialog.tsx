@@ -32,7 +32,7 @@ type RequestPreviewTab = "system" | "user" | "input";
 
 const REQUEST_PREVIEW_TABS: Array<{ value: RequestPreviewTab; label: string }> = [
   { value: "system", label: "Quy tắc hệ thống" },
-  { value: "user", label: "Dữ liệu câu Quiz" },
+  { value: "user", label: "Dữ liệu câu hỏi" },
   { value: "input", label: "Request OpenAI" },
 ];
 
@@ -88,6 +88,7 @@ export function AdminQuizSolutionRefinementDialog({
     jobQuery.data?.status === "QUEUED" || jobQuery.data?.status === "RUNNING";
   const isBusy = isQueuePending || isJobActive;
   const isPreviewStale = previewInputKey !== currentInputKey;
+  const assessmentLabel = assessmentKind === "test" ? "Test" : "Quiz";
 
   const closeDialog = useCallback(() => {
     previewRequestSequenceRef.current += 1;
@@ -138,15 +139,15 @@ export function AdminQuizSolutionRefinementDialog({
       void invalidateQuestion();
       toast.success(
         mode === "REFINE"
-          ? "Đã tinh chỉnh lời giải bằng AI. Câu Quiz cần được duyệt lại."
-          : "Đã tạo lại đáp án, gợi ý và lời giải. Câu Quiz cần được duyệt lại.",
+          ? `Đã tinh chỉnh lời giải bằng AI. Câu ${assessmentLabel} cần được duyệt lại.`
+          : `Đã tạo lại đáp án, gợi ý và lời giải. Câu ${assessmentLabel} cần được duyệt lại.`,
       );
       closeDialog();
     } else if (job.status === "FAILED" || job.status === "CANCELLED") {
       handledJobIdRef.current = job.jobId;
       toast.error(job.error || "Không thể hoàn tất tinh chỉnh lời giải bằng AI.");
     }
-  }, [closeDialog, invalidateQuestion, jobQuery.data, mode]);
+  }, [assessmentLabel, closeDialog, invalidateQuestion, jobQuery.data, mode]);
 
   async function execute(values: AdminQuizSolutionRefinementFormValues) {
     if (!preview || isPreviewStale) return;
@@ -253,7 +254,7 @@ export function AdminQuizSolutionRefinementDialog({
               </h3>
               <div className="mt-3 overflow-hidden rounded-xl border border-[var(--theme-border)] bg-white p-3">
                 <Image
-                  alt="Hình đề Quiz gửi kèm OpenAI"
+                  alt={`Hình đề ${assessmentLabel} gửi kèm OpenAI`}
                   className="mx-auto max-h-80 w-auto object-contain"
                   height={800}
                   src={preview.questionImageDataUrl}

@@ -9,6 +9,7 @@ import {
 } from "@/features/admin/quiz/api/admin-quiz-api";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 import { adminAssessmentQueryKeys } from "@/features/admin/assessments/hooks/use-admin-assessment";
+import { useAuthenticatedRealtime } from "@/components/common/realtime/authenticated-realtime-provider";
 
 export function useAdminQuizSolutionRefinement(
   setId: string,
@@ -69,6 +70,7 @@ export function useAdminQuizSolutionRefinement(
 
 export function useAdminQuizSolutionRefinementJob(jobId: string | null) {
   const session = useAuthSessionStore((state) => state.session);
+  const { status: realtimeStatus } = useAuthenticatedRealtime();
   return useQuery({
     queryKey: ["admin", "quiz", "solution-refinement-job", jobId ?? "idle"],
     queryFn: () =>
@@ -77,7 +79,11 @@ export function useAdminQuizSolutionRefinementJob(jobId: string | null) {
     refetchOnWindowFocus: false,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      return status === "QUEUED" || status === "RUNNING" ? 1_500 : false;
+      return status === "QUEUED" || status === "RUNNING"
+        ? realtimeStatus === "connected"
+          ? 60_000
+          : 3_000
+        : false;
     },
     staleTime: 0,
   });

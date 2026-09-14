@@ -24,6 +24,32 @@ test("lets KaTeX inherit the weight of bold Math, Physics, and Chemistry heading
   );
 });
 
+test("matches an ordered-list marker to a leading bold title", async ({ page }) => {
+  await page.setContent(`
+    <style>${rendererStyles}</style>
+    <main class="mmd-content">
+      <ol>
+        <li data-testid="tight-bold-item"><strong>Đa giác đều</strong></li>
+        <li data-testid="loose-bold-item"><div><strong>Phép quay</strong></div></li>
+        <li data-testid="regular-item">Bước giải thông thường</li>
+      </ol>
+    </main>
+  `);
+
+  const weights = await page.locator("li").evaluateAll((items) =>
+    items.map((item) => ({
+      marker: getComputedStyle(item, "::marker").fontWeight,
+      text: getComputedStyle(item).fontWeight,
+    })),
+  );
+
+  expect(weights).toEqual([
+    { marker: "800", text: "400" },
+    { marker: "800", text: "400" },
+    { marker: "400", text: "400" },
+  ]);
+});
+
 test("keeps a wide display formula readable and scrolls only its local block", async ({
   page,
 }) => {

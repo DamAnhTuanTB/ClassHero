@@ -10,6 +10,7 @@ import {
   Bot,
   FileText,
   Layers3,
+  MessageCircleMore,
   Pencil,
   Trash2,
   Users,
@@ -56,6 +57,7 @@ const adminNavItems: AdminCoursesSidebarItem[] = [
   { label: "Khóa học", icon: Layers3, active: true },
   { label: "Buổi học", icon: BookOpen, active: false },
   { label: "Tài liệu", icon: FileText, active: false },
+  { label: "Chat với AI", icon: MessageCircleMore, active: false, href: "/admin/ai-chat" },
   { label: "Cài đặt AI", icon: Bot, active: false, href: "/admin/ai-settings" },
 ];
 
