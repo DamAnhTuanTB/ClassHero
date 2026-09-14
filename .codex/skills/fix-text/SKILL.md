@@ -208,7 +208,7 @@ Verification must compare effective serialized requests for at least two differe
 - the same static contract resolves to the same cache key, while a changed static prompt/schema/version resolves to a different key when keying is enabled;
 - unrelated prompt/schema ordering and cache settings are unchanged.
 
-Local tests can prove composition and key stability, not a provider cache hit. Use stored `cachedInputTokens`, `cacheWriteInputTokens`, cache-hit ratio, or the OpenAI Prompt Caching dashboard for post-deploy evidence; do not call a paid provider merely to prove this gate without owner approval.
+Local tests can prove composition and key stability, not a provider cache hit. Use stored `cachedInputTokens`, `cacheWriteInputTokens`, cache-hit ratio, or the OpenAI Prompt Caching dashboard for post-deploy evidence; call a paid provider only when the owner explicitly requests a live test. That request is sufficient approval. Choose the necessary affected stable-prefix/cache-contract cases that collectively cover the main cache behaviors and risks in the applicability matrix; when cache behavior itself is under acceptance, run the request sequence required to prove the selected case. Equivalent cells may share one case when the reason is documented. Do not choose only the cheapest prefix or use a cache-only observation for a case whose acceptance requires a live provider.
 
 ## Reusable Learning-Text Invariants
 
@@ -241,7 +241,7 @@ Always include a counterexample in the design or tests. For example, “concise�
 7. Update `docs/06-ai-rag-spec.md` and relevant M9 implementation docs when AI text behavior changes. Update API/database docs only for a real contract or persistence change. Add a reusable learning note when warranted. Do not update changelog outside `/commit`.
 8. Run focused prompt/schema/mapper tests first, then formatter/static checks and API/web typechecks as relevant. Run broader checks when shared schemas, workers, renderers, or cross-feature prompt architecture changed.
 
-Do not call a paid AI provider by default. Use local prompt/schema tests and fixtures. Before a live provider regression, state sample size and estimated cost, then wait for explicit owner approval.
+Do not call a paid AI provider by default. Use local prompt/schema tests and fixtures. When the owner requests a live provider regression, treat that request as cost approval, derive the main scenarios and important risks from the `APPLY` and `ADAPT` cells, then choose the necessary representative feature × subject × subject domain × content role × variant cases whose combined coverage is sufficient. Do not run every Cartesian combination when equivalent cases can be grouped, but document the coverage reason. Estimate the budget for that coverage set and optimize cost only after coverage is sufficient; never drop a main scenario merely to make the run cheaper. Run without waiting for a second confirmation. If a budget guard prevents required coverage, report the remaining cases as `Not run` and do not claim the live regression passed. Report actual usage and estimated cost afterward when available.
 
 If worker-loaded prompts or `apps/api/src/workers/*` changed, restart or clearly provide the command to restart `pnpm dev`. Explain that already generated or cached content retains its old output until it is regenerated, refreshed, or marked stale according to the existing contract.
 

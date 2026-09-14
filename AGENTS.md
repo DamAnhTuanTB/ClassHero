@@ -55,11 +55,27 @@ ghi trong docs.
 
 ### Provider trả phí
 
-- Ưu tiên cache, mock, test local và sample nhỏ.
-- Trước forced/full run có thể tốn tiền, báo phạm vi và ước tính chi phí cụ thể rồi
-  chờ owner xác nhận; không chạy lại nếu cache/artifact hợp lệ đã đủ kiểm chứng.
-- Final phải nói rõ gọi provider thật hay cache, số lượng xử lý và usage/chi phí
-  ước tính nếu biết.
+- Mặc định ưu tiên cache, mock và test local để ổn định harness,
+  deterministic gate và các nhánh không phụ thuộc provider thật.
+- Chỉ gọi provider thật khi owner yêu cầu test live. Yêu cầu đó đồng thời là phê
+  duyệt chi phí. Trước khi chạy, Codex phải lập live acceptance matrix từ
+  contract bị ảnh hưởng và chọn bộ case cần thiết đủ bao phủ các trường
+  hợp chính cùng rủi ro quan trọng theo feature, subject, mode, role, state,
+  input family, provider/model và fallback khi các trục đó thực sự áp dụng.
+  Không cần chạy tích Descartes của mọi biến thể; các case tương đương
+  có thể gộp khi nêu được lý do chúng cùng contract serialize và hành vi
+  provider.
+- Coverage là mục tiêu nghiệm thu; không chọn sample rẻ nhất hoặc phạm vi nhỏ
+  nhất làm tiêu chí cắt case chính hoặc rủi ro quan trọng. Codex tự ước tính
+  chi phí cho bộ coverage đã xác định và chạy ngay không xin xác nhận lần
+  hai; chỉ tối ưu token, kích thước input và call trùng sau khi coverage đã đủ.
+- Mọi run vẫn phải tuân budget guard. Nếu guard không đủ cho bộ case cần
+  thiết, dừng trước khi vượt giới hạn, liệt kê các case `Not run` và không
+  báo live test pass. Cache/artifact chỉ thay thế được khi chính case đang kiểm
+  cache/reuse hoặc phần provider không đổi; không thay thế bằng chứng live của
+  provider.
+- Final phải báo matrix case `Pass/Fail/Not run`, provider thật hay cache cho
+  từng nhóm, số lượng xử lý và usage/chi phí thực tế hoặc ước tính.
 
 ### Worker
 

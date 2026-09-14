@@ -189,9 +189,14 @@ Giữ chất lượng bằng gate theo tầng thay vì lặp full suite sau mỗ
    chạy ở completion gate sau khi các batch đã hội tụ. Không chạy full build lặp
    lại ở từng handoff trừ khi batch có rủi ro build-only cụ thể.
 
-Ưu tiên cache và deterministic local test. Paid-provider/live smoke chỉ chạy sau
-khi deterministic gate pass, với sample nhỏ nhất đã được owner cho phép; không
-gọi lại nếu artifact/cache hợp lệ đã đủ chứng minh phần code không đổi.
+Ưu tiên cache và deterministic local test để ổn định harness trước.
+Paid-provider/live smoke chỉ chạy sau khi deterministic gate pass; khi owner
+yêu cầu live test, coordinator phải chọn bộ case cần thiết đủ bao phủ các
+trường hợp chính và rủi ro quan trọng trong live acceptance matrix, không
+chọn sample nhỏ nhất theo chi phí. Có thể gộp case tương đương khi ghi rõ lý
+do coverage. Artifact/cache chỉ thay thế được case cache/reuse hoặc phần
+provider không đổi. Nếu budget guard chặn case cần thiết, ghi `Not run` và
+không báo completion gate pass.
 
 Batch có migration, security, data integrity hoặc API contract khó có thể được
 `REVIEWER` review sớm ngay khi ổn định, song song với implementation độc lập khác.
